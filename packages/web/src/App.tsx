@@ -1,8 +1,19 @@
+import { Route, Routes } from "react-router-dom";
+
+import { AppShell } from "./components/AppShell";
+import { DraftsPage } from "./routes/DraftsPage";
+
 export function App(): JSX.Element {
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold">Pencraft</h1>
-      <p className="text-slate-400 mt-2">Scaffold ready. App shell lands in PR9.</p>
-    </div>
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<DraftsPage />} />
+        <Route path="/drafts/:id" element={<DraftPlaceholder />} />
+      </Route>
+    </Routes>
   );
+}
+
+function DraftPlaceholder(): JSX.Element {
+  return <div className="text-slate-400">Draft page lands in Task 10.</div>;
 }
