@@ -9,6 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from myvoice import PackStore
 
 from pencraft import __version__
 from pencraft.drafts import DraftStore
@@ -34,10 +35,27 @@ def _resolve_drafts_root() -> Path:
     return Path.home() / ".pencraft" / "drafts"
 
 
+def _resolve_pack_roots() -> list[Path]:
+    """Same resolution as myvoice: env override > ~/.myvoice/packs > repo packs/."""
+    env = os.environ.get("MYVOICE_PACKS_ROOT")
+    if env:
+        return [Path(env)]
+    user_root = Path.home() / ".myvoice" / "packs"
+    if user_root.is_dir():
+        return [user_root]
+    # Dev fallback: sibling myvoice repo
+    repo_packs = Path(__file__).resolve().parents[3].parent / "myvoice" / "packs"
+    if repo_packs.is_dir():
+        return [repo_packs]
+    return []
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     drafts_root = _resolve_drafts_root()
     app.state.draft_store = DraftStore(drafts_root)
+    pack_roots = _resolve_pack_roots()
+    app.state.pack_store = PackStore(pack_roots)
     yield
 
 
@@ -46,8 +64,12 @@ def create_app() -> FastAPI:
     app = FastAPI(title="pencraft", version=__version__, lifespan=_lifespan)
 
     from pencraft.api.drafts import router as drafts_router
+    from pencraft.api.packs import router as packs_router
+    from pencraft.api.providers import router as providers_router
 
     app.include_router(drafts_router)
+    app.include_router(packs_router)
+    app.include_router(providers_router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

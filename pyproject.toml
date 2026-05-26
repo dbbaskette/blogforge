@@ -62,6 +62,10 @@ python_version = "3.11"
 mypy_path = "packages/api"
 explicit_package_bases = true
 
+[[tool.mypy.overrides]]
+module = "myvoice.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["packages/api/tests"]
 asyncio_mode = "auto"
