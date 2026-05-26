@@ -17,6 +17,9 @@ dist/
 node_modules/
 packages/web/dist/
 packages/api/pencraft/static/
+*.tsbuildinfo
+packages/web/vite.config.js
+packages/web/vite.config.d.ts
 
 # uv
 .uv/

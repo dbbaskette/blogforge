@@ -18,6 +18,16 @@ Three stages per draft:
 
 Drafts persist to `~/.pencraft/drafts/`. Resume any time.
 
+## Quick start
+
+1. Install myvoice and add an API key (`pipx install myvoice && myvoice serve` → Settings).
+2. Install Pencraft: `pipx install pencraft`.
+3. Run `pencraft serve`. Browser opens at `localhost:7880`.
+4. Click "+ New draft", fill in a topic, pick a voice pack, generate outline, expand sections.
+5. Download the `.md` when you're happy.
+
+![3-stage flow](docs/screenshots/pencraft-flow.png)
+
 ## Install
 
 ```bash

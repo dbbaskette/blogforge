@@ -1,0 +1,17 @@
+You are writing section {{ position }} of a blog post titled "{{ title }}".
+
+Full outline (current section marked **bold**):
+{{ outline_md }}
+
+Opening hook of the post: {{ opening_hook }}
+
+This section's title: {{ section_title }}
+This section's brief: {{ section_brief }}
+Target length: ~{{ target_section_words }} words.
+
+Write the section as flowing markdown prose. Do NOT include the section title as a heading; the renderer adds it.
+{% if is_first %}This is the OPENING section — establish the conflict/question/surprise.
+{% elif is_last %}This is the CLOSING section — land the argument; the brief above tells you the closing beat.
+{% else %}Open and close mid-thought; flow into the next section.
+{% endif %}
+Use the author's voice. Banished words/phrases never appear.

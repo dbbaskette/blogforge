@@ -1,0 +1,31 @@
+name: api-tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pencraft
+        uses: actions/checkout@v4
+        with:
+          path: pencraft
+      - name: Checkout myvoice (sibling — referenced via [tool.uv.sources])
+        uses: actions/checkout@v4
+        with:
+          repository: dbbaskette/myvoice
+          path: myvoice
+      - uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        working-directory: pencraft
+        run: uv python install 3.11
+      - name: Sync deps (resolves myvoice from ../myvoice via tool.uv.sources)
+        working-directory: pencraft
+        run: uv sync
+      - name: Pytest
+        working-directory: pencraft
+        run: uv run pytest packages/api/tests -q
+      - name: Ruff
+        working-directory: pencraft
+        run: uv run ruff check packages/api
+      - name: Mypy
+        working-directory: pencraft
+        run: uv run mypy packages/api
