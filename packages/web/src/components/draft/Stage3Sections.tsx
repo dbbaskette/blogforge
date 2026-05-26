@@ -11,6 +11,7 @@ interface Stage3SectionsProps {
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onRegenerateSection: (sectionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
+  onJobComplete?: () => void;
 }
 
 export function Stage3Sections({
@@ -19,6 +20,7 @@ export function Stage3Sections({
   onSectionSave,
   onRegenerateSection,
   onReorder,
+  onJobComplete,
 }: Stage3SectionsProps): JSX.Element {
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [lintOpen, setLintOpen] = useState(false);
@@ -46,12 +48,15 @@ export function Stage3Sections({
       },
       onComplete: () => {
         setGeneratingIds(new Set());
+        onJobComplete?.();
       },
       onError: () => {
         setGeneratingIds(new Set());
       },
     }),
-    [],
+    // onJobComplete is stable (useCallback in DraftPage), so including it is safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onJobComplete],
   );
 
   // Stable proxy so useExpandJob's dependency on `handlers` stays constant.

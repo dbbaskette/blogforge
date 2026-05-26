@@ -57,6 +57,13 @@ export function DraftPage(): JSX.Element {
     setJobId(job_id);
   }, [id, draft]);
 
+  const onJobComplete = useCallback(() => {
+    if (!id) return;
+    getDraft(id)
+      .then(setDraft)
+      .catch(() => {});
+  }, [id]);
+
   const onGoTo = useCallback(
     (stage: DraftStage) => {
       if (!draft) return;
@@ -99,6 +106,7 @@ export function DraftPage(): JSX.Element {
             setJobId(job_id);
           }}
           onReorder={async (ids) => setDraft(await reorderSections(id, ids))}
+          onJobComplete={onJobComplete}
         />
       )}
     </div>
