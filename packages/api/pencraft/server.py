@@ -13,6 +13,7 @@ from myvoice import PackStore
 
 from pencraft import __version__
 from pencraft.drafts import DraftStore
+from pencraft.jobs.registry import JobRegistry
 
 
 def _default_static_dir() -> Path:
@@ -56,6 +57,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.draft_store = DraftStore(drafts_root)
     pack_roots = _resolve_pack_roots()
     app.state.pack_store = PackStore(pack_roots)
+    app.state.job_registry = JobRegistry()
     yield
 
 
@@ -64,14 +66,20 @@ def create_app() -> FastAPI:
     app = FastAPI(title="pencraft", version=__version__, lifespan=_lifespan)
 
     from pencraft.api.drafts import router as drafts_router
+    from pencraft.api.expand import router as expand_router
+    from pencraft.api.jobs import router as jobs_router
     from pencraft.api.outline import router as outline_router
     from pencraft.api.packs import router as packs_router
     from pencraft.api.providers import router as providers_router
+    from pencraft.api.section import router as section_router
 
     app.include_router(drafts_router)
     app.include_router(outline_router)
     app.include_router(packs_router)
     app.include_router(providers_router)
+    app.include_router(expand_router)
+    app.include_router(section_router)
+    app.include_router(jobs_router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

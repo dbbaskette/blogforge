@@ -1,0 +1,164 @@
+"""POST /api/drafts/{id}/expand — async pipeline expanding all sections."""
+from __future__ import annotations
+
+import asyncio
+import time
+from datetime import UTC, datetime
+from typing import Any
+
+import yaml
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+
+from pencraft.api.outline import _read_myvoice_key
+from pencraft.drafts import DraftStore
+from pencraft.generate.section import stream_section
+from pencraft.jobs.models import JobType
+from pencraft.jobs.registry import JobRegistry
+from pencraft.llm.exceptions import ProviderError, ProviderMissingKey
+from pencraft.llm.registry import get_provider
+
+router = APIRouter(tags=["expand"])
+
+_CONCURRENCY = 2
+
+
+@router.post("/api/drafts/{draft_id}/expand", status_code=202)
+async def expand_draft(
+    draft_id: str, request: Request, background_tasks: BackgroundTasks,
+) -> dict[str, str]:
+    store: DraftStore = request.app.state.draft_store
+    pack_store = request.app.state.pack_store
+    reg: JobRegistry = request.app.state.job_registry
+
+    draft = store.get(draft_id)
+    if draft is None:
+        raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
+    if draft.outline is None or not draft.sections:
+        raise HTTPException(
+            409,
+            detail={
+                "error": {
+                    "code": "invalid_stage",
+                    "message": "Outline must exist before expanding.",
+                }
+            },
+        )
+
+    pack_info = pack_store.get(draft.idea.pack_slug)
+    if pack_info is None:
+        raise HTTPException(
+            404,
+            detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
+        )
+
+    api_key = _read_myvoice_key(draft.idea.provider)
+    if not api_key:
+        raise HTTPException(
+            400,
+            detail={
+                "error": {
+                    "code": "provider_missing_key",
+                    "message": f"No API key for {draft.idea.provider}",
+                    "hint": "Add the key in myvoice Settings.",
+                }
+            },
+        )
+
+    job = await reg.create(JobType.EXPAND)
+    background_tasks.add_task(
+        _run_expand,
+        reg,
+        store,
+        job.id,
+        draft_id,
+        pack_info,
+        draft.idea.provider,
+        api_key,
+        draft.idea.model,
+    )
+    return {"job_id": job.id}
+
+
+async def _run_expand(
+    reg: JobRegistry,
+    store: DraftStore,
+    job_id: str,
+    draft_id: str,
+    pack_info: Any,
+    provider_name: str,
+    api_key: str,
+    model: str,
+) -> None:
+    cancel_evt = reg.cancellation_event(job_id)
+    started = time.monotonic()
+    try:
+        draft = store.get(draft_id)
+        if draft is None:
+            await reg.fail(job_id, "draft_not_found", f"Draft {draft_id} gone")
+            return
+
+        manifest = yaml.safe_load(
+            (pack_info.root_path / "stylepack.yaml").read_text(encoding="utf-8")
+        ) or {}
+        provider = get_provider(provider_name, api_key)
+        semaphore = asyncio.Semaphore(_CONCURRENCY)
+
+        async def expand_one(idx: int) -> None:
+            section = draft.sections[idx]
+            if cancel_evt.is_set():
+                return
+            if section.status in ("ready", "edited"):
+                return
+            async with semaphore:
+                if cancel_evt.is_set():
+                    return
+                section.status = "generating"
+                store.update(draft.id, draft)
+                await reg.set_stage(job_id, f"section:start:{section.id}")
+                buf = ""
+                try:
+                    async for chunk in stream_section(
+                        draft, section, pack_info.root_path, manifest, provider, model=model
+                    ):
+                        if cancel_evt.is_set():
+                            section.status = "failed"
+                            store.update(draft.id, draft)
+                            return
+                        if chunk.delta:
+                            buf += chunk.delta
+                except ProviderMissingKey as e:
+                    section.status = "failed"
+                    store.update(draft.id, draft)
+                    await reg.fail(job_id, e.code, e.message, e.hint)
+                    return
+                except ProviderError as e:
+                    section.status = "failed"
+                    store.update(draft.id, draft)
+                    await reg.fail(job_id, e.code, e.message, e.hint)
+                    return
+                section.content_md = buf.strip() + "\n"
+                section.word_count = len(buf.split())
+                section.status = "ready"
+                section.last_generated_at = datetime.now(UTC)
+                store.update(draft.id, draft)
+                await reg.set_stage(job_id, f"section:done:{section.id}")
+
+        targets = [i for i, s in enumerate(draft.sections) if s.status not in ("ready", "edited")]
+        await asyncio.gather(*[expand_one(i) for i in targets])
+        if cancel_evt.is_set():
+            return
+        # Persist final stage
+        draft.stage = "sections"
+        store.update(draft.id, draft)
+        elapsed = time.monotonic() - started
+        await reg.complete(
+            job_id,
+            {
+                "draft_id": draft.id,
+                "sections_done": sum(1 for s in draft.sections if s.status == "ready"),
+                "sections_failed": sum(1 for s in draft.sections if s.status == "failed"),
+                "elapsed_seconds": elapsed,
+            },
+        )
+    except Exception as e:
+        await reg.fail(job_id, "internal_error", f"Unexpected: {e}")
