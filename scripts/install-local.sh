@@ -2,18 +2,40 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Build the wheel (includes bundled frontend)
+REPO_ROOT="$(pwd)"
+MYVOICE_PATH="${MYVOICE_PATH:-$REPO_ROOT/../myvoice}"
+
+if [ ! -d "$MYVOICE_PATH" ]; then
+  echo "error: myvoice not found at $MYVOICE_PATH"
+  echo "set MYVOICE_PATH to the myvoice repo root, e.g.:"
+  echo "  MYVOICE_PATH=/path/to/myvoice ./scripts/install-local.sh"
+  exit 1
+fi
+
+# Build wheel (includes bundled frontend)
+echo "==> Building frontend"
 rm -rf packages/api/pencraft/static
-cd packages/web && pnpm install && pnpm build
-cd ../..
+(cd packages/web && pnpm install && pnpm build)
 mkdir -p packages/api/pencraft/static
 cp -R packages/web/dist/* packages/api/pencraft/static/
+
+echo "==> Building wheel"
+rm -rf dist
 uv build
 
-# Install into an isolated venv
+# Fresh venv
+echo "==> Creating venv at local-venv/"
 rm -rf local-venv
 uv venv local-venv --python 3.11
-local-venv/bin/python -m pip install dist/pencraft-*.whl
+
+# Install myvoice editable first (not on PyPI yet) then the pencraft wheel.
+# Using `uv pip install --python` avoids needing pip inside the venv.
+echo "==> Installing myvoice from $MYVOICE_PATH"
+uv pip install --python local-venv/bin/python -e "$MYVOICE_PATH"
+
+echo "==> Installing pencraft wheel"
+WHEEL=$(ls -1 dist/pencraft-*.whl | head -1)
+uv pip install --python local-venv/bin/python "$WHEEL"
 
 echo
 echo "Installed. Run with: ./scripts/run-local.sh"
