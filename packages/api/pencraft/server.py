@@ -64,10 +64,12 @@ def create_app() -> FastAPI:
     app = FastAPI(title="pencraft", version=__version__, lifespan=_lifespan)
 
     from pencraft.api.drafts import router as drafts_router
+    from pencraft.api.outline import router as outline_router
     from pencraft.api.packs import router as packs_router
     from pencraft.api.providers import router as providers_router
 
     app.include_router(drafts_router)
+    app.include_router(outline_router)
     app.include_router(packs_router)
     app.include_router(providers_router)
 
