@@ -26,8 +26,12 @@ def list_drafts(request: Request) -> list[DraftSummary]:
 
 
 @router.post("", status_code=201)
-def create_draft(idea: IdeaInput, request: Request) -> Draft:
-    return _store(request).create(idea)
+async def create_draft(idea: IdeaInput, request: Request) -> Draft:
+    draft = _store(request).create(idea)
+    await request.app.state.event_bus.emit(
+        {"type": "draft:created", "id": draft.id, "title": draft.title}
+    )
+    return draft
 
 
 @router.get("/{draft_id}")
@@ -39,16 +43,24 @@ def get_draft(draft_id: str, request: Request) -> Draft:
 
 
 @router.put("/{draft_id}")
-def update_draft(draft_id: str, draft: Draft, request: Request) -> Draft:
+async def update_draft(draft_id: str, draft: Draft, request: Request) -> Draft:
     store = _store(request)
     if store.get(draft_id) is None:
         raise _not_found(draft_id)
-    return store.update(draft_id, draft)
+    updated = store.update(draft_id, draft)
+    await request.app.state.event_bus.emit(
+        {"type": "draft:updated", "id": updated.id, "title": updated.title}
+    )
+    return updated
 
 
 @router.delete("/{draft_id}", status_code=204)
-def delete_draft(draft_id: str, request: Request) -> None:
+async def delete_draft(draft_id: str, request: Request) -> None:
     store = _store(request)
-    if store.get(draft_id) is None:
+    draft = store.get(draft_id)
+    if draft is None:
         raise _not_found(draft_id)
     store.delete(draft_id)
+    await request.app.state.event_bus.emit(
+        {"type": "draft:deleted", "id": draft_id, "title": draft.title}
+    )
