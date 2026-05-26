@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/AppShell";
+import { DraftPage } from "./routes/DraftPage";
 import { DraftsPage } from "./routes/DraftsPage";
 
 export function App(): JSX.Element {
@@ -8,12 +9,8 @@ export function App(): JSX.Element {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<DraftsPage />} />
-        <Route path="/drafts/:id" element={<DraftPlaceholder />} />
+        <Route path="/drafts/:id" element={<DraftPage />} />
       </Route>
     </Routes>
   );
-}
-
-function DraftPlaceholder(): JSX.Element {
-  return <div className="text-slate-400">Draft page lands in Task 10.</div>;
 }
