@@ -59,14 +59,13 @@ from pencraft.db.engine import get_engine, get_sessionmaker  # noqa: E402
 from pencraft.db.models import User  # noqa: E402
 
 
-@pytest_asyncio.fixture
-async def authed_client():
-    """A TestClient signed in as an approved user. Yields (client, user_id)."""
+async def _seed_approved_user(email: str = "test@user.com"):
+    """Create the schema + an approved user; return its id."""
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with get_sessionmaker()() as session:
         user = User(
-            email="test@user.com",
+            email=email,
             password_hash=hash_password("x"),
             status="approved",
             role="user",
@@ -74,9 +73,21 @@ async def authed_client():
         session.add(user)
         await session.commit()
         await session.refresh(user)
-        uid = user.id
+        return user.id
 
+
+def _signed_client(uid):
+    """Build a TestClient and pre-set a signed session cookie for `uid`."""
     app = create_app()
-    with TestClient(app) as c:
-        c.cookies.set(COOKIE_NAME, SessionSigner("test-session-secret").sign(uid))
+    c = TestClient(app)
+    c.cookies.set(COOKIE_NAME, SessionSigner("test-session-secret").sign(uid))
+    return c
+
+
+@pytest_asyncio.fixture
+async def authed_client():
+    """A TestClient signed in as an approved user. Yields (client, user_id)."""
+    uid = await _seed_approved_user()
+    c = _signed_client(uid)
+    with c:
         yield c, uid

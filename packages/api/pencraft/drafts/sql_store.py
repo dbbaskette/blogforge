@@ -132,6 +132,15 @@ class SqlDraftStore:
             # Replace sections in bulk.
             await session.refresh(row, ["sections"])
             existing_by_id = {s.id: s for s in row.sections}
+
+            # Two-phase position update to avoid tripping the (draft_id, position)
+            # UNIQUE constraint when a reorder shuffles existing rows.
+            # Phase 1: bump every existing row to a guaranteed-unique negative slot.
+            for offset, er in enumerate(row.sections):
+                er.position = -(offset + 1)
+            await session.flush()
+
+            # Phase 2: assign final positions + apply field updates.
             for pos, s in enumerate(draft.sections):
                 if s.id in existing_by_id:
                     er = existing_by_id.pop(s.id)
@@ -164,6 +173,19 @@ class SqlDraftStore:
             await session.commit()
             await session.refresh(row, ["sections"])
             return _draft_from_row(row)
+
+    @staticmethod
+    def assemble_markdown(draft: Draft) -> str:
+        parts: list[str] = []
+        if draft.title:
+            parts.append(f"# {draft.title}\n")
+        if draft.outline and draft.outline.opening_hook:
+            parts.append(draft.outline.opening_hook.strip() + "\n")
+        for section in draft.sections:
+            parts.append(f"## {section.title}\n")
+            if section.content_md.strip():
+                parts.append(section.content_md.strip() + "\n")
+        return "\n".join(parts) + "\n"
 
     async def delete(self, draft_id: str, *, user_id: UUID) -> None:
         try:
