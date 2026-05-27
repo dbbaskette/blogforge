@@ -42,11 +42,33 @@ def get_draft(draft_id: str, request: Request) -> Draft:
     return draft
 
 
+_STAGE_ORDER = {"idea": 0, "outline": 1, "sections": 2}
+
+
 @router.put("/{draft_id}")
 async def update_draft(draft_id: str, draft: Draft, request: Request) -> Draft:
+    """Update a draft. Guards against client-side stale writes:
+
+    Stage 1's auto-save can race with Generate outline + Expand sections,
+    and would otherwise clobber server-side outline/sections back to empty.
+    Rules:
+      - stage never regresses (idea < outline < sections)
+      - if the body's outline is null but disk has one, keep disk's
+      - if the body's sections is empty but disk has some, keep disk's
+    The idea / title fields are always writable.
+    """
     store = _store(request)
-    if store.get(draft_id) is None:
+    existing = store.get(draft_id)
+    if existing is None:
         raise _not_found(draft_id)
+
+    if _STAGE_ORDER[draft.stage] < _STAGE_ORDER[existing.stage]:
+        draft.stage = existing.stage
+    if draft.outline is None and existing.outline is not None:
+        draft.outline = existing.outline
+    if not draft.sections and existing.sections:
+        draft.sections = existing.sections
+
     updated = store.update(draft_id, draft)
     await request.app.state.event_bus.emit(
         {"type": "draft:updated", "id": updated.id, "title": updated.title}
