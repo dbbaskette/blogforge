@@ -8,6 +8,7 @@ import {
   promoteUser,
   rejectUser,
 } from "../api/admin";
+import { ProviderKeysSection } from "../components/ProviderKeysSection";
 
 export function AdminPage(): JSX.Element {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
@@ -149,6 +150,10 @@ export function AdminPage(): JSX.Element {
           ))}
         </ul>
       </section>
+
+      <div className="mt-10">
+        <ProviderKeysSection />
+      </div>
     </div>
   );
 }

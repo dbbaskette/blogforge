@@ -52,7 +52,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
         const msg = e.message ?? String(e);
         if (msg.includes("provider_missing_key") || msg.includes("HTTP 400")) {
           setModelsError(
-            `${provider} rejected the configured key. Update it in myvoice (localhost:7878 → Settings).`,
+            `${provider} rejected the configured key. An admin can replace it under /admin (API keys section).`,
           );
         } else {
           setModelsError(`Failed to load ${provider} models: ${msg}`);
@@ -222,7 +222,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
               className="text-xs px-3 py-2 rounded-nb-sm"
               style={{ background: "#fdf6e6", color: "#8a5d18", border: "1px solid #f0d5a4" }}
             >
-              No API key for {provider}. Add one in myvoice → Settings.
+              No API key for {provider}. An admin can add one under /admin (API keys section).
             </p>
           )}
 

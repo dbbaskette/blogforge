@@ -12,6 +12,23 @@ vi.mock("../../src/api/admin", () => ({
   promoteUser: vi.fn(),
 }));
 
+// Keep the ProviderKeysSection from making a real network call in tests.
+vi.mock("../../src/api/adminKeys", () => ({
+  listProviderKeys: vi.fn().mockResolvedValue([
+    {
+      provider: "anthropic",
+      configured: false,
+      source: "none",
+      updated_at: null,
+      updated_by: null,
+    },
+    { provider: "google", configured: false, source: "none", updated_at: null, updated_by: null },
+    { provider: "openai", configured: false, source: "none", updated_at: null, updated_by: null },
+  ]),
+  setProviderKey: vi.fn(),
+  deleteProviderKey: vi.fn(),
+}));
+
 describe("AdminPage", () => {
   it("renders pending users and calls approve()", async () => {
     const adm = await import("../../src/api/admin");

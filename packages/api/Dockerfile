@@ -16,21 +16,38 @@ RUN pnpm build
 # ---- runtime stage ----
 FROM python:3.11-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (pinned via pip; smaller than the standalone installer).
 RUN pip install --no-cache-dir uv==0.5.0
 
-# Copy project metadata.
-COPY pyproject.toml uv.lock /app/
+# Pencraft's pyproject.toml has `[tool.uv.sources]` pointing myvoice at
+# ../myvoice (a sibling-repo editable install for local dev). Resolved
+# relative to /app, that's /myvoice — fetch it from GitHub so the source
+# override finds something at the expected path.
+#
+# Override the ref at build time with `--build-arg MYVOICE_REF=<sha-or-tag>`
+# for reproducible images.
+ARG MYVOICE_REF=main
+RUN git clone --depth=1 --branch "${MYVOICE_REF}" \
+        https://github.com/dbbaskette/myvoice /myvoice
+
+# Copy project metadata. README is required because pyproject.toml
+# declares `readme = "README.md"` and hatchling validates the file
+# exists at wheel-build time.
+COPY pyproject.toml uv.lock README.md /app/
 COPY packages/api /app/packages/api
 
 # Copy the built web bundle into the API's static dir.
 COPY --from=web /work/packages/web/dist /app/packages/api/pencraft/static
 
-# Install Python deps (system install — production image, no venv).
-RUN uv pip install --system --no-cache .
+# Install Python deps editable so the alembic/ + alembic.ini at the
+# source-tree's well-known paths (parents[1] of pencraft/server.py)
+# remain reachable at runtime. With a non-editable wheel install
+# `__file__` points into site-packages/ and the migrations dir lookup
+# resolves to alembic's own library directory, which crashes on boot.
+RUN uv pip install --system --no-cache -e .
 
 # Default port; override via $PORT in cloud envs.
 ENV PORT=7880

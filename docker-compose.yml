@@ -5,7 +5,9 @@ services:
       POSTGRES_USER: pencraft
       POSTGRES_PASSWORD: pencraft
       POSTGRES_DB: pencraft
-    ports: ["5432:5432"]
+    # Host-side mapped to 5433 to avoid colliding with a system Postgres on 5432.
+    # API connects via the internal docker network as `postgres:5432`, unaffected.
+    ports: ["5433:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "pencraft"]
