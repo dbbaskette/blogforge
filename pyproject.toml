@@ -23,6 +23,10 @@ dependencies = [
     "jinja2>=3.1",
     "myvoice>=0.1.0",
     "openai>=1.50",
+    # asyncpg is the async runtime driver; psycopg2-binary covers alembic
+    # migrations (env.py strips +asyncpg from the URL, so sqlalchemy
+    # reaches for psycopg2 by default).
+    "psycopg2-binary>=2.9",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "python-multipart>=0.0.12",

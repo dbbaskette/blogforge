@@ -37,7 +37,7 @@ cat <<'BANNER'
   App         http://localhost:7880
   Health      http://localhost:7880/api/health
   MinIO UI    http://localhost:9001  (login: pencraft / pencraft-minio-secret)
-  Postgres    localhost:5432         (db: pencraft, user/pass: pencraft / pencraft)
+  Postgres    localhost:5433         (db: pencraft, user/pass: pencraft / pencraft)
 
   Seeded admin
     email:    dbbaskette@gmail.com
