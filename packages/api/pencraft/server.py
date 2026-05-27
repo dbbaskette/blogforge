@@ -112,6 +112,7 @@ def create_app() -> FastAPI:
     """Build and return the FastAPI app."""
     app = FastAPI(title="pencraft", version=__version__, lifespan=_lifespan)
 
+    from pencraft.api.admin import router as admin_router
     from pencraft.api.auth import router as auth_router
     from pencraft.api.download import router as download_router
     from pencraft.api.drafts import router as drafts_router
@@ -125,6 +126,7 @@ def create_app() -> FastAPI:
     from pencraft.api.section import router as section_router
 
     app.include_router(auth_router)
+    app.include_router(admin_router)
     app.include_router(drafts_router)
     app.include_router(outline_router)
     app.include_router(packs_router)
