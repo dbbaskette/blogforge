@@ -51,3 +51,32 @@ def client() -> Iterator[TestClient]:
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client
+
+
+from pencraft.auth.passwords import hash_password  # noqa: E402
+from pencraft.auth.sessions import COOKIE_NAME, SessionSigner  # noqa: E402
+from pencraft.db.engine import get_engine, get_sessionmaker  # noqa: E402
+from pencraft.db.models import User  # noqa: E402
+
+
+@pytest_asyncio.fixture
+async def authed_client():
+    """A TestClient signed in as an approved user. Yields (client, user_id)."""
+    async with get_engine().begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async with get_sessionmaker()() as session:
+        user = User(
+            email="test@user.com",
+            password_hash=hash_password("x"),
+            status="approved",
+            role="user",
+        )
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        uid = user.id
+
+    app = create_app()
+    with TestClient(app) as c:
+        c.cookies.set(COOKIE_NAME, SessionSigner("test-session-secret").sign(uid))
+        yield c, uid
