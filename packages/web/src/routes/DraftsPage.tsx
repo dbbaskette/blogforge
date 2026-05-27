@@ -6,6 +6,7 @@ import { listProviderAvailability } from "../api/providers";
 import { NewDraftDialog } from "../components/NewDraftDialog";
 import { Icon } from "../components/ui/Icon";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
+import { useMe } from "../hooks/useMe";
 
 const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: string }> = {
   idea: { label: "Seed", pillClass: "nb-pill nb-pill-empty" },
@@ -14,6 +15,7 @@ const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: str
 };
 
 export function DraftsPage(): JSX.Element {
+  const { user } = useMe();
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -46,7 +48,7 @@ export function DraftsPage(): JSX.Element {
     <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10 animate-fade-up">
       <Hero onNew={() => setNewOpen(true)} />
 
-      {noKeys && <KeysBanner />}
+      {noKeys && <KeysBanner isAdmin={user?.role === "admin"} />}
       {error && <ErrorBanner message={error} />}
 
       <section className="mt-10">
@@ -185,7 +187,7 @@ function EmptyState({ onNew }: { onNew: () => void }): JSX.Element {
 // ────────────────────────────────────────────────────────────────
 // Banners
 
-function KeysBanner(): JSX.Element {
+function KeysBanner({ isAdmin }: { isAdmin: boolean }): JSX.Element {
   return (
     <div
       className="mt-6 rounded-nb p-4 flex items-start gap-3"
@@ -193,16 +195,21 @@ function KeysBanner(): JSX.Element {
     >
       <span className="nb-pill nb-pill-gen">Heads up</span>
       <p className="text-sm text-ink-2 leading-relaxed">
-        No API keys configured in myvoice. Add one in{" "}
-        <a
-          href="http://localhost:7878/settings"
-          target="_blank"
-          rel="noreferrer"
-          className="text-cobalt-600 font-medium underline underline-offset-2 hover:text-cobalt-700"
-        >
-          myvoice Settings
-        </a>{" "}
-        before drafting.
+        No API keys configured.{" "}
+        {isAdmin ? (
+          <>
+            Add one in{" "}
+            <Link
+              to="/admin"
+              className="text-cobalt-600 font-medium underline underline-offset-2 hover:text-cobalt-700"
+            >
+              /admin
+            </Link>{" "}
+            (API keys section) before drafting.
+          </>
+        ) : (
+          <>Ask an admin to add one before drafting.</>
+        )}
       </p>
     </div>
   );
