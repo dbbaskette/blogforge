@@ -1,0 +1,14 @@
+**/node_modules
+**/__pycache__
+**/.venv
+**/local-venv
+**/.git
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/dist
+**/build
+**/coverage
+.idea
+.vscode
+*.log
