@@ -4,12 +4,13 @@ import { Link } from "react-router-dom";
 import { type DraftSummary, deleteDraft, listDrafts } from "../api/drafts";
 import { listProviderAvailability } from "../api/providers";
 import { NewDraftDialog } from "../components/NewDraftDialog";
+import { Icon } from "../components/ui/Icon";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
 
-const STAGE_LABELS: Record<DraftSummary["stage"], { label: string; chip: string }> = {
-  idea: { label: "Seed", chip: "chip" },
-  outline: { label: "Outline", chip: "chip chip-teal" },
-  sections: { label: "Drafting", chip: "chip chip-gold" },
+const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: string }> = {
+  idea: { label: "Seed", pillClass: "nb-pill nb-pill-empty" },
+  outline: { label: "Outline", pillClass: "nb-pill nb-pill-edited" },
+  sections: { label: "Drafting", pillClass: "nb-pill nb-pill-gen" },
 };
 
 export function DraftsPage(): JSX.Element {
@@ -36,36 +37,38 @@ export function DraftsPage(): JSX.Element {
   useGlobalEvents(onEvent);
 
   const onDelete = async (id: string): Promise<void> => {
-    if (!confirm("Move this draft to the wastebasket?")) return;
+    if (!confirm("Move this draft to the trash?")) return;
     await deleteDraft(id);
     reload();
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <Hero count={drafts?.length ?? 0} onNew={() => setNewOpen(true)} />
+    <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10 animate-fade-up">
+      <Hero onNew={() => setNewOpen(true)} />
 
       {noKeys && <KeysBanner />}
       {error && <ErrorBanner message={error} />}
 
-      <section className="mt-8">
-        <SectionMast label="The desk" subline="drafts in progress" />
+      <section className="mt-10">
+        <div className="flex items-baseline justify-between mb-4">
+          <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">Your drafts</h2>
+          <span className="text-xs text-muted">
+            {drafts?.length ?? 0} {drafts?.length === 1 ? "piece" : "pieces"}
+          </span>
+        </div>
 
         {drafts === null && !error && (
-          <p className="font-mono text-xs uppercase tracking-wide-3 text-muted py-12 text-center">
-            …
-          </p>
+          <p className="text-center text-muted text-sm py-16">Loading…</p>
         )}
 
         {drafts && drafts.length === 0 && <EmptyState onNew={() => setNewOpen(true)} />}
 
         {drafts && drafts.length > 0 && (
-          <ol className="mt-2">
-            {drafts.map((d, i) => (
-              <DraftRow key={d.id} draft={d} index={i + 1} onDelete={() => onDelete(d.id)} />
+          <div className="space-y-3">
+            {drafts.map((d) => (
+              <DraftRow key={d.id} draft={d} onDelete={() => onDelete(d.id)} />
             ))}
-            <li className="rule" />
-          </ol>
+          </div>
         )}
       </section>
 
@@ -77,35 +80,30 @@ export function DraftsPage(): JSX.Element {
 // ────────────────────────────────────────────────────────────────
 // Hero
 
-function Hero({ count, onNew }: { count: number; onNew: () => void }): JSX.Element {
+function Hero({ onNew }: { onNew: () => void }): JSX.Element {
   return (
-    <section className="grid grid-cols-12 gap-8 items-end animate-fade-up">
-      <div className="col-span-12 md:col-span-8">
-        <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400 mb-3">
-          Issue {String(count).padStart(2, "0")} ·{" "}
-          {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-        </p>
-        <h1 className="font-display text-cream-2 text-[clamp(2.75rem,6vw,4.5rem)] leading-[0.95] tracking-tight-2">
-          A workshop for{" "}
-          <span
-            className="italic text-vermilion-400"
-            style={{ fontVariationSettings: "'SOFT' 100, 'WONK' 1" }}
-          >
-            long-form
-          </span>{" "}
-          writing in your voice.
-        </h1>
-        <p className="font-prose text-cream/70 text-lg mt-6 max-w-xl leading-relaxed">
-          Sketch an idea, shape its outline, then let the pack do the writing in your tongue. Every
-          piece begins on this desk.
-        </p>
-      </div>
-      <div className="col-span-12 md:col-span-4 flex md:justify-end">
-        <button type="button" onClick={onNew} className="btn-stamp">
-          <span aria-hidden className="text-base leading-none">
-            ✺
-          </span>
-          Start a new piece
+    <section className="mb-2">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600 mb-2">
+            Workshop
+          </p>
+          <h1 className="font-serif text-4xl md:text-5xl font-medium text-ink leading-[1.1] tracking-tight">
+            A space for long-form
+            <br />
+            writing in your voice.
+          </h1>
+          <p className="text-base text-muted mt-3 max-w-xl leading-relaxed">
+            Sketch an idea, shape its outline, then let the pack do the writing in your tongue.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onNew}
+          className="nb-btn nb-btn-primary self-start md:self-end"
+        >
+          <span aria-hidden>＋</span>
+          New piece
         </button>
       </div>
     </section>
@@ -113,117 +111,94 @@ function Hero({ count, onNew }: { count: number; onNew: () => void }): JSX.Eleme
 }
 
 // ────────────────────────────────────────────────────────────────
-// Section masthead — "The desk" + subline
-
-function SectionMast({ label, subline }: { label: string; subline: string }): JSX.Element {
-  return (
-    <div className="flex items-baseline justify-between">
-      <h2 className="font-display text-cream-2 text-2xl tracking-tight-2">{label}</h2>
-      <span className="font-mono text-[10px] uppercase tracking-wide-3 text-muted">{subline}</span>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────
-// Single draft row — like a TOC entry
+// Draft row — Notebook card
 
 function DraftRow({
   draft,
-  index,
   onDelete,
 }: {
   draft: DraftSummary;
-  index: number;
   onDelete: () => void;
 }): JSX.Element {
-  const stage = STAGE_LABELS[draft.stage];
+  const stage = STAGE_LABEL[draft.stage];
   const updated = formatRelative(draft.updated_at);
 
   return (
-    <li className="group border-t border-rule first:border-t-0">
-      <div className="grid grid-cols-[3.5rem_1fr_auto] gap-6 items-start py-6">
-        {/* Big numeral */}
-        <span className="font-display-tight text-muted-2 text-3xl leading-none pt-1 group-hover:text-vermilion-400 transition-colors duration-300 font-mono-num">
-          {String(index).padStart(2, "0")}
-        </span>
-
-        {/* Title + meta */}
-        <Link to={`/drafts/${draft.id}`} className="block min-w-0">
-          <h3 className="font-display text-cream-2 text-[1.65rem] leading-tight tracking-tight-2 ink-underline inline-block">
-            {draft.title || <span className="italic text-muted">untitled draft</span>}
+    <article className="group nb-card nb-card-hover">
+      <div className="flex items-start gap-4 p-5">
+        <Link to={`/drafts/${draft.id}`} className="flex-1 min-w-0">
+          <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight group-hover:text-cobalt-600 transition-colors">
+            {draft.title || <span className="italic text-muted-2">untitled draft</span>}
           </h3>
           <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className={stage.chip}>{stage.label}</span>
-            <span className="chip chip-muted">{draft.pack_slug}</span>
+            <span className={stage.pillClass}>
+              <span className="dot" />
+              {stage.label}
+            </span>
+            <span className="nb-pill nb-pill-empty">{draft.pack_slug}</span>
             {draft.word_count > 0 && (
-              <span className="font-mono text-xs text-muted">
+              <span className="text-xs text-muted font-mono">
                 {draft.word_count.toLocaleString()} words
               </span>
             )}
-            <span className="font-mono text-xs text-muted-2">— {updated}</span>
+            <span className="text-xs text-muted-2">· {updated}</span>
           </div>
         </Link>
 
-        {/* Delete action — visible on hover */}
         <button
           type="button"
           onClick={onDelete}
           aria-label={`Delete ${draft.title || "untitled draft"}`}
-          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-200 font-mono text-[10px] uppercase tracking-wide-3 text-muted hover:text-vermilion-400 self-start pt-2"
+          className="nb-icon-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:!text-rose"
+          title="Move to trash"
         >
-          discard
+          <Icon name="trash" size={16} title="" />
         </button>
       </div>
-    </li>
+    </article>
   );
 }
 
 // ────────────────────────────────────────────────────────────────
-// Empty state — characterful, not boring
+// Empty state
 
 function EmptyState({ onNew }: { onNew: () => void }): JSX.Element {
   return (
-    <div className="mt-8 border border-rule rounded-sm py-16 px-8 text-center relative overflow-hidden">
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(45deg, transparent 0 12px, #E04E3F 12px 13px)",
-        }}
-      />
-      <div className="relative">
-        <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400">
-          a blank desk
-        </p>
-        <h3 className="font-display text-cream-2 text-3xl mt-3 tracking-tight-2">
-          Nothing here yet.
-        </h3>
-        <p className="font-prose text-cream/60 mt-3 max-w-md mx-auto">
-          Every piece you write starts with a single seed — a topic, a question, a hook. Plant one.
-        </p>
-        <button type="button" onClick={onNew} className="btn-stamp mt-7">
-          Plant a seed
-        </button>
+    <div className="nb-card text-center py-16 px-8">
+      <div className="w-12 h-12 rounded-full bg-cobalt-50 grid place-items-center mx-auto mb-5 text-cobalt-600">
+        <Icon name="file-plus" size={22} title="" />
       </div>
+      <h3 className="font-serif text-2xl font-medium text-ink mb-2 tracking-tight">
+        Nothing here yet
+      </h3>
+      <p className="text-muted text-sm max-w-md mx-auto mb-6 leading-relaxed">
+        Every piece starts with a topic, a question, a hook. Plant one.
+      </p>
+      <button type="button" onClick={onNew} className="nb-btn nb-btn-primary">
+        <span aria-hidden>＋</span>
+        Start a new piece
+      </button>
     </div>
   );
 }
 
 // ────────────────────────────────────────────────────────────────
-// Top-of-page banners
+// Banners
 
 function KeysBanner(): JSX.Element {
   return (
-    <div className="mt-6 border-l-2 border-gold pl-4 py-3 bg-gold/[0.04]">
-      <p className="font-mono text-[10px] uppercase tracking-wide-3 text-gold">notice</p>
-      <p className="text-sm text-cream/80 mt-1">
-        No API keys found in myvoice. Add one in{" "}
+    <div
+      className="mt-6 rounded-nb p-4 flex items-start gap-3"
+      style={{ border: "1px solid #f0d5a4", background: "#fdf6e6" }}
+    >
+      <span className="nb-pill nb-pill-gen">Heads up</span>
+      <p className="text-sm text-ink-2 leading-relaxed">
+        No API keys configured in myvoice. Add one in{" "}
         <a
           href="http://localhost:7878/settings"
           target="_blank"
           rel="noreferrer"
-          className="text-gold-400 underline underline-offset-4 hover:no-underline"
+          className="text-cobalt-600 font-medium underline underline-offset-2 hover:text-cobalt-700"
         >
           myvoice Settings
         </a>{" "}
@@ -235,9 +210,12 @@ function KeysBanner(): JSX.Element {
 
 function ErrorBanner({ message }: { message: string }): JSX.Element {
   return (
-    <div className="mt-6 border-l-2 border-vermilion pl-4 py-3 bg-vermilion-900/30">
-      <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400">error</p>
-      <p className="text-sm text-cream/80 mt-1">{message}</p>
+    <div
+      className="mt-6 rounded-nb p-4 flex items-start gap-3"
+      style={{ border: "1px solid #f7c7cf", background: "#fde9ec" }}
+    >
+      <span className="nb-pill nb-pill-failed">Error</span>
+      <p className="text-sm text-rose-ink leading-relaxed">{message}</p>
     </div>
   );
 }

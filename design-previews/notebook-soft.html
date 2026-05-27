@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Pencraft — Notebook (soft)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --card-2: #fafbfc;
+    --ink: #1f2328;
+    --ink-2: #3a3f47;
+    --muted: #6e7682;
+    --muted-2: #aab1bd;
+    --rule: #e6e8ed;
+    --rule-2: #d0d4dc;
+    --accent: #4f6df0;          /* friendly cobalt */
+    --accent-soft: #eaeefe;
+    --accent-ink: #2b40a8;
+    --green: #2f9968;
+    --green-soft: #e3f5ec;
+    --amber: #c98a26;
+    --amber-soft: #fbf1de;
+    --rose: #d4546b;
+    --rose-soft: #fde9ec;
+    --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
+    --shadow-hover: 0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .prose { font-family: "Lora", ui-serif, Georgia, serif; font-size: 17px; line-height: 1.7; color: var(--ink-2); }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  .app { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+
+  /* Sidebar: friendly outline minimap */
+  aside.outline {
+    background: transparent;
+    padding: 24px 16px 24px 24px;
+    position: sticky; top: 0; height: 100vh;
+    overflow-y: auto;
+  }
+  aside.outline .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 600; font-size: 15px; letter-spacing: -0.01em;
+    padding: 6px 10px; margin-bottom: 24px;
+  }
+  aside.outline .brand .logo {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), #6e88f4);
+    display: grid; place-items: center;
+    color: white; font-family: "Lora", serif; font-style: italic; font-weight: 600; font-size: 16px;
+  }
+  aside.outline .brand .sub { color: var(--muted); font-size: 12px; font-weight: 400; }
+
+  aside.outline .nav-label {
+    color: var(--muted); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 10px 10px 6px; margin: 0;
+  }
+  aside.outline ol { list-style: none; padding: 0; margin: 0; }
+  aside.outline li a {
+    display: grid; grid-template-columns: 22px 18px 1fr auto; gap: 8px;
+    padding: 7px 10px; border-radius: var(--radius-sm);
+    text-decoration: none; color: var(--ink-2);
+    align-items: center; line-height: 1.4;
+    transition: background 0.15s, color 0.15s;
+  }
+  aside.outline li a:hover { background: var(--card); }
+  aside.outline li.current a { background: var(--accent-soft); color: var(--accent-ink); font-weight: 500; }
+  aside.outline .num { color: var(--muted-2); font-family: "JetBrains Mono", monospace; font-size: 11px; }
+  aside.outline li.current .num { color: var(--accent); }
+  aside.outline .icon {
+    width: 14px; height: 14px; border-radius: 4px;
+    display: inline-grid; place-items: center; font-size: 9px; color: white;
+  }
+  aside.outline .icon.ready { background: var(--green); }
+  aside.outline .icon.ready::before { content: "✓"; }
+  aside.outline .icon.empty { background: transparent; border: 1.5px dashed var(--muted-2); }
+  aside.outline .icon.failed { background: var(--rose); }
+  aside.outline .icon.failed::before { content: "!"; }
+  aside.outline .title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  aside.outline .words { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--muted-2); }
+
+  aside.outline .meta {
+    margin: 28px 10px 0; padding: 14px;
+    background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius);
+    font-size: 12px; color: var(--muted-2); line-height: 1.7;
+  }
+  aside.outline .meta .row { display: flex; justify-content: space-between; }
+  aside.outline .meta .row strong { color: var(--ink-2); font-weight: 500; }
+
+  /* Main column */
+  main { padding: 32px 40px 200px; max-width: 880px; margin: 0 auto; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .topbar a.back {
+    color: var(--muted); text-decoration: none; font-size: 13px;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: var(--radius-sm);
+    transition: background 0.15s;
+  }
+  .topbar a.back:hover { background: var(--card); color: var(--ink); }
+  .topbar .save-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted); padding: 6px 10px; border-radius: 100px;
+  }
+  .topbar .save-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  }
+
+  /* Hero card */
+  .hero {
+    background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius);
+    padding: 32px 36px 28px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-family: "Lora", serif;
+    font-weight: 500;
+    font-size: 38px;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    margin: 0 0 10px 0;
+    color: var(--ink);
+  }
+  .hero .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 0 0 20px 0;
+    font-family: "Lora", serif;
+    font-style: italic;
+  }
+  .hero .progress {
+    margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--rule);
+    display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--muted);
+  }
+  .hero .progress-bar {
+    flex: 1; height: 6px; border-radius: 100px; background: var(--rule); overflow: hidden;
+  }
+  .hero .progress-fill { height: 100%; width: 33%; background: linear-gradient(90deg, var(--accent), #6e88f4); border-radius: 100px; }
+
+  /* Setup card — collapsible */
+  details.setup {
+    background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius);
+    margin-bottom: 32px;
+    overflow: hidden;
+  }
+  details.setup > summary {
+    list-style: none;
+    padding: 14px 20px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; color: var(--muted);
+  }
+  details.setup > summary::-webkit-details-marker { display: none; }
+  details.setup > summary .left { display: inline-flex; align-items: center; gap: 8px; }
+  details.setup > summary .chev { width: 14px; height: 14px; color: var(--muted-2); transition: transform 0.2s; }
+  details.setup[open] > summary .chev { transform: rotate(90deg); }
+  details.setup > summary strong { color: var(--ink-2); font-weight: 500; }
+  details.setup .grid {
+    padding: 4px 20px 20px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px;
+  }
+  details.setup .field {
+    background: var(--card-2); border: 1px solid var(--rule); border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  details.setup .field .label {
+    color: var(--muted); font-size: 11px; font-weight: 500;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  details.setup .field .val { color: var(--ink); font-size: 14px; margin-top: 2px; }
+
+  /* Section cards — the bread and butter */
+  .section-card {
+    background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius);
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+  .section-card:hover { box-shadow: var(--shadow-hover); border-color: var(--rule-2); }
+  .section-card.failed { border-color: var(--rose-soft); }
+
+  .section-head {
+    display: grid; grid-template-columns: 32px 1fr auto; gap: 14px;
+    align-items: center;
+    padding: 18px 24px;
+    cursor: pointer;
+  }
+  .section-card.expanded .section-head { border-bottom: 1px solid var(--rule); }
+  .section-head .num {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--bg); color: var(--muted);
+    display: grid; place-items: center;
+    font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500;
+  }
+  .section-card.expanded .section-head .num { background: var(--accent-soft); color: var(--accent-ink); }
+  .section-head h3 {
+    margin: 0;
+    font-family: "Lora", serif; font-weight: 500;
+    font-size: 19px; line-height: 1.35; letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .section-head .meta-row {
+    display: flex; align-items: center; gap: 10px; margin-top: 4px;
+    font-size: 12px; color: var(--muted);
+  }
+  .section-head .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 100px;
+    font-size: 11px; font-weight: 500;
+  }
+  .pill.ready { background: var(--green-soft); color: var(--green); }
+  .pill.empty { background: var(--bg); color: var(--muted); border: 1px dashed var(--rule-2); }
+  .pill.failed { background: var(--rose-soft); color: var(--rose); }
+  .pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  .section-actions {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .icon-btn {
+    width: 30px; height: 30px; border-radius: var(--radius-sm);
+    background: transparent; border: none; cursor: pointer;
+    display: grid; place-items: center;
+    color: var(--muted); transition: background 0.15s, color 0.15s;
+  }
+  .icon-btn:hover { background: var(--bg); color: var(--ink); }
+
+  .section-body { padding: 18px 24px 24px; }
+  .section-body .brief {
+    font-family: "Lora", serif; font-size: 14px; color: var(--muted); font-style: italic;
+    border-left: 3px solid var(--accent-soft); padding: 4px 12px;
+    margin: 0 0 18px 0;
+    background: var(--accent-soft);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .section-body p { margin: 0 0 14px 0; }
+  .section-body p:last-child { margin-bottom: 0; }
+
+  .section-body .empty-state {
+    text-align: center; padding: 36px 20px;
+    color: var(--muted); font-size: 13px;
+    border: 1.5px dashed var(--rule-2); border-radius: var(--radius-sm);
+    background: var(--card-2);
+  }
+  .section-body .empty-state .btn { margin-top: 12px; }
+
+  .failure-banner {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    background: var(--rose-soft);
+    border: 1px solid #f7c7cf;
+    border-radius: var(--radius-sm);
+    color: #94293c;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .failure-banner .label {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    margin-bottom: 4px; color: var(--rose);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    background: var(--card); border: 1px solid var(--rule-2); color: var(--ink);
+    border-radius: var(--radius-sm); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  }
+  .btn:hover { background: var(--card-2); border-color: var(--muted-2); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary {
+    background: var(--accent); border-color: var(--accent); color: white;
+    box-shadow: 0 1px 2px rgba(79, 109, 240, 0.3), 0 4px 12px -2px rgba(79, 109, 240, 0.35);
+  }
+  .btn.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+  .btn.ghost:hover { background: var(--bg); color: var(--ink); }
+
+  .compose-all {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 20px 0;
+    padding: 14px 20px;
+    background: var(--accent-soft); border: 1px solid #c9d4fd; border-radius: var(--radius);
+    color: var(--accent-ink); font-size: 13px;
+  }
+  .compose-all strong { font-weight: 600; }
+  .compose-all .btn.primary { background: var(--accent-ink); border-color: var(--accent-ink); }
+
+  /* Floating footer */
+  footer.deskfoot {
+    position: fixed; bottom: 16px; left: calc(280px + 40px); right: 40px;
+    background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius);
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 28px -8px rgba(15, 23, 42, 0.18);
+    font-size: 12px; color: var(--muted);
+    max-width: 880px; margin: 0 auto;
+  }
+  footer.deskfoot .count { color: var(--ink); font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 13px; }
+  footer.deskfoot .spacer { flex: 1; }
+  footer.deskfoot .btn { padding: 5px 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <aside class="outline">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div>Pencraft <div class="sub">a workshop</div></div>
+    </div>
+
+    <p class="nav-label">In this piece</p>
+    <ol>
+      <li><a href="#s1"><span class="num">01</span><span class="icon ready"></span><span class="title">The Promise Is Real…</span><span class="words">312w</span></a></li>
+      <li class="current"><a href="#s2"><span class="num">02</span><span class="icon ready"></span><span class="title">What an Agentic App Needs</span><span class="words">287w</span></a></li>
+      <li><a href="#s3"><span class="num">03</span><span class="icon ready"></span><span class="title">Spring AI Gives You the Blueprint</span><span class="words">248w</span></a></li>
+      <li><a href="#s4"><span class="num">04</span><span class="icon empty"></span><span class="title">Tanzu Platform Is the Paved Road</span><span class="words">—</span></a></li>
+      <li><a href="#s5"><span class="num">05</span><span class="icon empty"></span><span class="title">Spring AI + Tanzu = 1+1=3</span><span class="words">—</span></a></li>
+      <li><a href="#s6"><span class="num">06</span><span class="icon failed"></span><span class="title">Agents With a Connection String</span><span class="words">—</span></a></li>
+      <li><a href="#s7"><span class="num">07</span><span class="icon empty"></span><span class="title">You Can't Debug What You Can't See</span><span class="words">—</span></a></li>
+      <li><a href="#s8"><span class="num">08</span><span class="icon empty"></span><span class="title">From Laptop to Production</span><span class="words">—</span></a></li>
+      <li><a href="#s9"><span class="num">09</span><span class="icon empty"></span><span class="title">The Tipping Point</span><span class="words">—</span></a></li>
+    </ol>
+
+    <div class="meta">
+      <div class="row"><span>Total</span><strong>2,847 / ~6,500</strong></div>
+      <div class="row"><span>Drafted</span><strong>3 of 9</strong></div>
+      <div class="row"><span>Pack</span><strong>dan</strong></div>
+      <div class="row"><span>Model</span><strong>sonnet-4-6</strong></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <a class="back" href="#">← All drafts</a>
+      <span class="save-pill"><span class="dot"></span>All changes saved</span>
+    </div>
+
+    <div class="hero">
+      <h1 contenteditable="true">Agentic Apps running on Tanzu Platform</h1>
+      <p class="subtitle">A field guide to shipping enterprise-grade AI agents without inventing your own platform.</p>
+      <div class="progress">
+        <div class="progress-bar"><div class="progress-fill"></div></div>
+        <span><strong style="color: var(--ink);">3 of 9</strong> sections · ~2,847 / 6,500 words</span>
+      </div>
+    </div>
+
+    <details class="setup">
+      <summary>
+        <div class="left">
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>
+          <span><strong>Setup</strong> · pack <strong>dan</strong> · blog-post · sonnet-4-6 · 1,500 words</span>
+        </div>
+        <span style="color: var(--accent); font-weight: 500;">Edit</span>
+      </summary>
+      <div class="grid">
+        <div class="field"><div class="label">Voice pack</div><div class="val">dan</div></div>
+        <div class="field"><div class="label">Format</div><div class="val">blog-post</div></div>
+        <div class="field"><div class="label">Model</div><div class="val">Anthropic · claude-sonnet-4-6</div></div>
+        <div class="field"><div class="label">Target length</div><div class="val">1,500 words</div></div>
+      </div>
+    </details>
+
+    <div class="compose-all">
+      <div>
+        <strong>6 sections still unwritten.</strong> Compose them all in one go.
+      </div>
+      <button class="btn primary">Compose 6 unfilled →</button>
+    </div>
+
+    <!-- Section 1: ready, expanded -->
+    <article class="section-card expanded" id="s1">
+      <div class="section-head">
+        <div class="num">01</div>
+        <div>
+          <h3>The Promise Is Real. The Plumbing Is a Nightmare.</h3>
+          <div class="meta-row">
+            <span class="pill ready"><span class="dot"></span>Ready</span>
+            <span>312 words</span>
+            <span>·</span>
+            <span>edited 4 min ago</span>
+          </div>
+        </div>
+        <div class="section-actions">
+          <button class="icon-btn" title="Regenerate"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+          <button class="icon-btn" title="More"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="prose">
+          <p>Every CTO has seen the demo. Three lines of LangChain, a vector store, a smiling chatbot that <em>actually answers the question</em>. The room nods. The pilot ships. And then somebody asks the question that quietly torpedoes the project: how do we run this in production?</p>
+          <p>The honest answer, in most enterprises, is <em>we built a one-off</em>. A Python script on an EC2 box, a Pinecone key in a Slack DM, a model API call wrapped in retry logic written by an intern who has since left.</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- Section 2: ready, collapsed by default — shown expanded here for the demo -->
+    <article class="section-card expanded" id="s2">
+      <div class="section-head">
+        <div class="num">02</div>
+        <div>
+          <h3>What an Agentic App Actually Needs From Its Platform</h3>
+          <div class="meta-row">
+            <span class="pill ready"><span class="dot"></span>Ready</span>
+            <span>287 words</span>
+          </div>
+        </div>
+        <div class="section-actions">
+          <button class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+          <button class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="prose">
+          <p>Set aside the model for a moment. The model is the easy part — somebody else makes it, you pay for tokens, you call an API. What's hard is everything around it.</p>
+          <p>An agentic app needs identity. It needs network policy. It needs secrets that don't live in dotenv files. It needs observability for prompts and tool calls, not just CPU graphs.</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- Section 3: ready, collapsed -->
+    <article class="section-card" id="s3">
+      <div class="section-head">
+        <div class="num">03</div>
+        <div>
+          <h3>Spring AI Gives You the Blueprint</h3>
+          <div class="meta-row">
+            <span class="pill ready"><span class="dot"></span>Ready</span>
+            <span>248 words</span>
+          </div>
+        </div>
+        <div class="section-actions">
+          <button class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Section 4: empty -->
+    <article class="section-card expanded" id="s4">
+      <div class="section-head">
+        <div class="num">04</div>
+        <div>
+          <h3>Tanzu Platform Is the Paved Road</h3>
+          <div class="meta-row">
+            <span class="pill empty"><span class="dot"></span>Unwritten</span>
+          </div>
+        </div>
+      </div>
+      <div class="section-body">
+        <p class="brief">Argue that Tanzu turns the operational nightmare into the boring part — service binding, identity, secrets, network policy all out of the box.</p>
+        <div class="empty-state">
+          <div>This section hasn't been composed yet.</div>
+          <button class="btn primary">Compose this section →</button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Section 5: empty, collapsed -->
+    <article class="section-card" id="s5">
+      <div class="section-head">
+        <div class="num">05</div>
+        <div>
+          <h3>Spring AI + Tanzu Platform: 1 + 1 = 3</h3>
+          <div class="meta-row">
+            <span class="pill empty"><span class="dot"></span>Unwritten</span>
+          </div>
+        </div>
+        <div class="section-actions">
+          <button class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+    </article>
+
+    <!-- Section 6: failed -->
+    <article class="section-card failed expanded" id="s6">
+      <div class="section-head">
+        <div class="num">06</div>
+        <div>
+          <h3>Agents With a Connection String Are an Avengers-Level Threat</h3>
+          <div class="meta-row">
+            <span class="pill failed"><span class="dot"></span>Failed</span>
+          </div>
+        </div>
+      </div>
+      <div class="section-body">
+        <div class="failure-banner">
+          <div class="label">⚠ Last attempt failed</div>
+          format 'blogs' not found in pack manifest — check the draft setup above.
+        </div>
+        <p class="brief">Drive home the security argument — an agent with database access is a privileged process. Identity-aware service binding is the move.</p>
+        <div class="empty-state">
+          <div>Fix the setup, then try again.</div>
+          <button class="btn primary">Retry →</button>
+        </div>
+      </div>
+    </article>
+
+  </main>
+</div>
+
+<footer class="deskfoot">
+  <span class="count">2,847</span> words · 3 of 9 drafted
+  <span class="spacer"></span>
+  <button class="btn">Copy markdown</button>
+  <button class="btn">Download .md</button>
+  <button class="btn">Lint</button>
+</footer>
+
+</body>
+</html>

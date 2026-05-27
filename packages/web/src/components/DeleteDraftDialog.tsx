@@ -38,7 +38,7 @@ export function DeleteDraftDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/85 backdrop-blur-sm animate-fade-up"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4"
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
@@ -47,40 +47,51 @@ export function DeleteDraftDialog({
     >
       <dialog
         open
-        className="bg-surface border border-rule rounded-sm w-[480px] max-w-[90vw] m-0 p-0 text-cream shadow-2xl shadow-vermilion-900/30"
+        className="nb-card w-[460px] max-w-full m-0 p-0 text-ink animate-fade-up"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         aria-label="Delete draft"
       >
         <header className="px-7 pt-6 pb-4 border-b border-rule">
-          <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400 mb-2">
-            The wastebasket
+          <p className="text-xs font-semibold uppercase tracking-wider text-rose mb-1.5">
+            Wastebasket
           </p>
-          <h2 className="font-display text-cream-2 text-2xl tracking-tight-2">
-            Discard this draft?
+          <h2 className="font-serif text-xl font-medium text-ink tracking-tight">
+            Move this draft to the trash?
           </h2>
         </header>
 
-        <div className="px-7 py-5 space-y-4">
-          <p className="font-prose text-cream/80 text-sm leading-relaxed">
-            <em className="italic text-cream-2">{draftTitle || draftId}</em> goes to the
+        <div className="px-7 py-5 space-y-3">
+          <p className="text-sm text-ink-2 leading-relaxed">
+            <em className="font-serif italic text-ink">{draftTitle || draftId}</em> will go to the
             wastebasket. You can recover it manually from{" "}
-            <code className="font-mono text-xs text-vermilion-300 bg-ink px-1.5 py-0.5 rounded">
+            <code className="font-mono text-xs text-cobalt-700 bg-canvas border border-rule px-1.5 py-0.5 rounded">
               ~/.pencraft/trash/
             </code>
             .
           </p>
           {error && (
-            <p className="text-vermilion-300 text-sm border-l-2 border-vermilion pl-3">{error}</p>
+            <p
+              className="text-sm px-3 py-2 rounded-nb-sm"
+              style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+            >
+              {error}
+            </p>
           )}
         </div>
 
-        <div className="px-7 pb-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="btn-press">
+        <div className="px-7 pb-6 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="nb-btn">
             Cancel
           </button>
-          <button type="button" onClick={confirm} disabled={submitting} className="btn-stamp">
-            {submitting ? "Discarding…" : "Discard draft"}
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={submitting}
+            className="nb-btn"
+            style={{ background: "#d4546b", borderColor: "#d4546b", color: "#fff" }}
+          >
+            {submitting ? "Deleting…" : "Move to trash"}
           </button>
         </div>
       </dialog>

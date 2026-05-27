@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Pencraft — Design previews</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 60px 40px; font-family: "Inter", sans-serif; background: #f6f7f9; color: #1f2328; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-family: "Lora", serif; font-weight: 500; font-size: 36px; margin: 0 0 6px; letter-spacing: -0.015em; }
+  .sub { color: #6e7682; margin: 0 0 40px; font-style: italic; font-family: "Lora", serif; font-size: 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .card {
+    background: white; border: 1px solid #e6e8ed; border-radius: 12px; padding: 24px;
+    text-decoration: none; color: inherit;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: block;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.12); }
+  .card .tag { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #4f6df0; margin-bottom: 8px; }
+  .card h2 { font-family: "Lora", serif; font-weight: 500; font-size: 22px; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .card p { color: #6e7682; font-size: 14px; line-height: 1.55; margin: 0; }
+  .preview { margin-top: 16px; aspect-ratio: 16 / 10; border-radius: 8px; border: 1px solid #e6e8ed; overflow: hidden; }
+  .preview iframe { width: 200%; height: 200%; transform: scale(0.5); transform-origin: top left; border: 0; }
+  .note {
+    margin-top: 40px;
+    padding: 16px 20px; background: #eaeefe; border: 1px solid #c9d4fd; border-radius: 12px;
+    color: #2b40a8; font-size: 13px; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pencraft — design auditions</h1>
+  <p class="sub">Two directions for the long-form drafting workspace. Same workflow (single scrolling document, collapsible setup, outline minimap, continuous prose feel) — different skin.</p>
+
+  <div class="grid">
+    <a class="card" href="writer-quiet.html">
+      <div class="tag">Option A</div>
+      <h2>Writer (quiet)</h2>
+      <p>iA Writer / Ulysses energy. Paper, ink, one slate-blue accent. Source Serif body type. No chrome. Reads like a serious place to write.</p>
+      <div class="preview"><iframe src="writer-quiet.html"></iframe></div>
+    </a>
+
+    <a class="card" href="notebook-soft.html">
+      <div class="tag">Option B</div>
+      <h2>Notebook (soft)</h2>
+      <p>Notion / Linear energy. Soft gray app, white rounded cards, friendly cobalt accent, expandable section cards. Inter + Lora.</p>
+      <div class="preview"><iframe src="notebook-soft.html"></iframe></div>
+    </a>
+  </div>
+
+  <div class="note">
+    <strong>Both fix the workflow the same way:</strong> single scrolling document instead of three pages, setup hidden behind a disclosure at the top, sections rendered as a continuous piece (no separate "Sections" tab), and an outline minimap in the sidebar for navigation + status at a glance.
+  </div>
+</div>
+</body>
+</html>

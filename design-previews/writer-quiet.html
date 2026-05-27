@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Pencraft — Writer (quiet)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,500;8..60,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f8f6f1;
+    --paper-2: #efece4;
+    --ink: #1f1d1b;
+    --ink-2: #3d3a35;
+    --muted: #8a847a;
+    --muted-2: #b8b2a6;
+    --rule: #d9d4c7;
+    --accent: #3f5e7c;       /* quiet slate blue */
+    --accent-soft: #e1e8ef;
+    --warning: #b08440;       /* aged ochre, no red */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", ui-serif, Georgia, serif;
+    font-size: 18px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+  .ui { font-family: "Inter", ui-sans-serif, system-ui, sans-serif; font-size: 13px; letter-spacing: -0.005em; }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; letter-spacing: 0.02em; }
+
+  /* Layout: subtle sidebar that's collapsed to a thin rail by default. */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  aside.outline {
+    background: var(--paper);
+    border-right: 1px solid var(--rule);
+    padding: 28px 0 28px 32px;
+    position: sticky; top: 0; height: 100vh;
+    overflow-y: auto;
+  }
+  aside.outline .label {
+    color: var(--muted);
+    font-family: "Inter", sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 18px 0;
+  }
+  aside.outline ol { list-style: none; padding: 0; margin: 0; }
+  aside.outline li { display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 5px 0; align-items: baseline; }
+  aside.outline a {
+    color: var(--ink-2);
+    text-decoration: none;
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    transition: color 0.15s;
+  }
+  aside.outline a:hover { color: var(--accent); }
+  aside.outline .num { color: var(--muted-2); font-family: "JetBrains Mono", monospace; font-size: 11px; }
+  aside.outline .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; margin-right: 6px; vertical-align: middle; background: var(--muted-2); }
+  aside.outline .dot.ready { background: var(--accent); }
+  aside.outline .dot.empty { background: transparent; border: 1px solid var(--muted-2); }
+  aside.outline .dot.failed { background: var(--warning); }
+  aside.outline .current a { color: var(--ink); font-weight: 600; }
+
+  /* Sidebar footer — metadata */
+  aside.outline .meta {
+    margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--rule);
+    font-family: "Inter", sans-serif; font-size: 12px; color: var(--muted);
+    line-height: 1.8;
+  }
+  aside.outline .meta strong { color: var(--ink-2); font-weight: 500; }
+
+  main { padding: 60px 80px 200px; max-width: 760px; margin: 0 auto; }
+
+  /* Quiet top bar — just a back link, no chrome */
+  .topbar {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 80px;
+    font-family: "Inter", sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .topbar a { color: var(--muted); text-decoration: none; }
+  .topbar a:hover { color: var(--accent); }
+  .topbar .saving { font-family: "JetBrains Mono", monospace; font-size: 11px; }
+
+  /* Title — editable inline, looks like prose not a form */
+  h1.title {
+    font-family: "Source Serif 4", serif;
+    font-weight: 400;
+    font-size: 44px;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    margin: 0 0 12px 0;
+    color: var(--ink);
+  }
+  .subtitle {
+    font-family: "Source Serif 4", serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: 20px;
+    line-height: 1.5;
+    color: var(--muted);
+    margin: 0 0 48px 0;
+  }
+
+  /* Disclosure for setup — collapsed by default */
+  details.setup {
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    margin: 48px 0;
+    padding: 14px 0;
+  }
+  details.setup > summary {
+    list-style: none;
+    cursor: pointer;
+    font-family: "Inter", sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  details.setup > summary::-webkit-details-marker { display: none; }
+  details.setup > summary::after { content: "edit ›"; color: var(--accent); }
+  details.setup[open] > summary::after { content: "close"; }
+  details.setup .grid {
+    margin-top: 18px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px 32px;
+    font-family: "Inter", sans-serif; font-size: 13px;
+  }
+  details.setup .field label {
+    display: block; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+  }
+  details.setup .field .val { color: var(--ink-2); }
+  details.setup .summary-line {
+    margin-top: 14px;
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  details.setup .summary-line strong { color: var(--ink-2); font-weight: 500; }
+
+  /* Section anchors — read like a real document */
+  section.piece { margin-top: 24px; }
+  section.piece h2 {
+    font-family: "Source Serif 4", serif;
+    font-weight: 500;
+    font-size: 28px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    margin: 64px 0 18px 0;
+    color: var(--ink);
+    position: relative;
+  }
+  section.piece h2 .nm {
+    position: absolute; left: -52px; top: 5px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: var(--muted-2);
+    line-height: 1.7;
+  }
+  section.piece p {
+    margin: 0 0 18px 0;
+    color: var(--ink-2);
+  }
+  section.piece p:first-of-type::first-letter {
+    /* No drop cap — too magazine-y. Leaving prose plain. */
+  }
+  section.piece blockquote {
+    border-left: 2px solid var(--accent-soft);
+    margin: 24px 0;
+    padding: 4px 0 4px 20px;
+    color: var(--ink-2);
+    font-style: italic;
+  }
+
+  /* Section action strip — appears on hover/focus only, no permanent chrome */
+  .section-actions {
+    margin-top: 12px;
+    display: flex; gap: 16px; align-items: center;
+    opacity: 0; transition: opacity 0.2s;
+    font-family: "Inter", sans-serif; font-size: 12px;
+  }
+  section.piece:hover .section-actions,
+  section.piece:focus-within .section-actions { opacity: 1; }
+  .section-actions a {
+    color: var(--muted); text-decoration: none; border-bottom: 1px dotted var(--muted-2); padding-bottom: 1px;
+  }
+  .section-actions a:hover { color: var(--accent); border-color: var(--accent); }
+  .section-actions .status {
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    color: var(--muted-2); text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .section-actions .status .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: middle; }
+  .section-actions .status.failed .dot { background: var(--warning); }
+
+  /* The one place red-ish appears: a failed section banner above the prose */
+  .failure {
+    margin: 12px 0 24px 0;
+    padding: 10px 0 10px 14px;
+    border-left: 2px solid var(--warning);
+    color: var(--ink-2);
+    font-size: 14px;
+    font-family: "Inter", sans-serif;
+  }
+  .failure .label {
+    display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--warning); margin-bottom: 2px;
+  }
+
+  /* Empty-section state — for sections not yet expanded */
+  .unwritten {
+    margin: 16px 0 24px 0;
+    padding: 14px 18px;
+    background: transparent;
+    border: 1px dashed var(--rule);
+    color: var(--muted);
+    font-family: "Inter", sans-serif; font-size: 13px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .unwritten .brief { font-style: italic; font-family: "Source Serif 4", serif; font-size: 15px; color: var(--ink-2); margin-bottom: 4px; display: block; }
+  .unwritten .small { font-size: 12px; }
+  .unwritten button {
+    border: none; background: none; color: var(--accent); font-family: "Inter", sans-serif; font-size: 12px; cursor: pointer; padding: 0;
+    border-bottom: 1px solid var(--accent);
+  }
+
+  /* Quiet floating footer — minimal counters */
+  footer.deskfoot {
+    position: fixed; bottom: 0; left: 240px; right: 0;
+    background: linear-gradient(to top, var(--paper) 70%, transparent);
+    padding: 16px 80px;
+    display: flex; align-items: center; justify-content: flex-end; gap: 24px;
+    font-family: "Inter", sans-serif; font-size: 12px; color: var(--muted);
+    pointer-events: none;
+  }
+  footer.deskfoot .group { pointer-events: auto; }
+  footer.deskfoot .count { color: var(--ink-2); font-family: "JetBrains Mono", monospace; font-size: 13px; }
+  footer.deskfoot a { color: var(--muted); margin-left: 18px; text-decoration: none; border-bottom: 1px dotted var(--muted-2); padding-bottom: 1px; }
+  footer.deskfoot a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Single primary action — a quiet link, not a stamped button */
+  .primary {
+    display: inline-block;
+    margin: 36px 0;
+    font-family: "Inter", sans-serif;
+    font-size: 14px;
+    color: var(--accent);
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 2px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .primary:hover { color: var(--ink); border-color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Sidebar: outline minimap. Quiet. -->
+  <aside class="outline">
+    <p class="label">In this piece</p>
+    <ol>
+      <li><span class="num">01</span> <a href="#s1"><span class="dot ready"></span>The Promise Is Real. The Plumbing Is a Nightmare.</a></li>
+      <li class="current"><span class="num">02</span> <a href="#s2"><span class="dot ready"></span>What an Agentic App Actually Needs From Its Platform</a></li>
+      <li><span class="num">03</span> <a href="#s3"><span class="dot ready"></span>Spring AI Gives You the Blueprint</a></li>
+      <li><span class="num">04</span> <a href="#s4"><span class="dot empty"></span>Tanzu Platform Is the Paved Road</a></li>
+      <li><span class="num">05</span> <a href="#s5"><span class="dot empty"></span>Spring AI + Tanzu Platform: 1 + 1 = 3</a></li>
+      <li><span class="num">06</span> <a href="#s6"><span class="dot failed"></span>Agents With a Connection String Are an Avengers-Level Threat</a></li>
+      <li><span class="num">07</span> <a href="#s7"><span class="dot empty"></span>You Can't Debug What You Can't See</a></li>
+      <li><span class="num">08</span> <a href="#s8"><span class="dot empty"></span>From Laptop to Production: The Real Workflow</a></li>
+      <li><span class="num">09</span> <a href="#s9"><span class="dot empty"></span>This Is the Tipping Point for Enterprise Agentic Apps</a></li>
+    </ol>
+    <div class="meta">
+      <div><strong>2,847</strong> words · 3 of 9 drafted</div>
+      <div>Pack · <strong>dan</strong> · blog-post</div>
+      <div>Anthropic · claude-sonnet-4-6</div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <a href="#">← All drafts</a>
+      <span class="saving">Saved</span>
+    </div>
+
+    <h1 class="title" contenteditable="true">Agentic Apps running on Tanzu Platform</h1>
+    <p class="subtitle">A field guide to shipping enterprise-grade AI agents without inventing your own platform.</p>
+
+    <details class="setup">
+      <summary>Setup</summary>
+      <div class="grid">
+        <div class="field"><label>Voice pack</label><span class="val">dan</span></div>
+        <div class="field"><label>Format</label><span class="val">blog-post</span></div>
+        <div class="field"><label>Model</label><span class="val">Anthropic · claude-sonnet-4-6</span></div>
+        <div class="field"><label>Target length</label><span class="val">1,500 words</span></div>
+      </div>
+      <p class="summary-line">Topic: <strong>Building agents that don't suck on Tanzu Platform.</strong></p>
+    </details>
+
+    <section class="piece" id="s1">
+      <h2><span class="nm">01</span>The Promise Is Real. The Plumbing Is a Nightmare.</h2>
+      <p>Every CTO has seen the demo. Three lines of LangChain, a vector store, a smiling chatbot that <em>actually answers the question</em>. The room nods. The pilot ships. And then somebody asks the question that quietly torpedoes the project: how do we run this in production?</p>
+      <p>The honest answer, in most enterprises, is <em>we built a one-off</em>. A Python script on an EC2 box, a Pinecone key in a Slack DM, a model API call wrapped in retry logic written by an intern who has since left. The promise of agentic apps is real — but the plumbing underneath them looks like a 2014 Hackathon project that nobody's taken responsibility for.</p>
+      <div class="section-actions">
+        <span class="status"><span class="dot"></span>Ready · 312 words</span>
+        <a href="#">Regenerate</a>
+        <a href="#">Edit source</a>
+      </div>
+    </section>
+
+    <section class="piece" id="s2">
+      <h2><span class="nm">02</span>What an Agentic App Actually Needs From Its Platform</h2>
+      <p>Set aside the model for a moment. The model is the easy part — somebody else makes it, you pay for tokens, you call an API. What's hard is everything around it. An agentic app is not a model; it's a process that calls models, calls tools, holds state, reads from your data, writes to your databases, and runs for as long as the user needs an answer.</p>
+      <p>That process needs the same things any other long-running enterprise workload needs — and a few new ones besides. It needs identity. It needs network policy. It needs secrets that don't live in dotenv files. It needs observability for prompts and tool calls, not just CPU graphs. And it needs <em>boring</em>, predictable deployment.</p>
+      <div class="section-actions">
+        <span class="status"><span class="dot"></span>Ready · 287 words</span>
+        <a href="#">Regenerate</a>
+        <a href="#">Edit source</a>
+      </div>
+    </section>
+
+    <section class="piece" id="s3">
+      <h2><span class="nm">03</span>Spring AI Gives You the Blueprint</h2>
+      <p>Here's the part that surprised me. If you've already invested in Spring — and most large engineering shops have, whether they admit it or not — Spring AI gets you most of the way there without inventing a new framework. The abstractions are right where you'd expect them: <code>ChatClient</code>, <code>VectorStore</code>, <code>FunctionCallback</code>. The same dependency injection you use for a controller now wires up a model call.</p>
+      <div class="section-actions">
+        <span class="status"><span class="dot"></span>Ready · 248 words</span>
+        <a href="#">Regenerate</a>
+        <a href="#">Edit source</a>
+      </div>
+    </section>
+
+    <section class="piece" id="s4">
+      <h2><span class="nm">04</span>Tanzu Platform Is the Paved Road</h2>
+      <div class="unwritten">
+        <div>
+          <span class="brief">Argue that Tanzu turns the operational nightmare into the boring part — service binding, identity, secrets, network policy all out of the box.</span>
+          <span class="small">Unwritten — outline brief above.</span>
+        </div>
+        <button>Compose →</button>
+      </div>
+    </section>
+
+    <section class="piece" id="s5">
+      <h2><span class="nm">05</span>Spring AI + Tanzu Platform: 1 + 1 = 3</h2>
+      <div class="unwritten">
+        <div>
+          <span class="brief">Show the concrete combination — a Spring AI app, deployed to Tanzu, with bound services, identity, and observability all stitched together.</span>
+          <span class="small">Unwritten — outline brief above.</span>
+        </div>
+        <button>Compose →</button>
+      </div>
+    </section>
+
+    <section class="piece" id="s6">
+      <h2><span class="nm">06</span>Agents With a Connection String Are an Avengers-Level Threat</h2>
+      <div class="failure">
+        <span class="label">Last attempt failed</span>
+        format 'blogs' not found in pack manifest
+      </div>
+      <div class="unwritten">
+        <div>
+          <span class="brief">Drive home the security argument — an agent with database access is a privileged process. Identity-aware service binding is the move.</span>
+          <span class="small">Failed earlier — fix the format mismatch above, then re-compose.</span>
+        </div>
+        <button>Retry →</button>
+      </div>
+    </section>
+
+    <a href="#" class="primary">Compose all unfilled sections →</a>
+
+  </main>
+</div>
+
+<footer class="deskfoot">
+  <div class="group"><span class="count">2,847</span> words · 3 of 9 drafted</div>
+  <div class="group">
+    <a href="#">Copy markdown</a>
+    <a href="#">Download .md</a>
+    <a href="#">Lint full doc</a>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,43 +1,90 @@
 import { useState } from "react";
 
 import type { Section } from "../../api/drafts";
+import { Icon } from "../ui/Icon";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { Spinner } from "./Stage1Idea";
 
 interface SectionCardProps {
   section: Section;
   index: number;
   isGenerating: boolean;
+  defaultOpen?: boolean;
   onSave: (content_md: string) => Promise<void>;
   onRegenerate: () => Promise<void>;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }
 
-function StatusChip({ status }: { status: Section["status"] }): JSX.Element {
-  const map: Record<Section["status"], { label: string; cls: string }> = {
-    empty: { label: "Unwritten", cls: "chip chip-muted" },
-    generating: { label: "Composing", cls: "chip chip-gold" },
-    ready: { label: "Ready", cls: "chip chip-teal" },
-    failed: { label: "Failed", cls: "chip chip-vermilion" },
-    edited: { label: "Edited", cls: "chip chip-teal" },
-  };
-  const { label, cls } = map[status] ?? { label: status, cls: "chip" };
-  return <span className={cls}>{label}</span>;
+function StatusPill({ status }: { status: Section["status"] }): JSX.Element {
+  switch (status) {
+    case "ready":
+      return (
+        <span className="nb-pill nb-pill-ready">
+          <span className="dot" />
+          Ready
+        </span>
+      );
+    case "edited":
+      return (
+        <span className="nb-pill nb-pill-edited">
+          <span className="dot" />
+          Edited
+        </span>
+      );
+    case "generating":
+      return (
+        <span className="nb-pill nb-pill-gen">
+          <span className="dot animate-pulse" />
+          Composing
+        </span>
+      );
+    case "failed":
+      return (
+        <span className="nb-pill nb-pill-failed">
+          <span className="dot" />
+          Failed
+        </span>
+      );
+    default:
+      return (
+        <span className="nb-pill nb-pill-empty">
+          <span className="dot" />
+          Unwritten
+        </span>
+      );
+  }
 }
 
 export function SectionCard({
   section,
   index,
   isGenerating,
+  defaultOpen,
   onSave,
   onRegenerate,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
 }: SectionCardProps): JSX.Element {
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenError, setRegenError] = useState<string | null>(null);
-
   const effectiveGenerating = isGenerating || section.status === "generating";
   const displayStatus: Section["status"] = effectiveGenerating ? "generating" : section.status;
 
-  const handleRegenerate = async () => {
+  const initialOpen =
+    defaultOpen !== undefined
+      ? defaultOpen
+      : displayStatus === "ready" ||
+        displayStatus === "edited" ||
+        displayStatus === "failed" ||
+        displayStatus === "generating";
+
+  const [open, setOpen] = useState(initialOpen);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
+
+  const handleRegenerate = async (): Promise<void> => {
     setRegenerating(true);
     setRegenError(null);
     try {
@@ -49,78 +96,153 @@ export function SectionCard({
     }
   };
 
+  const isFailed = displayStatus === "failed";
+
   return (
-    <article className="border border-rule rounded-sm overflow-hidden bg-surface/40 transition-colors hover:border-rule-2">
-      {/* Header: numeral + title + chips */}
-      <header className="px-5 pt-5 pb-4 border-b border-rule">
-        <div className="grid grid-cols-[3rem_1fr_auto] gap-4 items-start">
-          <span className="font-display-tight font-mono-num text-muted-2 text-3xl leading-none">
+    <article
+      id={`section-${section.id}`}
+      className={`nb-card scroll-mt-20 ${isFailed ? "" : "nb-card-hover"}`}
+      style={isFailed ? { borderColor: "#f7c7cf" } : undefined}
+    >
+      {/* Toggle row — heading is a button, side controls live outside it. */}
+      <div className="grid grid-cols-[1fr_auto] items-stretch">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="grid grid-cols-[44px_1fr] gap-4 items-center p-5 text-left hover:bg-card-2 transition-colors rounded-l-nb"
+          aria-expanded={open}
+          aria-controls={`section-body-${section.id}`}
+        >
+          <span
+            className={`w-9 h-9 rounded-nb-sm grid place-items-center font-mono text-xs font-semibold transition-colors ${
+              open ? "bg-cobalt-50 text-cobalt-700" : "bg-canvas text-muted"
+            }`}
+          >
             {String(index + 1).padStart(2, "0")}
           </span>
           <div className="min-w-0">
-            <h3 className="font-display text-cream-2 text-2xl leading-tight tracking-tight-2">
+            <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight">
               {section.title}
             </h3>
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <StatusChip status={displayStatus} />
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
+              <StatusPill status={displayStatus} />
               {section.word_count > 0 && (
-                <span className="font-mono text-[11px] text-muted">
-                  {section.word_count.toLocaleString()} words
-                </span>
+                <span className="text-muted font-mono">{section.word_count} words</span>
               )}
             </div>
           </div>
-        </div>
-        {section.brief && (
-          <p className="mt-3 pl-[3.5rem] font-prose italic text-cream/65 text-sm leading-relaxed">
-            {section.brief}
-          </p>
-        )}
-      </header>
+        </button>
 
-      {effectiveGenerating ? (
-        <div className="px-5 py-10 flex items-center justify-center gap-3 text-gold">
-          <Spinner />
-          <span className="font-mono text-[11px] uppercase tracking-wide-3">
-            Setting type — composing section…
-          </span>
+        <div className="flex items-center gap-1 pr-5">
+          {canMoveUp && (
+            <button
+              type="button"
+              onClick={onMoveUp}
+              className="nb-icon-btn"
+              aria-label="Move section up"
+            >
+              <Icon name="chevron-up" size={14} title="" />
+            </button>
+          )}
+          {canMoveDown && (
+            <button
+              type="button"
+              onClick={onMoveDown}
+              className="nb-icon-btn"
+              aria-label="Move section down"
+            >
+              <Icon name="chevron-down" size={14} title="" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="nb-icon-btn"
+            aria-label={open ? "Collapse section" : "Expand section"}
+          >
+            <Icon
+              name="chevron-down"
+              size={16}
+              title=""
+              className={`transition-transform ${open ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
-      ) : (
-        <div className="p-5">
-          {section.status === "failed" && section.last_error && (
-            <div className="mb-4 border-l-2 border-vermilion pl-4 py-2 bg-vermilion-900/30">
-              <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400">
-                last attempt failed
+      </div>
+
+      {open && (
+        <div
+          id={`section-body-${section.id}`}
+          className="px-5 pb-5 pt-1 border-t border-rule animate-fade-in"
+        >
+          {section.brief && (
+            <p className="font-serif italic text-[14px] text-muted px-3 py-2 mt-3 mb-4 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200">
+              {section.brief}
+            </p>
+          )}
+
+          {isFailed && section.last_error && (
+            <div
+              className="mb-4 px-3 py-2.5 rounded-nb-sm text-sm leading-snug"
+              style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wider mb-0.5">
+                Last attempt failed
               </p>
-              <p className="font-prose text-sm text-cream/85 mt-1">{section.last_error}</p>
+              {section.last_error}
             </div>
           )}
-          <MarkdownEditor initialMarkdown={section.content_md} onSave={onSave} />
+
+          {effectiveGenerating ? (
+            <div className="flex items-center gap-3 py-10 justify-center text-amber">
+              <span
+                aria-hidden
+                className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
+              />
+              <span className="text-sm font-medium">Composing this section…</span>
+            </div>
+          ) : section.content_md.trim() ? (
+            <MarkdownEditor initialMarkdown={section.content_md} onSave={onSave} />
+          ) : (
+            <div
+              className="nb-card p-6 text-center border-dashed"
+              style={{ background: "#fafbfc" }}
+            >
+              <p className="text-sm text-muted mb-3">This section hasn't been composed yet.</p>
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className="nb-btn nb-btn-primary nb-btn-sm"
+              >
+                {regenerating ? "Composing…" : "Compose this section →"}
+              </button>
+            </div>
+          )}
+
+          {regenError && (
+            <p
+              className="mt-3 text-xs px-3 py-2 rounded-nb-sm"
+              style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+            >
+              {regenError}
+            </p>
+          )}
+
+          {section.content_md.trim() && !effectiveGenerating && (
+            <div className="mt-4 pt-4 border-t border-rule flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleRegenerate}
+                disabled={regenerating || effectiveGenerating}
+                className="nb-btn nb-btn-sm"
+              >
+                {regenerating ? "Regenerating…" : "Regenerate"}
+              </button>
+            </div>
+          )}
         </div>
       )}
-
-      {regenError && (
-        <p className="mx-5 mb-3 text-vermilion-300 text-xs border-l-2 border-vermilion pl-3">
-          {regenError}
-        </p>
-      )}
-
-      <footer className="px-5 py-3 border-t border-rule flex items-center justify-end gap-2 bg-surface/60">
-        <button
-          type="button"
-          onClick={handleRegenerate}
-          disabled={regenerating || effectiveGenerating}
-          className="btn-press text-xs"
-        >
-          {regenerating ? (
-            <>
-              <Spinner /> Regenerating…
-            </>
-          ) : (
-            "Regenerate"
-          )}
-        </button>
-      </footer>
     </article>
   );
 }

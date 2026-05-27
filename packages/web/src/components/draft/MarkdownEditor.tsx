@@ -39,8 +39,7 @@ export function MarkdownEditor({
     content: "",
     editorProps: {
       attributes: {
-        class:
-          "prose prose-invert prose-stone max-w-none min-h-[220px] p-5 focus:outline-none font-prose prose-headings:font-display prose-headings:tracking-tight-2 prose-headings:text-cream-2 prose-p:text-cream prose-p:leading-relaxed prose-strong:text-cream-2 prose-em:text-cream prose-code:text-vermilion-300 prose-code:bg-ink prose-code:px-1 prose-code:rounded prose-blockquote:border-l-vermilion prose-blockquote:text-cream/85 prose-blockquote:italic prose-a:text-vermilion-300 prose-a:underline-offset-4",
+        class: "prose-body max-w-none min-h-[200px] p-5 focus:outline-none",
       },
     },
     onUpdate: ({ editor: e }) => {
@@ -51,7 +50,6 @@ export function MarkdownEditor({
     },
   });
 
-  // Initialise editor content when initialMarkdown changes.
   useEffect(() => {
     if (!editor) return;
     const html = marked.parse(initialMarkdown) as string;
@@ -75,7 +73,7 @@ export function MarkdownEditor({
     }
   }, [editor, mode, raw, turndown, onSave]);
 
-  const handleSwitchMode = (next: Mode) => {
+  const handleSwitchMode = (next: Mode): void => {
     if (next === mode || !editor) return;
     if (next === "raw") {
       setRaw(turndown.turndown(editor.getHTML()));
@@ -85,16 +83,16 @@ export function MarkdownEditor({
     setMode(next);
   };
 
-  const handleRawChange = (val: string) => {
+  const handleRawChange = (val: string): void => {
     setRaw(val);
     if (onChange) onChange(val);
   };
 
   return (
-    <div className="flex flex-col border border-rule rounded-sm overflow-hidden bg-ink">
-      <header className="border-b border-rule px-4 py-2 flex items-center gap-3 bg-surface">
+    <div className="flex flex-col border border-rule rounded-nb overflow-hidden bg-white">
+      <header className="border-b border-rule px-3 py-2 flex items-center gap-3 bg-card-2">
         <div
-          className="inline-flex border border-rule rounded-sm overflow-hidden"
+          className="inline-flex bg-canvas rounded-md p-0.5 border border-rule"
           role="tablist"
           aria-label="Editor mode"
         >
@@ -103,8 +101,8 @@ export function MarkdownEditor({
             role="tab"
             aria-selected={mode === "rich"}
             onClick={() => handleSwitchMode("rich")}
-            className={`px-3 py-1 font-mono text-[10px] uppercase tracking-wide-3 transition-colors ${
-              mode === "rich" ? "bg-vermilion text-cream-2" : "text-muted hover:text-cream"
+            className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+              mode === "rich" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"
             }`}
           >
             Rich
@@ -114,25 +112,19 @@ export function MarkdownEditor({
             role="tab"
             aria-selected={mode === "raw"}
             onClick={() => handleSwitchMode("raw")}
-            className={`px-3 py-1 font-mono text-[10px] uppercase tracking-wide-3 border-l border-rule transition-colors ${
-              mode === "raw" ? "bg-vermilion text-cream-2" : "text-muted hover:text-cream"
+            className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+              mode === "raw" ? "bg-white text-ink shadow-sm" : "text-muted hover:text-ink"
             }`}
           >
             Raw
           </button>
         </div>
         <div className="flex-1" />
-        {error && (
-          <span className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-300">
-            {error}
-          </span>
-        )}
+        {error && <span className="text-xs text-rose-ink">{error}</span>}
         {savedMessage && (
-          <span className="font-mono text-[10px] uppercase tracking-wide-3 text-teal animate-fade-up">
-            ✓ {savedMessage}
-          </span>
+          <span className="text-xs text-leaf font-medium animate-fade-in">✓ {savedMessage}</span>
         )}
-        <button type="button" onClick={handleSave} disabled={saving} className="btn-press">
+        <button type="button" onClick={handleSave} disabled={saving} className="nb-btn nb-btn-sm">
           {saving ? "Saving…" : "Save"}
         </button>
       </header>
@@ -140,7 +132,7 @@ export function MarkdownEditor({
       {mode === "rich" && editor && (
         <>
           <Toolbar editor={editor} />
-          <div className="flex-1 overflow-y-auto bg-ink">
+          <div className="bg-white">
             <EditorContent editor={editor} />
           </div>
         </>
@@ -149,7 +141,7 @@ export function MarkdownEditor({
         <textarea
           value={raw}
           onChange={(e) => handleRawChange(e.target.value)}
-          className="flex-1 min-h-[220px] bg-ink text-cream font-mono text-sm p-5 focus:outline-none resize-none leading-relaxed"
+          className="min-h-[200px] bg-white text-ink font-mono text-[13px] p-5 focus:outline-none resize-none leading-relaxed"
         />
       )}
     </div>
@@ -163,20 +155,20 @@ interface ToolbarProps {
 function Toolbar({ editor }: ToolbarProps): JSX.Element | null {
   if (!editor) return null;
   return (
-    <div className="border-b border-rule px-4 py-1.5 flex gap-0.5 bg-surface/60">
+    <div className="border-b border-rule px-3 py-1.5 flex items-center gap-0.5 bg-card-2">
       <TButton
         active={editor.isActive("heading", { level: 2 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
         label="Heading 2"
       >
-        <span className="font-display text-base leading-none">H2</span>
+        <span className="font-serif text-sm font-semibold">H2</span>
       </TButton>
       <TButton
         active={editor.isActive("heading", { level: 3 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         label="Heading 3"
       >
-        <span className="font-display text-sm leading-none">H3</span>
+        <span className="font-serif text-xs font-semibold">H3</span>
       </TButton>
       <Divider />
       <TButton
@@ -184,21 +176,21 @@ function Toolbar({ editor }: ToolbarProps): JSX.Element | null {
         onClick={() => editor.chain().focus().toggleBold().run()}
         label="Bold"
       >
-        <b className="font-display">B</b>
+        <b>B</b>
       </TButton>
       <TButton
         active={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
         label="Italic"
       >
-        <i className="font-display">I</i>
+        <i>I</i>
       </TButton>
       <TButton
         active={editor.isActive("strike")}
         onClick={() => editor.chain().focus().toggleStrike().run()}
         label="Strikethrough"
       >
-        <s className="font-display">S</s>
+        <s>S</s>
       </TButton>
       <Divider />
       <TButton
@@ -213,14 +205,14 @@ function Toolbar({ editor }: ToolbarProps): JSX.Element | null {
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         label="Numbered list"
       >
-        <span className="font-mono-num">1.</span>
+        <span className="font-mono">1.</span>
       </TButton>
       <TButton
         active={editor.isActive("blockquote")}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         label="Blockquote"
       >
-        <span className="font-display">❝</span>
+        <span className="font-serif">❝</span>
       </TButton>
       <TButton
         active={editor.isActive("code")}
@@ -234,7 +226,7 @@ function Toolbar({ editor }: ToolbarProps): JSX.Element | null {
 }
 
 function Divider(): JSX.Element {
-  return <div aria-hidden className="w-px h-5 bg-rule mx-1 self-center" />;
+  return <div aria-hidden className="w-px h-5 bg-rule mx-1.5" />;
 }
 
 interface TButtonProps {
@@ -251,8 +243,8 @@ function TButton({ active, onClick, label, children }: TButtonProps): JSX.Elemen
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
-      className={`min-w-[2rem] h-7 px-2 rounded-sm text-xs flex items-center justify-center transition-colors ${
-        active ? "bg-vermilion text-cream-2" : "text-cream/80 hover:bg-rule/40 hover:text-cream-2"
+      className={`min-w-[28px] h-7 px-2 rounded-md text-xs flex items-center justify-center transition-colors ${
+        active ? "bg-cobalt-50 text-cobalt-700" : "text-ink-2 hover:bg-canvas"
       }`}
     >
       {children}

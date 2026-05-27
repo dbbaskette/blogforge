@@ -3,13 +3,9 @@
 @tailwind utilities;
 
 /* ────────────────────────────────────────────────────────────────
-   Pencraft — editorial workshop theme
+   Pencraft — Notebook theme
+   Soft, content-first, friendly. Inter UI, Lora prose, cobalt accent.
    ──────────────────────────────────────────────────────────────── */
-
-:root {
-  /* Riso-style grain layer (subtle, ~3% opacity, large blur) */
-  --grain: url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.18 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-}
 
 html,
 body,
@@ -18,190 +14,292 @@ body,
 }
 
 html {
-  font-family: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "ss01" on, "cv11" on;
+  font-feature-settings: "cv11" on, "ss01" on;
+  color-scheme: light;
 }
 
 body {
-  background-color: #0e1015;
-  color: #e8e5da;
-  /* The grain overlay sits above the base color, below content. */
-  background-image: var(--grain);
-  background-size: 300px 300px;
-  background-repeat: repeat;
-  background-blend-mode: overlay;
+  background-color: #f6f7f9;
+  color: #1f2328;
+  line-height: 1.55;
 }
 
-/* Display headings use Fraunces with pushed optical axes. */
-.font-display {
-  font-family: "Fraunces", ui-serif, Georgia, serif;
-  font-optical-sizing: auto;
-  font-variation-settings: "SOFT" 50, "WONK" 1;
-  letter-spacing: -0.02em;
+::selection {
+  background: rgba(79, 109, 240, 0.18);
+  color: #1f2328;
 }
 
-/* Tighter display variant for large hero numerals. */
-.font-display-tight {
-  font-family: "Fraunces", ui-serif, Georgia, serif;
-  font-optical-sizing: auto;
-  font-variation-settings: "SOFT" 0, "WONK" 0;
-  letter-spacing: -0.04em;
+:focus-visible {
+  outline: 2px solid #4f6df0;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
-/* Body prose font — Newsreader is a literary serif designed for reading. */
-.font-prose {
-  font-family: "Newsreader", ui-serif, Georgia, serif;
-  font-optical-sizing: auto;
-  letter-spacing: 0;
+/* Prose body type — Lora */
+.prose-body {
+  font-family: "Lora", ui-serif, Georgia, serif;
+  font-size: 17px;
+  line-height: 1.7;
+  color: #3a3f47;
+}
+.prose-body p {
+  margin: 0 0 1em 0;
+}
+.prose-body p:last-child {
+  margin-bottom: 0;
+}
+.prose-body em,
+.prose-body i {
+  font-style: italic;
+}
+.prose-body strong,
+.prose-body b {
+  color: #1f2328;
+  font-weight: 600;
+}
+.prose-body code {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.92em;
+  background: #f6f7f9;
+  border: 1px solid #e6e8ed;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #2b40a8;
+}
+.prose-body blockquote {
+  margin: 1.2em 0;
+  padding: 4px 0 4px 16px;
+  border-left: 3px solid #d5dcfc;
+  font-style: italic;
+  color: #3a3f47;
+}
+.prose-body h2,
+.prose-body h3 {
+  font-family: "Lora", serif;
+  font-weight: 600;
+  color: #1f2328;
+  letter-spacing: -0.01em;
+  margin-top: 1.6em;
+}
+.prose-body h2 {
+  font-size: 22px;
+}
+.prose-body h3 {
+  font-size: 18px;
+}
+.prose-body ul,
+.prose-body ol {
+  padding-left: 1.4em;
+  margin: 0 0 1em 0;
+}
+.prose-body li {
+  margin: 0.25em 0;
+}
+.prose-body a {
+  color: #4f6df0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.prose-body a:hover {
+  color: #2b40a8;
 }
 
-/* Mono numerals with tabular figures for word counts + stage numbers. */
-.font-mono,
-.font-mono-num {
-  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace;
-  font-feature-settings: "tnum" on;
-  font-variant-numeric: tabular-nums;
+/* ──────────────────────────── Components ──────────────────────────── */
+
+/* Card surface */
+.nb-card {
+  background: #ffffff;
+  border: 1px solid #e6e8ed;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.2s ease-out, border-color 0.2s ease-out;
+}
+.nb-card-hover:hover {
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.12);
+  border-color: #d0d4dc;
 }
 
-/* Hairline horizontal rule, classic print style. */
-.rule {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #3b404f 18%, #3b404f 82%, transparent);
-}
-
-/* Animated ink stroke under hovered draft entries. */
-.ink-underline {
-  position: relative;
-}
-.ink-underline::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -2px;
-  height: 2px;
-  background: #e04e3f;
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.ink-underline:hover::after,
-.ink-underline:focus-visible::after {
-  transform: scaleX(1);
-}
-
-/* Generic chip / pill */
-.chip {
+/* Status pill */
+.nb-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.125rem 0.5rem;
-  border: 1px solid #2a2e3d;
+  gap: 5px;
+  padding: 2px 9px;
   border-radius: 9999px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.6875rem;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.005em;
+}
+.nb-pill .dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.nb-pill-ready {
+  background: #e3f5ec;
+  color: #1f7752;
+}
+.nb-pill-empty {
+  background: #f6f7f9;
+  color: #6e7682;
+  border: 1px dashed #d0d4dc;
+  padding-block: 1px;
+}
+.nb-pill-failed {
+  background: #fde9ec;
+  color: #94293c;
+}
+.nb-pill-gen {
+  background: #fbf1de;
+  color: #8a5d18;
+}
+.nb-pill-edited {
+  background: #eaeefe;
+  color: #2b40a8;
+}
+
+/* Buttons */
+.nb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid #d0d4dc;
+  color: #1f2328;
+  border-radius: 8px;
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s ease-out, box-shadow 0.15s;
+}
+.nb-btn:hover:not(:disabled) {
+  background: #fafbfc;
+  border-color: #aab1bd;
+}
+.nb-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.nb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nb-btn-primary {
+  background: #4f6df0;
+  border-color: #4f6df0;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgba(79, 109, 240, 0.3), 0 4px 12px -2px rgba(79, 109, 240, 0.35);
+}
+.nb-btn-primary:hover:not(:disabled) {
+  background: #2b40a8;
+  border-color: #2b40a8;
+}
+.nb-btn-primary:disabled {
+  background: #aebbfa;
+  border-color: #aebbfa;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.nb-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #6e7682;
+  box-shadow: none;
+}
+.nb-btn-ghost:hover:not(:disabled) {
+  background: #f6f7f9;
+  color: #1f2328;
+  border-color: transparent;
+}
+
+.nb-btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+/* Icon button — round, small, used for section actions */
+.nb-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: #6e7682;
+  transition: background 0.15s, color 0.15s;
+}
+.nb-icon-btn:hover:not(:disabled) {
+  background: #f6f7f9;
+  color: #1f2328;
+}
+.nb-icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Form controls */
+.nb-input,
+.nb-select,
+.nb-textarea {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #d0d4dc;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  color: #1f2328;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.nb-input::placeholder,
+.nb-textarea::placeholder {
+  color: #aab1bd;
+}
+.nb-input:focus,
+.nb-select:focus,
+.nb-textarea:focus {
+  outline: none;
+  border-color: #4f6df0;
+  box-shadow: 0 0 0 3px rgba(79, 109, 240, 0.12);
+}
+.nb-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.nb-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #9c9885;
+  color: #6e7682;
+  margin-bottom: 4px;
 }
 
-.chip-gold {
-  border-color: rgba(244, 163, 60, 0.35);
-  color: #f4a33c;
-  background: rgba(244, 163, 60, 0.07);
-}
-.chip-teal {
-  border-color: rgba(122, 168, 176, 0.35);
-  color: #7aa8b0;
-  background: rgba(122, 168, 176, 0.07);
-}
-.chip-vermilion {
-  border-color: rgba(224, 78, 63, 0.45);
-  color: #f08679;
-  background: rgba(224, 78, 63, 0.1);
-}
-.chip-muted {
-  border-color: #2a2e3d;
-  color: #6e6b5e;
+/* Hairline rule */
+.nb-rule {
+  height: 1px;
+  background: #e6e8ed;
+  border: none;
 }
 
-/* Primary button — the "vermilion stamp" */
-.btn-stamp {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.125rem;
-  background: #e04e3f;
-  color: #f4f1e7;
-  font-family: "Inter Tight", sans-serif;
-  font-weight: 600;
-  font-size: 0.875rem;
-  letter-spacing: 0.01em;
-  border: 1px solid #c43d31;
-  border-radius: 0.25rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 0 rgba(0, 0, 0, 0.3), 0 6px 18px -8px
-    rgba(224, 78, 63, 0.5);
-  transition: transform 120ms ease-out, box-shadow 200ms ease-out;
-}
-.btn-stamp:hover {
-  transform: translateY(-1px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 0 rgba(0, 0, 0, 0.4), 0 10px 24px -10px
-    rgba(224, 78, 63, 0.7);
-}
-.btn-stamp:active {
-  transform: translateY(0);
-}
-.btn-stamp:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Secondary outlined button — "letterpress" feel */
-.btn-press {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.875rem;
-  background: transparent;
-  color: #e8e5da;
-  font-family: "Inter Tight", sans-serif;
-  font-weight: 500;
-  font-size: 0.8125rem;
-  letter-spacing: 0.01em;
-  border: 1px solid #3b404f;
-  border-radius: 0.125rem;
-  transition: background 150ms ease-out, border-color 150ms ease-out;
-}
-.btn-press:hover {
-  background: rgba(232, 229, 218, 0.04);
-  border-color: #585d72;
-}
-.btn-press:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* Focus ring for everything */
-:focus-visible {
-  outline: 2px solid #e04e3f;
-  outline-offset: 2px;
-}
-
-/* Selection color */
-::selection {
-  background: rgba(224, 78, 63, 0.35);
-  color: #f4f1e7;
-}
-
-/* Pencraft wordmark — the only thing styled by hand */
-.wordmark {
-  font-family: "Fraunces", ui-serif, Georgia, serif;
-  font-weight: 700;
-  font-optical-sizing: auto;
-  font-variation-settings: "SOFT" 100, "WONK" 1;
-  font-style: italic;
-  letter-spacing: -0.04em;
+/* Range slider — cobalt accent */
+input[type="range"] {
+  accent-color: #4f6df0;
 }

@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DraftPage } from "../../src/routes/DraftPage";
 
-// vi.mock is hoisted — cannot reference top-level variables here.
 vi.mock("../../src/api/drafts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/api/drafts")>();
   return {
@@ -40,7 +39,7 @@ vi.mock("../../src/api/providers", () => ({
 }));
 
 describe("DraftPage", () => {
-  it("renders Stage1Idea once draft loads", async () => {
+  it("renders the IdeaPanel once draft loads at the idea stage", async () => {
     render(
       <MemoryRouter initialEntries={["/drafts/abc123"]}>
         <Routes>
@@ -53,7 +52,7 @@ describe("DraftPage", () => {
     );
   });
 
-  it("renders stage indicator", async () => {
+  it("shows the back-to-drafts link and saved status", async () => {
     render(
       <MemoryRouter initialEntries={["/drafts/abc123"]}>
         <Routes>
@@ -61,6 +60,7 @@ describe("DraftPage", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await waitFor(() => expect(screen.getByText("1. Idea")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/All drafts/i)).toBeInTheDocument());
+    expect(screen.getByText(/All changes saved/i)).toBeInTheDocument();
   });
 });

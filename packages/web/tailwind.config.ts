@@ -6,71 +6,87 @@ export default {
   theme: {
     extend: {
       colors: {
-        // "Coffee-and-vermilion" palette — warm, editorial, opinionated.
-        ink: "#0E1015", // deepest background
-        surface: "#161922", // cards, dialogs
-        "surface-2": "#1D2030", // raised surfaces
-        rule: "#2A2E3D", // hairline borders
-        "rule-2": "#3B404F", // emphasized borders
-        cream: "#E8E5DA", // body text
-        "cream-2": "#F4F1E7", // emphasized text
-        muted: "#9C9885", // metadata
-        "muted-2": "#6E6B5E", // very low-emphasis
-        vermilion: {
-          DEFAULT: "#E04E3F",
-          50: "#FDEDEC",
-          100: "#FBD9D6",
-          200: "#F6B0A8",
-          300: "#F08679",
-          400: "#E84F3F",
-          500: "#E04E3F",
-          600: "#B33A2E",
-          700: "#822A22",
-          800: "#561B16",
-          900: "#2C0F0C",
+        // Notebook palette — friendly, soft, content-first.
+        canvas: "#f6f7f9", // app background
+        card: "#ffffff",
+        "card-2": "#fafbfc",
+        ink: {
+          DEFAULT: "#1f2328",
+          2: "#3a3f47",
         },
-        gold: {
-          DEFAULT: "#F4A33C",
-          400: "#F4A33C",
-          500: "#D9892A",
-          600: "#A66920",
+        muted: {
+          DEFAULT: "#6e7682",
+          2: "#aab1bd",
         },
-        teal: {
-          DEFAULT: "#7AA8B0",
-          400: "#7AA8B0",
+        rule: {
+          DEFAULT: "#e6e8ed",
+          2: "#d0d4dc",
+        },
+        cobalt: {
+          DEFAULT: "#4f6df0",
+          50: "#eaeefe",
+          100: "#d5dcfc",
+          200: "#aebbfa",
+          300: "#8094f6",
+          400: "#5b76f2",
+          500: "#4f6df0",
+          600: "#3a55d8",
+          700: "#2b40a8",
+          800: "#1e2d76",
+          900: "#121a45",
+        },
+        // Status accents
+        leaf: {
+          DEFAULT: "#2f9968",
+          soft: "#e3f5ec",
+        },
+        amber: {
+          DEFAULT: "#c98a26",
+          soft: "#fbf1de",
+        },
+        rose: {
+          DEFAULT: "#d4546b",
+          soft: "#fde9ec",
+          ink: "#94293c",
         },
       },
       fontFamily: {
-        display: ['"Fraunces"', "ui-serif", "Georgia", "serif"],
-        body: ['"Newsreader"', "ui-serif", "Georgia", "serif"],
-        ui: ['"Inter Tight"', "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ['"Inter"', "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ['"Lora"', "ui-serif", "Georgia", "serif"],
         mono: ['"JetBrains Mono"', "ui-monospace", "Menlo", "monospace"],
       },
-      fontVariationSettings: {
-        "display-soft": '"SOFT" 80, "WONK" 1',
-        "display-tight": '"SOFT" 20, "WONK" 0',
+      borderRadius: {
+        nb: "12px",
+        "nb-sm": "8px",
       },
-      letterSpacing: {
-        "tight-2": "-0.04em",
-        "wide-3": "0.18em",
+      boxShadow: {
+        nb: "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06)",
+        "nb-hover": "0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.12)",
+        "nb-pop": "0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 28px -8px rgba(15, 23, 42, 0.18)",
+        "nb-cobalt": "0 1px 2px rgba(79, 109, 240, 0.3), 0 4px 12px -2px rgba(79, 109, 240, 0.35)",
       },
       animation: {
-        "fade-up": "fade-up 600ms cubic-bezier(0.22, 1, 0.36, 1) both",
-        "slide-in": "slide-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both",
-        ink: "ink 1.6s ease-out forwards",
+        "fade-in": "fade-in 240ms ease-out both",
+        "fade-up": "fade-up 360ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "slide-in-right": "slide-in-right 320ms cubic-bezier(0.22, 1, 0.36, 1) both",
+        "expand-card": "expand-card 280ms cubic-bezier(0.22, 1, 0.36, 1) both",
       },
       keyframes: {
+        "fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
         "fade-up": {
-          "0%": { opacity: "0", transform: "translateY(12px)" },
+          "0%": { opacity: "0", transform: "translateY(8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
-        "slide-in": {
-          "0%": { opacity: "0", transform: "translateX(-16px)" },
+        "slide-in-right": {
+          "0%": { opacity: "0", transform: "translateX(20px)" },
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
-        ink: {
-          "0%": { width: "0%" },
-          "100%": { width: "100%" },
+        "expand-card": {
+          "0%": { opacity: "0", maxHeight: "0", paddingTop: "0", paddingBottom: "0" },
+          "100%": { opacity: "1", maxHeight: "4000px" },
         },
       },
     },
