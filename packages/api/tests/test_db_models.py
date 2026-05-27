@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from pencraft.db.base import Base
 from pencraft.db.models import Draft, Section, User
@@ -24,7 +24,9 @@ async def test_create_user(session):
     u = User(email="alice@example.com", password_hash="x", status="approved", role="user")
     session.add(u)
     await session.commit()
-    row = (await session.execute(select(User).where(User.email == "alice@example.com"))).scalar_one()
+    row = (
+        await session.execute(select(User).where(User.email == "alice@example.com"))
+    ).scalar_one()
     assert row.id is not None
     assert row.role == "user"
     assert row.status == "approved"

@@ -1,5 +1,6 @@
 """Auth endpoints: /api/auth/request, /login, /logout, /me."""
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from typing import Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr, Field
@@ -49,11 +50,11 @@ async def request_access(
     session.add(user)
     try:
         await session.commit()
-    except IntegrityError:
+    except IntegrityError as err:
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="email_already_exists"
-        )
+        ) from err
     return {"status": "pending"}
 
 
@@ -84,7 +85,7 @@ async def login(
         max_age=COOKIE_MAX_AGE_SECONDS,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite=settings.cookie_samesite,
+        samesite=cast(Literal["lax", "strict", "none"], settings.cookie_samesite),
         path="/",
     )
     return {"status": "ok"}

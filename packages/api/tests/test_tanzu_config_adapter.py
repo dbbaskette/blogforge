@@ -5,7 +5,6 @@ from unittest import mock
 
 from pencraft.config.tanzu import apply_vcap_services
 
-
 VCAP = {
     "postgresql": [
         {

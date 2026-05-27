@@ -12,7 +12,8 @@ router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
 
 def _store(request: Request) -> SqlDraftStore:
-    return request.app.state.draft_store
+    store: SqlDraftStore = request.app.state.draft_store
+    return store
 
 
 def _not_found(draft_id: str) -> HTTPException:

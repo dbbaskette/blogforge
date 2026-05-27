@@ -70,7 +70,7 @@ def client() -> Iterator[TestClient]:
 
 from pencraft.auth.passwords import hash_password  # noqa: E402
 from pencraft.auth.sessions import COOKIE_NAME, SessionSigner  # noqa: E402
-from pencraft.db.engine import get_engine, get_sessionmaker  # noqa: E402
+from pencraft.db.engine import get_sessionmaker  # noqa: E402
 from pencraft.db.models import User  # noqa: E402
 
 

@@ -62,6 +62,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "RUF"]
+# B008: FastAPI's Depends()/Query()/etc. are intentionally called in default-arg
+# position. The rule is meant for "expensive sentinels"; FastAPI's helpers are
+# the idiomatic exception across the framework.
+ignore = ["B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["pencraft"]
@@ -75,6 +79,16 @@ explicit_package_bases = true
 [[tool.mypy.overrides]]
 module = "myvoice.*"
 ignore_missing_imports = true
+
+# Tests don't need full strict-mode annotations (e.g. `-> None` on every test).
+# Production code still under strict.
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+disable_error_code = ["untyped-decorator"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages/api/tests"]

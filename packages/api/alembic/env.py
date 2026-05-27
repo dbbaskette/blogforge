@@ -5,10 +5,10 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from pencraft.config import get_settings
-from pencraft.db.base import Base
 
 # Make sure model metadata is populated before autogenerate inspects it.
 from pencraft.db import models  # noqa: F401
+from pencraft.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:

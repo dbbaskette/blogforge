@@ -11,6 +11,7 @@ wins over bound-service inference.
 import json
 import logging
 import os
+from typing import Any
 
 _log = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def apply_vcap_services() -> None:
         return
 
     # Flatten all service bindings into (label, instance) pairs.
-    instances: list[tuple[str, dict]] = []
+    instances: list[tuple[str, dict[str, Any]]] = []
     for label, bindings in vcap.items():
         if not isinstance(bindings, list):
             continue
@@ -39,7 +40,7 @@ def apply_vcap_services() -> None:
     _apply_s3(instances)
 
 
-def _apply_postgres(instances: list[tuple[str, dict]]) -> None:
+def _apply_postgres(instances: list[tuple[str, dict[str, Any]]]) -> None:
     for label, inst in instances:
         if label not in ("postgresql", "postgres") and inst.get("name") != "pencraft-postgres":
             continue
@@ -56,7 +57,7 @@ def _apply_postgres(instances: list[tuple[str, dict]]) -> None:
         return
 
 
-def _apply_s3(instances: list[tuple[str, dict]]) -> None:
+def _apply_s3(instances: list[tuple[str, dict[str, Any]]]) -> None:
     for label, inst in instances:
         if label not in ("seaweedfs", "s3") and inst.get("name") != "pencraft-s3":
             continue

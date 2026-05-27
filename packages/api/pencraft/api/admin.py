@@ -1,5 +1,5 @@
 """Admin user-management endpoints. All require role=admin."""
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status

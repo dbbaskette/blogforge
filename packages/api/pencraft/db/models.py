@@ -4,7 +4,7 @@ Uses SQLAlchemy 2.0 typed-mapped style. JSON columns store the existing
 pydantic structures (IdeaInput, OutlineProposal) as dicts — they're
 validated at the API boundary, not at the ORM boundary.
 """
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 

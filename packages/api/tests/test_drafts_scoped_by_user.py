@@ -1,5 +1,4 @@
 """SqlDraftStore enforces per-user scoping on every method."""
-import pytest
 import pytest_asyncio
 
 from pencraft.auth.passwords import hash_password
