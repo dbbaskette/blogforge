@@ -1,24 +1,8 @@
 """POST /api/drafts/{id}/sections/{id}/save + reorder."""
 from __future__ import annotations
 
-from collections.abc import Iterator
-from pathlib import Path
 
-import pytest
-from fastapi.testclient import TestClient
-
-from pencraft.server import create_app
-
-
-@pytest.fixture
-def section_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
-    app = create_app()
-    with TestClient(app) as c:
-        yield c
-
-
-def _seed(client: TestClient) -> str:
+def _seed(client) -> str:
     created = client.post(
         "/api/drafts",
         json={
@@ -51,9 +35,10 @@ def _seed(client: TestClient) -> str:
     return created["id"]  # type: ignore[no-any-return]
 
 
-def test_save_section_sets_edited(section_client: TestClient) -> None:
-    did = _seed(section_client)
-    r = section_client.post(
+async def test_save_section_sets_edited(authed_client) -> None:
+    client, _ = authed_client
+    did = _seed(client)
+    r = client.post(
         f"/api/drafts/{did}/sections/s1/save",
         json={"content_md": "Some new content here."},
     )
@@ -64,9 +49,10 @@ def test_save_section_sets_edited(section_client: TestClient) -> None:
     assert s1["word_count"] == 4
 
 
-def test_reorder_sections(section_client: TestClient) -> None:
-    did = _seed(section_client)
-    r = section_client.post(
+async def test_reorder_sections(authed_client) -> None:
+    client, _ = authed_client
+    did = _seed(client)
+    r = client.post(
         f"/api/drafts/{did}/sections/reorder",
         json={"section_ids": ["s2", "s1"]},
     )

@@ -2,20 +2,19 @@
 from __future__ import annotations
 
 import shutil
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 import yaml
-from fastapi.testclient import TestClient
 
-from pencraft.server import create_app
+from tests.conftest import _seed_approved_user, _signed_client
 
 _MYVOICE_DAN = Path("/Users/dbbaskette/Projects/myvoice/packs/dan")
 
 
-@pytest.fixture
-def expand_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+@pytest_asyncio.fixture
+async def expand_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     if not _MYVOICE_DAN.exists():
         pytest.skip("requires myvoice dan pack")
     packs_root = tmp_path / "packs"
@@ -25,15 +24,15 @@ def expand_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[T
     cfg.write_text(yaml.safe_dump({"providers": {"anthropic": {"api_key": "sk-mock"}}}))
     monkeypatch.setenv("MYVOICE_PACKS_ROOT", str(packs_root))
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(cfg))
-    monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
     monkeypatch.setenv("PENCRAFT_TEST_PROVIDER", "mock")
     monkeypatch.setenv("PENCRAFT_MOCK_OUTPUT", "Section body content here.")
-    app = create_app()
-    with TestClient(app) as c:
+
+    uid = await _seed_approved_user()
+    with _signed_client(uid) as c:
         yield c
 
 
-def _seed_outlined_draft(client: TestClient) -> str:
+def _seed_outlined_draft(client) -> str:
     """Create a draft and add an outline manually (PUT)."""
     created = client.post(
         "/api/drafts",
@@ -67,7 +66,7 @@ def _seed_outlined_draft(client: TestClient) -> str:
     return created["id"]  # type: ignore[no-any-return]
 
 
-def test_expand_returns_job_and_runs_sections(expand_client: TestClient) -> None:
+async def test_expand_returns_job_and_runs_sections(expand_client) -> None:
     did = _seed_outlined_draft(expand_client)
     r = expand_client.post(f"/api/drafts/{did}/expand")
     assert r.status_code == 202
@@ -82,7 +81,7 @@ def test_expand_returns_job_and_runs_sections(expand_client: TestClient) -> None
     assert all(s["content_md"].strip() for s in final["sections"])
 
 
-def test_expand_outline_missing_409(expand_client: TestClient) -> None:
+async def test_expand_outline_missing_409(expand_client) -> None:
     created = expand_client.post(
         "/api/drafts",
         json={

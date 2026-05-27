@@ -4,6 +4,24 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DraftPage } from "../../src/routes/DraftPage";
 
+vi.mock("../../src/hooks/useMe", () => ({
+  useMe: () => ({
+    user: { id: "u1", email: "test@x.com", role: "user", status: "approved" },
+    loading: false,
+    error: null,
+    refresh: () => {},
+  }),
+}));
+vi.mock("../../src/api/auth", () => ({
+  logout: vi.fn().mockResolvedValue(undefined),
+  getMe: vi.fn().mockResolvedValue({
+    id: "u1",
+    email: "test@x.com",
+    role: "user",
+    status: "approved",
+  }),
+}));
+
 vi.mock("../../src/api/drafts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/api/drafts")>();
   return {

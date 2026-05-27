@@ -16,30 +16,65 @@ Three stages per draft:
 2. **Outline** — Pencraft proposes an opening hook + 5–9 sections with briefs. Edit titles, reorder, regenerate; nothing's written to disk yet beyond the draft itself.
 3. **Sections** — Pencraft expands each section as the pack would (parallel, streaming). Edit any section by hand or regenerate just that one. Download the assembled markdown when you're done.
 
-Drafts persist to `~/.pencraft/drafts/`. Resume any time.
+Drafts persist to Postgres (multi-user, scoped per account). Bring your own database, or use the bundled docker-compose stack below.
 
-## Quick start
+## Quickstart (Docker)
 
-1. Install myvoice and add an API key (`pipx install myvoice && myvoice serve` → Settings).
-2. Install Pencraft: `pipx install pencraft`.
-3. Run `pencraft serve`. Browser opens at `localhost:7880`.
-4. Click "+ New draft", fill in a topic, pick a voice pack, generate outline, expand sections.
-5. Download the `.md` when you're happy.
+```bash
+docker compose up --build
+```
+
+Then open http://localhost:7880 in your browser. The first time the API
+container starts it will:
+
+1. Run database migrations (`alembic upgrade head`).
+2. Seed an admin user — `dbbaskette@gmail.com` / `VMware0!`.
+
+Sign in with that account. To add more users, share the URL — anyone can
+hit `/login`, click **Request access**, and submit. You'll see them in
+`/admin` and can approve.
 
 ![3-stage flow](docs/screenshots/pencraft-flow.png)
 
-## Install
+## Local dev (without Docker)
+
+Run Postgres and MinIO via Docker, but the API/web from your host:
 
 ```bash
-brew install pipx
-pipx ensurepath
-pipx install pencraft
-pencraft serve
+docker compose up postgres minio -d
+PENCRAFT_DATABASE_URL="postgresql+asyncpg://pencraft:pencraft@localhost:5432/pencraft" \
+PENCRAFT_S3_ENDPOINT_URL="http://localhost:9000" \
+PENCRAFT_S3_ACCESS_KEY=pencraft \
+PENCRAFT_S3_SECRET_KEY=pencraft-minio-secret \
+PENCRAFT_S3_BUCKET=pencraft \
+PENCRAFT_ADMIN_EMAIL=dbbaskette@gmail.com \
+PENCRAFT_ADMIN_PASSWORD=VMware0! \
+PENCRAFT_CORS_ORIGINS=http://localhost:7881 \
+  uv run pencraft serve --port 7880
 ```
 
-Browser opens at `http://localhost:7880`.
+In another terminal, the web dev server:
 
-Pencraft reads API keys from `~/.myvoice/config.yaml`. Add at least one provider key in myvoice's Settings page (`localhost:7878`) before generating.
+```bash
+cd packages/web && pnpm dev
+# vite serves :7881; API calls hit :7880 via CORS with credentials
+```
+
+## Tanzu Platform deployment
+
+```bash
+cf create-service postgres on-demand-postgres-small pencraft-postgres
+cf create-service seaweedfs default pencraft-s3
+cf push -f manifest.yml
+cf set-env pencraft PENCRAFT_ADMIN_PASSWORD '<your-strong-secret>'
+cf set-env pencraft PENCRAFT_SESSION_SECRET "$(openssl rand -hex 32)"
+cf restage pencraft
+```
+
+The `pencraft.config.tanzu` adapter translates `VCAP_SERVICES` into the
+env vars the app reads, so no manual database / S3 wiring is needed.
+
+Pencraft reads LLM API keys from `~/.myvoice/config.yaml`. Add at least one provider key in myvoice's Settings page (`localhost:7878`) before generating.
 
 ## Requires
 

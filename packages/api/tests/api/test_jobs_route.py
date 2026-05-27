@@ -2,7 +2,7 @@ import pytest
 
 
 @pytest.mark.asyncio
-async def test_job_not_found(tmp_path, monkeypatch):  # type: ignore[no-untyped-def]
+async def test_job_not_found(tmp_path, monkeypatch):
     monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
     from fastapi.testclient import TestClient
 

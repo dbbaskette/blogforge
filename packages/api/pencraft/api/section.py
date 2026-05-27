@@ -6,14 +6,18 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 import yaml
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from myvoice.compose import ComposeError
 from pydantic import BaseModel
 
 from pencraft.api.outline import _read_myvoice_key
-from pencraft.drafts import Draft, DraftStore
+from pencraft.auth.dependencies import get_current_user
+from pencraft.db.models import User
+from pencraft.drafts.models import Draft
+from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.generate.section import stream_section
 from pencraft.jobs.models import JobType
 from pencraft.jobs.registry import JobRegistry
@@ -46,9 +50,15 @@ def _draft_not_found(draft_id: str) -> HTTPException:
 
 
 @router.post("/api/drafts/{draft_id}/sections/{section_id}/save")
-def save_section(draft_id: str, section_id: str, body: _SaveBody, request: Request) -> Draft:
-    store: DraftStore = request.app.state.draft_store
-    draft = store.get(draft_id)
+async def save_section(
+    draft_id: str,
+    section_id: str,
+    body: _SaveBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    store: SqlDraftStore = request.app.state.draft_store
+    draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise _draft_not_found(draft_id)
     section = next((s for s in draft.sections if s.id == section_id), None)
@@ -58,14 +68,19 @@ def save_section(draft_id: str, section_id: str, body: _SaveBody, request: Reque
     section.status = "edited"
     section.last_error = None
     section.word_count = len(body.content_md.split())
-    store.update(draft.id, draft)
-    return draft
+    updated = await store.update(draft.id, draft, user_id=current.id)
+    return updated if updated is not None else draft
 
 
 @router.post("/api/drafts/{draft_id}/sections/reorder")
-def reorder_sections(draft_id: str, body: _ReorderBody, request: Request) -> Draft:
-    store: DraftStore = request.app.state.draft_store
-    draft = store.get(draft_id)
+async def reorder_sections(
+    draft_id: str,
+    body: _ReorderBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    store: SqlDraftStore = request.app.state.draft_store
+    draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise _draft_not_found(draft_id)
     by_id = {s.id: s for s in draft.sections}
@@ -84,19 +99,23 @@ def reorder_sections(draft_id: str, body: _ReorderBody, request: Request) -> Dra
     if draft.outline:
         ol_by_id = {s.id: s for s in draft.outline.sections}
         draft.outline.sections = [ol_by_id[sid] for sid in body.section_ids]
-    store.update(draft.id, draft)
-    return draft
+    updated = await store.update(draft.id, draft, user_id=current.id)
+    return updated if updated is not None else draft
 
 
 @router.post("/api/drafts/{draft_id}/sections/{section_id}/regenerate", status_code=202)
 async def regenerate_section(
-    draft_id: str, section_id: str, request: Request, background_tasks: BackgroundTasks,
+    draft_id: str,
+    section_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current: User = Depends(get_current_user),
 ) -> dict[str, str]:
-    store: DraftStore = request.app.state.draft_store
+    store: SqlDraftStore = request.app.state.draft_store
     pack_store = request.app.state.pack_store
     reg: JobRegistry = request.app.state.job_registry
 
-    draft = store.get(draft_id)
+    draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise _draft_not_found(draft_id)
     section = next((s for s in draft.sections if s.id == section_id), None)
@@ -134,13 +153,14 @@ async def regenerate_section(
         draft.idea.provider,
         api_key,
         draft.idea.model,
+        current.id,
     )
     return {"job_id": job.id}
 
 
 async def _run_regenerate(
     reg: JobRegistry,
-    store: DraftStore,
+    store: SqlDraftStore,
     job_id: str,
     draft_id: str,
     section_id: str,
@@ -148,10 +168,11 @@ async def _run_regenerate(
     provider_name: str,
     api_key: str,
     model: str,
+    user_id: UUID,
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
     try:
-        draft = store.get(draft_id)
+        draft = await store.get(draft_id, user_id=user_id)
         if draft is None:
             await reg.fail(job_id, "draft_not_found", draft_id)
             return
@@ -167,7 +188,7 @@ async def _run_regenerate(
 
         section.status = "generating"
         section.last_error = None
-        store.update(draft.id, draft)
+        await store.update(draft.id, draft, user_id=user_id)
         await reg.set_stage(job_id, f"section:start:{section_id}")
         buf = ""
         try:
@@ -177,26 +198,26 @@ async def _run_regenerate(
                 if cancel_evt.is_set():
                     section.status = "failed"
                     section.last_error = "Cancelled before completion."
-                    store.update(draft.id, draft)
+                    await store.update(draft.id, draft, user_id=user_id)
                     return
                 if chunk.delta:
                     buf += chunk.delta
         except ProviderMissingKey as e:
             section.status = "failed"
             section.last_error = e.message
-            store.update(draft.id, draft)
+            await store.update(draft.id, draft, user_id=user_id)
             await reg.fail(job_id, e.code, e.message, e.hint)
             return
         except ProviderError as e:
             section.status = "failed"
             section.last_error = e.message
-            store.update(draft.id, draft)
+            await store.update(draft.id, draft, user_id=user_id)
             await reg.fail(job_id, e.code, e.message, e.hint)
             return
         except ComposeError as e:
             section.status = "failed"
             section.last_error = str(e)
-            store.update(draft.id, draft)
+            await store.update(draft.id, draft, user_id=user_id)
             await reg.fail(
                 job_id,
                 "compose_error",
@@ -209,7 +230,7 @@ async def _run_regenerate(
         section.status = "ready"
         section.last_error = None
         section.last_generated_at = datetime.now(UTC)
-        store.update(draft.id, draft)
+        await store.update(draft.id, draft, user_id=user_id)
         await reg.set_stage(job_id, f"section:done:{section_id}")
         await reg.complete(job_id, {"section_id": section_id, "word_count": section.word_count})
     except Exception as e:

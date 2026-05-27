@@ -1,4 +1,7 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+
+import { logout } from "../api/auth";
+import { useMe } from "../hooks/useMe";
 
 export function AppShell(): JSX.Element {
   return (
@@ -12,6 +15,22 @@ export function AppShell(): JSX.Element {
 }
 
 function TopBar(): JSX.Element {
+  const { user, refresh } = useMe();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const onSignOut = async (): Promise<void> => {
+    try {
+      await logout();
+    } finally {
+      refresh();
+      navigate("/login");
+    }
+  };
+
+  // No top bar on the login page itself.
+  if (location.pathname === "/login") return <></>;
+
   return (
     <header className="border-b border-rule bg-white/60 backdrop-blur-sm sticky top-0 z-30">
       <div className="max-w-6xl mx-auto px-6 lg:px-10 h-14 flex items-center justify-between">
@@ -24,16 +43,19 @@ function TopBar(): JSX.Element {
             <span className="text-[11px] text-muted leading-none mt-0.5">a workshop</span>
           </span>
         </Link>
-        <nav className="flex items-center gap-1">
-          <a
-            href="http://localhost:7878"
-            target="_blank"
-            rel="noreferrer"
-            className="nb-btn-ghost nb-btn nb-btn-sm"
-          >
-            myvoice ↗
-          </a>
-        </nav>
+        {user && (
+          <nav className="flex items-center gap-2">
+            {user.role === "admin" && (
+              <Link to="/admin" className="nb-btn-ghost nb-btn nb-btn-sm">
+                Admin
+              </Link>
+            )}
+            <span className="text-xs text-muted hidden sm:block">{user.email}</span>
+            <button type="button" onClick={onSignOut} className="nb-btn nb-btn-sm">
+              Sign out
+            </button>
+          </nav>
+        )}
       </div>
     </header>
   );

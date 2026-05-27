@@ -3,14 +3,13 @@ from __future__ import annotations
 
 import json
 import shutil
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 import yaml
-from fastapi.testclient import TestClient
 
-from pencraft.server import create_app
+from tests.conftest import _seed_approved_user, _signed_client
 
 _MYVOICE_DAN = Path("/Users/dbbaskette/Projects/myvoice/packs/dan")
 
@@ -24,8 +23,8 @@ _CANNED = {
 }
 
 
-@pytest.fixture
-def outline_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+@pytest_asyncio.fixture
+async def outline_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     if not _MYVOICE_DAN.exists():
         pytest.skip("requires myvoice's dan pack")
 
@@ -38,16 +37,15 @@ def outline_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[
 
     monkeypatch.setenv("MYVOICE_PACKS_ROOT", str(packs_root))
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(cfg_path))
-    monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
     monkeypatch.setenv("PENCRAFT_TEST_PROVIDER", "mock")
     monkeypatch.setenv("PENCRAFT_MOCK_OUTPUT_JSON", json.dumps(_CANNED))
 
-    app = create_app()
-    with TestClient(app) as c:
+    uid = await _seed_approved_user()
+    with _signed_client(uid) as c:
         yield c
 
 
-def test_generate_outline_happy_path(outline_client: TestClient) -> None:
+async def test_generate_outline_happy_path(outline_client) -> None:
     created = outline_client.post(
         "/api/drafts",
         json={
@@ -67,6 +65,6 @@ def test_generate_outline_happy_path(outline_client: TestClient) -> None:
     assert len(body["sections"]) == 2  # seeded
 
 
-def test_generate_outline_draft_not_found(outline_client: TestClient) -> None:
+async def test_generate_outline_draft_not_found(outline_client) -> None:
     r = outline_client.post("/api/drafts/nope/outline")
     assert r.status_code == 404

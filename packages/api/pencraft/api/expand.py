@@ -5,13 +5,16 @@ import asyncio
 import time
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 import yaml
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from myvoice.compose import ComposeError
 
 from pencraft.api.outline import _read_myvoice_key
-from pencraft.drafts import DraftStore
+from pencraft.auth.dependencies import get_current_user
+from pencraft.db.models import User
+from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.generate.section import stream_section
 from pencraft.jobs.models import JobType
 from pencraft.jobs.registry import JobRegistry
@@ -25,13 +28,16 @@ _CONCURRENCY = 2
 
 @router.post("/api/drafts/{draft_id}/expand", status_code=202)
 async def expand_draft(
-    draft_id: str, request: Request, background_tasks: BackgroundTasks,
+    draft_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current: User = Depends(get_current_user),
 ) -> dict[str, str]:
-    store: DraftStore = request.app.state.draft_store
+    store: SqlDraftStore = request.app.state.draft_store
     pack_store = request.app.state.pack_store
     reg: JobRegistry = request.app.state.job_registry
 
-    draft = store.get(draft_id)
+    draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
     if draft.outline is None or not draft.sections:
@@ -76,24 +82,26 @@ async def expand_draft(
         draft.idea.provider,
         api_key,
         draft.idea.model,
+        current.id,
     )
     return {"job_id": job.id}
 
 
 async def _run_expand(
     reg: JobRegistry,
-    store: DraftStore,
+    store: SqlDraftStore,
     job_id: str,
     draft_id: str,
     pack_info: Any,
     provider_name: str,
     api_key: str,
     model: str,
+    user_id: UUID,
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
     started = time.monotonic()
     try:
-        draft = store.get(draft_id)
+        draft = await store.get(draft_id, user_id=user_id)
         if draft is None:
             await reg.fail(job_id, "draft_not_found", f"Draft {draft_id} gone")
             return
@@ -122,7 +130,7 @@ async def _run_expand(
                     return
                 section.status = "generating"
                 section.last_error = None
-                store.update(draft.id, draft)
+                await store.update(draft.id, draft, user_id=user_id)
                 await reg.set_stage(job_id, f"section:start:{section.id}")
                 buf = ""
                 try:
@@ -132,26 +140,26 @@ async def _run_expand(
                         if cancel_evt.is_set():
                             section.status = "failed"
                             section.last_error = "Cancelled before completion."
-                            store.update(draft.id, draft)
+                            await store.update(draft.id, draft, user_id=user_id)
                             return
                         if chunk.delta:
                             buf += chunk.delta
                 except ProviderMissingKey as e:
                     section.status = "failed"
                     section.last_error = e.message
-                    store.update(draft.id, draft)
+                    await store.update(draft.id, draft, user_id=user_id)
                     section_errors.append((e.code, e.message, e.hint))
                     return
                 except ProviderError as e:
                     section.status = "failed"
                     section.last_error = e.message
-                    store.update(draft.id, draft)
+                    await store.update(draft.id, draft, user_id=user_id)
                     section_errors.append((e.code, e.message, e.hint))
                     return
                 except ComposeError as e:
                     section.status = "failed"
                     section.last_error = str(e)
-                    store.update(draft.id, draft)
+                    await store.update(draft.id, draft, user_id=user_id)
                     section_errors.append(
                         (
                             "compose_error",
@@ -165,7 +173,7 @@ async def _run_expand(
                 section.status = "ready"
                 section.last_error = None
                 section.last_generated_at = datetime.now(UTC)
-                store.update(draft.id, draft)
+                await store.update(draft.id, draft, user_id=user_id)
                 await reg.set_stage(job_id, f"section:done:{section.id}")
 
         targets = [
@@ -178,7 +186,7 @@ async def _run_expand(
             return
         # Persist final stage
         draft.stage = "sections"
-        store.update(draft.id, draft)
+        await store.update(draft.id, draft, user_id=user_id)
         elapsed = time.monotonic() - started
         done = sum(1 for s in draft.sections if s.status == "ready")
         failed = sum(1 for s in draft.sections if s.status == "failed")

@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pencraft
+      POSTGRES_PASSWORD: pencraft
+      POSTGRES_DB: pencraft
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "pencraft"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: pencraft
+      MINIO_ROOT_PASSWORD: pencraft-minio-secret
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["miniodata:/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    environment:
+      PENCRAFT_DATABASE_URL: "postgresql+asyncpg://pencraft:pencraft@postgres:5432/pencraft"
+      PENCRAFT_S3_ENDPOINT_URL: "http://minio:9000"
+      PENCRAFT_S3_ACCESS_KEY: pencraft
+      PENCRAFT_S3_SECRET_KEY: pencraft-minio-secret
+      PENCRAFT_S3_BUCKET: pencraft
+      PENCRAFT_SESSION_SECRET: dev-session-secret-change-me
+      PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
+      PENCRAFT_ADMIN_PASSWORD: VMware0!
+      PENCRAFT_CORS_ORIGINS: "http://localhost:7881"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports: ["7880:7880"]
+
+volumes:
+  pgdata:
+  miniodata:

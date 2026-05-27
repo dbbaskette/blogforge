@@ -3,19 +3,25 @@ from __future__ import annotations
 
 import dataclasses
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from pencraft.drafts import DraftStore
+from pencraft.auth.dependencies import get_current_user
+from pencraft.db.models import User
+from pencraft.drafts.sql_store import SqlDraftStore
 
 router = APIRouter(tags=["lint"])
 
 
 @router.post("/api/drafts/{draft_id}/lint")
-def lint_draft(draft_id: str, request: Request) -> dict[str, list[dict[str, object]]]:
-    store: DraftStore = request.app.state.draft_store
+async def lint_draft(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, list[dict[str, object]]]:
+    store: SqlDraftStore = request.app.state.draft_store
     pack_store = request.app.state.pack_store
 
-    draft = store.get(draft_id)
+    draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
     pack_info = pack_store.get(draft.idea.pack_slug)

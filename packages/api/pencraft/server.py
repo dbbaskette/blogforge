@@ -7,14 +7,22 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from myvoice import PackStore
 
 from pencraft import __version__
 from pencraft.api.events import EventBus
-from pencraft.drafts import DraftStore
+from pencraft.config import get_settings
+from pencraft.config.tanzu import apply_vcap_services
+from pencraft.db.engine import get_engine, get_sessionmaker
+from pencraft.db.seed import ensure_admin_user
+from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.jobs.registry import JobRegistry
+
+# Translate VCAP_SERVICES into PENCRAFT_* env vars before Settings is read.
+apply_vcap_services()
 
 
 def _default_static_dir() -> Path:
@@ -28,13 +36,6 @@ def _resolve_static_dir() -> Path:
 
 def _is_dev_mode() -> bool:
     return os.environ.get("PENCRAFT_DEV", "").lower() in ("1", "true", "yes")
-
-
-def _resolve_drafts_root() -> Path:
-    env = os.environ.get("PENCRAFT_DRAFTS_ROOT")
-    if env:
-        return Path(env)
-    return Path.home() / ".pencraft" / "drafts"
 
 
 def _resolve_pack_roots() -> list[Path]:
@@ -99,19 +100,57 @@ def _read_myvoice_pack_paths() -> list[Path]:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    drafts_root = _resolve_drafts_root()
-    app.state.draft_store = DraftStore(drafts_root)
-    pack_roots = _resolve_pack_roots()
-    app.state.pack_store = PackStore(pack_roots)
+    settings = get_settings()
+
+    # 1) Migrations.
+    if settings.run_migrations_on_boot:
+        from alembic import command
+        from alembic.config import Config as AlembicConfig
+
+        # __file__ is packages/api/pencraft/server.py → parents[1] is packages/api.
+        api_root = Path(__file__).resolve().parents[1]
+        ini = api_root / "alembic.ini"
+        cfg = AlembicConfig(str(ini))
+        # Force absolute paths so migrations work regardless of CWD.
+        cfg.set_main_option("script_location", str(api_root / "alembic"))
+        cfg.set_main_option("sqlalchemy.url", settings.database_url)
+        command.upgrade(cfg, "head")
+
+    # 2) Seed admin.
+    async with get_sessionmaker()() as session:
+        await ensure_admin_user(
+            session, email=settings.admin_email, password=settings.admin_password
+        )
+        await session.commit()
+
+    # 3) Per-request shared state.
+    app.state.draft_store = SqlDraftStore()
+    app.state.pack_store = PackStore(_resolve_pack_roots())
     app.state.job_registry = JobRegistry()
     app.state.event_bus = EventBus()
+
     yield
+
+    await get_engine().dispose()
 
 
 def create_app() -> FastAPI:
     """Build and return the FastAPI app."""
+    settings = get_settings()
     app = FastAPI(title="pencraft", version=__version__, lifespan=_lifespan)
 
+    if settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["x-job-id"],
+        )
+
+    from pencraft.api.admin import router as admin_router
+    from pencraft.api.auth import router as auth_router
     from pencraft.api.download import router as download_router
     from pencraft.api.drafts import router as drafts_router
     from pencraft.api.events import router as events_router
@@ -123,6 +162,8 @@ def create_app() -> FastAPI:
     from pencraft.api.providers import router as providers_router
     from pencraft.api.section import router as section_router
 
+    app.include_router(auth_router)
+    app.include_router(admin_router)
     app.include_router(drafts_router)
     app.include_router(outline_router)
     app.include_router(packs_router)

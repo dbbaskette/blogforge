@@ -1,10 +1,12 @@
 """POST /api/drafts/{id}/outline — sync outline generation."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from myvoice.compose import ComposeError
 
-from pencraft.drafts import Draft, OutlineProposal
+from pencraft.auth.dependencies import get_current_user
+from pencraft.db.models import User
+from pencraft.drafts.models import Draft, OutlineProposal
 from pencraft.generate.outline import propose_outline
 from pencraft.llm.exceptions import ProviderError, ProviderMissingKey
 from pencraft.llm.registry import get_provider
@@ -28,11 +30,15 @@ def _read_myvoice_key(provider: str) -> str:
 
 
 @router.post("/api/drafts/{draft_id}/outline")
-async def generate_outline(draft_id: str, request: Request) -> Draft:
+async def generate_outline(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
     store = request.app.state.draft_store
     pack_store = request.app.state.pack_store
 
-    draft: Draft | None = store.get(draft_id)
+    draft: Draft | None = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise HTTPException(
             404,
@@ -107,5 +113,5 @@ async def generate_outline(draft_id: str, request: Request) -> Draft:
     draft.stage = "outline"
     if not draft.title:
         draft.title = draft.idea.topic
-    store.update(draft.id, draft)
-    return draft
+    updated = await store.update(draft.id, draft, user_id=current.id)
+    return updated if updated is not None else draft
