@@ -11,6 +11,7 @@ interface Stage3SectionsProps {
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onRegenerateSection: (sectionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
+  onExpandUnfilled: () => Promise<void>;
   onJobComplete?: () => void;
 }
 
@@ -20,6 +21,7 @@ export function Stage3Sections({
   onSectionSave,
   onRegenerateSection,
   onReorder,
+  onExpandUnfilled,
   onJobComplete,
 }: Stage3SectionsProps): JSX.Element {
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
@@ -106,9 +108,30 @@ export function Stage3Sections({
     await onReorder(ids).catch(() => {});
   };
 
+  const unfilledCount = draft.sections.filter(
+    (s) => s.status !== "ready" && s.status !== "edited",
+  ).length;
+  const jobRunning = jobId !== null && generatingIds.size > 0;
+
   return (
     <div className="space-y-4 pb-24">
-      <h2 className="text-xl font-semibold">Sections</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Sections</h2>
+        {unfilledCount > 0 && !jobRunning && (
+          <button
+            type="button"
+            onClick={() => onExpandUnfilled()}
+            className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded"
+          >
+            Expand {unfilledCount} unfilled section{unfilledCount === 1 ? "" : "s"} →
+          </button>
+        )}
+        {jobRunning && (
+          <span className="text-sm text-amber-400">
+            Generating {generatingIds.size} section{generatingIds.size === 1 ? "" : "s"}…
+          </span>
+        )}
+      </div>
 
       {draft.sections.length === 0 && <p className="text-slate-500 text-sm">No sections yet.</p>}
 
