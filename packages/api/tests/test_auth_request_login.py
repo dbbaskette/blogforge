@@ -41,7 +41,11 @@ async def test_request_lowercases_email(client):
     )
     assert r.status_code == 201
     async with get_sessionmaker()() as session:
-        user = (await session.execute(select(User))).scalar_one()
+        # The lifespan also seeds the admin user (Task 21), so filter for the
+        # request we just made instead of asserting a single row.
+        user = (
+            await session.execute(select(User).where(User.email == "mixed@case.com"))
+        ).scalar_one()
         assert user.email == "mixed@case.com"
 
 

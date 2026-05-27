@@ -20,12 +20,26 @@ from pencraft.server import create_app
 @pytest.fixture(autouse=True)
 def _force_sqlite_for_tests(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Every test runs against a fresh in-memory sqlite. Module-level singletons
-    are reset between tests so the new URL takes effect."""
+    are reset between tests so the new URL takes effect.
+
+    Also creates the schema up front (since migrations-on-boot is disabled in
+    tests) so the lifespan's admin-seed step can succeed."""
+    import asyncio
+
     monkeypatch.setenv("PENCRAFT_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setenv("PENCRAFT_SESSION_SECRET", "test-session-secret")
     monkeypatch.setenv("PENCRAFT_RUN_MIGRATIONS_ON_BOOT", "false")
     get_settings.cache_clear()
     reset_engine_for_tests()
+
+    async def _setup_schema() -> None:
+        from pencraft.db.engine import get_engine
+
+        async with get_engine().begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(_setup_schema())
+
     yield
     get_settings.cache_clear()
     reset_engine_for_tests()
@@ -46,8 +60,9 @@ async def session() -> AsyncIterator[AsyncSession]:
 @pytest.fixture
 def client() -> Iterator[TestClient]:
     """Legacy sync FastAPI TestClient. Kept for tests that pre-date the
-    auth/SQL migration; will be replaced by an authenticated async client
-    in Task 18 of Phase A."""
+    auth/SQL migration. Schema is created by the autouse
+    `_force_sqlite_for_tests` fixture, which is required for the
+    lifespan's admin-seed step to succeed."""
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client
@@ -60,9 +75,9 @@ from pencraft.db.models import User  # noqa: E402
 
 
 async def _seed_approved_user(email: str = "test@user.com"):
-    """Create the schema + an approved user; return its id."""
-    async with get_engine().begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Insert an approved user; return its id.
+
+    The schema is created by the autouse `_force_sqlite_for_tests` fixture."""
     async with get_sessionmaker()() as session:
         user = User(
             email=email,
