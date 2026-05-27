@@ -57,6 +57,13 @@ export function DraftPage(): JSX.Element {
     setJobId(job_id);
   }, [id, draft]);
 
+  // Same as onExpandAll but for use inside Stage 3 — doesn't change stage.
+  const onExpandUnfilled = useCallback(async () => {
+    if (!id) return;
+    const { job_id } = await expandSections(id);
+    setJobId(job_id);
+  }, [id]);
+
   const onJobComplete = useCallback(() => {
     if (!id) return;
     getDraft(id)
@@ -106,6 +113,7 @@ export function DraftPage(): JSX.Element {
             setJobId(job_id);
           }}
           onReorder={async (ids) => setDraft(await reorderSections(id, ids))}
+          onExpandUnfilled={onExpandUnfilled}
           onJobComplete={onJobComplete}
         />
       )}

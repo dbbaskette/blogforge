@@ -52,6 +52,7 @@ describe("Stage3Sections", () => {
         onSectionSave={vi.fn().mockResolvedValue(undefined)}
         onRegenerateSection={vi.fn().mockResolvedValue(undefined)}
         onReorder={vi.fn().mockResolvedValue(undefined)}
+        onExpandUnfilled={vi.fn().mockResolvedValue(undefined)}
       />,
     );
     expect(screen.getByText("First Section")).toBeInTheDocument();
@@ -65,6 +66,7 @@ describe("Stage3Sections", () => {
         onSectionSave={vi.fn().mockResolvedValue(undefined)}
         onRegenerateSection={vi.fn().mockResolvedValue(undefined)}
         onReorder={vi.fn().mockResolvedValue(undefined)}
+        onExpandUnfilled={vi.fn().mockResolvedValue(undefined)}
       />,
     );
     expect(screen.getByRole("link", { name: /Download .md/i })).toBeInTheDocument();
@@ -78,6 +80,7 @@ describe("Stage3Sections", () => {
         onSectionSave={vi.fn().mockResolvedValue(undefined)}
         onRegenerateSection={vi.fn().mockResolvedValue(undefined)}
         onReorder={vi.fn().mockResolvedValue(undefined)}
+        onExpandUnfilled={vi.fn().mockResolvedValue(undefined)}
       />,
     );
     // "10 words" may appear in both section header and sticky footer — assert at least one
