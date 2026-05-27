@@ -35,9 +35,6 @@ async def client_for_pending_user():
         yield c
 
 
-@pytest.mark.skip(
-    reason="Task 17 wires get_current_user into /api/drafts; unskip then."
-)
 async def test_pending_user_blocked_from_drafts(client_for_pending_user):
     r = client_for_pending_user.get("/api/drafts")
     assert r.status_code == 403

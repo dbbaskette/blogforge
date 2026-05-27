@@ -13,7 +13,7 @@ from myvoice import PackStore
 
 from pencraft import __version__
 from pencraft.api.events import EventBus
-from pencraft.drafts import DraftStore
+from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.jobs.registry import JobRegistry
 
 
@@ -99,8 +99,7 @@ def _read_myvoice_pack_paths() -> list[Path]:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
-    drafts_root = _resolve_drafts_root()
-    app.state.draft_store = DraftStore(drafts_root)
+    app.state.draft_store = SqlDraftStore()
     pack_roots = _resolve_pack_roots()
     app.state.pack_store = PackStore(pack_roots)
     app.state.job_registry = JobRegistry()

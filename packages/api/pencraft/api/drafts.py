@@ -1,42 +1,54 @@
-"""CRUD routes for drafts."""
+"""Draft CRUD routes — user-scoped via Postgres."""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from pencraft.drafts import Draft, DraftStore, DraftSummary, IdeaInput
+from pencraft.auth.dependencies import get_current_user
+from pencraft.db.models import User
+from pencraft.drafts.models import Draft, DraftSummary, IdeaInput
+from pencraft.drafts.sql_store import SqlDraftStore
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
 
-def _store(request: Request) -> DraftStore:
-    store: DraftStore = request.app.state.draft_store
-    return store
+def _store(request: Request) -> SqlDraftStore:
+    return request.app.state.draft_store
 
 
 def _not_found(draft_id: str) -> HTTPException:
     return HTTPException(
-        404,
+        status.HTTP_404_NOT_FOUND,
         detail={"error": {"code": "draft_not_found", "message": f"No draft '{draft_id}'"}},
     )
 
 
-@router.get("")
-def list_drafts(request: Request) -> list[DraftSummary]:
-    return _store(request).list()
+@router.get("", response_model=list[DraftSummary])
+async def list_drafts(
+    request: Request, current: User = Depends(get_current_user)
+) -> list[DraftSummary]:
+    return await _store(request).list_for_user(current.id)
 
 
-@router.post("", status_code=201)
-async def create_draft(idea: IdeaInput, request: Request) -> Draft:
-    draft = _store(request).create(idea)
+@router.post("", response_model=Draft, status_code=status.HTTP_201_CREATED)
+async def create_draft(
+    idea: IdeaInput,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    draft = await _store(request).create(user_id=current.id, idea=idea)
     await request.app.state.event_bus.emit(
         {"type": "draft:created", "id": draft.id, "title": draft.title}
     )
     return draft
 
 
-@router.get("/{draft_id}")
-def get_draft(draft_id: str, request: Request) -> Draft:
-    draft = _store(request).get(draft_id)
+@router.get("/{draft_id}", response_model=Draft)
+async def get_draft(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    draft = await _store(request).get(draft_id, user_id=current.id)
     if draft is None:
         raise _not_found(draft_id)
     return draft
@@ -45,8 +57,13 @@ def get_draft(draft_id: str, request: Request) -> Draft:
 _STAGE_ORDER = {"idea": 0, "outline": 1, "sections": 2}
 
 
-@router.put("/{draft_id}")
-async def update_draft(draft_id: str, draft: Draft, request: Request) -> Draft:
+@router.put("/{draft_id}", response_model=Draft)
+async def update_draft(
+    draft_id: str,
+    draft: Draft,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
     """Update a draft. Guards against client-side stale writes:
 
     Stage 1's auto-save can race with Generate outline + Expand sections,
@@ -58,7 +75,7 @@ async def update_draft(draft_id: str, draft: Draft, request: Request) -> Draft:
     The idea / title fields are always writable.
     """
     store = _store(request)
-    existing = store.get(draft_id)
+    existing = await store.get(draft_id, user_id=current.id)
     if existing is None:
         raise _not_found(draft_id)
 
@@ -69,20 +86,26 @@ async def update_draft(draft_id: str, draft: Draft, request: Request) -> Draft:
     if not draft.sections and existing.sections:
         draft.sections = existing.sections
 
-    updated = store.update(draft_id, draft)
+    updated = await store.update(draft_id, draft, user_id=current.id)
+    if updated is None:
+        raise _not_found(draft_id)
     await request.app.state.event_bus.emit(
         {"type": "draft:updated", "id": updated.id, "title": updated.title}
     )
     return updated
 
 
-@router.delete("/{draft_id}", status_code=204)
-async def delete_draft(draft_id: str, request: Request) -> None:
+@router.delete("/{draft_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_draft(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> None:
     store = _store(request)
-    draft = store.get(draft_id)
+    draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise _not_found(draft_id)
-    store.delete(draft_id)
+    await store.delete(draft_id, user_id=current.id)
     await request.app.state.event_bus.emit(
         {"type": "draft:deleted", "id": draft_id, "title": draft.title}
     )
