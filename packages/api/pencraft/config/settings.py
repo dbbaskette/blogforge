@@ -38,6 +38,12 @@ class Settings(BaseSettings):
 
     run_migrations_on_boot: bool = True
 
+    # Auth cookie flags. Default False so the test suite (which talks to
+    # http://testserver) can replay the session cookie. Production deploys
+    # set PENCRAFT_COOKIE_SECURE=true.
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"  # production cross-site flows can override to "none"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def split_csv(cls, v: object) -> object:

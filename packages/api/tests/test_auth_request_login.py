@@ -64,3 +64,86 @@ async def test_request_rejects_short_password(client):
         json={"email": "x@y.com", "password": "short"},
     )
     assert r.status_code == 422
+
+
+async def test_login_approved_user_sets_cookie(client):
+    client.post(
+        "/api/auth/request",
+        json={"email": "go@user.com", "password": "secret123"},
+    )
+    # Approve manually for this test.
+    async with get_sessionmaker()() as session:
+        user = (
+            await session.execute(select(User).where(User.email == "go@user.com"))
+        ).scalar_one()
+        user.status = "approved"
+        await session.commit()
+
+    r = client.post(
+        "/api/auth/login",
+        json={"email": "go@user.com", "password": "secret123"},
+    )
+    assert r.status_code == 200
+    assert "pencraft_session" in r.cookies
+    me = client.get("/api/auth/me")
+    assert me.status_code == 200
+    assert me.json()["email"] == "go@user.com"
+
+
+async def test_login_pending_blocked(client):
+    client.post(
+        "/api/auth/request",
+        json={"email": "p@user.com", "password": "secret123"},
+    )
+    r = client.post(
+        "/api/auth/login",
+        json={"email": "p@user.com", "password": "secret123"},
+    )
+    assert r.status_code == 403
+
+
+async def test_login_wrong_password_returns_401(client):
+    client.post(
+        "/api/auth/request",
+        json={"email": "w@user.com", "password": "secret123"},
+    )
+    async with get_sessionmaker()() as session:
+        user = (
+            await session.execute(select(User).where(User.email == "w@user.com"))
+        ).scalar_one()
+        user.status = "approved"
+        await session.commit()
+    r = client.post(
+        "/api/auth/login",
+        json={"email": "w@user.com", "password": "wrong"},
+    )
+    assert r.status_code == 401
+
+
+async def test_login_unknown_email_returns_401(client):
+    r = client.post(
+        "/api/auth/login",
+        json={"email": "ghost@nowhere.com", "password": "anything"},
+    )
+    assert r.status_code == 401
+
+
+async def test_logout_clears_cookie(client):
+    client.post(
+        "/api/auth/request",
+        json={"email": "lo@user.com", "password": "secret123"},
+    )
+    async with get_sessionmaker()() as session:
+        user = (
+            await session.execute(select(User).where(User.email == "lo@user.com"))
+        ).scalar_one()
+        user.status = "approved"
+        await session.commit()
+    client.post(
+        "/api/auth/login",
+        json={"email": "lo@user.com", "password": "secret123"},
+    )
+    r = client.post("/api/auth/logout")
+    assert r.status_code == 204
+    me = client.get("/api/auth/me")
+    assert me.status_code == 401
