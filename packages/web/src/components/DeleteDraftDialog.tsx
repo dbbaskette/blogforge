@@ -37,39 +37,53 @@ export function DeleteDraftDialog({
   };
 
   return (
-    <dialog
-      open
-      className="fixed inset-0 z-50 m-0 flex h-full w-full max-w-none items-center justify-center bg-black/60 p-0"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/85 backdrop-blur-sm animate-fade-up"
+      onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
-      aria-label="Delete draft"
+      role="presentation"
     >
-      <div className="bg-slate-900 border border-red-800 rounded-lg p-6 w-[480px] max-w-[90vw] space-y-4">
-        <h2 className="text-lg font-semibold text-red-300">Delete draft</h2>
-        <p className="text-slate-300 text-sm">
-          This will move <em>{draftTitle || draftId}</em> to the trash. You can recover the files
-          manually from <code>~/.pencraft/trash/</code>.
-        </p>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 text-sm border border-slate-700 rounded text-slate-300 hover:bg-slate-800"
-          >
+      <dialog
+        open
+        className="bg-surface border border-rule rounded-sm w-[480px] max-w-[90vw] m-0 p-0 text-cream shadow-2xl shadow-vermilion-900/30"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        aria-label="Delete draft"
+      >
+        <header className="px-7 pt-6 pb-4 border-b border-rule">
+          <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400 mb-2">
+            The wastebasket
+          </p>
+          <h2 className="font-display text-cream-2 text-2xl tracking-tight-2">
+            Discard this draft?
+          </h2>
+        </header>
+
+        <div className="px-7 py-5 space-y-4">
+          <p className="font-prose text-cream/80 text-sm leading-relaxed">
+            <em className="italic text-cream-2">{draftTitle || draftId}</em> goes to the
+            wastebasket. You can recover it manually from{" "}
+            <code className="font-mono text-xs text-vermilion-300 bg-ink px-1.5 py-0.5 rounded">
+              ~/.pencraft/trash/
+            </code>
+            .
+          </p>
+          {error && (
+            <p className="text-vermilion-300 text-sm border-l-2 border-vermilion pl-3">{error}</p>
+          )}
+        </div>
+
+        <div className="px-7 pb-6 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="btn-press">
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={submitting}
-            className="px-3 py-1.5 text-sm bg-red-700 hover:bg-red-600 text-white rounded disabled:opacity-50"
-          >
-            {submitting ? "Deleting…" : "Delete draft"}
+          <button type="button" onClick={confirm} disabled={submitting} className="btn-stamp">
+            {submitting ? "Discarding…" : "Discard draft"}
           </button>
         </div>
-      </div>
-    </dialog>
+      </dialog>
+    </div>
   );
 }

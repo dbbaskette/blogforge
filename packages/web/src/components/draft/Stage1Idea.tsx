@@ -129,14 +129,14 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
   const canAdvance = topic.trim() && packSlug && model && !advancing;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Idea</h2>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          {saving && <span>Saving…</span>}
-          {saveError && <span className="text-red-400">{saveError}</span>}
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-up">
+      <StageHeader
+        eyebrow="Stage 01 · The seed"
+        title="What's the piece about?"
+        subline="Plant a topic. Pick a voice. Pencraft drafts an outline first."
+        saving={saving}
+        saveError={saveError}
+      />
 
       <Field label="Topic" id="s1-topic">
         <input
@@ -144,30 +144,38 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
           type="text"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          placeholder="What is this piece about?"
-          className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+          placeholder="Building agents that don't suck"
+          className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream-2 font-prose text-base placeholder:text-muted-2 focus:border-vermilion-400 focus:outline-none transition-colors"
         />
       </Field>
 
       <div>
-        <label htmlFor="s1-new-bullet" className="block text-sm font-medium text-slate-200 mb-1">
+        <label
+          htmlFor="s1-new-bullet"
+          className="block font-mono text-[10px] uppercase tracking-wide-3 text-muted mb-1.5"
+        >
           Key points
         </label>
-        <div className="space-y-1 mb-2">
-          {bullets.map((b, i) => (
-            <div key={`${b}-${String(i)}`} className="flex items-center gap-2">
-              <span className="text-slate-400 text-sm flex-1">{b}</span>
-              <button
-                type="button"
-                onClick={() => removeBullet(i)}
-                className="text-slate-500 hover:text-red-400 text-xs"
-                aria-label="Remove bullet"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
+        {bullets.length > 0 && (
+          <ol className="mb-2 border-l border-rule pl-4 space-y-1.5">
+            {bullets.map((b, i) => (
+              <li key={`${b}-${String(i)}`} className="flex items-baseline gap-3 group/bullet">
+                <span className="font-mono-num text-[10px] text-muted-2 w-6 shrink-0">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="font-prose text-sm text-cream/85 flex-1 leading-snug">{b}</span>
+                <button
+                  type="button"
+                  onClick={() => removeBullet(i)}
+                  className="opacity-0 group-hover/bullet:opacity-100 focus:opacity-100 transition-opacity font-mono text-[10px] uppercase tracking-wide-3 text-muted hover:text-vermilion-400"
+                  aria-label="Remove bullet"
+                >
+                  remove
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
         <div className="flex gap-2">
           <input
             id="s1-new-bullet"
@@ -180,14 +188,10 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
                 addBullet();
               }
             }}
-            placeholder="Add a key point…"
-            className="flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100 text-sm"
+            placeholder="A thread to pull on…"
+            className="flex-1 bg-ink border border-rule rounded-sm px-3 py-2 text-cream font-prose text-sm placeholder:text-muted-2 focus:border-vermilion-400 focus:outline-none transition-colors"
           />
-          <button
-            type="button"
-            onClick={addBullet}
-            className="px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 text-slate-200 rounded"
-          >
+          <button type="button" onClick={addBullet} className="btn-press">
             Add
           </button>
         </div>
@@ -199,7 +203,7 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
             id="s1-pack"
             value={packSlug}
             onChange={(e) => setPackSlug(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+            className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-ui text-sm focus:border-vermilion-400 focus:outline-none transition-colors"
           >
             <option value="">— pick a pack —</option>
             {packs
@@ -217,7 +221,7 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
             id="s1-format"
             value={format}
             onChange={(e) => setFormat(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+            className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-ui text-sm focus:border-vermilion-400 focus:outline-none transition-colors disabled:opacity-50"
             disabled={packFormats.length === 0}
           >
             <option value="">— none —</option>
@@ -237,7 +241,7 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
             id="s1-provider"
             value={provider}
             onChange={(e) => setProvider(e.target.value as Provider)}
-            className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+            className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-ui text-sm focus:border-vermilion-400 focus:outline-none transition-colors"
           >
             {(["anthropic", "openai", "google"] as Provider[]).map((p) => (
               <option key={p} value={p} disabled={!providers[p]}>
@@ -253,7 +257,7 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
             id="s1-model"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+            className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-ui text-sm focus:border-vermilion-400 focus:outline-none transition-colors"
           >
             {models.length === 0 && <option value="">No models</option>}
             {models.map((m) => (
@@ -265,17 +269,22 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
         </Field>
       </div>
 
-      <Field label={`Target length: ${targetWords} words`} id="s1-words">
-        <input
-          id="s1-words"
-          type="range"
-          min={500}
-          max={3500}
-          step={100}
-          value={targetWords}
-          onChange={(e) => setTargetWords(Number.parseInt(e.target.value, 10))}
-          className="w-full"
-        />
+      <Field label="Target length" id="s1-words">
+        <div className="flex items-center gap-4">
+          <input
+            id="s1-words"
+            type="range"
+            min={500}
+            max={3500}
+            step={100}
+            value={targetWords}
+            onChange={(e) => setTargetWords(Number.parseInt(e.target.value, 10))}
+            className="flex-1 accent-vermilion"
+          />
+          <span className="font-mono-num text-sm text-cream-2 tabular-nums min-w-[5rem] text-right">
+            {targetWords.toLocaleString()} <span className="text-muted">words</span>
+          </span>
+        </div>
       </Field>
 
       <Field label="Notes (optional)" id="s1-notes">
@@ -283,28 +292,31 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
           id="s1-notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Any extra context for the AI…"
+          placeholder="Any extra context for the writer — angle, tone, audience…"
           rows={3}
-          className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100 text-sm resize-none"
+          className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-prose text-sm placeholder:text-muted-2 focus:border-vermilion-400 focus:outline-none transition-colors resize-none"
         />
       </Field>
 
-      {advanceError && <p className="text-red-400 text-sm">{advanceError}</p>}
+      {advanceError && (
+        <p className="text-vermilion-300 text-sm border-l-2 border-vermilion pl-3">
+          {advanceError}
+        </p>
+      )}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end pt-2 border-t border-rule">
         <button
           type="button"
           onClick={handleAdvance}
           disabled={!canAdvance}
-          className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded disabled:opacity-50 flex items-center gap-2"
+          className="btn-stamp mt-4"
         >
           {advancing ? (
             <>
-              <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Generating outline…
+              <Spinner /> Generating outline…
             </>
           ) : (
-            "Generate outline →"
+            <>Generate outline →</>
           )}
         </button>
       </div>
@@ -312,7 +324,45 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
   );
 }
 
-function Field({
+// ────────────────────────────────────────────────────────────────
+// Shared stage header used by Stage 1/2/3 — masthead style
+
+export function StageHeader({
+  eyebrow,
+  title,
+  subline,
+  saving,
+  saveError,
+}: {
+  eyebrow: string;
+  title: string;
+  subline?: string;
+  saving?: boolean;
+  saveError?: string | null;
+}): JSX.Element {
+  return (
+    <header className="space-y-3">
+      <div className="flex items-baseline justify-between">
+        <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400">
+          {eyebrow}
+        </p>
+        <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-wide-3">
+          {saving && <span className="text-muted">saving…</span>}
+          {saveError && <span className="text-vermilion-300">{saveError}</span>}
+        </div>
+      </div>
+      <h2 className="font-display text-cream-2 text-[clamp(2rem,4vw,3rem)] leading-[1] tracking-tight-2">
+        {title}
+      </h2>
+      {subline && (
+        <p className="font-prose text-cream/65 text-base leading-relaxed max-w-2xl">{subline}</p>
+      )}
+      <div className="rule" />
+    </header>
+  );
+}
+
+export function Field({
   label,
   id,
   children,
@@ -323,10 +373,22 @@ function Field({
 }): JSX.Element {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-200 mb-1">
+      <label
+        htmlFor={id}
+        className="block font-mono text-[10px] uppercase tracking-wide-3 text-muted mb-1.5"
+      >
         {label}
       </label>
       {children}
     </div>
+  );
+}
+
+export function Spinner(): JSX.Element {
+  return (
+    <span
+      aria-hidden
+      className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
+    />
   );
 }

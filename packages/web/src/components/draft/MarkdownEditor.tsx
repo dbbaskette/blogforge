@@ -39,7 +39,8 @@ export function MarkdownEditor({
     content: "",
     editorProps: {
       attributes: {
-        class: "prose prose-invert prose-slate max-w-none min-h-[200px] p-4 focus:outline-none",
+        class:
+          "prose prose-invert prose-stone max-w-none min-h-[220px] p-5 focus:outline-none font-prose prose-headings:font-display prose-headings:tracking-tight-2 prose-headings:text-cream-2 prose-p:text-cream prose-p:leading-relaxed prose-strong:text-cream-2 prose-em:text-cream prose-code:text-vermilion-300 prose-code:bg-ink prose-code:px-1 prose-code:rounded prose-blockquote:border-l-vermilion prose-blockquote:text-cream/85 prose-blockquote:italic prose-a:text-vermilion-300 prose-a:underline-offset-4",
       },
     },
     onUpdate: ({ editor: e }) => {
@@ -90,37 +91,48 @@ export function MarkdownEditor({
   };
 
   return (
-    <div className="flex flex-col border border-slate-700 rounded overflow-hidden">
-      <header className="border-b border-slate-800 px-4 py-2 flex items-center gap-3 bg-slate-900/50">
-        <div className="inline-flex bg-slate-800 rounded p-0.5">
+    <div className="flex flex-col border border-rule rounded-sm overflow-hidden bg-ink">
+      <header className="border-b border-rule px-4 py-2 flex items-center gap-3 bg-surface">
+        <div
+          className="inline-flex border border-rule rounded-sm overflow-hidden"
+          role="tablist"
+          aria-label="Editor mode"
+        >
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === "rich"}
             onClick={() => handleSwitchMode("rich")}
-            className={`px-3 py-1 text-xs rounded ${
-              mode === "rich" ? "bg-slate-700 text-slate-100" : "text-slate-400"
+            className={`px-3 py-1 font-mono text-[10px] uppercase tracking-wide-3 transition-colors ${
+              mode === "rich" ? "bg-vermilion text-cream-2" : "text-muted hover:text-cream"
             }`}
           >
             Rich
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === "raw"}
             onClick={() => handleSwitchMode("raw")}
-            className={`px-3 py-1 text-xs rounded ${
-              mode === "raw" ? "bg-slate-700 text-slate-100" : "text-slate-400"
+            className={`px-3 py-1 font-mono text-[10px] uppercase tracking-wide-3 border-l border-rule transition-colors ${
+              mode === "raw" ? "bg-vermilion text-cream-2" : "text-muted hover:text-cream"
             }`}
           >
             Raw
           </button>
         </div>
         <div className="flex-1" />
-        {error && <span className="text-red-400 text-xs">{error}</span>}
-        {savedMessage && <span className="text-emerald-400 text-xs">{savedMessage}</span>}
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-1 text-xs rounded bg-blue-600 text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-        >
+        {error && (
+          <span className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-300">
+            {error}
+          </span>
+        )}
+        {savedMessage && (
+          <span className="font-mono text-[10px] uppercase tracking-wide-3 text-teal animate-fade-up">
+            ✓ {savedMessage}
+          </span>
+        )}
+        <button type="button" onClick={handleSave} disabled={saving} className="btn-press">
           {saving ? "Saving…" : "Save"}
         </button>
       </header>
@@ -128,7 +140,7 @@ export function MarkdownEditor({
       {mode === "rich" && editor && (
         <>
           <Toolbar editor={editor} />
-          <div className="flex-1 overflow-y-auto bg-slate-950">
+          <div className="flex-1 overflow-y-auto bg-ink">
             <EditorContent editor={editor} />
           </div>
         </>
@@ -137,7 +149,7 @@ export function MarkdownEditor({
         <textarea
           value={raw}
           onChange={(e) => handleRawChange(e.target.value)}
-          className="flex-1 min-h-[200px] bg-slate-950 text-slate-200 font-mono text-sm p-4 focus:outline-none resize-none"
+          className="flex-1 min-h-[220px] bg-ink text-cream font-mono text-sm p-5 focus:outline-none resize-none leading-relaxed"
         />
       )}
     </div>
@@ -151,80 +163,96 @@ interface ToolbarProps {
 function Toolbar({ editor }: ToolbarProps): JSX.Element | null {
   if (!editor) return null;
   return (
-    <div className="border-b border-slate-800 px-4 py-2 flex gap-1 bg-slate-900/30 text-sm">
+    <div className="border-b border-rule px-4 py-1.5 flex gap-0.5 bg-surface/60">
       <TButton
         active={editor.isActive("heading", { level: 2 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        label="Heading 2"
       >
-        H2
+        <span className="font-display text-base leading-none">H2</span>
       </TButton>
       <TButton
         active={editor.isActive("heading", { level: 3 })}
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        label="Heading 3"
       >
-        H3
+        <span className="font-display text-sm leading-none">H3</span>
       </TButton>
-      <div className="w-px h-5 bg-slate-700 mx-1" />
+      <Divider />
       <TButton
         active={editor.isActive("bold")}
         onClick={() => editor.chain().focus().toggleBold().run()}
+        label="Bold"
       >
-        <b>B</b>
+        <b className="font-display">B</b>
       </TButton>
       <TButton
         active={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
+        label="Italic"
       >
-        <i>I</i>
+        <i className="font-display">I</i>
       </TButton>
       <TButton
         active={editor.isActive("strike")}
         onClick={() => editor.chain().focus().toggleStrike().run()}
+        label="Strikethrough"
       >
-        <s>S</s>
+        <s className="font-display">S</s>
       </TButton>
-      <div className="w-px h-5 bg-slate-700 mx-1" />
+      <Divider />
       <TButton
         active={editor.isActive("bulletList")}
         onClick={() => editor.chain().focus().toggleBulletList().run()}
+        label="Bullet list"
       >
         •
       </TButton>
       <TButton
         active={editor.isActive("orderedList")}
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        label="Numbered list"
       >
-        1.
+        <span className="font-mono-num">1.</span>
       </TButton>
       <TButton
         active={editor.isActive("blockquote")}
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        label="Blockquote"
       >
-        ❝
+        <span className="font-display">❝</span>
       </TButton>
       <TButton
         active={editor.isActive("code")}
         onClick={() => editor.chain().focus().toggleCode().run()}
+        label="Inline code"
       >
-        {"<>"}
+        <span className="font-mono text-xs">&lt;/&gt;</span>
       </TButton>
     </div>
   );
 }
 
+function Divider(): JSX.Element {
+  return <div aria-hidden className="w-px h-5 bg-rule mx-1 self-center" />;
+}
+
 interface TButtonProps {
   active: boolean;
   onClick: () => void;
+  label: string;
   children: React.ReactNode;
 }
 
-function TButton({ active, onClick, children }: TButtonProps): JSX.Element {
+function TButton({ active, onClick, label, children }: TButtonProps): JSX.Element {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`px-2 py-1 rounded text-xs ${
-        active ? "bg-slate-700 text-slate-100" : "text-slate-300 hover:bg-slate-800"
+      aria-label={label}
+      aria-pressed={active}
+      className={`min-w-[2rem] h-7 px-2 rounded-sm text-xs flex items-center justify-center transition-colors ${
+        active ? "bg-vermilion text-cream-2" : "text-cream/80 hover:bg-rule/40 hover:text-cream-2"
       }`}
     >
       {children}

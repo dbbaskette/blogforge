@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import type { Draft, OutlineProposal, OutlineSection } from "../../api/drafts";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { OutlineSectionCard } from "./OutlineSectionCard";
+import { Field, Spinner, StageHeader } from "./Stage1Idea";
 
 function makeSection(): OutlineSection {
   return {
@@ -93,79 +94,83 @@ export function Stage2Outline({
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Outline</h2>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          {saving && <span>Saving…</span>}
-          {saveError && <span className="text-red-400">{saveError}</span>}
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-up">
+      <StageHeader
+        eyebrow="Stage 02 · The outline"
+        title="Shape the bones."
+        subline="A hook to start, then the sections. Reorder, rewrite, regenerate. Nothing's set yet."
+        saving={saving}
+        saveError={saveError}
+      />
 
-      <div>
-        <label htmlFor="s2-hook" className="block text-sm font-medium text-slate-200 mb-1">
-          Opening hook
-        </label>
+      <Field label="Opening hook" id="s2-hook">
         <textarea
           id="s2-hook"
           value={openingHook}
           onChange={(e) => setOpeningHook(e.target.value)}
           placeholder="A compelling opening sentence or paragraph…"
           rows={3}
-          className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100 text-sm resize-none"
+          className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-prose text-base placeholder:text-muted-2 focus:border-vermilion-400 focus:outline-none transition-colors resize-none"
         />
-      </div>
+      </Field>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-slate-200">Sections ({sections.length})</h3>
+      <section>
+        <div className="flex items-baseline justify-between mb-1">
+          <h3 className="font-display text-cream-2 text-xl tracking-tight-2">
+            Sections{" "}
+            <span className="font-mono-num text-muted text-base ml-1">
+              ({sections.length.toString().padStart(2, "0")})
+            </span>
+          </h3>
           <button
             type="button"
             onClick={addSection}
-            className="text-xs text-emerald-400 hover:text-emerald-300"
+            className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400 hover:text-vermilion-300 transition-colors"
           >
-            + Add section
+            + add section
           </button>
         </div>
+
         {sections.length === 0 && (
-          <p className="text-slate-500 text-sm text-center py-4">
-            No sections yet. Add one or regenerate the outline.
+          <p className="font-prose italic text-muted text-sm text-center py-10 border-t border-rule">
+            No sections yet. Add one, or regenerate the outline.
           </p>
         )}
-        {sections.map((s, i) => (
-          <OutlineSectionCard
-            key={s.id}
-            section={s}
-            index={i}
-            total={sections.length}
-            onChange={(updated) => updateSection(i, updated)}
-            onRemove={() => removeSection(i)}
-            onMoveUp={() => moveSection(i, -1)}
-            onMoveDown={() => moveSection(i, 1)}
-          />
-        ))}
-      </div>
 
-      {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
+        <div>
+          {sections.map((s, i) => (
+            <OutlineSectionCard
+              key={s.id}
+              section={s}
+              index={i}
+              total={sections.length}
+              onChange={(updated) => updateSection(i, updated)}
+              onRemove={() => removeSection(i)}
+              onMoveUp={() => moveSection(i, -1)}
+              onMoveDown={() => moveSection(i, 1)}
+            />
+          ))}
+          {sections.length > 0 && <div className="rule" />}
+        </div>
+      </section>
 
-      <div className="flex items-center gap-3 pt-2 border-t border-slate-800">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-3 py-1.5 text-sm border border-slate-700 rounded text-slate-300 hover:bg-slate-800"
-        >
+      {actionError && (
+        <p className="text-vermilion-300 text-sm border-l-2 border-vermilion pl-3">{actionError}</p>
+      )}
+
+      <div className="flex items-center gap-3 pt-4 border-t border-rule">
+        <button type="button" onClick={onBack} className="btn-press">
           ← Back
         </button>
         <button
           type="button"
           onClick={handleRegenerate}
           disabled={regenerating || advancing}
-          className="px-3 py-1.5 text-sm border border-slate-700 rounded text-slate-300 hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"
+          className="btn-press"
         >
           {regenerating ? (
             <>
-              <span className="inline-block w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-              Regenerating…
+              <Spinner /> Regenerating…
             </>
           ) : (
             "Regenerate outline"
@@ -176,15 +181,14 @@ export function Stage2Outline({
           type="button"
           onClick={handleAdvance}
           disabled={sections.length === 0 || advancing || regenerating}
-          className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded disabled:opacity-50 flex items-center gap-2"
+          className="btn-stamp"
         >
           {advancing ? (
             <>
-              <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Starting…
+              <Spinner /> Starting…
             </>
           ) : (
-            "Expand all sections →"
+            <>Expand all sections →</>
           )}
         </button>
       </div>

@@ -84,8 +84,23 @@ export function DraftPage(): JSX.Element {
     navigate("/");
     return <div />;
   }
-  if (error) return <div className="text-red-400">Error: {error}</div>;
-  if (!draft) return <div className="text-slate-500">Loading…</div>;
+  if (error)
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="border-l-2 border-vermilion pl-4 py-3 bg-vermilion-900/30">
+          <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400">
+            error
+          </p>
+          <p className="text-sm text-cream/85 mt-1">{error}</p>
+        </div>
+      </div>
+    );
+  if (!draft)
+    return (
+      <p className="font-mono text-[10px] uppercase tracking-wide-3 text-muted text-center py-16">
+        …setting type…
+      </p>
+    );
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

@@ -2,28 +2,31 @@ import { useState } from "react";
 
 import type { Section } from "../../api/drafts";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { Spinner } from "./Stage1Idea";
 
 interface SectionCardProps {
   section: Section;
+  index: number;
   isGenerating: boolean;
   onSave: (content_md: string) => Promise<void>;
   onRegenerate: () => Promise<void>;
 }
 
-function StatusIcon({ status }: { status: Section["status"] }): JSX.Element {
-  const map: Record<Section["status"], { icon: string; cls: string }> = {
-    empty: { icon: "○", cls: "text-slate-500" },
-    generating: { icon: "●", cls: "text-amber-400 animate-pulse" },
-    ready: { icon: "✓", cls: "text-emerald-400" },
-    failed: { icon: "✗", cls: "text-red-400" },
-    edited: { icon: "✎", cls: "text-blue-400" },
+function StatusChip({ status }: { status: Section["status"] }): JSX.Element {
+  const map: Record<Section["status"], { label: string; cls: string }> = {
+    empty: { label: "Unwritten", cls: "chip chip-muted" },
+    generating: { label: "Composing", cls: "chip chip-gold" },
+    ready: { label: "Ready", cls: "chip chip-teal" },
+    failed: { label: "Failed", cls: "chip chip-vermilion" },
+    edited: { label: "Edited", cls: "chip chip-teal" },
   };
-  const { icon, cls } = map[status] ?? { icon: "?", cls: "text-slate-500" };
-  return <span className={`font-mono text-sm ${cls}`}>{icon}</span>;
+  const { label, cls } = map[status] ?? { label: status, cls: "chip" };
+  return <span className={cls}>{label}</span>;
 }
 
 export function SectionCard({
   section,
+  index,
   isGenerating,
   onSave,
   onRegenerate,
@@ -32,6 +35,7 @@ export function SectionCard({
   const [regenError, setRegenError] = useState<string | null>(null);
 
   const effectiveGenerating = isGenerating || section.status === "generating";
+  const displayStatus: Section["status"] = effectiveGenerating ? "generating" : section.status;
 
   const handleRegenerate = async () => {
     setRegenerating(true);
@@ -46,51 +50,69 @@ export function SectionCard({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-3">
-        <StatusIcon status={effectiveGenerating ? "generating" : section.status} />
-        <h3 className="font-medium text-slate-100 flex-1">{section.title}</h3>
-        {section.word_count > 0 && (
-          <span className="text-xs text-slate-500">{section.word_count} words</span>
-        )}
-      </div>
-
-      {section.brief && (
-        <div className="px-4 py-2 bg-slate-950/30 text-xs text-slate-400 italic">
-          {section.brief}
+    <article className="border border-rule rounded-sm overflow-hidden bg-surface/40 transition-colors hover:border-rule-2">
+      {/* Header: numeral + title + chips */}
+      <header className="px-5 pt-5 pb-4 border-b border-rule">
+        <div className="grid grid-cols-[3rem_1fr_auto] gap-4 items-start">
+          <span className="font-display-tight font-mono-num text-muted-2 text-3xl leading-none">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-display text-cream-2 text-2xl leading-tight tracking-tight-2">
+              {section.title}
+            </h3>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <StatusChip status={displayStatus} />
+              {section.word_count > 0 && (
+                <span className="font-mono text-[11px] text-muted">
+                  {section.word_count.toLocaleString()} words
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-      )}
+        {section.brief && (
+          <p className="mt-3 pl-[3.5rem] font-prose italic text-cream/65 text-sm leading-relaxed">
+            {section.brief}
+          </p>
+        )}
+      </header>
 
       {effectiveGenerating ? (
-        <div className="px-4 py-6 flex items-center gap-3 text-slate-400">
-          <span className="inline-block w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Generating section content…</span>
+        <div className="px-5 py-10 flex items-center justify-center gap-3 text-gold">
+          <Spinner />
+          <span className="font-mono text-[11px] uppercase tracking-wide-3">
+            Setting type — composing section…
+          </span>
         </div>
       ) : (
-        <div className="p-4">
+        <div className="p-5">
           <MarkdownEditor initialMarkdown={section.content_md} onSave={onSave} />
         </div>
       )}
 
-      {regenError && <p className="px-4 pb-3 text-red-400 text-xs">{regenError}</p>}
+      {regenError && (
+        <p className="mx-5 mb-3 text-vermilion-300 text-xs border-l-2 border-vermilion pl-3">
+          {regenError}
+        </p>
+      )}
 
-      <div className="px-4 py-3 border-t border-slate-800 flex justify-end gap-2">
+      <footer className="px-5 py-3 border-t border-rule flex items-center justify-end gap-2 bg-surface/60">
         <button
           type="button"
           onClick={handleRegenerate}
           disabled={regenerating || effectiveGenerating}
-          className="px-3 py-1 text-xs border border-slate-700 rounded text-slate-300 hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1"
+          className="btn-press text-xs"
         >
           {regenerating ? (
             <>
-              <span className="inline-block w-2.5 h-2.5 border border-slate-400 border-t-transparent rounded-full animate-spin" />
-              Regenerating…
+              <Spinner /> Regenerating…
             </>
           ) : (
             "Regenerate"
           )}
         </button>
-      </div>
-    </div>
+      </footer>
+    </article>
   );
 }
