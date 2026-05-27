@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import TypedDict
 from uuid import UUID
 
 import yaml

@@ -6,7 +6,6 @@ typo doesn't quietly land in the DB and break every draft.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
@@ -14,6 +13,7 @@ from pydantic import BaseModel, Field
 from pencraft.auth.dependencies import require_admin
 from pencraft.db.models import User
 from pencraft.keys import SUPPORTED_PROVIDERS, KeyVault
+from pencraft.keys.vault import ProviderKeyStatus
 from pencraft.llm.exceptions import ProviderError, ProviderMissingKey
 from pencraft.llm.registry import get_provider
 
@@ -55,7 +55,7 @@ def _check_provider(provider: str) -> None:
         )
 
 
-def _status_to_out(row: dict[str, Any]) -> KeyStatusOut:
+def _status_to_out(row: ProviderKeyStatus) -> KeyStatusOut:
     updated_by = row["updated_by"]
     return KeyStatusOut(
         provider=row["provider"],

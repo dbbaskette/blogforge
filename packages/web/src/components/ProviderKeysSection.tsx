@@ -41,9 +41,8 @@ export function ProviderKeysSection(): JSX.Element {
     <section>
       <h2 className="font-serif text-xl font-medium text-ink mb-3">API keys</h2>
       <p className="text-sm text-muted mb-4">
-        Keys are encrypted at rest and never displayed after saving. PUT
-        validates the key by calling the provider's list-models endpoint, so a
-        typo here won't quietly break drafting.
+        Keys are encrypted at rest and never displayed after saving. PUT validates the key by
+        calling the provider's list-models endpoint, so a typo here won't quietly break drafting.
       </p>
 
       {error && (
@@ -134,9 +133,7 @@ function ProviderRow({ provider, status, onChanged, onError }: ProviderRowProps)
               </span>
             )}
             {updatedAt && (
-              <span className="text-xs text-muted">
-                updated {updatedAt.toLocaleString()}
-              </span>
+              <span className="text-xs text-muted">updated {updatedAt.toLocaleString()}</span>
             )}
           </div>
         </div>
