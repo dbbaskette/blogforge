@@ -15,12 +15,13 @@ vi.mock("../src/api/providers", () => ({
 }));
 
 describe("App", () => {
-  it("renders the scaffold header", () => {
+  it("renders the masthead wordmark", () => {
     render(
       <MemoryRouter>
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText("Pencraft")).toBeInTheDocument();
+    // Two "Pencraft" elements appear (masthead + colophon) — either is fine.
+    expect(screen.getAllByText("Pencraft").length).toBeGreaterThan(0);
   });
 });

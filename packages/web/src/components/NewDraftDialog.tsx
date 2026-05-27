@@ -92,7 +92,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/85 backdrop-blur-sm animate-fade-up"
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
@@ -101,28 +101,40 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
     >
       <dialog
         open
-        className="bg-slate-900 border border-slate-700 rounded-lg p-6 w-[520px] max-w-[90vw] space-y-4 m-0"
+        className="bg-surface border border-rule rounded-sm w-[560px] max-w-[92vw] m-0 p-0 text-cream shadow-2xl shadow-vermilion-900/30"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         aria-label="New draft"
       >
-        <h2 className="text-lg font-semibold">New draft</h2>
-        <form onSubmit={submit} className="space-y-4">
+        {/* Header — masthead style */}
+        <header className="px-7 pt-6 pb-5 border-b border-rule">
+          <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400 mb-2">
+            New piece
+          </p>
+          <h2 className="font-display text-cream-2 text-2xl tracking-tight-2">Plant a seed.</h2>
+          <p className="font-prose text-cream/60 text-sm mt-2">
+            What's the piece about? Pick a voice. Pencraft drafts an outline first.
+          </p>
+        </header>
+
+        <form onSubmit={submit} className="px-7 pt-5 pb-6 space-y-5">
           <Field label="Topic" id="nd-topic">
             <input
               id="nd-topic"
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+              placeholder="Building agents that don't suck"
+              className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream-2 font-prose text-base placeholder:text-muted-2 focus:border-vermilion-400 focus:outline-none transition-colors"
             />
           </Field>
+
           <Field label="Voice pack" id="nd-pack">
             <select
               id="nd-pack"
               value={pack}
               onChange={(e) => setPack(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+              className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-ui text-sm focus:border-vermilion-400 focus:outline-none transition-colors"
             >
               <option value="">— pick a pack —</option>
               {packs
@@ -134,13 +146,14 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
                 ))}
             </select>
           </Field>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Provider" id="nd-provider">
               <select
                 id="nd-provider"
                 value={provider}
                 onChange={(e) => setProvider(e.target.value as Provider)}
-                className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+                className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-ui text-sm focus:border-vermilion-400 focus:outline-none transition-colors"
               >
                 {(["anthropic", "openai", "google"] as Provider[]).map((p) => (
                   <option key={p} value={p} disabled={!providers[p]}>
@@ -155,7 +168,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
                 id="nd-model"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
+                className="w-full bg-ink border border-rule rounded-sm px-3 py-2.5 text-cream font-ui text-sm focus:border-vermilion-400 focus:outline-none transition-colors"
               >
                 {models.length === 0 && <option value="">No models</option>}
                 {models.map((m) => (
@@ -166,39 +179,43 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
               </select>
             </Field>
           </div>
-          {modelsError && <p className="text-amber-400 text-xs">{modelsError}</p>}
-          <Field label={`Target length: ${targetWords} words`} id="nd-words">
-            <input
-              id="nd-words"
-              type="range"
-              min={500}
-              max={3500}
-              step={100}
-              value={targetWords}
-              onChange={(e) => setTargetWords(Number.parseInt(e.target.value, 10))}
-              className="w-full"
-            />
+          {modelsError && (
+            <p className="text-gold text-xs border-l-2 border-gold pl-3">{modelsError}</p>
+          )}
+
+          <Field label="Target length" id="nd-words">
+            <div className="flex items-center gap-4">
+              <input
+                id="nd-words"
+                type="range"
+                min={500}
+                max={3500}
+                step={100}
+                value={targetWords}
+                onChange={(e) => setTargetWords(Number.parseInt(e.target.value, 10))}
+                className="flex-1 accent-vermilion"
+              />
+              <span className="font-mono-num text-sm text-cream-2 tabular-nums min-w-[5rem] text-right">
+                {targetWords.toLocaleString()} <span className="text-muted">words</span>
+              </span>
+            </div>
           </Field>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+
+          {error && (
+            <p className="text-vermilion-300 text-sm border-l-2 border-vermilion pl-3">{error}</p>
+          )}
           {!providers[provider] && (
-            <p className="text-amber-400 text-xs">
-              No API key for {provider}. Add one in myvoice (localhost:7878) → Settings.
+            <p className="text-gold text-xs border-l-2 border-gold pl-3">
+              No API key for {provider}. Add one in myvoice → Settings.
             </p>
           )}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 text-sm border border-slate-700 rounded text-slate-300 hover:bg-slate-800"
-            >
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="btn-press">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded disabled:opacity-50"
-            >
-              {submitting ? "Creating…" : "Create draft"}
+            <button type="submit" disabled={!canSubmit} className="btn-stamp">
+              {submitting ? "Setting type…" : "Begin →"}
             </button>
           </div>
         </form>
@@ -218,7 +235,10 @@ function Field({
 }): JSX.Element {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-200 mb-1">
+      <label
+        htmlFor={id}
+        className="block font-mono text-[10px] uppercase tracking-wide-3 text-muted mb-1.5"
+      >
         {label}
       </label>
       {children}

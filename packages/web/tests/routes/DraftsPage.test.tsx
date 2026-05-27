@@ -21,6 +21,6 @@ describe("DraftsPage", () => {
         <DraftsPage />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(screen.getByText(/No drafts yet/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Nothing here yet/i)).toBeInTheDocument());
   });
 });
