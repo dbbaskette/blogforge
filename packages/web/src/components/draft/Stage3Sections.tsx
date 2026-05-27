@@ -27,6 +27,7 @@ export function Stage3Sections({
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [lintOpen, setLintOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
 
   // Use a ref to hold stable handler refs so useExpandJob effect does not re-fire.
   const handlersRef = useRef<ExpandJobHandlers>({
@@ -50,10 +51,14 @@ export function Stage3Sections({
       },
       onComplete: () => {
         setGeneratingIds(new Set());
+        setJobError(null);
         onJobComplete?.();
       },
-      onError: () => {
+      onError: (_code, message, hint) => {
         setGeneratingIds(new Set());
+        setJobError({ message, hint });
+        // Also re-fetch the draft so per-section "failed" statuses show up.
+        onJobComplete?.();
       },
     }),
     // onJobComplete is stable (useCallback in DraftPage), so including it is safe.
@@ -132,6 +137,20 @@ export function Stage3Sections({
           </span>
         )}
       </div>
+
+      {jobError && (
+        <div className="bg-red-900/40 border border-red-700 text-red-200 rounded p-3 text-sm">
+          <div className="font-medium">Expand failed: {jobError.message}</div>
+          {jobError.hint && <div className="text-red-300/80 mt-1">{jobError.hint}</div>}
+          <button
+            type="button"
+            onClick={() => setJobError(null)}
+            className="mt-2 text-xs underline hover:no-underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {draft.sections.length === 0 && <p className="text-slate-500 text-sm">No sections yet.</p>}
 

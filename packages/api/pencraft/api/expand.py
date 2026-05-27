@@ -104,11 +104,18 @@ async def _run_expand(
         provider = get_provider(provider_name, api_key)
         semaphore = asyncio.Semaphore(_CONCURRENCY)
 
+        # Captured per-section failures. Inner expand_one no longer calls
+        # reg.fail directly — the outer code decides whether the whole job
+        # failed (every target failed) or succeeded (some sections produced).
+        section_errors: list[tuple[str, str, str | None]] = []
+
         async def expand_one(idx: int) -> None:
             section = draft.sections[idx]
             if cancel_evt.is_set():
                 return
-            if section.status in ("ready", "edited"):
+            # Skip only sections that have real content — empty "edited" sections
+            # (saved while blank) should still be retried by a bulk expand.
+            if section.content_md.strip() and section.status in ("ready", "edited"):
                 return
             async with semaphore:
                 if cancel_evt.is_set():
@@ -130,21 +137,22 @@ async def _run_expand(
                 except ProviderMissingKey as e:
                     section.status = "failed"
                     store.update(draft.id, draft)
-                    await reg.fail(job_id, e.code, e.message, e.hint)
+                    section_errors.append((e.code, e.message, e.hint))
                     return
                 except ProviderError as e:
                     section.status = "failed"
                     store.update(draft.id, draft)
-                    await reg.fail(job_id, e.code, e.message, e.hint)
+                    section_errors.append((e.code, e.message, e.hint))
                     return
                 except ComposeError as e:
                     section.status = "failed"
                     store.update(draft.id, draft)
-                    await reg.fail(
-                        job_id,
-                        "compose_error",
-                        str(e),
-                        "Check the draft's format/samples against the pack manifest.",
+                    section_errors.append(
+                        (
+                            "compose_error",
+                            str(e),
+                            "Check the draft's format/samples against the pack manifest.",
+                        )
                     )
                     return
                 section.content_md = buf.strip() + "\n"
@@ -154,7 +162,11 @@ async def _run_expand(
                 store.update(draft.id, draft)
                 await reg.set_stage(job_id, f"section:done:{section.id}")
 
-        targets = [i for i, s in enumerate(draft.sections) if s.status not in ("ready", "edited")]
+        targets = [
+            i
+            for i, s in enumerate(draft.sections)
+            if not (s.content_md.strip() and s.status in ("ready", "edited"))
+        ]
         await asyncio.gather(*[expand_one(i) for i in targets])
         if cancel_evt.is_set():
             return
@@ -162,12 +174,21 @@ async def _run_expand(
         draft.stage = "sections"
         store.update(draft.id, draft)
         elapsed = time.monotonic() - started
+        done = sum(1 for s in draft.sections if s.status == "ready")
+        failed = sum(1 for s in draft.sections if s.status == "failed")
+        # If every target failed, surface that as a job-level failure with the
+        # FIRST per-section error's actual message (so the user sees what's
+        # wrong: missing key, bad format, etc.) instead of a generic "all failed".
+        if targets and done == 0 and section_errors:
+            code, message, hint = section_errors[0]
+            await reg.fail(job_id, code, message, hint)
+            return
         await reg.complete(
             job_id,
             {
                 "draft_id": draft.id,
-                "sections_done": sum(1 for s in draft.sections if s.status == "ready"),
-                "sections_failed": sum(1 for s in draft.sections if s.status == "failed"),
+                "sections_done": done,
+                "sections_failed": failed,
                 "elapsed_seconds": elapsed,
             },
         )
