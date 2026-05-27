@@ -31,6 +31,9 @@ packages/web/vite.config.d.ts
 .vscode/
 .idea/
 
+# Git worktrees (created for isolated parallel work)
+.worktrees/
+
 # Playwright
 playwright-report/
 test-results/
