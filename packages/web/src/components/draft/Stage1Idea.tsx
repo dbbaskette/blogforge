@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { Draft, IdeaInput } from "../../api/drafts";
-import { type PackSummary, listPacks } from "../../api/packs";
+import { type PackFormatEntry, type PackSummary, getManifest, listPacks } from "../../api/packs";
 import { type ModelInfo, listModels, listProviderAvailability } from "../../api/providers";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 
@@ -16,6 +16,7 @@ type Provider = "anthropic" | "openai" | "google";
 export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX.Element {
   const idea = draft.idea;
   const [packs, setPacks] = useState<PackSummary[]>([]);
+  const [packFormats, setPackFormats] = useState<PackFormatEntry[]>([]);
   const [providers, setProviders] = useState<Record<string, boolean>>({});
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [advancing, setAdvancing] = useState(false);
@@ -59,6 +60,30 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
       .then(setProviders)
       .catch(() => {});
   }, []);
+
+  // Load formats from the selected pack's manifest. Clears the format selection
+  // if the previously-stored format isn't valid in the new pack.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: format is read once on pack change
+  useEffect(() => {
+    if (!packSlug) {
+      setPackFormats([]);
+      return;
+    }
+    let cancelled = false;
+    getManifest(packSlug)
+      .then((m) => {
+        if (cancelled) return;
+        const raw = (m.formats as PackFormatEntry[] | undefined) ?? [];
+        setPackFormats(raw);
+        if (format && !raw.some((f) => f.name === format)) setFormat("");
+      })
+      .catch(() => {
+        if (!cancelled) setPackFormats([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [packSlug]);
 
   useEffect(() => {
     if (!provider || !providers[provider]) {
@@ -180,14 +205,21 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
         </Field>
 
         <Field label="Format (optional)" id="s1-format">
-          <input
+          <select
             id="s1-format"
-            type="text"
             value={format}
             onChange={(e) => setFormat(e.target.value)}
-            placeholder="e.g. listicle, essay…"
             className="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-100"
-          />
+            disabled={packFormats.length === 0}
+          >
+            <option value="">— none —</option>
+            {packFormats.map((f) => (
+              <option key={f.name} value={f.name}>
+                {f.name}
+                {f.description ? ` — ${f.description}` : ""}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 

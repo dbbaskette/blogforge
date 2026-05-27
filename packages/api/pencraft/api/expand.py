@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from myvoice.compose import ComposeError
 
 from pencraft.api.outline import _read_myvoice_key
 from pencraft.drafts import DraftStore
@@ -135,6 +136,16 @@ async def _run_expand(
                     section.status = "failed"
                     store.update(draft.id, draft)
                     await reg.fail(job_id, e.code, e.message, e.hint)
+                    return
+                except ComposeError as e:
+                    section.status = "failed"
+                    store.update(draft.id, draft)
+                    await reg.fail(
+                        job_id,
+                        "compose_error",
+                        str(e),
+                        "Check the draft's format/samples against the pack manifest.",
+                    )
                     return
                 section.content_md = buf.strip() + "\n"
                 section.word_count = len(buf.split())

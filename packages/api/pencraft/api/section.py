@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from myvoice.compose import ComposeError
 from pydantic import BaseModel
 
 from pencraft.api.outline import _read_myvoice_key
@@ -187,5 +188,12 @@ async def _run_regenerate(
         await reg.fail(job_id, e.code, e.message, e.hint)
     except ProviderError as e:
         await reg.fail(job_id, e.code, e.message, e.hint)
+    except ComposeError as e:
+        await reg.fail(
+            job_id,
+            "compose_error",
+            str(e),
+            "Check the draft's format/samples against the pack manifest.",
+        )
     except Exception as e:
         await reg.fail(job_id, "internal_error", f"Unexpected: {e}")
