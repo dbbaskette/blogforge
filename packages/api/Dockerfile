@@ -16,11 +16,22 @@ RUN pnpm build
 # ---- runtime stage ----
 FROM python:3.11-slim
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv (pinned via pip; smaller than the standalone installer).
 RUN pip install --no-cache-dir uv==0.5.0
+
+# Pencraft's pyproject.toml has `[tool.uv.sources]` pointing myvoice at
+# ../myvoice (a sibling-repo editable install for local dev). Resolved
+# relative to /app, that's /myvoice — fetch it from GitHub so the source
+# override finds something at the expected path.
+#
+# Override the ref at build time with `--build-arg MYVOICE_REF=<sha-or-tag>`
+# for reproducible images.
+ARG MYVOICE_REF=main
+RUN git clone --depth=1 --branch "${MYVOICE_REF}" \
+        https://github.com/dbbaskette/myvoice /myvoice
 
 # Copy project metadata.
 COPY pyproject.toml uv.lock /app/
