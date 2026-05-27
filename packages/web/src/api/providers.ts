@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { api } from "./client";
 
 export interface ModelInfo {
   id: string;
@@ -8,11 +8,11 @@ export interface ModelInfo {
 }
 
 export async function listProviderAvailability(): Promise<Record<string, boolean>> {
-  return apiFetch("/api/providers");
+  return api("/api/providers");
 }
 
 export async function listModels(
   provider: "anthropic" | "openai" | "google",
 ): Promise<ModelInfo[]> {
-  return apiFetch(`/api/providers/${provider}/models`);
+  return api(`/api/providers/${provider}/models`);
 }

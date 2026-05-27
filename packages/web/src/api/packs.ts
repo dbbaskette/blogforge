@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { api } from "./client";
 
 export interface PackSummary {
   slug: string;
@@ -15,9 +15,9 @@ export interface PackFormatEntry {
 }
 
 export async function listPacks(): Promise<PackSummary[]> {
-  return apiFetch<PackSummary[]>("/api/packs");
+  return api<PackSummary[]>("/api/packs");
 }
 
 export async function getManifest(slug: string): Promise<Record<string, unknown>> {
-  return apiFetch(`/api/packs/${encodeURIComponent(slug)}/manifest`);
+  return api(`/api/packs/${encodeURIComponent(slug)}/manifest`);
 }

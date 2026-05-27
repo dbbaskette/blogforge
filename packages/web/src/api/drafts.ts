@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { api } from "./client";
 
 export interface IdeaInput {
   topic: string;
@@ -53,36 +53,35 @@ export interface DraftSummary {
 }
 
 export async function listDrafts(init?: RequestInit): Promise<DraftSummary[]> {
-  return apiFetch<DraftSummary[]>("/api/drafts", init);
+  return api<DraftSummary[]>("/api/drafts", init);
 }
 export async function createDraft(idea: IdeaInput): Promise<Draft> {
-  return apiFetch<Draft>("/api/drafts", { method: "POST", body: JSON.stringify(idea) });
+  return api<Draft>("/api/drafts", { method: "POST", body: JSON.stringify(idea) });
 }
 export async function getDraft(id: string, init?: RequestInit): Promise<Draft> {
-  return apiFetch<Draft>(`/api/drafts/${encodeURIComponent(id)}`, init);
+  return api<Draft>(`/api/drafts/${encodeURIComponent(id)}`, init);
 }
 export async function updateDraft(id: string, draft: Draft): Promise<Draft> {
-  return apiFetch<Draft>(`/api/drafts/${encodeURIComponent(id)}`, {
+  return api<Draft>(`/api/drafts/${encodeURIComponent(id)}`, {
     method: "PUT",
     body: JSON.stringify(draft),
   });
 }
 export async function deleteDraft(id: string): Promise<void> {
-  const res = await fetch(`/api/drafts/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) throw new Error(`HTTP ${res.status}`);
+  await api<void>(`/api/drafts/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 export async function generateOutline(id: string): Promise<Draft> {
-  return apiFetch<Draft>(`/api/drafts/${encodeURIComponent(id)}/outline`, { method: "POST" });
+  return api<Draft>(`/api/drafts/${encodeURIComponent(id)}/outline`, { method: "POST" });
 }
 export async function expandSections(id: string): Promise<{ job_id: string }> {
-  return apiFetch(`/api/drafts/${encodeURIComponent(id)}/expand`, { method: "POST" });
+  return api(`/api/drafts/${encodeURIComponent(id)}/expand`, { method: "POST" });
 }
 export async function regenerateSection(
   id: string,
   sectionId: string,
 ): Promise<{ job_id: string }> {
-  return apiFetch(
+  return api(
     `/api/drafts/${encodeURIComponent(id)}/sections/${encodeURIComponent(sectionId)}/regenerate`,
     { method: "POST" },
   );
@@ -92,7 +91,7 @@ export async function saveSection(
   sectionId: string,
   content_md: string,
 ): Promise<Draft> {
-  return apiFetch(
+  return api(
     `/api/drafts/${encodeURIComponent(id)}/sections/${encodeURIComponent(sectionId)}/save`,
     {
       method: "POST",
@@ -101,7 +100,7 @@ export async function saveSection(
   );
 }
 export async function reorderSections(id: string, section_ids: string[]): Promise<Draft> {
-  return apiFetch(`/api/drafts/${encodeURIComponent(id)}/sections/reorder`, {
+  return api(`/api/drafts/${encodeURIComponent(id)}/sections/reorder`, {
     method: "POST",
     body: JSON.stringify({ section_ids }),
   });
@@ -110,5 +109,5 @@ export function downloadDraftUrl(id: string): string {
   return `/api/drafts/${encodeURIComponent(id)}/download`;
 }
 export async function lintDraft(id: string): Promise<{ violations: unknown[]; hits: unknown[] }> {
-  return apiFetch(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
+  return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
 }
