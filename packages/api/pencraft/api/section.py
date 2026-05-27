@@ -13,7 +13,6 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from myvoice.compose import ComposeError
 from pydantic import BaseModel
 
-from pencraft.api.outline import _read_myvoice_key
 from pencraft.auth.dependencies import get_current_user
 from pencraft.db.models import User
 from pencraft.drafts.models import Draft
@@ -21,6 +20,7 @@ from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.generate.section import stream_section
 from pencraft.jobs.models import JobType
 from pencraft.jobs.registry import JobRegistry
+from pencraft.keys import KeyVault
 from pencraft.llm.exceptions import ProviderError, ProviderMissingKey
 from pencraft.llm.registry import get_provider
 
@@ -128,7 +128,7 @@ async def regenerate_section(
             404, detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}}
         )
 
-    api_key = _read_myvoice_key(draft.idea.provider)
+    api_key = await KeyVault().get(draft.idea.provider)
     if not api_key:
         raise HTTPException(
             400,
@@ -136,7 +136,7 @@ async def regenerate_section(
                 "error": {
                     "code": "provider_missing_key",
                     "message": f"No API key for {draft.idea.provider}",
-                    "hint": "Add the key in myvoice Settings.",
+                    "hint": "An admin can add one under /admin (API keys section).",
                 }
             },
         )

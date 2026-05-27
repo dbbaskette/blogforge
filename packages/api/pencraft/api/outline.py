@@ -8,25 +8,11 @@ from pencraft.auth.dependencies import get_current_user
 from pencraft.db.models import User
 from pencraft.drafts.models import Draft, OutlineProposal
 from pencraft.generate.outline import propose_outline
+from pencraft.keys import KeyVault
 from pencraft.llm.exceptions import ProviderError, ProviderMissingKey
 from pencraft.llm.registry import get_provider
 
 router = APIRouter(tags=["outline"])
-
-
-def _read_myvoice_key(provider: str) -> str:
-    """Read provider key from ~/.myvoice/config.yaml."""
-    import os
-    from pathlib import Path
-
-    import yaml
-
-    env = os.environ.get("MYVOICE_CONFIG_PATH")
-    path = Path(env) if env else Path.home() / ".myvoice" / "config.yaml"
-    if not path.is_file():
-        return ""
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    return str((data.get("providers") or {}).get(provider, {}).get("api_key", ""))
 
 
 @router.post("/api/drafts/{draft_id}/outline")
@@ -53,7 +39,7 @@ async def generate_outline(
             detail={"error": {"code": "pack_not_found", "message": f"No pack '{slug}'"}},
         )
 
-    api_key = _read_myvoice_key(draft.idea.provider)
+    api_key = await KeyVault().get(draft.idea.provider)
     if not api_key:
         raise HTTPException(
             400,
@@ -61,7 +47,7 @@ async def generate_outline(
                 "error": {
                     "code": "provider_missing_key",
                     "message": f"No API key for {draft.idea.provider}",
-                    "hint": "Add the key in myvoice Settings.",
+                    "hint": "An admin can add one under /admin (API keys section).",
                 }
             },
         )
