@@ -42,9 +42,7 @@ export function AdminPage(): JSX.Element {
   return (
     <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10 animate-fade-up">
       <header className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600 mb-2">
-          Admin
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600 mb-2">Admin</p>
         <h1 className="font-serif text-3xl md:text-4xl font-medium text-ink leading-tight tracking-tight">
           Users
         </h1>
@@ -61,8 +59,7 @@ export function AdminPage(): JSX.Element {
 
       <section className="mb-8">
         <h2 className="font-serif text-xl font-medium text-ink mb-3">
-          Pending requests{" "}
-          <span className="font-mono text-sm text-muted">({pending.length})</span>
+          Pending requests <span className="font-mono text-sm text-muted">({pending.length})</span>
         </h2>
         {pending.length === 0 ? (
           <p className="nb-card p-6 text-center italic text-muted">No pending requests.</p>

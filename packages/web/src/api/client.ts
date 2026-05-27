@@ -26,9 +26,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     try {
       const j = await res.json();
       detail =
-        typeof j?.detail === "string"
-          ? j.detail
-          : (j?.detail?.error?.message ?? JSON.stringify(j));
+        typeof j?.detail === "string" ? j.detail : (j?.detail?.error?.message ?? JSON.stringify(j));
     } catch {
       /* fall through */
     }
