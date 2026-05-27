@@ -1,0 +1,23 @@
+---
+applications:
+  - name: pencraft
+    memory: 512M
+    instances: 1
+    buildpacks:
+      - python_buildpack
+    command: pencraft serve --host 0.0.0.0 --port $PORT
+    services:
+      - pencraft-postgres
+      - pencraft-s3
+    env:
+      # Required at deploy time:
+      #   cf set-env pencraft PENCRAFT_ADMIN_PASSWORD <strong-secret>
+      #   cf set-env pencraft PENCRAFT_SESSION_SECRET <64-char-hex>
+      # The Tanzu config adapter translates VCAP_SERVICES into
+      # PENCRAFT_DATABASE_URL and PENCRAFT_S3_* at startup.
+      PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
+      PENCRAFT_S3_BUCKET: pencraft
+      PENCRAFT_S3_REGION: us-east-1
+      PENCRAFT_RUN_MIGRATIONS_ON_BOOT: "true"
+      # Empty by default — when api and web share an origin, CORS is unnecessary.
+      PENCRAFT_CORS_ORIGINS: ""
