@@ -38,18 +38,63 @@ def _resolve_drafts_root() -> Path:
 
 
 def _resolve_pack_roots() -> list[Path]:
-    """Same resolution as myvoice: env override > ~/.myvoice/packs > repo packs/."""
+    """Find every directory where myvoice packs might live.
+
+    Priority order (first hit wins; missing entries skipped):
+    1. ``MYVOICE_PACKS_ROOT`` env var (test/dev override).
+    2. ``~/.myvoice/packs/`` if it exists.
+    3. ``pack_paths`` from ``~/.myvoice/config.yaml`` (myvoice's own user config).
+    4. Sibling myvoice repo's ``packs/`` dir (relative to the Pencraft repo, or
+       to the current working directory — covers both ``uv run`` and
+       wheel-installed launches).
+    5. Walk-up from ``__file__`` — works when Pencraft is installed editable
+       inside the repo (``parents[3].parent / 'myvoice' / 'packs'`` is the
+       sibling-repo path); a no-op for wheel installs.
+    """
+    candidates: list[Path] = []
     env = os.environ.get("MYVOICE_PACKS_ROOT")
     if env:
-        return [Path(env)]
-    user_root = Path.home() / ".myvoice" / "packs"
-    if user_root.is_dir():
-        return [user_root]
-    # Dev fallback: sibling myvoice repo
-    repo_packs = Path(__file__).resolve().parents[3].parent / "myvoice" / "packs"
-    if repo_packs.is_dir():
-        return [repo_packs]
-    return []
+        candidates.append(Path(env))
+    candidates.append(Path.home() / ".myvoice" / "packs")
+    # Read pack_paths from myvoice's config.
+    candidates.extend(_read_myvoice_pack_paths())
+    # Sibling-repo candidates: try common locations for a dev checkout.
+    cwd = Path.cwd()
+    candidates.extend([
+        cwd / ".." / "myvoice" / "packs",
+        cwd.parent / "myvoice" / "packs",
+        Path(__file__).resolve().parents[3].parent / "myvoice" / "packs",
+    ])
+    # Dedupe by resolved path, keeping insertion order.
+    seen: set[Path] = set()
+    roots: list[Path] = []
+    for raw in candidates:
+        try:
+            resolved = raw.expanduser().resolve()
+        except OSError:
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if resolved.is_dir():
+            roots.append(resolved)
+    return roots
+
+
+def _read_myvoice_pack_paths() -> list[Path]:
+    """Pull ``pack_paths`` from ~/.myvoice/config.yaml. Returns [] on any error."""
+    import yaml
+
+    cfg_env = os.environ.get("MYVOICE_CONFIG_PATH")
+    cfg_path = Path(cfg_env) if cfg_env else Path.home() / ".myvoice" / "config.yaml"
+    if not cfg_path.is_file():
+        return []
+    try:
+        data = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, OSError):
+        return []
+    raw = data.get("pack_paths") or []
+    return [Path(p) for p in raw if isinstance(p, str) and p]
 
 
 @asynccontextmanager
