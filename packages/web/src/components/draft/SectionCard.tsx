@@ -87,6 +87,14 @@ export function SectionCard({
         </div>
       ) : (
         <div className="p-5">
+          {section.status === "failed" && section.last_error && (
+            <div className="mb-4 border-l-2 border-vermilion pl-4 py-2 bg-vermilion-900/30">
+              <p className="font-mono text-[10px] uppercase tracking-wide-3 text-vermilion-400">
+                last attempt failed
+              </p>
+              <p className="font-prose text-sm text-cream/85 mt-1">{section.last_error}</p>
+            </div>
+          )}
           <MarkdownEditor initialMarkdown={section.content_md} onSave={onSave} />
         </div>
       )}

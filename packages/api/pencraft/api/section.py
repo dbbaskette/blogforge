@@ -56,6 +56,7 @@ def save_section(draft_id: str, section_id: str, body: _SaveBody, request: Reque
         raise _section_not_found(section_id)
     section.content_md = body.content_md
     section.status = "edited"
+    section.last_error = None
     section.word_count = len(body.content_md.split())
     store.update(draft.id, draft)
     return draft
@@ -165,35 +166,51 @@ async def _run_regenerate(
         provider = get_provider(provider_name, api_key)
 
         section.status = "generating"
+        section.last_error = None
         store.update(draft.id, draft)
         await reg.set_stage(job_id, f"section:start:{section_id}")
         buf = ""
-        async for chunk in stream_section(
-            draft, section, pack_info.root_path, manifest, provider, model=model
-        ):
-            if cancel_evt.is_set():
-                section.status = "failed"
-                store.update(draft.id, draft)
-                return
-            if chunk.delta:
-                buf += chunk.delta
+        try:
+            async for chunk in stream_section(
+                draft, section, pack_info.root_path, manifest, provider, model=model
+            ):
+                if cancel_evt.is_set():
+                    section.status = "failed"
+                    section.last_error = "Cancelled before completion."
+                    store.update(draft.id, draft)
+                    return
+                if chunk.delta:
+                    buf += chunk.delta
+        except ProviderMissingKey as e:
+            section.status = "failed"
+            section.last_error = e.message
+            store.update(draft.id, draft)
+            await reg.fail(job_id, e.code, e.message, e.hint)
+            return
+        except ProviderError as e:
+            section.status = "failed"
+            section.last_error = e.message
+            store.update(draft.id, draft)
+            await reg.fail(job_id, e.code, e.message, e.hint)
+            return
+        except ComposeError as e:
+            section.status = "failed"
+            section.last_error = str(e)
+            store.update(draft.id, draft)
+            await reg.fail(
+                job_id,
+                "compose_error",
+                str(e),
+                "Check the draft's format/samples against the pack manifest.",
+            )
+            return
         section.content_md = buf.strip() + "\n"
         section.word_count = len(buf.split())
         section.status = "ready"
+        section.last_error = None
         section.last_generated_at = datetime.now(UTC)
         store.update(draft.id, draft)
         await reg.set_stage(job_id, f"section:done:{section_id}")
         await reg.complete(job_id, {"section_id": section_id, "word_count": section.word_count})
-    except ProviderMissingKey as e:
-        await reg.fail(job_id, e.code, e.message, e.hint)
-    except ProviderError as e:
-        await reg.fail(job_id, e.code, e.message, e.hint)
-    except ComposeError as e:
-        await reg.fail(
-            job_id,
-            "compose_error",
-            str(e),
-            "Check the draft's format/samples against the pack manifest.",
-        )
     except Exception as e:
         await reg.fail(job_id, "internal_error", f"Unexpected: {e}")

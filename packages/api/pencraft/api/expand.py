@@ -121,6 +121,7 @@ async def _run_expand(
                 if cancel_evt.is_set():
                     return
                 section.status = "generating"
+                section.last_error = None
                 store.update(draft.id, draft)
                 await reg.set_stage(job_id, f"section:start:{section.id}")
                 buf = ""
@@ -130,22 +131,26 @@ async def _run_expand(
                     ):
                         if cancel_evt.is_set():
                             section.status = "failed"
+                            section.last_error = "Cancelled before completion."
                             store.update(draft.id, draft)
                             return
                         if chunk.delta:
                             buf += chunk.delta
                 except ProviderMissingKey as e:
                     section.status = "failed"
+                    section.last_error = e.message
                     store.update(draft.id, draft)
                     section_errors.append((e.code, e.message, e.hint))
                     return
                 except ProviderError as e:
                     section.status = "failed"
+                    section.last_error = e.message
                     store.update(draft.id, draft)
                     section_errors.append((e.code, e.message, e.hint))
                     return
                 except ComposeError as e:
                     section.status = "failed"
+                    section.last_error = str(e)
                     store.update(draft.id, draft)
                     section_errors.append(
                         (
@@ -158,6 +163,7 @@ async def _run_expand(
                 section.content_md = buf.strip() + "\n"
                 section.word_count = len(buf.split())
                 section.status = "ready"
+                section.last_error = None
                 section.last_generated_at = datetime.now(UTC)
                 store.update(draft.id, draft)
                 await reg.set_stage(job_id, f"section:done:{section.id}")

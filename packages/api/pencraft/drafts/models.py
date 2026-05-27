@@ -49,6 +49,7 @@ class Section(BaseModel):
     content_md: str = ""
     status: SectionStatus = "empty"
     last_generated_at: datetime | None = None
+    last_error: str | None = None
     word_count: int = 0
 
 

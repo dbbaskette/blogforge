@@ -29,6 +29,7 @@ export interface Section {
   content_md: string;
   status: SectionStatus;
   last_generated_at: string | null;
+  last_error?: string | null;
   word_count: number;
 }
 export type DraftStage = "idea" | "outline" | "sections";
