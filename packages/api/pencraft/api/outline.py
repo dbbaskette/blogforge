@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
+from myvoice.compose import ComposeError
 
 from pencraft.drafts import Draft, OutlineProposal
 from pencraft.generate.outline import propose_outline
@@ -77,6 +78,22 @@ async def generate_outline(draft_id: str, request: Request) -> Draft:
     except ProviderError as e:
         raise HTTPException(
             502, detail={"error": {"code": e.code, "message": e.message}}
+        ) from e
+    except ComposeError as e:
+        raise HTTPException(
+            422,
+            detail={
+                "error": {
+                    "code": "compose_error",
+                    "message": str(e),
+                    "hint": "Pick a different format/sample from the pack, or clear the field.",
+                }
+            },
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            422,
+            detail={"error": {"code": "invalid_outline_json", "message": str(e)}},
         ) from e
 
     draft.outline = proposal
