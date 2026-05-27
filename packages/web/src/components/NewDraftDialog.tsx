@@ -24,6 +24,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
   const [targetWords, setTargetWords] = useState(1500);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [modelsError, setModelsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -36,13 +37,27 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
   }, [open]);
 
   useEffect(() => {
+    setModelsError(null);
     if (!provider || !providers[provider]) {
       setModels([]);
       return;
     }
     listModels(provider)
-      .then(setModels)
-      .catch(() => setModels([]));
+      .then((m) => {
+        setModels(m);
+        setModelsError(null);
+      })
+      .catch((e: Error) => {
+        setModels([]);
+        const msg = e.message ?? String(e);
+        if (msg.includes("provider_missing_key") || msg.includes("HTTP 400")) {
+          setModelsError(
+            `${provider} rejected the configured key. Update it in myvoice (localhost:7878 → Settings).`,
+          );
+        } else {
+          setModelsError(`Failed to load ${provider} models: ${msg}`);
+        }
+      });
   }, [provider, providers]);
 
   useEffect(() => {
@@ -151,6 +166,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
               </select>
             </Field>
           </div>
+          {modelsError && <p className="text-amber-400 text-xs">{modelsError}</p>}
           <Field label={`Target length: ${targetWords} words`} id="nd-words">
             <input
               id="nd-words"
