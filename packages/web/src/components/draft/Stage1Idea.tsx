@@ -48,9 +48,17 @@ export function Stage1Idea({ draft, onChange, onAdvance }: Stage1IdeaProps): JSX
     return { ...draft, title: topic || draft.title, idea: updatedIdea };
   }, [draft, topic, bullets, packSlug, format, provider, model, targetWords, notes]);
 
-  // Debounced auto-save
+  // Debounced auto-save. Suspended while advancing so a stale state can't
+  // race the Generate-outline POST and clobber the server's new outline.
   const draftValue = buildDraft();
-  const { saving, error: saveError } = useDebouncedSave(draftValue, onChange, 600);
+  const saveWhenNotAdvancing = useCallback(
+    async (v: Draft) => {
+      if (advancing) return;
+      await onChange(v);
+    },
+    [advancing, onChange],
+  );
+  const { saving, error: saveError } = useDebouncedSave(draftValue, saveWhenNotAdvancing, 600);
 
   useEffect(() => {
     listPacks()

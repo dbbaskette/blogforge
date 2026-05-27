@@ -71,3 +71,34 @@ def test_delete_draft(client_with_drafts: TestClient) -> None:
     assert r.status_code == 204
     r2 = client_with_drafts.get(f"/api/drafts/{created['id']}")
     assert r2.status_code == 404
+
+
+def test_put_does_not_regress_stage_or_clobber_outline(client_with_drafts: TestClient) -> None:
+    """Regression: a stale Stage 1 auto-save must not wipe a freshly-generated outline."""
+    created = client_with_drafts.post("/api/drafts", json=_idea_json()).json()
+    promoted = dict(created)
+    promoted["stage"] = "outline"
+    promoted["outline"] = {
+        "opening_hook": "An opener.",
+        "sections": [{"id": "s1", "title": "First", "brief": "b1"}],
+        "estimated_words": 800,
+    }
+    promoted["sections"] = [{
+        "id": "s1", "title": "First", "brief": "b1",
+        "content_md": "", "status": "empty",
+        "last_generated_at": None, "word_count": 0,
+    }]
+    r = client_with_drafts.put(f"/api/drafts/{created['id']}", json=promoted)
+    assert r.status_code == 200
+    assert r.json()["stage"] == "outline"
+
+    stale = dict(created)
+    stale["stage"] = "idea"
+    stale["outline"] = None
+    stale["sections"] = []
+    r = client_with_drafts.put(f"/api/drafts/{created['id']}", json=stale)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["stage"] == "outline", "stage should not regress idea ← outline"
+    assert body["outline"] is not None, "outline must not be clobbered by stale PUT"
+    assert len(body["sections"]) == 1, "sections must not be clobbered"
