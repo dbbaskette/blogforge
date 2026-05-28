@@ -161,6 +161,13 @@ async def test_accept_copies_outline_and_advances_stage(signed_admin_client):
     assert body["outline"] is not None
     assert body["outline"]["opening_hook"] == "h"
 
+    # Sections must be seeded from the outline so /expand doesn't 409 the
+    # moment the user clicks Compose.
+    assert len(body["sections"]) == len(body["outline"]["sections"])
+    assert body["sections"][0]["id"] == body["outline"]["sections"][0]["id"]
+    assert body["sections"][0]["title"] == body["outline"]["sections"][0]["title"]
+    assert body["sections"][0]["status"] == "empty"
+
 
 async def test_accept_returns_409_when_no_proposed_outline_yet(signed_admin_client):
     client, draft_id = signed_admin_client

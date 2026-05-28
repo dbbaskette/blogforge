@@ -37,9 +37,42 @@ export function SectionsPanel({
     await onReorder(ids).catch(() => {});
   };
 
+  const total = draft.sections.length;
+  const doneCount = draft.sections.filter(
+    (s) => s.status === "ready" || s.status === "edited",
+  ).length;
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+
   return (
     <section className="space-y-4 animate-fade-up">
       {references}
+
+      {jobRunning && (
+        <output
+          className="block px-5 py-4 rounded-nb"
+          style={{ background: "#eef2ff", border: "1px solid #c9d4fd" }}
+          aria-live="polite"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="flex items-center gap-2 text-sm font-semibold text-cobalt-700">
+              <span
+                aria-hidden
+                className="inline-block w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"
+              />
+              Composing your draft…
+            </span>
+            <span className="font-mono text-xs text-cobalt-700">
+              {doneCount} / {total} sections
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#c9d4fd" }}>
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${pct}%`, background: "var(--cobalt-500, #3b5bdb)" }}
+            />
+          </div>
+        </output>
+      )}
 
       {unfilledCount > 0 && (
         <div
@@ -52,15 +85,7 @@ export function SectionsPanel({
             </strong>{" "}
             Compose them all in one go.
           </div>
-          {jobRunning ? (
-            <span className="flex items-center gap-2 text-sm font-medium text-amber">
-              <span
-                aria-hidden
-                className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
-              />
-              Composing {generatingIds.size}…
-            </span>
-          ) : (
+          {!jobRunning && (
             <button
               type="button"
               onClick={() => onExpandUnfilled()}

@@ -12,3 +12,4 @@
 .idea
 .vscode
 *.log
+packages/api/pencraft/static
