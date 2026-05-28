@@ -9,7 +9,7 @@ import { useGlobalEvents } from "../hooks/useGlobalEvents";
 import { useMe } from "../hooks/useMe";
 
 const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: string }> = {
-  idea: { label: "Seed", pillClass: "nb-pill nb-pill-empty" },
+  research: { label: "Researching", pillClass: "nb-pill nb-pill-empty" },
   outline: { label: "Outline", pillClass: "nb-pill nb-pill-edited" },
   sections: { label: "Drafting", pillClass: "nb-pill nb-pill-gen" },
 };

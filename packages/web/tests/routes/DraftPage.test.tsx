@@ -31,7 +31,7 @@ vi.mock("../../src/api/drafts", async (importOriginal) => {
       created_at: "2026-01-01T00:00:00Z",
       updated_at: "2026-01-01T00:00:00Z",
       title: "My Test Draft",
-      stage: "idea",
+      stage: "research",
       idea: {
         topic: "My Test Draft",
         pack_slug: "dan",
@@ -46,6 +46,21 @@ vi.mock("../../src/api/drafts", async (importOriginal) => {
   };
 });
 
+// Keep ResearchPanel's network calls deterministic.
+vi.mock("../../src/api/ideation", () => ({
+  listIdeation: vi.fn().mockResolvedValue([]),
+  postIdeationMessage: vi.fn(),
+  acceptIdeation: vi.fn(),
+}));
+
+vi.mock("../../src/api/references", () => ({
+  listReferences: vi.fn().mockResolvedValue([]),
+  deleteReference: vi.fn(),
+  addUrlReference: vi.fn(),
+  addTextReference: vi.fn(),
+  addFileReference: vi.fn(),
+}));
+
 vi.mock("../../src/api/packs", () => ({
   listPacks: vi.fn().mockResolvedValue([]),
   getManifest: vi.fn().mockResolvedValue({ formats: [] }),
@@ -57,7 +72,7 @@ vi.mock("../../src/api/providers", () => ({
 }));
 
 describe("DraftPage", () => {
-  it("renders the IdeaPanel once draft loads at the idea stage", async () => {
+  it("renders the ResearchPanel once a draft loads at the research stage", async () => {
     render(
       <MemoryRouter initialEntries={["/drafts/abc123"]}>
         <Routes>
@@ -66,8 +81,9 @@ describe("DraftPage", () => {
       </MemoryRouter>,
     );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Generate outline/i })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: /^Send$/i })).toBeInTheDocument(),
     );
+    expect(screen.getByRole("button", { name: /Accept this outline/i })).toBeDisabled();
   });
 
   it("shows the back-to-drafts link and saved status", async () => {
