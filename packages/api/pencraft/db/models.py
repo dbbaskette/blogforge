@@ -53,8 +53,10 @@ class Draft(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    stage: Mapped[str] = mapped_column(String(16), nullable=False, default="idea")
-    # one of: "idea" | "outline" | "sections"
+    stage: Mapped[str] = mapped_column(String(16), nullable=False, default="research")
+    # one of: "research" | "outline" | "sections"
+    # ("idea" was the pre-Phase-B name; existing rows get coerced at the
+    # SqlDraftStore boundary, and migration 0003 rewrites them in place.)
     idea: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     outline: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

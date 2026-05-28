@@ -21,13 +21,22 @@ from pencraft.drafts.models import (
 )
 
 
+def _coerce_stage(raw: str) -> str:
+    """Map the legacy 'idea' stage to its Phase B name 'research'.
+
+    The schema migration rewrites rows in place; this is the runtime
+    safety net for any rows the migration missed (e.g. test fixtures
+    that pass stage='idea' explicitly)."""
+    return "research" if raw == "idea" else raw
+
+
 def _draft_from_row(row: DraftRow) -> Draft:
     return Draft(
         id=str(row.id),
         created_at=row.created_at,
         updated_at=row.updated_at,
         title=row.title,
-        stage=row.stage,  # type: ignore[arg-type]
+        stage=_coerce_stage(row.stage),  # type: ignore[arg-type]
         idea=IdeaInput.model_validate(row.idea),
         outline=(OutlineProposal.model_validate(row.outline) if row.outline else None),
         sections=[
@@ -100,7 +109,7 @@ class SqlDraftStore:
             row = DraftRow(
                 user_id=user_id,
                 title=idea.topic,
-                stage="idea",
+                stage="research",
                 idea=idea.model_dump(),
             )
             session.add(row)

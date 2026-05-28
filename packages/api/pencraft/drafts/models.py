@@ -53,7 +53,44 @@ class Section(BaseModel):
     word_count: int = 0
 
 
-DraftStage = Literal["idea", "outline", "sections"]
+DraftStage = Literal["research", "outline", "sections"]
+
+ReferenceKind = Literal["url", "file", "text"]
+
+
+class Reference(BaseModel):
+    """Metadata for a reference document attached to a draft.
+
+    Content (extracted markdown + original) lives in S3 keyed by id;
+    this shape is what the API returns and what gets persisted to the
+    `references` table.
+    """
+
+    id: str
+    kind: ReferenceKind
+    name: str
+    url: str | None = None
+    original_filename: str | None = None
+    extracted_chars: int = 0
+    added_at: datetime = Field(default_factory=_now)
+
+
+IdeationRole = Literal["user", "assistant"]
+
+
+class IdeationMessage(BaseModel):
+    id: str
+    position: int
+    role: IdeationRole
+    content: str
+    proposed_outline: OutlineProposal | None = None
+    timestamp: datetime = Field(default_factory=_now)
+
+
+class IdeationSession(BaseModel):
+    """The full ordered chat history for a draft. Just sugar around the list."""
+
+    messages: list[IdeationMessage] = Field(default_factory=list)
 
 
 class Draft(BaseModel):
@@ -61,10 +98,12 @@ class Draft(BaseModel):
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
     title: str = ""
-    stage: DraftStage = "idea"
+    stage: DraftStage = "research"
     idea: IdeaInput
     outline: OutlineProposal | None = None
     sections: list[Section] = Field(default_factory=list)
+    references: list[Reference] = Field(default_factory=list)
+    ideation_messages: list[IdeationMessage] = Field(default_factory=list)
 
 
 class DraftSummary(BaseModel):
