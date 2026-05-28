@@ -82,7 +82,9 @@ async def test_unique_position_per_draft(session):
             id="m-b", draft_id=draft.id, position=0, role="assistant", content="hello"
         )
     )
-    with pytest.raises(Exception):
+    from sqlalchemy.exc import IntegrityError
+
+    with pytest.raises(IntegrityError):
         await session.commit()
 
 

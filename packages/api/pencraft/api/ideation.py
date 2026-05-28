@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import secrets
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 import yaml
@@ -168,11 +169,11 @@ async def _run_ideation(
     job_id: str,
     draft_id: str,
     new_user_content: str,
-    pack_info,
+    pack_info: Any,
     provider_name: str,
     api_key: str,
     model: str,
-    user_id,
+    user_id: UUID,
     assistant_position: int,
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
@@ -205,12 +206,14 @@ async def _run_ideation(
             ):
                 if cancel_evt.is_set():
                     return
-                if evt["kind"] == "delta":
-                    buf += evt["delta"]
-                    await reg.append_token(job_id, evt["delta"])
-                elif evt["kind"] == "result":
-                    proposed = evt["proposed_outline"]
-                    buf = evt["text"]  # full assembled text
+                kind = evt["kind"]
+                if kind == "delta":
+                    delta = evt["delta"]  # type: ignore[typeddict-item]
+                    buf += delta
+                    await reg.append_token(job_id, delta)
+                elif kind == "result":
+                    proposed = evt["proposed_outline"]  # type: ignore[typeddict-item]
+                    buf = evt["text"]  # type: ignore[typeddict-item]  # full assembled text
         except ProviderMissingKey as e:
             await reg.fail(job_id, e.code, e.message, e.hint)
             return

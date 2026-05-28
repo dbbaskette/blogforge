@@ -21,7 +21,6 @@ from typing import Any, TypedDict
 from pencraft.drafts.models import Draft, OutlineProposal
 from pencraft.llm.base import LLMProvider
 
-
 IDEATION_SYSTEM_BLOCK = """\
 You are helping the author plan a long-form piece in their voice (defined
 above by ROLE / Humanizer / style guide). You will go back and forth with

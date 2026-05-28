@@ -8,12 +8,9 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from pencraft.db.engine import get_sessionmaker
 from pencraft.db.models import Draft as DraftRow
-from pencraft.db.models import IdeationMessage as IdeationMessageRow
-from pencraft.db.models import Reference as ReferenceRow
 from pencraft.db.models import Section as SectionRow
 from pencraft.drafts.models import (
     Draft,

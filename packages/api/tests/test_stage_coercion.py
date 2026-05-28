@@ -28,5 +28,7 @@ def test_outline_and_sections_unchanged():
 
 def test_unknown_stage_still_rejected():
     """The coercion shim is intentionally narrow — only "idea" is rewritten."""
-    with pytest.raises(Exception):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
         Draft.model_validate({"stage": "thinking", "idea": _idea().model_dump()})

@@ -3,13 +3,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-import pytest
-
 from pencraft.drafts.models import (
     Draft,
     IdeaInput,
     IdeationMessage,
-    OutlineProposal,
 )
 from pencraft.generate.ideation import (
     IDEATION_SYSTEM_BLOCK,

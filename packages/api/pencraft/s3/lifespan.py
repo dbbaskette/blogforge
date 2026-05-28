@@ -14,7 +14,7 @@ async def ensure_bucket() -> None:
     (Tanzu) this is the canonical create-if-missing pattern.
     """
     s3 = get_s3_client()
-    async with s3._client_ctx() as client:  # noqa: SLF001  (one-off setup; not perf-sensitive)
+    async with s3._client_ctx() as client:
         try:
             await client.head_bucket(Bucket=s3.bucket)
             return  # already exists

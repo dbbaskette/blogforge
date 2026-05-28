@@ -12,14 +12,14 @@ import asyncio
 import logging
 
 from pencraft.drafts.models import Reference
-from pencraft.s3 import S3Error, get_s3_client
+from pencraft.s3 import S3Client, S3Error, get_s3_client
 
 _log = logging.getLogger(__name__)
 
 REFERENCE_BUDGET_CHARS = 30_000
 """Soft cap on the total chars of the assembled reference block.
 
-Chosen so that 9 section calls × 30k chars × ~3 chars/token ≈ ~80k tokens of
+Chosen so that 9 section calls x 30k chars x ~3 chars/token ~= 80k tokens of
 reference context across a draft's lifetime — generous but not absurd. The
 v1 spec keeps this conservative; per-call summarisation is a later add."""
 
@@ -66,13 +66,14 @@ async def get_reference_context(draft_id: str, refs: list[Reference]) -> str:
     return _format(truncated)
 
 
-async def _fetch_one(s3, draft_id: str, ref: Reference) -> str:
+async def _fetch_one(s3: S3Client, draft_id: str, ref: Reference) -> str:
     key = f"drafts/{draft_id}/references/extracted/{ref.id}.md"
     try:
         raw = await s3.get_object(key)
     except S3Error as err:
         raise err  # surfaced into the gather; logged + treated as empty
-    return raw.decode("utf-8", errors="replace")
+    decoded: str = raw.decode("utf-8", errors="replace")
+    return decoded
 
 
 def _truncate(body: str, budget: int) -> str:

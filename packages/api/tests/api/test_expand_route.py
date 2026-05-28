@@ -63,7 +63,7 @@ def _seed_outlined_draft(client) -> str:
     ]
     created["stage"] = "outline"
     client.put(f"/api/drafts/{created['id']}", json=created)
-    return created["id"]  # type: ignore[no-any-return]
+    return created["id"]
 
 
 async def test_expand_returns_job_and_runs_sections(expand_client) -> None:

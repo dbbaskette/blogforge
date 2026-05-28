@@ -4,7 +4,7 @@ import pytest_asyncio
 from moto.server import ThreadedMotoServer
 
 from pencraft.config import get_settings
-from pencraft.s3 import S3Error, S3Client, get_s3_client, reset_s3_client_for_tests
+from pencraft.s3 import S3Error, get_s3_client, reset_s3_client_for_tests
 
 
 @pytest_asyncio.fixture

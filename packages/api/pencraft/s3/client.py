@@ -21,7 +21,7 @@ from botocore.exceptions import ClientError
 from pencraft.config import get_settings
 
 if TYPE_CHECKING:
-    from types import TracebackType
+    pass
 
 
 class S3Error(Exception):
@@ -81,7 +81,8 @@ class S3Client:
             except ClientError as err:
                 raise S3Error(f"get_object({key!r}) failed: {err}") from err
             async with resp["Body"] as stream:
-                return await stream.read()
+                body: bytes = await stream.read()
+                return body
 
     async def head_object(self, key: str) -> bool:
         async with self._client_ctx() as client:

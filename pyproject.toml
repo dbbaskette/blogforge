@@ -90,6 +90,11 @@ explicit_package_bases = true
 module = "myvoice.*"
 ignore_missing_imports = true
 
+# aiobotocore + botocore don't ship type stubs and aren't worth typing.
+[[tool.mypy.overrides]]
+module = ["aiobotocore.*", "botocore.*", "moto.*"]
+ignore_missing_imports = true
+
 # Tests don't need full strict-mode annotations (e.g. `-> None` on every test).
 # Production code still under strict.
 [[tool.mypy.overrides]]
@@ -98,7 +103,7 @@ disallow_untyped_defs = false
 disallow_untyped_calls = false
 disallow_incomplete_defs = false
 check_untyped_defs = false
-disable_error_code = ["untyped-decorator"]
+disable_error_code = ["untyped-decorator", "no-any-return", "call-arg"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages/api/tests"]

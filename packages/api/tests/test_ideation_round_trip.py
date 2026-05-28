@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
@@ -16,7 +15,6 @@ from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_te
 from pencraft.db.models import User
 from pencraft.drafts.models import IdeaInput
 from pencraft.drafts.sql_store import SqlDraftStore
-from pencraft.llm.base import StreamChunk
 from pencraft.server import create_app
 
 
