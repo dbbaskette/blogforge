@@ -17,6 +17,7 @@ from pencraft.auth.dependencies import get_current_user
 from pencraft.db.models import User
 from pencraft.drafts.models import Draft
 from pencraft.drafts.sql_store import SqlDraftStore
+from pencraft.generate.references import get_reference_context
 from pencraft.generate.section import stream_section
 from pencraft.jobs.models import JobType
 from pencraft.jobs.registry import JobRegistry
@@ -190,10 +191,17 @@ async def _run_regenerate(
         section.last_error = None
         await store.update(draft.id, draft, user_id=user_id)
         await reg.set_stage(job_id, f"section:start:{section_id}")
+        reference_context = await get_reference_context(draft.id, draft.references)
         buf = ""
         try:
             async for chunk in stream_section(
-                draft, section, pack_info.root_path, manifest, provider, model=model
+                draft,
+                section,
+                pack_info.root_path,
+                manifest,
+                provider,
+                model=model,
+                reference_context=reference_context,
             ):
                 if cancel_evt.is_set():
                     section.status = "failed"

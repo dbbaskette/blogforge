@@ -32,7 +32,7 @@ export interface Section {
   last_error?: string | null;
   word_count: number;
 }
-export type DraftStage = "idea" | "outline" | "sections";
+export type DraftStage = "research" | "outline" | "sections";
 export interface Draft {
   id: string;
   created_at: string;

@@ -12,6 +12,8 @@ interface SectionsPanelProps {
   onRegenerateSection: (sectionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
   onExpandUnfilled: () => Promise<void>;
+  /** Optional right-rail block, typically a collapsible ReferencesList. */
+  references?: React.ReactNode;
 }
 
 export function SectionsPanel({
@@ -25,6 +27,7 @@ export function SectionsPanel({
   onRegenerateSection,
   onReorder,
   onExpandUnfilled,
+  references,
 }: SectionsPanelProps): JSX.Element {
   const moveSection = async (idx: number, dir: -1 | 1): Promise<void> => {
     const ids = draft.sections.map((s) => s.id);
@@ -36,6 +39,8 @@ export function SectionsPanel({
 
   return (
     <section className="space-y-4 animate-fade-up">
+      {references}
+
       {unfilledCount > 0 && (
         <div
           className="flex items-center justify-between gap-3 px-5 py-3.5 rounded-nb"

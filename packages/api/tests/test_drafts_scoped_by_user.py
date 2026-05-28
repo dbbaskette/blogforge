@@ -35,7 +35,7 @@ async def test_create_returns_draft_for_user(two_users):
     store = SqlDraftStore()
     draft = await store.create(user_id=a_id, idea=_idea())
     assert draft.idea.topic == "t"
-    assert draft.stage == "idea"
+    assert draft.stage == "research"
 
 
 async def test_list_only_returns_user_drafts(two_users):

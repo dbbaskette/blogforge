@@ -8,6 +8,7 @@ from pencraft.auth.dependencies import get_current_user
 from pencraft.db.models import User
 from pencraft.drafts.models import Draft, OutlineProposal
 from pencraft.generate.outline import propose_outline
+from pencraft.generate.references import get_reference_context
 from pencraft.keys import KeyVault
 from pencraft.llm.exceptions import ProviderError, ProviderMissingKey
 from pencraft.llm.registry import get_provider
@@ -58,10 +59,17 @@ async def generate_outline(
         yaml.safe_load((pack_info.root_path / "stylepack.yaml").read_text(encoding="utf-8")) or {}
     )
 
+    reference_context = await get_reference_context(draft.id, draft.references)
+
     try:
         provider = get_provider(draft.idea.provider, api_key)
         proposal: OutlineProposal = await propose_outline(
-            draft.idea, pack_info.root_path, manifest, provider, model=draft.idea.model,
+            draft.idea,
+            pack_info.root_path,
+            manifest,
+            provider,
+            model=draft.idea.model,
+            reference_context=reference_context,
         )
     except ProviderMissingKey as e:
         raise HTTPException(

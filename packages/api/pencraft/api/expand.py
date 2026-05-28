@@ -14,6 +14,7 @@ from myvoice.compose import ComposeError
 from pencraft.auth.dependencies import get_current_user
 from pencraft.db.models import User
 from pencraft.drafts.sql_store import SqlDraftStore
+from pencraft.generate.references import get_reference_context
 from pencraft.generate.section import stream_section
 from pencraft.jobs.models import JobType
 from pencraft.jobs.registry import JobRegistry
@@ -110,6 +111,9 @@ async def _run_expand(
             (pack_info.root_path / "stylepack.yaml").read_text(encoding="utf-8")
         ) or {}
         provider = get_provider(provider_name, api_key)
+        # Build reference context once per expand job (every section in this
+        # draft sees the same materials), not per-section.
+        reference_context = await get_reference_context(draft.id, draft.references)
         semaphore = asyncio.Semaphore(_CONCURRENCY)
 
         # Captured per-section failures. Inner expand_one no longer calls
@@ -135,7 +139,13 @@ async def _run_expand(
                 buf = ""
                 try:
                     async for chunk in stream_section(
-                        draft, section, pack_info.root_path, manifest, provider, model=model
+                        draft,
+                        section,
+                        pack_info.root_path,
+                        manifest,
+                        provider,
+                        model=model,
+                        reference_context=reference_context,
                     ):
                         if cancel_evt.is_set():
                             section.status = "failed"

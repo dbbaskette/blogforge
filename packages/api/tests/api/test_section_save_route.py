@@ -32,7 +32,7 @@ def _seed(client) -> str:
     ]
     created["stage"] = "sections"
     client.put(f"/api/drafts/{created['id']}", json=created)
-    return created["id"]  # type: ignore[no-any-return]
+    return created["id"]
 
 
 async def test_save_section_sets_edited(authed_client) -> None:

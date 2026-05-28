@@ -53,8 +53,10 @@ class Draft(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    stage: Mapped[str] = mapped_column(String(16), nullable=False, default="idea")
-    # one of: "idea" | "outline" | "sections"
+    stage: Mapped[str] = mapped_column(String(16), nullable=False, default="research")
+    # one of: "research" | "outline" | "sections"
+    # ("idea" was the pre-Phase-B name; existing rows get coerced at the
+    # SqlDraftStore boundary, and migration 0003 rewrites them in place.)
     idea: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     outline: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
@@ -69,6 +71,67 @@ class Draft(Base):
         cascade="all, delete-orphan",
         order_by="Section.position",
     )
+    references: Mapped[list["Reference"]] = relationship(
+        back_populates="draft",
+        cascade="all, delete-orphan",
+        order_by="Reference.added_at",
+    )
+    ideation_messages: Mapped[list["IdeationMessage"]] = relationship(
+        back_populates="draft",
+        cascade="all, delete-orphan",
+        order_by="IdeationMessage.position",
+    )
+
+
+class Reference(Base):
+    """A reference document attached to a draft (URL, uploaded file, or pasted text).
+
+    Metadata only — extracted markdown + originals live in S3 at
+    ``drafts/{draft_id}/references/{originals,extracted}/{id}.*``.
+    """
+
+    __tablename__ = "references"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    draft_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    # one of: "url" | "file" | "text"
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_filename: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    extracted_chars: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    draft: Mapped[Draft] = relationship(back_populates="references")
+
+
+class IdeationMessage(Base):
+    """A single message in the research-stage chat for a draft.
+
+    Ordered by ``position`` (0-based); assistant messages may carry a
+    ``proposed_outline`` JSON blob that the user can Accept to advance
+    the draft into the outline stage.
+    """
+
+    __tablename__ = "ideation_messages"
+    __table_args__ = (
+        UniqueConstraint("draft_id", "position", name="uq_ideation_position"),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    draft_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    # one of: "user" | "assistant"
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    proposed_outline: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    draft: Mapped[Draft] = relationship(back_populates="ideation_messages")
 
 
 class ProviderKey(Base):

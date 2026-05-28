@@ -18,7 +18,7 @@ async def test_create_draft(authed_client) -> None:
     assert r.status_code == 201
     body = r.json()
     assert body["idea"]["topic"] == "Test topic"
-    assert body["stage"] == "idea"
+    assert body["stage"] == "research"
 
 
 async def test_list_drafts(authed_client) -> None:
@@ -84,12 +84,12 @@ async def test_put_does_not_regress_stage_or_clobber_outline(authed_client) -> N
     assert r.json()["stage"] == "outline"
 
     stale = dict(created)
-    stale["stage"] = "idea"
+    stale["stage"] = "research"
     stale["outline"] = None
     stale["sections"] = []
     r = client.put(f"/api/drafts/{created['id']}", json=stale)
     assert r.status_code == 200
     body = r.json()
-    assert body["stage"] == "outline", "stage should not regress idea ← outline"
+    assert body["stage"] == "outline", "stage should not regress research ← outline"
     assert body["outline"] is not None, "outline must not be clobbered by stale PUT"
     assert len(body["sections"]) == 1, "sections must not be clobbered"

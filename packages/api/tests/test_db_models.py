@@ -37,7 +37,7 @@ async def test_draft_belongs_to_user(session):
     u = User(email="bob@example.com", password_hash="x", status="approved", role="user")
     session.add(u)
     await session.flush()
-    d = Draft(user_id=u.id, title="Test", stage="idea", idea={"topic": "Test"})
+    d = Draft(user_id=u.id, title="Test", stage="research", idea={"topic": "Test"})
     session.add(d)
     await session.commit()
     fetched = (await session.execute(select(Draft).where(Draft.user_id == u.id))).scalar_one()

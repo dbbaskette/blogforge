@@ -116,14 +116,20 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         cfg.set_main_option("sqlalchemy.url", settings.database_url)
         command.upgrade(cfg, "head")
 
-    # 2) Seed admin.
+    # 2) S3 bucket bootstrap. Idempotent; creates the bucket on first boot.
+    if settings.s3_bootstrap_on_boot:
+        from pencraft.s3.lifespan import ensure_bucket
+
+        await ensure_bucket()
+
+    # 3) Seed admin.
     async with get_sessionmaker()() as session:
         await ensure_admin_user(
             session, email=settings.admin_email, password=settings.admin_password
         )
         await session.commit()
 
-    # 3) Per-request shared state.
+    # 4) Per-request shared state.
     app.state.draft_store = SqlDraftStore()
     app.state.pack_store = PackStore(_resolve_pack_roots())
     app.state.job_registry = JobRegistry()
@@ -156,21 +162,25 @@ def create_app() -> FastAPI:
     from pencraft.api.drafts import router as drafts_router
     from pencraft.api.events import router as events_router
     from pencraft.api.expand import router as expand_router
+    from pencraft.api.ideation import router as ideation_router
     from pencraft.api.jobs import router as jobs_router
     from pencraft.api.lint import router as lint_router
     from pencraft.api.outline import router as outline_router
     from pencraft.api.packs import router as packs_router
     from pencraft.api.providers import router as providers_router
+    from pencraft.api.references import router as references_router
     from pencraft.api.section import router as section_router
 
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(admin_keys_router)
     app.include_router(drafts_router)
+    app.include_router(references_router)
     app.include_router(outline_router)
     app.include_router(packs_router)
     app.include_router(providers_router)
     app.include_router(expand_router)
+    app.include_router(ideation_router)
     app.include_router(section_router)
     app.include_router(jobs_router)
     app.include_router(download_router)

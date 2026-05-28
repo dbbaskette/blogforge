@@ -55,7 +55,7 @@ async def get_draft(
     return draft
 
 
-_STAGE_ORDER = {"idea": 0, "outline": 1, "sections": 2}
+_STAGE_ORDER = {"research": 0, "outline": 1, "sections": 2}
 
 
 @router.put("/{draft_id}", response_model=Draft)

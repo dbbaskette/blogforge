@@ -4,10 +4,11 @@ import { Link } from "react-router-dom";
 import type { Draft, IdeaInput, OutlineProposal } from "../../api/drafts";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
-import { IdeaPanel } from "./IdeaPanel";
 import { LintPanel } from "./LintPanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
+import { ReferencesList } from "./ReferencesList";
+import { ResearchPanel } from "./ResearchPanel";
 import { SectionsPanel } from "./SectionsPanel";
 import { SetupDisclosure } from "./SetupDisclosure";
 import { WorkspaceFooter } from "./WorkspaceFooter";
@@ -95,13 +96,13 @@ export function DraftWorkspace({
     }
   }, [draft.sections]);
 
-  // ── Local editable state for idea / outline, debounced into onChange. ──
+  // ── Local editable state for research / outline, debounced into onChange. ──
   const [advancing, setAdvancing] = useState(false);
   const [topic, setTopic] = useState(draft.title);
 
   useEffect(() => setTopic(draft.title), [draft.title]);
 
-  // Build the next draft from a partial idea or outline patch, then push it.
+  // Build the next draft from a partial research/idea or outline patch, then push it.
   const handleIdeaChange = useCallback(
     (next: IdeaInput) => {
       const merged: Draft = {
@@ -210,21 +211,16 @@ export function DraftWorkspace({
           />
         </header>
 
-        {/* Setup — collapsed unless we're at the idea stage */}
+        {/* Setup — collapsed unless we're at the research stage */}
         <SetupDisclosure
           draft={draft}
           onChange={handleIdeaChange}
-          forceOpen={draft.stage === "idea"}
+          forceOpen={draft.stage === "research"}
         />
 
         {/* Stage-specific body */}
-        {draft.stage === "idea" && (
-          <IdeaPanel
-            idea={draft.idea}
-            draft={draft}
-            onChange={handleIdeaChange}
-            onAdvance={handleGenerate}
-          />
+        {draft.stage === "research" && (
+          <ResearchPanel draft={draft} onJobComplete={onJobComplete} />
         )}
 
         {draft.stage === "outline" && (
@@ -233,6 +229,7 @@ export function DraftWorkspace({
             onChange={handleOutlineChange}
             onAdvance={handleExpandAll}
             onRegenerate={handleGenerate}
+            references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
         )}
 
@@ -248,6 +245,7 @@ export function DraftWorkspace({
             onRegenerateSection={onRegenerateSection}
             onReorder={onReorder}
             onExpandUnfilled={onExpandUnfilled}
+            references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
         )}
       </main>

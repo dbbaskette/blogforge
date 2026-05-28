@@ -16,6 +16,8 @@ interface OutlinePanelProps {
   onChange: (outline: OutlineProposal) => void;
   onAdvance: () => Promise<void>;
   onRegenerate: () => Promise<void>;
+  /** Optional right-rail block, typically a collapsible ReferencesList. */
+  references?: React.ReactNode;
 }
 
 export function OutlinePanel({
@@ -23,6 +25,7 @@ export function OutlinePanel({
   onChange,
   onAdvance,
   onRegenerate,
+  references,
 }: OutlinePanelProps): JSX.Element {
   const outline = draft.outline ?? { opening_hook: "", sections: [], estimated_words: 0 };
   const [advancing, setAdvancing] = useState(false);
@@ -101,6 +104,8 @@ export function OutlinePanel({
           />
         </div>
       </header>
+
+      {references}
 
       <div>
         <div className="flex items-baseline justify-between mb-2 px-1">

@@ -56,7 +56,11 @@ async def stream_section(
     provider: LLMProvider,
     *,
     model: str,
+    reference_context: str = "",
 ) -> AsyncIterator[StreamChunk]:
+    """Stream a section's body. `reference_context` is the pre-assembled
+    "## Reference Materials" block (see pencraft.generate.references);
+    when non-empty it's prepended to the user prompt with a `---`."""
     from myvoice import compose_prompt
 
     sample_ids = _auto_pick_samples(manifest, n=3)
@@ -67,6 +71,8 @@ async def stream_section(
         draft=None,
     )
     user = _render_section_prompt(draft, section)
+    if reference_context:
+        user = f"{reference_context}\n\n---\n\n{user}"
     full_prompt = f"{system}\n\n---\n\n{user}"
     async for chunk in provider.stream(model=model, prompt=full_prompt):
         yield chunk

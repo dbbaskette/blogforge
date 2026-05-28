@@ -12,11 +12,11 @@ Local-first long-form drafting tool. Give Pencraft a topic and a [myvoice](https
 
 Three stages per draft:
 
-1. **Idea** — topic, optional bullets, pick a pack and a model.
-2. **Outline** — Pencraft proposes an opening hook + 5–9 sections with briefs. Edit titles, reorder, regenerate; nothing's written to disk yet beyond the draft itself.
-3. **Sections** — Pencraft expands each section as the pack would (parallel, streaming). Edit any section by hand or regenerate just that one. Download the assembled markdown when you're done.
+1. **Research** — paste URLs, files, or notes as references; chat with the LLM about your topic until the proposed outline feels right. Accept to move on.
+2. **Outline** — edit titles, reorder, regenerate the opening hook + 5–9 sections with briefs. References stay attached and inform every regeneration.
+3. **Sections** — Pencraft expands each section as the pack would (parallel, streaming), grounded in your references. Edit any section by hand or regenerate just that one. Download the assembled markdown when you're done.
 
-Drafts persist to Postgres (multi-user, scoped per account). Bring your own database, or use the bundled docker-compose stack below.
+Drafts (with their references and chat history) persist to Postgres + S3, multi-user, scoped per account. Bring your own database + object store, or use the bundled docker-compose stack below.
 
 ## Quickstart (Docker)
 
