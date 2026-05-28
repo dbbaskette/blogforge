@@ -279,6 +279,13 @@ async def accept_ideation(
         )
 
     draft.outline = proposal
+    # Seed sections from outline so the expand route doesn't 409 the moment
+    # the user clicks Compose. Matches POST /api/drafts/{id}/outline.
+    from pencraft.drafts.models import Section
+
+    draft.sections = [
+        Section(id=s.id, title=s.title, brief=s.brief) for s in proposal.sections
+    ]
     draft.stage = "outline"
     draft.updated_at = datetime.now(UTC)
     updated = await store.update(draft.id, draft, user_id=current.id)
