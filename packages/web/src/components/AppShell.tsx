@@ -50,6 +50,9 @@ function TopBar(): JSX.Element {
                 Admin
               </Link>
             )}
+            <Link to="/settings" className="nb-btn-ghost nb-btn nb-btn-sm">
+              Settings
+            </Link>
             <span className="text-xs text-muted hidden sm:block">{user.email}</span>
             <button type="button" onClick={onSignOut} className="nb-btn nb-btn-sm">
               Sign out
