@@ -45,6 +45,10 @@ export function DraftWorkspace({
   const [lintOpen, setLintOpen] = useState(false);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
+  // True from the instant Compose fires until the job completes/errors —
+  // independent of generatingIds, which stays empty during the latency
+  // window before the first SSE section:start event arrives.
+  const [jobActive, setJobActive] = useState(false);
 
   // Stable handlers for the expand-job SSE stream.
   const handlersRef = useRef<ExpandJobHandlers>({
@@ -65,11 +69,13 @@ export function DraftWorkspace({
       onComplete: () => {
         setGeneratingIds(new Set());
         setJobError(null);
+        setJobActive(false);
         onJobComplete();
       },
       onError: (_code, message, hint) => {
         setGeneratingIds(new Set());
         setJobError({ message, hint });
+        setJobActive(false);
         onJobComplete();
       },
     }),
@@ -86,6 +92,13 @@ export function DraftWorkspace({
     [],
   );
   useExpandJob(jobId, stableHandlers);
+
+  // Flip jobActive on the moment a new jobId arrives (Compose / regenerate
+  // clicked) so the progress UI shows immediately, before the first SSE
+  // event. onComplete/onError flip it back off.
+  useEffect(() => {
+    if (jobId !== null) setJobActive(true);
+  }, [jobId]);
 
   useEffect(() => {
     const alreadyGenerating = draft.sections
@@ -143,7 +156,7 @@ export function DraftWorkspace({
   const unfilledCount = draft.sections.filter(
     (s) => s.status !== "ready" && s.status !== "edited",
   ).length;
-  const jobRunning = jobId !== null && generatingIds.size > 0;
+  const jobRunning = jobActive || generatingIds.size > 0;
 
   const handleGenerate = useCallback(async () => {
     setAdvancing(true);
