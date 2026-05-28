@@ -116,14 +116,20 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         cfg.set_main_option("sqlalchemy.url", settings.database_url)
         command.upgrade(cfg, "head")
 
-    # 2) Seed admin.
+    # 2) S3 bucket bootstrap. Idempotent; creates the bucket on first boot.
+    if settings.s3_bootstrap_on_boot:
+        from pencraft.s3.lifespan import ensure_bucket
+
+        await ensure_bucket()
+
+    # 3) Seed admin.
     async with get_sessionmaker()() as session:
         await ensure_admin_user(
             session, email=settings.admin_email, password=settings.admin_password
         )
         await session.commit()
 
-    # 3) Per-request shared state.
+    # 4) Per-request shared state.
     app.state.draft_store = SqlDraftStore()
     app.state.pack_store = PackStore(_resolve_pack_roots())
     app.state.job_registry = JobRegistry()

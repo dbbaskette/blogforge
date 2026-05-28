@@ -29,6 +29,7 @@ def _force_sqlite_for_tests(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("PENCRAFT_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
     monkeypatch.setenv("PENCRAFT_SESSION_SECRET", "test-session-secret")
     monkeypatch.setenv("PENCRAFT_RUN_MIGRATIONS_ON_BOOT", "false")
+    monkeypatch.setenv("PENCRAFT_S3_BOOTSTRAP_ON_BOOT", "false")
     get_settings.cache_clear()
     reset_engine_for_tests()
 

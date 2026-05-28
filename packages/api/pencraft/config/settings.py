@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
 
     run_migrations_on_boot: bool = True
+    # Set to False in tests to skip the S3 bucket bootstrap (tests use moto
+    # in-process; they don't need the lifespan's ensure_bucket() side-effect).
+    s3_bootstrap_on_boot: bool = True
 
     # Auth cookie flags. Default False so the test suite (which talks to
     # http://testserver) can replay the session cookie. Production deploys
