@@ -1,5 +1,13 @@
 # Research stage + references — design
 
+> **Superseded by `2026-05-28-research-stage-references-v2-design.md`** (SQL + S3 revision).
+> Kept for history. The shape, workflow, prompt design, and out-of-scope sections still apply;
+> only the storage layer (references in `~/.pencraft/drafts/<id>/`) is obsolete after Phase A
+> migrated to Postgres + S3.
+
+---
+
+
 **Date:** 2026-05-27
 **Status:** Approved (shape) · implementation plan to follow
 **Companion to:** existing 3-stage Notebook workspace (PR #12)
