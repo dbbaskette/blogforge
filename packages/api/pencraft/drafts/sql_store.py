@@ -8,15 +8,20 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from pencraft.db.engine import get_sessionmaker
 from pencraft.db.models import Draft as DraftRow
+from pencraft.db.models import IdeationMessage as IdeationMessageRow
+from pencraft.db.models import Reference as ReferenceRow
 from pencraft.db.models import Section as SectionRow
 from pencraft.drafts.models import (
     Draft,
     DraftSummary,
     IdeaInput,
+    IdeationMessage,
     OutlineProposal,
+    Reference,
     Section,
 )
 
@@ -51,6 +56,33 @@ def _draft_from_row(row: DraftRow) -> Draft:
                 word_count=s.word_count,
             )
             for s in sorted(row.sections, key=lambda s: s.position)
+        ],
+        references=[
+            Reference(
+                id=r.id,
+                kind=r.kind,  # type: ignore[arg-type]
+                name=r.name,
+                url=r.url,
+                original_filename=r.original_filename,
+                extracted_chars=r.extracted_chars,
+                added_at=r.added_at,
+            )
+            for r in sorted(row.references, key=lambda r: r.added_at)
+        ],
+        ideation_messages=[
+            IdeationMessage(
+                id=m.id,
+                position=m.position,
+                role=m.role,  # type: ignore[arg-type]
+                content=m.content,
+                proposed_outline=(
+                    OutlineProposal.model_validate(m.proposed_outline)
+                    if m.proposed_outline
+                    else None
+                ),
+                timestamp=m.timestamp,
+            )
+            for m in sorted(row.ideation_messages, key=lambda m: m.position)
         ],
     )
 
@@ -101,7 +133,7 @@ class SqlDraftStore:
             ).scalar_one_or_none()
             if row is None:
                 return None
-            await session.refresh(row, ["sections"])
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
 
     async def create(self, *, user_id: UUID, idea: IdeaInput) -> Draft:
@@ -114,7 +146,7 @@ class SqlDraftStore:
             )
             session.add(row)
             await session.commit()
-            await session.refresh(row, ["sections"])
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
 
     async def update(self, draft_id: str, draft: Draft, *, user_id: UUID) -> Draft | None:
@@ -180,7 +212,7 @@ class SqlDraftStore:
             for orphan in existing_by_id.values():
                 await session.delete(orphan)
             await session.commit()
-            await session.refresh(row, ["sections"])
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
 
     @staticmethod
