@@ -30,9 +30,11 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    "pypdf>=5.0",
     "python-multipart>=0.0.12",
     "pyyaml>=6.0",
     "sqlalchemy[asyncio]>=2.0.30",
+    "trafilatura>=2.0",
     "uvicorn[standard]>=0.32",
 ]
 
@@ -52,6 +54,7 @@ packages = ["packages/api/pencraft"]
 [dependency-groups]
 dev = [
     "asgi-lifespan>=2.1",
+    "moto[s3]>=5.0",
     "mypy>=2.0",
     "pytest>=8.3",
     "pytest-asyncio>=1.0",
