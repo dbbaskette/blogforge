@@ -223,10 +223,12 @@ class Section(Base):
     __tablename__ = "sections"
     __table_args__ = (UniqueConstraint("draft_id", "position", name="uq_section_position"),)
 
+    # Slugged section id ("the-pattern", "01-the-tax", etc.). The LLM reuses
+    # slugs across drafts, so the id is only unique *within* a draft — the PK
+    # is composite (draft_id, id), not id alone.
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    # the existing slugged section id ("01-the-tax", etc.)
     draft_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("drafts.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
