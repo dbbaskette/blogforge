@@ -187,6 +187,13 @@ def create_app() -> FastAPI:
     app.include_router(lint_router)
     app.include_router(events_router)
 
+    # Mount the LinkedIn connector same-origin unless explicitly running it
+    # standalone (mount_linkedin=False → use `pencraft serve-linkedin`).
+    if settings.mount_linkedin:
+        from pencraft.linkedin.routes import router as linkedin_router
+
+        app.include_router(linkedin_router)
+
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}

@@ -43,6 +43,13 @@ services:
       PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
       PENCRAFT_ADMIN_PASSWORD: VMware0!
       PENCRAFT_CORS_ORIGINS: "http://localhost:7881"
+      # LinkedIn connector (mounted same-origin into the API by default).
+      # Supply real values to enable posting; empty = the connect flow
+      # produces an unusable authorize URL but nothing else breaks.
+      LINKEDIN_CLIENT_ID: "${LINKEDIN_CLIENT_ID:-}"
+      LINKEDIN_CLIENT_SECRET: "${LINKEDIN_CLIENT_SECRET:-}"
+      LINKEDIN_REDIRECT_URI: "${LINKEDIN_REDIRECT_URI:-http://localhost:7880/linkedin/callback}"
+      LINKEDIN_POST_CONNECT_REDIRECT: "http://localhost:7880/settings"
     depends_on:
       postgres:
         condition: service_healthy
