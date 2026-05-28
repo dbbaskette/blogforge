@@ -162,6 +162,7 @@ def create_app() -> FastAPI:
     from pencraft.api.drafts import router as drafts_router
     from pencraft.api.events import router as events_router
     from pencraft.api.expand import router as expand_router
+    from pencraft.api.ideation import router as ideation_router
     from pencraft.api.jobs import router as jobs_router
     from pencraft.api.lint import router as lint_router
     from pencraft.api.outline import router as outline_router
@@ -179,6 +180,7 @@ def create_app() -> FastAPI:
     app.include_router(packs_router)
     app.include_router(providers_router)
     app.include_router(expand_router)
+    app.include_router(ideation_router)
     app.include_router(section_router)
     app.include_router(jobs_router)
     app.include_router(download_router)

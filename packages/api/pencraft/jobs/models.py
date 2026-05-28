@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 class JobType(StrEnum):
     EXPAND = "expand"
     REGEN_SECTION = "regen_section"
+    IDEATION = "ideation"
 
 
 JobStatus = Literal["pending", "running", "succeeded", "failed", "cancelled"]
