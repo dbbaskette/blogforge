@@ -54,7 +54,9 @@ packages = ["packages/api/pencraft"]
 [dependency-groups]
 dev = [
     "asgi-lifespan>=2.1",
-    "moto[s3]>=5.0",
+    # moto[server] gives us ThreadedMotoServer (needs flask + werkzeug) so
+    # aiobotocore can hit a real HTTP endpoint during S3 client tests.
+    "moto[s3,server]>=5.0",
     "mypy>=2.0",
     "pytest>=8.3",
     "pytest-asyncio>=1.0",
