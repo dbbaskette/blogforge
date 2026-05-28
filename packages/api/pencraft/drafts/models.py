@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 def _now() -> datetime:
@@ -104,6 +104,22 @@ class Draft(BaseModel):
     sections: list[Section] = Field(default_factory=list)
     references: list[Reference] = Field(default_factory=list)
     ideation_messages: list[IdeationMessage] = Field(default_factory=list)
+
+    @field_validator("stage", mode="before")
+    @classmethod
+    def _coerce_legacy_stage(cls, v: object) -> object:
+        """Backwards-compat: pre-Phase-B clients send stage="idea"; coerce
+        to "research" so their PUTs validate against the new Literal.
+
+        Safe to remove once we're confident no caller still emits "idea"
+        — a deprecation window of a release or two is fine."""
+        if v == "idea":
+            import logging
+            logging.getLogger(__name__).warning(
+                "Draft body sent stage='idea'; coercing to 'research'."
+            )
+            return "research"
+        return v
 
 
 class DraftSummary(BaseModel):
