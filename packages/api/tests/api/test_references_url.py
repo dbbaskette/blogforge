@@ -181,6 +181,52 @@ async def test_post_url_unknown_draft_404(authed) -> None:
     assert r.status_code == 404
 
 
+# ---------- GET /references ----------
+
+
+async def test_get_references_empty_for_new_draft(authed) -> None:
+    client, _ = authed
+    draft_id = _create_draft(client)
+    r = client.get(f"/api/drafts/{draft_id}/references")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+async def test_get_references_lists_in_added_order(authed) -> None:
+    client, _ = authed
+    draft_id = _create_draft(client)
+    html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
+    with (
+        mock.patch(
+            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+        ),
+        mock.patch(
+            "pencraft.references.extractors.trafilatura.extract", return_value="body"
+        ),
+    ):
+        client.post(
+            f"/api/drafts/{draft_id}/references/url",
+            json={"url": "https://example.com/a"},
+        )
+        client.post(
+            f"/api/drafts/{draft_id}/references/url",
+            json={"url": "https://example.com/b"},
+        )
+    r = client.get(f"/api/drafts/{draft_id}/references")
+    assert r.status_code == 200
+    items = r.json()
+    assert len(items) == 2
+    assert items[0]["added_at"] <= items[1]["added_at"]
+    assert items[0]["url"] == "https://example.com/a"
+    assert items[1]["url"] == "https://example.com/b"
+
+
+async def test_get_references_unknown_draft_404(authed) -> None:
+    client, _ = authed
+    r = client.get("/api/drafts/00000000-0000-0000-0000-000000000000/references")
+    assert r.status_code == 404
+
+
 # ---------- DELETE /references/{ref_id} ----------
 
 

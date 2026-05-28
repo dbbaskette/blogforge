@@ -157,6 +157,21 @@ async def _resolve_draft(request: Request, draft_id: str, current: User) -> UUID
     return UUID(draft.id)
 
 
+# ---------- GET /references ----------
+
+
+@router.get("/{draft_id}/references", response_model=list[Reference])
+async def list_references(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> list[Reference]:
+    draft = await _store(request).get(draft_id, user_id=current.id)
+    if draft is None:
+        raise _not_found()
+    return draft.references
+
+
 # ---------- POST /references/url ----------
 
 
