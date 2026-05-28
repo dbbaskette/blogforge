@@ -28,10 +28,12 @@ from fastapi import (
     Form,
     HTTPException,
     Request,
+    Response,
     UploadFile,
     status,
 )
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from pencraft.auth.dependencies import get_current_user
 from pencraft.db.engine import get_sessionmaker
@@ -47,7 +49,7 @@ from pencraft.references.extractors import (
     extract_url,
     file_extension_for_kind,
 )
-from pencraft.s3 import get_s3_client
+from pencraft.s3 import S3Error, get_s3_client
 
 router = APIRouter(prefix="/api/drafts", tags=["references"])
 
@@ -304,3 +306,50 @@ async def add_file_reference(
         original_ext=ext,
         original_filename=filename,
     )
+
+
+# ---------- DELETE /references/{ref_id} ----------
+
+
+@router.delete(
+    "/{draft_id}/references/{ref_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_reference(
+    draft_id: str,
+    ref_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Response:
+    draft_uuid = await _resolve_draft(request, draft_id, current)
+
+    async with get_sessionmaker()() as session:
+        row = (
+            await session.execute(
+                select(ReferenceRow).where(
+                    ReferenceRow.id == ref_id,
+                    ReferenceRow.draft_id == draft_uuid,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise _not_found("reference_not_found")
+        await session.delete(row)
+        await session.commit()
+
+    # Prefix-delete catches both originals/{ref_id}{ext} and
+    # extracted/{ref_id}.md regardless of which extension we wrote.
+    # The trailing `/` boundary in the parent path makes sibling refs
+    # ("ref-aaaaaa") immune to deletion when their ids share a prefix.
+    s3 = get_s3_client()
+    try:
+        await asyncio.gather(
+            s3.delete_prefix(f"drafts/{draft_id}/references/originals/{ref_id}"),
+            s3.delete_prefix(f"drafts/{draft_id}/references/extracted/{ref_id}"),
+        )
+    except S3Error:
+        # DB row is already gone; an orphaned object will be skipped at
+        # composition time per spec §"Error handling" (stale reference).
+        pass
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

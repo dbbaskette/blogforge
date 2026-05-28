@@ -179,3 +179,92 @@ async def test_post_url_unknown_draft_404(authed) -> None:
         json={"url": "https://example.com"},
     )
     assert r.status_code == 404
+
+
+# ---------- DELETE /references/{ref_id} ----------
+
+
+async def test_delete_reference_removes_row_and_s3_objects(authed) -> None:
+    """Happy path: DB row gone + both S3 objects gone."""
+    client, _ = authed
+    draft_id = _create_draft(client)
+    html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
+    with (
+        mock.patch(
+            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+        ),
+        mock.patch(
+            "pencraft.references.extractors.trafilatura.extract", return_value="body"
+        ),
+    ):
+        created = client.post(
+            f"/api/drafts/{draft_id}/references/url",
+            json={"url": "https://example.com/doomed"},
+        ).json()
+    ref_id = created["id"]
+    s3 = get_s3_client()
+    # sanity
+    assert await s3.head_object(
+        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
+    )
+    assert await s3.head_object(
+        f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt"
+    )
+
+    r = client.delete(f"/api/drafts/{draft_id}/references/{ref_id}")
+    assert r.status_code == 204
+
+    # S3 objects gone
+    assert not await s3.head_object(
+        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
+    )
+    assert not await s3.head_object(
+        f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt"
+    )
+
+
+async def test_delete_unknown_reference_404(authed) -> None:
+    client, _ = authed
+    draft_id = _create_draft(client)
+    r = client.delete(f"/api/drafts/{draft_id}/references/ref-nope")
+    assert r.status_code == 404
+
+
+async def test_delete_unknown_draft_404(authed) -> None:
+    client, _ = authed
+    r = client.delete(
+        "/api/drafts/00000000-0000-0000-0000-000000000000/references/ref-anything"
+    )
+    assert r.status_code == 404
+
+
+async def test_delete_only_targets_specified_ref(authed) -> None:
+    """Deleting one ref must NOT touch sibling refs in the same draft."""
+    client, _ = authed
+    draft_id = _create_draft(client)
+    html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
+    with (
+        mock.patch(
+            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+        ),
+        mock.patch(
+            "pencraft.references.extractors.trafilatura.extract", return_value="body"
+        ),
+    ):
+        a = client.post(
+            f"/api/drafts/{draft_id}/references/url",
+            json={"url": "https://example.com/a"},
+        ).json()
+        b = client.post(
+            f"/api/drafts/{draft_id}/references/url",
+            json={"url": "https://example.com/b"},
+        ).json()
+    assert client.delete(f"/api/drafts/{draft_id}/references/{a['id']}").status_code == 204
+    s3 = get_s3_client()
+    # `b` is untouched.
+    assert await s3.head_object(
+        f"drafts/{draft_id}/references/extracted/{b['id']}.md"
+    )
+    assert await s3.head_object(
+        f"drafts/{draft_id}/references/originals/{b['id']}.url-stub.txt"
+    )
