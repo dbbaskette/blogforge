@@ -60,6 +60,24 @@ cd packages/web && pnpm dev
 # vite serves :7881; API calls hit :7880 via CORS with credentials
 ```
 
+### LinkedIn connector (optional)
+
+The LinkedIn integration runs as its own process — the same image with a
+different command. To exercise the Settings → Connect flow and "Post to
+LinkedIn" locally, start the connector on :7890 in a third terminal:
+
+```bash
+LINKEDIN_CLIENT_ID=<your-app-id> \
+LINKEDIN_CLIENT_SECRET=<your-app-secret> \
+LINKEDIN_REDIRECT_URI=http://localhost:7890/linkedin/callback \
+PENCRAFT_DATABASE_URL="postgresql+asyncpg://pencraft:pencraft@localhost:5432/pencraft" \
+  uv run pencraft serve-linkedin --port 7890
+```
+
+The vite dev server proxies `/linkedin/*` to `http://127.0.0.1:7890`, so the
+web app talks to the connector same-origin (cookies ride along). In
+production the connector is served under the same `/linkedin` path prefix.
+
 ## Tanzu Platform deployment
 
 ```bash
