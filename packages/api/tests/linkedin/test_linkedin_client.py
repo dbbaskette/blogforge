@@ -7,7 +7,9 @@ from pencraft.linkedin.client import LinkedInClient, LinkedInError
 
 
 def _client() -> LinkedInClient:
-    return LinkedInClient(access_token="AQ-tok", api_base="https://api.linkedin.com", api_version="202401")
+    return LinkedInClient(
+        access_token="AQ-tok", api_base="https://api.linkedin.com", api_version="202401"
+    )
 
 
 @respx.mock

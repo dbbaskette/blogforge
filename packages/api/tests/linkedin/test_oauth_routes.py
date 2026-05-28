@@ -46,7 +46,7 @@ async def client_uid():
 
 
 async def test_connect_returns_authorize_url(client_uid):
-    c, uid = client_uid
+    c, _uid = client_uid
     r = c.get("/linkedin/connect")
     assert r.status_code == 200
     url = r.json()["authorize_url"]
@@ -135,7 +135,9 @@ async def test_disconnect_removes_connection(client_uid):
     c, uid = client_uid
     s = get_linkedin_settings()
     respx.post(s.token_url).mock(
-        return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 100, "scope": s.scopes})
+        return_value=httpx.Response(
+            200, json={"access_token": "t", "expires_in": 100, "scope": s.scopes}
+        )
     )
     respx.get(s.userinfo_url).mock(
         return_value=httpx.Response(200, json={"sub": "m", "name": "N"})

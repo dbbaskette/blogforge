@@ -131,7 +131,7 @@ async def test_stats_fetches_and_caches(client_uid, monkeypatch):
         "pencraft.linkedin.client.LinkedInClient.social_actions", _fake_social
     )
 
-    post_id = c.post("/linkedin/publish", json={"text": "go"}).json()
+    c.post("/linkedin/publish", json={"text": "go"})
     # /posts gives us the internal id
     pid = c.get("/linkedin/posts").json()[0]["id"]
 
@@ -158,7 +158,10 @@ async def test_stats_cross_user_404(client_uid, monkeypatch):
 
     # Second user can't read the first user's post stats.
     async with get_sessionmaker()() as session:
-        other = User(email="o@x.com", password_hash=hash_password("x"), status="approved", role="user")
+        other = User(
+            email="o@x.com", password_hash=hash_password("x"),
+            status="approved", role="user",
+        )
         session.add(other)
         await session.commit()
         await session.refresh(other)

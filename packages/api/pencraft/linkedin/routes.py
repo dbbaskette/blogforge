@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pencraft import __version__
 from pencraft.auth.crypto import SecretCipher
@@ -57,7 +58,7 @@ async def connect(current: User = Depends(get_current_user)) -> dict[str, str]:
 async def callback(
     code: str = Query(...),
     state: str = Query(...),
-    session=Depends(_get_session),
+    session: AsyncSession = Depends(_get_session),
 ) -> RedirectResponse:
     """OAuth redirect target. Verify state, exchange the code, fetch the
     member identity, persist an encrypted connection, bounce back to Pencraft.
@@ -86,7 +87,12 @@ async def callback(
         if token_resp.status_code != 200:
             raise HTTPException(
                 status_code=502,
-                detail={"error": {"code": "token_exchange_failed", "message": token_resp.text[:300]}},
+                detail={
+                    "error": {
+                        "code": "token_exchange_failed",
+                        "message": token_resp.text[:300],
+                    }
+                },
             )
         tok = token_resp.json()
         access_token = tok["access_token"]
@@ -138,7 +144,7 @@ async def callback(
 @router.get("/status")
 async def status_(
     current: User = Depends(get_current_user),
-    session=Depends(_get_session),
+    session: AsyncSession = Depends(_get_session),
 ) -> dict[str, object]:
     conn = (
         await session.execute(
@@ -157,7 +163,7 @@ async def status_(
 @router.delete("/connection", status_code=status.HTTP_204_NO_CONTENT)
 async def disconnect(
     current: User = Depends(get_current_user),
-    session=Depends(_get_session),
+    session: AsyncSession = Depends(_get_session),
 ) -> Response:
     await session.execute(
         delete(LinkedInConnection).where(LinkedInConnection.user_id == current.id)
@@ -191,11 +197,11 @@ def _post_out(p: LinkedInPost) -> PostOut:
         commentary=p.commentary,
         posted_at=p.posted_at,
         draft_id=str(p.draft_id) if p.draft_id else None,
-        last_stats=p.last_stats,  # type: ignore[arg-type]
+        last_stats=p.last_stats,
     )
 
 
-async def _require_connection(session, user_id) -> LinkedInConnection:
+async def _require_connection(session: AsyncSession, user_id: object) -> LinkedInConnection:
     conn = (
         await session.execute(
             select(LinkedInConnection).where(LinkedInConnection.user_id == user_id)
@@ -212,14 +218,16 @@ async def _require_connection(session, user_id) -> LinkedInConnection:
 def _client_for(conn: LinkedInConnection) -> LinkedInClient:
     li = get_linkedin_settings()
     token = _cipher().decrypt(conn.encrypted_access_token)
-    return LinkedInClient(access_token=token, api_base=li.api_base, api_version=li.api_version)
+    return LinkedInClient(
+        access_token=token, api_base=li.api_base, api_version=li.api_version
+    )
 
 
 @router.post("/publish", status_code=status.HTTP_201_CREATED)
 async def publish(
     body: PublishBody,
     current: User = Depends(get_current_user),
-    session=Depends(_get_session),
+    session: AsyncSession = Depends(_get_session),
 ) -> dict[str, str]:
     conn = await _require_connection(session, current.id)
 
@@ -244,7 +252,12 @@ async def publish(
         if err.stale_token:
             raise HTTPException(
                 status_code=409,
-                detail={"error": {"code": "linkedin_reconnect_required", "message": "Reconnect LinkedIn."}},
+                detail={
+                    "error": {
+                        "code": "linkedin_reconnect_required",
+                        "message": "Reconnect LinkedIn.",
+                    }
+                },
             ) from err
         raise HTTPException(
             status_code=502,
@@ -276,7 +289,7 @@ async def publish(
 @router.get("/posts", response_model=list[PostOut])
 async def list_posts(
     current: User = Depends(get_current_user),
-    session=Depends(_get_session),
+    session: AsyncSession = Depends(_get_session),
 ) -> list[PostOut]:
     rows = (
         await session.execute(
@@ -292,7 +305,7 @@ async def list_posts(
 async def get_stats(
     post_id: str,
     current: User = Depends(get_current_user),
-    session=Depends(_get_session),
+    session: AsyncSession = Depends(_get_session),
 ) -> dict[str, object]:
     post = (
         await session.execute(
@@ -312,7 +325,12 @@ async def get_stats(
         if err.stale_token:
             raise HTTPException(
                 status_code=409,
-                detail={"error": {"code": "linkedin_reconnect_required", "message": "Reconnect LinkedIn."}},
+                detail={
+                    "error": {
+                        "code": "linkedin_reconnect_required",
+                        "message": "Reconnect LinkedIn.",
+                    }
+                },
             ) from err
         raise HTTPException(
             status_code=502,

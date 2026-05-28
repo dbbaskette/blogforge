@@ -1,6 +1,6 @@
 """Connector app boots, exposes health, and shares Pencraft's session auth."""
 import pytest_asyncio
-from fastapi import Depends, FastAPI
+from fastapi import Depends
 from fastapi.testclient import TestClient
 
 from pencraft.auth.dependencies import get_current_user

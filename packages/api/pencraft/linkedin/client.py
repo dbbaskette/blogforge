@@ -63,7 +63,7 @@ class LinkedInClient:
         urn = resp.headers.get("x-restli-id")
         if not urn:
             raise LinkedInError("create_post succeeded but no post URN in response")
-        return urn
+        return str(urn)
 
     async def social_actions(self, post_urn: str) -> dict[str, int]:
         """Return {likes, comments} for a post. The ceiling for member posts —
