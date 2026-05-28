@@ -41,7 +41,7 @@ async def expand_draft(
     draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
-    if draft.outline is None or not draft.sections:
+    if draft.outline is None:
         raise HTTPException(
             409,
             detail={
@@ -51,6 +51,17 @@ async def expand_draft(
                 }
             },
         )
+    # Defensive backfill: if the outline exists but the sections list is empty
+    # (e.g. drafts created by an older ideation/accept that didn't seed sections),
+    # synthesize the section shells now from outline.sections and persist.
+    if not draft.sections:
+        from pencraft.drafts.models import Section
+
+        draft.sections = [
+            Section(id=s.id, title=s.title, brief=s.brief)
+            for s in draft.outline.sections
+        ]
+        await store.update(draft.id, draft, user_id=current.id)
 
     pack_info = pack_store.get(draft.idea.pack_slug)
     if pack_info is None:
