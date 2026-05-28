@@ -32,6 +32,7 @@ from pencraft.drafts.models import Reference
 from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.references.extractors import (
     ExtractionResult,
+    extract_text,
     extract_url,
     file_extension_for_kind,
 )
@@ -50,6 +51,11 @@ MAX_RAW_BYTES = 5 * 1024 * 1024
 class UrlReferenceBody(BaseModel):
     url: str = Field(min_length=1, max_length=4096)
     name: str | None = Field(default=None, max_length=500)
+
+
+class TextReferenceBody(BaseModel):
+    name: str = Field(min_length=1, max_length=500)
+    content: str = Field(min_length=1)
 
 
 def _store(request: Request) -> SqlDraftStore:
@@ -178,4 +184,40 @@ async def add_url_reference(
         original_bytes=body.url.encode("utf-8"),
         original_ext=file_extension_for_kind("url"),
         url=body.url,
+    )
+
+
+# ---------- POST /references/text ----------
+
+
+@router.post(
+    "/{draft_id}/references/text",
+    response_model=Reference,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_text_reference(
+    draft_id: str,
+    body: TextReferenceBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Reference:
+    draft_uuid = await _resolve_draft(request, draft_id, current)
+    if len(body.content.encode("utf-8")) > MAX_RAW_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "error": {
+                    "code": "file_too_large",
+                    "message": "pasted text exceeds 5 MB",
+                }
+            },
+        )
+    extraction = extract_text(body.name, body.content)
+    return await _persist(
+        draft_id_str=draft_id,
+        draft_uuid=draft_uuid,
+        kind="text",
+        extraction=extraction,
+        original_bytes=body.content.encode("utf-8"),
+        original_ext=file_extension_for_kind("text"),
     )
