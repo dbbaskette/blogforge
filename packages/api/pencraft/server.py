@@ -167,12 +167,14 @@ def create_app() -> FastAPI:
     from pencraft.api.outline import router as outline_router
     from pencraft.api.packs import router as packs_router
     from pencraft.api.providers import router as providers_router
+    from pencraft.api.references import router as references_router
     from pencraft.api.section import router as section_router
 
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(admin_keys_router)
     app.include_router(drafts_router)
+    app.include_router(references_router)
     app.include_router(outline_router)
     app.include_router(packs_router)
     app.include_router(providers_router)
