@@ -21,7 +21,16 @@ import secrets
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, Field
 
 from pencraft.auth.dependencies import get_current_user
@@ -32,6 +41,8 @@ from pencraft.drafts.models import Reference
 from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.references.extractors import (
     ExtractionResult,
+    UnsupportedFileType,
+    extract_file,
     extract_text,
     extract_url,
     file_extension_for_kind,
@@ -220,4 +231,76 @@ async def add_text_reference(
         extraction=extraction,
         original_bytes=body.content.encode("utf-8"),
         original_ext=file_extension_for_kind("text"),
+    )
+
+
+# ---------- POST /references/file ----------
+
+
+@router.post(
+    "/{draft_id}/references/file",
+    response_model=Reference,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_file_reference(
+    draft_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    name: str | None = Form(default=None),
+    current: User = Depends(get_current_user),
+) -> Reference:
+    draft_uuid = await _resolve_draft(request, draft_id, current)
+
+    filename = file.filename or "upload"
+    raw = await file.read()
+    # Size check BEFORE extension dispatch so a giant unsupported file
+    # still 413s rather than wasting an extraction attempt.
+    if len(raw) > MAX_RAW_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "error": {"code": "file_too_large", "message": "upload exceeds 5 MB"}
+            },
+        )
+    try:
+        ext = file_extension_for_kind("file", filename)
+    except UnsupportedFileType as err:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={
+                "error": {
+                    "code": "unsupported_file_type",
+                    "message": f"unsupported extension: {err.ext!r}",
+                }
+            },
+        ) from err
+
+    try:
+        extraction = extract_file(filename, raw)
+    except UnsupportedFileType as err:  # pragma: no cover — guarded above
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail={
+                "error": {
+                    "code": "unsupported_file_type",
+                    "message": f"unsupported extension: {err.ext!r}",
+                }
+            },
+        ) from err
+
+    if name:
+        extraction = ExtractionResult(
+            name=name,
+            extracted=extraction.extracted,
+            extracted_chars=extraction.extracted_chars,
+        )
+
+    return await _persist(
+        draft_id_str=draft_id,
+        draft_uuid=draft_uuid,
+        kind="file",
+        extraction=extraction,
+        original_bytes=raw,
+        original_ext=ext,
+        original_filename=filename,
     )
