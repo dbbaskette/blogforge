@@ -86,6 +86,12 @@ export async function generateOutline(id: string): Promise<Draft> {
 export async function expandSections(id: string): Promise<{ job_id: string }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/expand`, { method: "POST" });
 }
+export async function reviseDraft(id: string, instruction: string): Promise<{ job_id: string }> {
+  return api(`/api/drafts/${encodeURIComponent(id)}/revise`, {
+    method: "POST",
+    body: JSON.stringify({ instruction }),
+  });
+}
 export async function regenerateSection(
   id: string,
   sectionId: string,

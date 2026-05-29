@@ -25,6 +25,7 @@ export interface DraftWorkspaceProps {
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
+  onReviseDraft: (instruction: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
   onJobComplete: () => void;
 }
@@ -41,6 +42,7 @@ export function DraftWorkspace({
   onSectionSave,
   onRegenerateSection,
   onRevertSection,
+  onReviseDraft,
   onReorder,
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
@@ -201,6 +203,17 @@ export function DraftWorkspace({
     await onExpandUnfilled();
   }, [onExpandUnfilled]);
 
+  // Holistic revise touches many sections — clear any single-section live
+  // buffer so tokens aren't misattributed to one card.
+  const handleReviseDraft = useCallback(
+    async (instruction: string) => {
+      setLiveSectionId(null);
+      setLiveText("");
+      await onReviseDraft(instruction);
+    },
+    [onReviseDraft],
+  );
+
   // Single-section regenerate — arm the live buffer for this section before
   // the job's token frames start arriving. `instruction` steers a guided
   // revision when the author supplied a note.
@@ -296,6 +309,7 @@ export function DraftWorkspace({
             onSectionSave={onSectionSave}
             onRegenerateSection={handleRegenerateSection}
             onRevertSection={onRevertSection}
+            onReviseDraft={handleReviseDraft}
             onReorder={onReorder}
             onExpandUnfilled={handleExpandUnfilled}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}

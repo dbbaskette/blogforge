@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 class JobType(StrEnum):
     EXPAND = "expand"
     REGEN_SECTION = "regen_section"
+    REVISE_DRAFT = "revise_draft"
     IDEATION = "ideation"
 
 
