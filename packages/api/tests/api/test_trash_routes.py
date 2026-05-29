@@ -1,7 +1,7 @@
 """Trash lifecycle: delete -> appears in /trash -> restore / hard-delete."""
 
 
-def _idea_json() -> dict:
+def _idea_json() -> dict[str, object]:
     return {
         "topic": "Trash me",
         "pack_slug": "dan",
