@@ -1,3 +1,10 @@
+> **ABANDONED (2026-05-28).** The LinkedIn connector was built and merged (PR #16),
+> then removed: a 1,500-word draft can't fit LinkedIn's 3,000-char feed-post cap and
+> the long-form Article API isn't available to third-party apps, so it wasn't worth
+> carrying. Kept for history. See the removal PR.
+
+---
+
 # LinkedIn connector — design
 
 **Date:** 2026-05-28

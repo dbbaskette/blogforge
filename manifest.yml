@@ -13,10 +13,6 @@ applications:
       # Required at deploy time:
       #   cf set-env pencraft PENCRAFT_ADMIN_PASSWORD <strong-secret>
       #   cf set-env pencraft PENCRAFT_SESSION_SECRET <64-char-hex>
-      # LinkedIn posting (optional — leave unset to ship without it):
-      #   cf set-env pencraft LINKEDIN_CLIENT_ID <id>
-      #   cf set-env pencraft LINKEDIN_CLIENT_SECRET <secret>
-      #   cf set-env pencraft LINKEDIN_REDIRECT_URI https://<route>/linkedin/callback
       # The Tanzu config adapter translates VCAP_SERVICES into
       # PENCRAFT_DATABASE_URL and PENCRAFT_S3_* at startup.
       PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
@@ -25,10 +21,3 @@ applications:
       PENCRAFT_RUN_MIGRATIONS_ON_BOOT: "true"
       # Empty by default — when api and web share an origin, CORS is unnecessary.
       PENCRAFT_CORS_ORIGINS: ""
-      # LinkedIn connector mounted same-origin into this app (default). To run
-      # it as a SEPARATE Tanzu app instead, set PENCRAFT_MOUNT_LINKEDIN "false"
-      # here and push a second app with `command: pencraft serve-linkedin
-      # --host 0.0.0.0 --port $PORT` bound to the same pencraft-postgres,
-      # then route /linkedin/* to it.
-      PENCRAFT_MOUNT_LINKEDIN: "true"
-      LINKEDIN_POST_CONNECT_REDIRECT: "/settings"

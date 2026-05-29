@@ -60,40 +60,6 @@ cd packages/web && pnpm dev
 # vite serves :7881; API calls hit :7880 via CORS with credentials
 ```
 
-### LinkedIn connector (optional)
-
-Pencraft can post a finished draft to your **personal LinkedIn feed** and show
-basic engagement (likes/comments). It's mounted into the API same-origin by
-default, so the local stack just needs LinkedIn app credentials — no extra
-process. Set them on the API and restart:
-
-```bash
-LINKEDIN_CLIENT_ID=<your-app-id> \
-LINKEDIN_CLIENT_SECRET=<your-app-secret> \
-LINKEDIN_REDIRECT_URI=http://localhost:7880/linkedin/callback \
-  uv run pencraft serve --port 7880   # (plus the env from the block above)
-```
-
-Create the LinkedIn app at developer.linkedin.com with the **Share on
-LinkedIn** + **Sign In with LinkedIn using OpenID Connect** products. Then in
-Pencraft: **Settings → Connect LinkedIn**, authorize, and the "Post to
-LinkedIn" button appears in the draft footer once a draft reaches the sections
-stage.
-
-**Run it as a separate process instead** (true isolation): set
-`PENCRAFT_MOUNT_LINKEDIN=false` on the API, run `uv run pencraft
-serve-linkedin --port 7890`, and point the vite `/linkedin` proxy (or your
-prod route) at :7890.
-
-**Platform limits to know:**
-- LinkedIn feed posts cap at **3,000 characters** (~500 words). Longer drafts
-  are blocked with a "post the opening as a teaser" option — LinkedIn's
-  long-form Article API isn't available to third-party apps.
-- **Stats are likes + comments only.** LinkedIn doesn't expose impressions or
-  reach for personal posts via API.
-- **Tokens last ~60 days** with no silent refresh; you re-connect when they
-  lapse (the publish call prompts you).
-
 ## Tanzu Platform deployment
 
 ```bash

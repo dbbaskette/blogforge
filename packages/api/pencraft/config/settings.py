@@ -40,11 +40,6 @@ class Settings(BaseSettings):
     # Set to False in tests to skip the S3 bucket bootstrap (tests use moto
     # in-process; they don't need the lifespan's ensure_bucket() side-effect).
     s3_bootstrap_on_boot: bool = True
-    # Mount the LinkedIn connector router into the main API app so /linkedin/*
-    # is served same-origin (no reverse proxy needed locally / in the all-in-one
-    # container). Set False to run the connector strictly standalone via
-    # `pencraft serve-linkedin` + a platform route (true process isolation).
-    mount_linkedin: bool = True
 
     # Auth cookie flags. Default False so the test suite (which talks to
     # http://testserver) can replay the session cookie. Production deploys
