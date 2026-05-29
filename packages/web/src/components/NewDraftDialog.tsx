@@ -146,6 +146,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
                   </option>
                 ))}
             </select>
+            <PackPreview pack={packs.find((p) => p.slug === pack)} />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -236,6 +237,21 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
           </div>
         </form>
       </dialog>
+    </div>
+  );
+}
+
+function PackPreview({ pack }: { pack: PackSummary | undefined }): JSX.Element | null {
+  if (!pack) return null;
+  const description = pack.description?.trim();
+  const oneLine = pack.one_line?.trim();
+  if (!description && !oneLine) return null;
+  return (
+    <div className="mt-2 px-3 py-2 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200 animate-fade-in">
+      {description && <p className="text-xs text-ink-2 leading-snug">{description}</p>}
+      {oneLine && (
+        <p className="text-xs font-serif italic text-cobalt-700 leading-snug mt-0.5">{oneLine}</p>
+      )}
     </div>
   );
 }

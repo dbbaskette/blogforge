@@ -6,6 +6,8 @@ export interface PackSummary {
   version: string;
   valid: boolean;
   error_count: number;
+  description: string;
+  one_line: string;
 }
 
 export interface PackFormatEntry {
