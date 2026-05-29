@@ -101,6 +101,12 @@ export async function getActiveJob(
 ): Promise<{ job_id: string | null }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/active-job`, init);
 }
+export async function setDraftStage(id: string, stage: DraftStage): Promise<Draft> {
+  return api<Draft>(`/api/drafts/${encodeURIComponent(id)}/stage`, {
+    method: "POST",
+    body: JSON.stringify({ stage }),
+  });
+}
 export async function reviseDraft(id: string, instruction: string): Promise<{ job_id: string }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/revise`, {
     method: "POST",

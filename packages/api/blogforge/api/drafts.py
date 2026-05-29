@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
-from blogforge.drafts.models import Draft, DraftSummary, IdeaInput
+from blogforge.drafts.models import Draft, DraftStage, DraftSummary, IdeaInput
 from blogforge.drafts.sql_store import SqlDraftStore
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
@@ -17,6 +17,10 @@ _MAX_TAG_LEN = 40
 
 class _TagsBody(BaseModel):
     tags: list[str]
+
+
+class _StageBody(BaseModel):
+    stage: DraftStage
 
 
 def _normalize_tags(raw: list[str]) -> list[str]:
@@ -123,6 +127,40 @@ async def get_active_job(
 
 
 _STAGE_ORDER = {"research": 0, "outline": 1, "sections": 2}
+
+
+@router.post("/{draft_id}/stage", response_model=Draft)
+async def set_draft_stage(
+    draft_id: str,
+    body: _StageBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    """Jump a draft to a stage it has reached — e.g. back to 'research' to
+    rework in the chat. Content (outline / sections / chat) is preserved;
+    only the stage pointer moves. You can't *advance* to a stage that has no
+    content yet (use the normal generate/compose flow for that)."""
+    store = _store(request)
+    existing = await store.get(draft_id, user_id=current.id)
+    if existing is None:
+        raise _not_found(draft_id)
+    if body.stage == "outline" and existing.outline is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_stage", "message": "No outline yet."}},
+        )
+    if body.stage == "sections" and not existing.sections:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail={"error": {"code": "invalid_stage", "message": "No sections yet."}},
+        )
+    updated = await store.set_stage(draft_id, body.stage, user_id=current.id)
+    if updated is None:
+        raise _not_found(draft_id)
+    await request.app.state.event_bus.emit(
+        {"type": "draft:updated", "id": updated.id, "title": updated.title}
+    )
+    return updated
 
 
 @router.put("/{draft_id}", response_model=Draft)

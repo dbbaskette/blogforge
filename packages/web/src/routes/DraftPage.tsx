@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import {
   type Draft,
+  type DraftStage,
   expandSections,
   generateOutline,
   getActiveJob,
@@ -12,6 +13,7 @@ import {
   revertSectionVersion,
   reviseDraft,
   saveSection,
+  setDraftStage,
   updateDraft,
 } from "../api/drafts";
 import { DraftWorkspace } from "../components/draft/DraftWorkspace";
@@ -124,6 +126,14 @@ export function DraftPage(): JSX.Element {
     [id],
   );
 
+  const onJumpStage = useCallback(
+    async (stage: DraftStage) => {
+      if (!id) return;
+      setDraft(await setDraftStage(id, stage));
+    },
+    [id],
+  );
+
   const onReorder = useCallback(
     async (section_ids: string[]) => {
       if (!id) return;
@@ -165,6 +175,7 @@ export function DraftPage(): JSX.Element {
       onRegenerateSection={onRegenerateSection}
       onRevertSection={onRevertSection}
       onReviseDraft={onReviseDraft}
+      onJumpStage={onJumpStage}
       onReorder={onReorder}
       onJobComplete={onJobComplete}
     />
