@@ -86,6 +86,35 @@ class Draft(Base):
     )
 
 
+class Template(Base):
+    """A reusable starting point for new drafts.
+
+    Captures the idea defaults (pack, provider/model, length, bullets,
+    notes, and an optional suggested topic) so a user can spin up similar
+    pieces without re-entering everything. User-scoped.
+    """
+
+    __tablename__ = "templates"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    topic: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    pack_slug: Mapped[str] = mapped_column(String(128), nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    target_words: Mapped[int] = mapped_column(Integer, nullable=False, default=1500)
+    format: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bullets: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+
 class Reference(Base):
     """A reference document attached to a draft (URL, uploaded file, or pasted text).
 

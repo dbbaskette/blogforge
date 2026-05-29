@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { Draft, IdeaInput, OutlineProposal } from "../../api/drafts";
+import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { LintPanel } from "./LintPanel";
@@ -47,6 +48,7 @@ export function DraftWorkspace({
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
   const [lintOpen, setLintOpen] = useState(false);
+  const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
   // True from the instant Compose fires until the job completes/errors —
@@ -226,6 +228,18 @@ export function DraftWorkspace({
     [onRegenerateSection],
   );
 
+  const handleSaveTemplate = useCallback(async () => {
+    const name = window.prompt("Template name", draft.title || "Untitled template");
+    if (!name?.trim()) return;
+    try {
+      await createTemplateFromDraft(draft.id, name.trim());
+      setTemplateMsg("Saved as template ✓");
+    } catch (e) {
+      setTemplateMsg(e instanceof Error ? e.message : "Failed to save template");
+    }
+    setTimeout(() => setTemplateMsg(null), 2800);
+  }, [draft.id, draft.title]);
+
   const showFooter = draft.stage === "sections" && draft.sections.length > 0;
 
   return (
@@ -240,9 +254,18 @@ export function DraftWorkspace({
       <main className="min-w-0 max-w-3xl pb-32">
         {/* Top bar */}
         <div className="flex items-center justify-between mb-6">
-          <Link to="/" className="nb-btn nb-btn-ghost nb-btn-sm no-underline -ml-2">
-            ← All drafts
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link to="/" className="nb-btn nb-btn-ghost nb-btn-sm no-underline -ml-2">
+              ← All drafts
+            </Link>
+            <button
+              type="button"
+              onClick={handleSaveTemplate}
+              className="nb-btn nb-btn-ghost nb-btn-sm"
+            >
+              {templateMsg ?? "Save as template"}
+            </button>
+          </div>
           <span className="text-xs flex items-center gap-2 text-muted">
             {saving || titleSave.saving ? (
               <>
