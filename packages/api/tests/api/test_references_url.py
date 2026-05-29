@@ -15,14 +15,14 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from moto.server import ThreadedMotoServer
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.config import get_settings
-from pencraft.db.engine import get_sessionmaker
-from pencraft.db.models import User
-from pencraft.s3 import get_s3_client, reset_s3_client_for_tests
-from pencraft.s3.lifespan import ensure_bucket
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.config import get_settings
+from blogforge.db.engine import get_sessionmaker
+from blogforge.db.models import User
+from blogforge.s3 import get_s3_client, reset_s3_client_for_tests
+from blogforge.s3.lifespan import ensure_bucket
+from blogforge.server import create_app
 
 
 @pytest_asyncio.fixture
@@ -33,11 +33,11 @@ async def s3_env() -> AsyncIterator[str]:
     host, port = server.get_host_and_port()
     endpoint = f"http://{host}:{port}"
     env = {
-        "PENCRAFT_S3_ENDPOINT_URL": endpoint,
-        "PENCRAFT_S3_ACCESS_KEY": "test",
-        "PENCRAFT_S3_SECRET_KEY": "test",
-        "PENCRAFT_S3_BUCKET": "pencraft-test",
-        "PENCRAFT_S3_REGION": "us-east-1",
+        "BLOGFORGE_S3_ENDPOINT_URL": endpoint,
+        "BLOGFORGE_S3_ACCESS_KEY": "test",
+        "BLOGFORGE_S3_SECRET_KEY": "test",
+        "BLOGFORGE_S3_BUCKET": "blogforge-test",
+        "BLOGFORGE_S3_REGION": "us-east-1",
     }
     with mock.patch.dict(os.environ, env, clear=False):
         get_settings.cache_clear()
@@ -104,10 +104,10 @@ async def test_post_url_persists_reference_and_objects(authed) -> None:
     html = "<html><head><title>Atlas Docs</title></head><body><p>x</p></body></html>"
     with (
         mock.patch(
-            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
         ),
         mock.patch(
-            "pencraft.references.extractors.trafilatura.extract",
+            "blogforge.references.extractors.trafilatura.extract",
             return_value="# Atlas Docs\n\nBody text.",
         ),
     ):
@@ -144,10 +144,10 @@ async def test_post_url_custom_name_overrides_title(authed) -> None:
     html = "<html><head><title>Auto Title</title></head><body><p>x</p></body></html>"
     with (
         mock.patch(
-            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
         ),
         mock.patch(
-            "pencraft.references.extractors.trafilatura.extract", return_value="content"
+            "blogforge.references.extractors.trafilatura.extract", return_value="content"
         ),
     ):
         r = client.post(
@@ -162,7 +162,7 @@ async def test_post_url_fetch_failure_returns_422(authed) -> None:
     client, _ = authed
     draft_id = _create_draft(client)
     with mock.patch(
-        "pencraft.references.extractors.trafilatura.fetch_url", return_value=None
+        "blogforge.references.extractors.trafilatura.fetch_url", return_value=None
     ):
         r = client.post(
             f"/api/drafts/{draft_id}/references/url",
@@ -198,10 +198,10 @@ async def test_get_references_lists_in_added_order(authed) -> None:
     html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
     with (
         mock.patch(
-            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
         ),
         mock.patch(
-            "pencraft.references.extractors.trafilatura.extract", return_value="body"
+            "blogforge.references.extractors.trafilatura.extract", return_value="body"
         ),
     ):
         client.post(
@@ -237,10 +237,10 @@ async def test_delete_reference_removes_row_and_s3_objects(authed) -> None:
     html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
     with (
         mock.patch(
-            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
         ),
         mock.patch(
-            "pencraft.references.extractors.trafilatura.extract", return_value="body"
+            "blogforge.references.extractors.trafilatura.extract", return_value="body"
         ),
     ):
         created = client.post(
@@ -291,10 +291,10 @@ async def test_delete_only_targets_specified_ref(authed) -> None:
     html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
     with (
         mock.patch(
-            "pencraft.references.extractors.trafilatura.fetch_url", return_value=html
+            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
         ),
         mock.patch(
-            "pencraft.references.extractors.trafilatura.extract", return_value="body"
+            "blogforge.references.extractors.trafilatura.extract", return_value="body"
         ),
     ):
         a = client.post(

@@ -86,7 +86,7 @@ export function OutlinePanel({
           Shape the bones.
         </h2>
         <p className="text-sm text-muted mt-1.5 leading-relaxed">
-          Pencraft drafted an opening and a section list from your idea. Edit, reorder, or
+          BlogForge drafted an opening and a section list from your idea. Edit, reorder, or
           regenerate. When it feels right, compose.
         </p>
 

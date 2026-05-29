@@ -3,9 +3,9 @@
 ## Why
 
 Users today see *"No API keys configured in myvoice. Add one in myvoice
-Settings before drafting."* That requires leaving Pencraft, configuring
-a separate app, and coming back. With Pencraft now multi-user, we want
-keys managed inside Pencraft itself.
+Settings before drafting."* That requires leaving BlogForge, configuring
+a separate app, and coming back. With BlogForge now multi-user, we want
+keys managed inside BlogForge itself.
 
 ## What ships
 
@@ -15,7 +15,7 @@ keys managed inside Pencraft itself.
 - **Cipher.** A Fernet key derived from `Settings.session_secret` via
   `urlsafe_b64encode(sha256(secret))` so no extra config is required out
   of the box; operators can override with a dedicated
-  `PENCRAFT_KEY_ENCRYPTION_SECRET` setting later if they want
+  `BLOGFORGE_KEY_ENCRYPTION_SECRET` setting later if they want
   independent rotation.
 - **Admin routes.**
   - `GET /api/admin/keys` — `[{provider, configured, updated_at, updated_by}]`.

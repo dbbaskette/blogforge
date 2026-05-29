@@ -7,8 +7,8 @@ import httpx
 import pytest
 import respx
 
-from pencraft.llm.exceptions import ProviderError
-from pencraft.llm.openai import OpenAIProvider
+from blogforge.llm.exceptions import ProviderError
+from blogforge.llm.openai import OpenAIProvider
 
 _SIMPLE_SCHEMA = {
     "type": "object",

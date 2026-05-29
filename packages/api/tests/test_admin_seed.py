@@ -1,9 +1,9 @@
 """Admin user is seeded once, idempotently."""
 from sqlalchemy import select
 
-from pencraft.auth.passwords import verify_password
-from pencraft.db.models import User
-from pencraft.db.seed import ensure_admin_user
+from blogforge.auth.passwords import verify_password
+from blogforge.db.models import User
+from blogforge.db.seed import ensure_admin_user
 
 
 async def test_creates_admin_on_first_call(session):

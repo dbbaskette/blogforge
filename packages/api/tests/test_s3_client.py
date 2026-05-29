@@ -3,8 +3,8 @@ import pytest
 import pytest_asyncio
 from moto.server import ThreadedMotoServer
 
-from pencraft.config import get_settings
-from pencraft.s3 import S3Error, get_s3_client, reset_s3_client_for_tests
+from blogforge.config import get_settings
+from blogforge.s3 import S3Error, get_s3_client, reset_s3_client_for_tests
 
 
 @pytest_asyncio.fixture
@@ -19,11 +19,11 @@ async def s3():
     from unittest import mock
 
     env = {
-        "PENCRAFT_S3_ENDPOINT_URL": endpoint,
-        "PENCRAFT_S3_ACCESS_KEY": "test",
-        "PENCRAFT_S3_SECRET_KEY": "test",
-        "PENCRAFT_S3_BUCKET": "pencraft-test",
-        "PENCRAFT_S3_REGION": "us-east-1",
+        "BLOGFORGE_S3_ENDPOINT_URL": endpoint,
+        "BLOGFORGE_S3_ACCESS_KEY": "test",
+        "BLOGFORGE_S3_SECRET_KEY": "test",
+        "BLOGFORGE_S3_BUCKET": "blogforge-test",
+        "BLOGFORGE_S3_REGION": "us-east-1",
     }
     with mock.patch.dict(os.environ, env, clear=False):
         get_settings.cache_clear()
@@ -41,7 +41,7 @@ async def s3():
             aws_secret_access_key="test",
             region_name="us-east-1",
         ) as boto:
-            await boto.create_bucket(Bucket="pencraft-test")
+            await boto.create_bucket(Bucket="blogforge-test")
 
         try:
             yield client

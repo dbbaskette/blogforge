@@ -13,9 +13,9 @@
 
 ## Motivation
 
-Pencraft drafts a piece in your voice. The last mile is publishing it. For LinkedIn-format drafts we want a one-click **Post to LinkedIn** button and a lightweight signal of how the post is doing afterward — all without leaving Pencraft.
+BlogForge drafts a piece in your voice. The last mile is publishing it. For LinkedIn-format drafts we want a one-click **Post to LinkedIn** button and a lightweight signal of how the post is doing afterward — all without leaving BlogForge.
 
-This is built as a **separate container** (`pencraft-linkedin`) so the LinkedIn OAuth client secret and member tokens live in their own blast radius, the OAuth callback URL is stable and independent of Pencraft's release cycle, and LinkedIn's frequent API-version churn stays out of the core app.
+This is built as a **separate container** (`blogforge-linkedin`) so the LinkedIn OAuth client secret and member tokens live in their own blast radius, the OAuth callback URL is stable and independent of BlogForge's release cycle, and LinkedIn's frequent API-version churn stays out of the core app.
 
 ## Reality check (read before estimating)
 
@@ -30,7 +30,7 @@ LinkedIn's API constrains this more than the UI suggests. The spec is honest abo
 
 ```
 ┌────────────┐   session cookie    ┌──────────────────────┐   HTTPS    ┌──────────┐
-│  Pencraft  │ ──────────────────> │  pencraft-linkedin    │ ─────────> │ LinkedIn │
+│  BlogForge  │ ──────────────────> │  blogforge-linkedin    │ ─────────> │ LinkedIn │
 │  web + API │ <────────────────── │  (FastAPI container)  │ <───────── │   API    │
 └────────────┘   JSON responses    └──────────┬───────────┘            └──────────┘
                                                │
@@ -38,31 +38,31 @@ LinkedIn's API constrains this more than the UI suggests. The spec is honest abo
                                    linkedin_connections / linkedin_posts
 ```
 
-- **Auth sharing.** The connector validates the *same* signed Pencraft session cookie (shares `PENCRAFT_SESSION_SECRET`), so it resolves "current user" without its own login. It reuses the `SessionSigner` + a read-only `get_current_user`-style dependency. No second login.
+- **Auth sharing.** The connector validates the *same* signed BlogForge session cookie (shares `BLOGFORGE_SESSION_SECRET`), so it resolves "current user" without its own login. It reuses the `SessionSigner` + a read-only `get_current_user`-style dependency. No second login.
 - **DB sharing.** Same Postgres instance, two new tables owned by the connector. (Alternative considered: its own DB. Rejected for MVP — the user→connection mapping needs the same `users.id`, and a shared DB avoids cross-service joins. The connector still owns its tables.)
 - **Secret isolation.** Only the connector holds `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` and the member access tokens (encrypted at rest via the existing `SecretCipher`).
-- **Deploy.** Its own Tanzu app (`pencraft-linkedin`) bound to the same Postgres service; its own route. Local dev: a third service in `docker-compose.yml`.
+- **Deploy.** Its own Tanzu app (`blogforge-linkedin`) bound to the same Postgres service; its own route. Local dev: a third service in `docker-compose.yml`.
 
 ## OAuth flow (3-legged, OpenID Connect + Share)
 
 Scopes: `openid profile w_member_social`.
 
-1. User clicks **Connect LinkedIn** in Pencraft → calls connector `GET /linkedin/connect`.
+1. User clicks **Connect LinkedIn** in BlogForge → calls connector `GET /linkedin/connect`.
 2. Connector returns the authorize URL with a signed `state` (CSRF + carries the user id):
    `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=…&redirect_uri=…/linkedin/callback&scope=openid%20profile%20w_member_social&state=<signed>`
 3. User authorizes on LinkedIn → redirect to `GET /linkedin/callback?code=…&state=…`.
 4. Connector verifies `state`, exchanges the code at `POST https://www.linkedin.com/oauth/v2/accessToken`.
 5. Connector fetches member identity from `GET /v2/userinfo` (`sub` → `urn:li:person:{sub}`, plus name).
-6. Persist an encrypted `linkedin_connections` row; redirect the browser back to Pencraft (`/settings` or the draft).
+6. Persist an encrypted `linkedin_connections` row; redirect the browser back to BlogForge (`/settings` or the draft).
 
 ## Connector API
 
-All endpoints require a valid Pencraft session cookie (resolve `user_id` from it). All per-user-scoped.
+All endpoints require a valid BlogForge session cookie (resolve `user_id` from it). All per-user-scoped.
 
 | Method | Path | Body / params | Result |
 |---|---|---|---|
 | GET | `/linkedin/connect` | — | `{ authorize_url }` |
-| GET | `/linkedin/callback` | `code`, `state` | 302 redirect back to Pencraft |
+| GET | `/linkedin/callback` | `code`, `state` | 302 redirect back to BlogForge |
 | GET | `/linkedin/status` | — | `{ connected: bool, member_name?, expires_at? }` |
 | DELETE | `/linkedin/connection` | — | 204 (deletes token row) |
 | POST | `/linkedin/publish` | `{ text: str, visibility?: "PUBLIC"\|"CONNECTIONS" }` | `{ post_urn }` (201) |
@@ -118,7 +118,7 @@ class LinkedInPost(Base):
 
 Migration `0004_linkedin` adds both. (Lives in the connector's own alembic chain if it has its own metadata, or in the shared chain — TBD in plan; shared is simpler.)
 
-## Pencraft integration (web)
+## BlogForge integration (web)
 
 - **Connect flow:** a "LinkedIn" card in a new `/settings` page (or the existing draft footer) — "Connect LinkedIn" → opens the authorize URL → on return shows "Connected as {name}".
 - **Post button:** in `WorkspaceFooter` / `SectionsPanel` when the draft is complete. Shows a live char count vs 3,000. Disabled (with reason) when over the limit; offers "Post opening section as a teaser" as the escape hatch.
@@ -127,8 +127,8 @@ Migration `0004_linkedin` adds both. (Lives in the connector's own alembic chain
 ## Container + Tanzu
 
 - New `packages/linkedin/` (FastAPI app, mirrors `packages/api` patterns: Settings, SqlAlchemy, alembic, SecretCipher reuse).
-- `docker-compose.yml`: add a `linkedin` service, bound to the same postgres, env `LINKEDIN_CLIENT_ID/SECRET`, `PENCRAFT_SESSION_SECRET` (shared, to validate cookies), `LINKEDIN_REDIRECT_URI`.
-- `manifest.yml`: a second application `pencraft-linkedin` bound to `pencraft-postgres`.
+- `docker-compose.yml`: add a `linkedin` service, bound to the same postgres, env `LINKEDIN_CLIENT_ID/SECRET`, `BLOGFORGE_SESSION_SECRET` (shared, to validate cookies), `LINKEDIN_REDIRECT_URI`.
+- `manifest.yml`: a second application `blogforge-linkedin` bound to `blogforge-postgres`.
 - The web client talks to the connector via a configurable base URL (`VITE_LINKEDIN_URL`), same-origin in prod via a path prefix or a sibling route.
 
 ## Testing
@@ -136,7 +136,7 @@ Migration `0004_linkedin` adds both. (Lives in the connector's own alembic chain
 - OAuth: state sign/verify round-trip; callback exchanges code (mock LinkedIn token endpoint via respx); connection persisted encrypted.
 - Publish: mock `/rest/posts`; assert URN persisted; `content_too_long` 422 over 3,000 chars; 401 from LinkedIn → connection marked stale.
 - Stats: mock socialActions; likes/comments parsed + cached.
-- Cookie auth: connector rejects missing/invalid Pencraft session cookie (401); cross-user post access 404s.
+- Cookie auth: connector rejects missing/invalid BlogForge session cookie (401); cross-user post access 404s.
 - Web: connect-status rendering; post button char-count guard; posted-state chip.
 
 ## Out of scope (v1)
@@ -155,7 +155,7 @@ Migration `0004_linkedin` adds both. (Lives in the connector's own alembic chain
 - **Token expiry (~60 days, no refresh)** — surfaced as a "Reconnect" prompt on the next publish 401.
 - **LinkedIn API version churn** — pin `LinkedIn-Version`, centralize the header, watch deprecations.
 - **App review / verification** — Share on LinkedIn is largely self-serve, but the dev app may need verification before production posting; flag early.
-- **Shared session secret across two containers** — rotating `PENCRAFT_SESSION_SECRET` now invalidates cookies in both; acceptable, documented.
+- **Shared session secret across two containers** — rotating `BLOGFORGE_SESSION_SECRET` now invalidates cookies in both; acceptable, documented.
 
 ## Resolved decisions (was: open questions)
 

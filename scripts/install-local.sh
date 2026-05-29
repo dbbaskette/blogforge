@@ -14,10 +14,10 @@ fi
 
 # Build wheel (includes bundled frontend)
 echo "==> Building frontend"
-rm -rf packages/api/pencraft/static
+rm -rf packages/api/blogforge/static
 (cd packages/web && pnpm install && pnpm build)
-mkdir -p packages/api/pencraft/static
-cp -R packages/web/dist/* packages/api/pencraft/static/
+mkdir -p packages/api/blogforge/static
+cp -R packages/web/dist/* packages/api/blogforge/static/
 
 echo "==> Building wheel"
 rm -rf dist
@@ -28,13 +28,13 @@ echo "==> Creating venv at local-venv/"
 rm -rf local-venv
 uv venv local-venv --python 3.11
 
-# Install myvoice editable first (not on PyPI yet) then the pencraft wheel.
+# Install myvoice editable first (not on PyPI yet) then the blogforge wheel.
 # Using `uv pip install --python` avoids needing pip inside the venv.
 echo "==> Installing myvoice from $MYVOICE_PATH"
 uv pip install --python local-venv/bin/python -e "$MYVOICE_PATH"
 
-echo "==> Installing pencraft wheel"
-WHEEL=$(ls -1 dist/pencraft-*.whl | head -1)
+echo "==> Installing blogforge wheel"
+WHEEL=$(ls -1 dist/blogforge-*.whl | head -1)
 uv pip install --python local-venv/bin/python "$WHEEL"
 
 echo

@@ -25,9 +25,9 @@ Estimated 33 tasks across 8 sections, ~1.5–2× the Phase A surface (more new m
 - `uv lock`; `uv sync --all-extras --dev`; smoke-import both.
 - Commit: `deps: pypdf for PDF refs, moto for S3 unit tests`.
 
-### Task 2: Async S3 client (`pencraft.s3.client`)
+### Task 2: Async S3 client (`blogforge.s3.client`)
 
-**Files:** `packages/api/pencraft/s3/__init__.py`, `packages/api/pencraft/s3/client.py`, `packages/api/tests/test_s3_client.py`
+**Files:** `packages/api/blogforge/s3/__init__.py`, `packages/api/blogforge/s3/client.py`, `packages/api/tests/test_s3_client.py`
 
 **Surface:**
 ```python
@@ -52,7 +52,7 @@ def reset_s3_client_for_tests() -> None: ...
 
 ### Task 3: `ensure_bucket()` + lifespan wiring
 
-**Files:** `packages/api/pencraft/s3/lifespan.py`, `packages/api/pencraft/server.py`
+**Files:** `packages/api/blogforge/s3/lifespan.py`, `packages/api/blogforge/server.py`
 
 - `async def ensure_bucket() -> None` — creates `Settings.s3_bucket` if it doesn't exist; idempotent.
 - Lifespan: after migrations, before admin seed, call `await ensure_bucket()`.
@@ -66,13 +66,13 @@ def reset_s3_client_for_tests() -> None: ...
 
 ### Task 4: ORM models — `Reference`, `IdeationMessage`
 
-**Files:** `packages/api/pencraft/db/models.py`, `packages/api/tests/test_db_models.py`
+**Files:** `packages/api/blogforge/db/models.py`, `packages/api/tests/test_db_models.py`
 
 Per spec §"Data model". CASCADE delete to `drafts`. UNIQUE `(draft_id, position)` on `ideation_messages`. Tests assert insert/select round-trip with relationships.
 
 ### Task 5: Pydantic models
 
-**Files:** `packages/api/pencraft/drafts/models.py`, `packages/api/pencraft/references/__init__.py`
+**Files:** `packages/api/blogforge/drafts/models.py`, `packages/api/blogforge/references/__init__.py`
 
 - New pydantic `Reference`, `IdeationMessage`, `IdeationSession` types.
 - `Draft` gains `references: list[Reference] = []` and `ideation_messages: list[IdeationMessage] = []`.
@@ -90,11 +90,11 @@ Upgrade:
 
 Downgrade: drop new tables; reverse the UPDATE; restore default.
 
-**Acceptance:** `PENCRAFT_DATABASE_URL=sqlite:////tmp/test.db uv run alembic upgrade head` shows tables; existing tests still pass.
+**Acceptance:** `BLOGFORGE_DATABASE_URL=sqlite:////tmp/test.db uv run alembic upgrade head` shows tables; existing tests still pass.
 
 ### Task 7: `SqlDraftStore` loads references + ideation
 
-**Files:** `packages/api/pencraft/drafts/sql_store.py`, `packages/api/tests/test_drafts_scoped_by_user.py`
+**Files:** `packages/api/blogforge/drafts/sql_store.py`, `packages/api/tests/test_drafts_scoped_by_user.py`
 
 - `_draft_from_row` populates `references` + `ideation_messages` (eager load via `selectinload`).
 - Cross-user scoping tests gain assertions: A can't see B's references.
@@ -105,7 +105,7 @@ Downgrade: drop new tables; reverse the UPDATE; restore default.
 
 ### Task 8: Extractors module
 
-**Files:** `packages/api/pencraft/references/extractors.py`, `packages/api/tests/test_extractors.py`
+**Files:** `packages/api/blogforge/references/extractors.py`, `packages/api/tests/test_extractors.py`
 
 - `extract_url(url: str) -> ExtractionResult` — trafilatura + 8s timeout. Returns name (from `<title>`), extracted markdown.
 - `extract_file(filename: str, raw: bytes) -> ExtractionResult` — dispatch on extension: `.md`/`.txt` identity, `.pdf` via pypdf; reject others with `UnsupportedFileType`.
@@ -114,7 +114,7 @@ Downgrade: drop new tables; reverse the UPDATE; restore default.
 
 ### Task 9: POST /api/drafts/{id}/references/url
 
-**Files:** `packages/api/pencraft/api/references.py`, `packages/api/pencraft/server.py`, `packages/api/tests/test_references_url.py`
+**Files:** `packages/api/blogforge/api/references.py`, `packages/api/blogforge/server.py`, `packages/api/tests/test_references_url.py`
 
 - Auth-gated via `get_current_user`, draft scoped.
 - Generates `ref_id`, calls extractor, writes `originals/{ref_id}.url-stub.txt` + `extracted/{ref_id}.md` to S3 in one `asyncio.gather`, persists `Reference` row.
@@ -156,14 +156,14 @@ User A creates draft + ref. User B's GET/POST/DELETE on it all return 404 (not 4
 
 ### Task 15: `get_reference_context` helper
 
-**Files:** `packages/api/pencraft/generate/references.py`, `packages/api/tests/test_references_budget.py`
+**Files:** `packages/api/blogforge/generate/references.py`, `packages/api/tests/test_references_budget.py`
 
 - Async, takes `Draft` + `S3Client`, returns the formatted block or `""`.
 - Tests cover: empty refs → empty string; under budget → full content; over budget → proportional per-ref truncation.
 
 ### Task 16: Wire into outline + section generators
 
-**Files:** `packages/api/pencraft/generate/outline.py`, `packages/api/pencraft/generate/section.py`, existing tests in `test_outline_route.py` and `test_section_route.py`
+**Files:** `packages/api/blogforge/generate/outline.py`, `packages/api/blogforge/generate/section.py`, existing tests in `test_outline_route.py` and `test_section_route.py`
 
 - Prepend the reference block to the user prompt.
 - Tests: add a ref via the fixture, generate outline, assert prompt sent to mock LLM includes the reference content.
@@ -174,7 +174,7 @@ User A creates draft + ref. User B's GET/POST/DELETE on it all return 404 (not 4
 
 ### Task 17: `generate/ideation.py`
 
-**Files:** `packages/api/pencraft/generate/ideation.py`, `packages/api/tests/test_ideation.py`
+**Files:** `packages/api/blogforge/generate/ideation.py`, `packages/api/tests/test_ideation.py`
 
 - Builds full conversation: system (pack-composed + ideation system block) + history + new user message.
 - Streams via the provider's `stream_chat` (or wraps `chat` if streaming unavailable).
@@ -182,7 +182,7 @@ User A creates draft + ref. User B's GET/POST/DELETE on it all return 404 (not 4
 
 ### Task 18: POST /api/drafts/{id}/ideation/message
 
-**Files:** `packages/api/pencraft/api/ideation.py`, `packages/api/tests/test_ideation_round_trip.py`
+**Files:** `packages/api/blogforge/api/ideation.py`, `packages/api/tests/test_ideation_round_trip.py`
 
 - Persists the user message; creates an `ideation` job; streams the assistant reply via SSE using the existing `JobRegistry` + frame conventions; on done persists the assistant message with parsed `proposed_outline`.
 - 409 `ideation_in_progress` if another ideation job is active on this draft.
@@ -256,7 +256,7 @@ Each hit gets reviewed; most are test fixtures (already valid because the migrat
 
 ### Task 29: API-side coercion shim
 
-**Files:** `packages/api/pencraft/api/drafts.py` (PUT handler).
+**Files:** `packages/api/blogforge/api/drafts.py` (PUT handler).
 
 If an incoming `Draft` body has `stage == "idea"`, coerce to `"research"`. Log a deprecation warning. Removable after the next deploy.
 

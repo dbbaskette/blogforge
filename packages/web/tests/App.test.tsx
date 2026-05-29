@@ -40,7 +40,7 @@ describe("App", () => {
         <App />
       </MemoryRouter>,
     );
-    // Two "Pencraft" elements appear (masthead + colophon) — either is fine.
-    expect(screen.getAllByText("Pencraft").length).toBeGreaterThan(0);
+    // Two "BlogForge" elements appear (masthead + colophon) — either is fine.
+    expect(screen.getAllByText("BlogForge").length).toBeGreaterThan(0);
   });
 });

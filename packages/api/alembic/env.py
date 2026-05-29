@@ -1,14 +1,14 @@
-"""Alembic env — uses Pencraft's Settings + Base.metadata."""
+"""Alembic env — uses BlogForge's Settings + Base.metadata."""
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from pencraft.config import get_settings
+from blogforge.config import get_settings
 
 # Make sure model metadata is populated before autogenerate inspects it.
-from pencraft.db import models  # noqa: F401
-from pencraft.db.base import Base
+from blogforge.db import models  # noqa: F401
+from blogforge.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:

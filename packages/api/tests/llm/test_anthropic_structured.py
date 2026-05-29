@@ -5,8 +5,8 @@ import httpx
 import pytest
 import respx
 
-from pencraft.llm.anthropic import AnthropicProvider
-from pencraft.llm.exceptions import ProviderError
+from blogforge.llm.anthropic import AnthropicProvider
+from blogforge.llm.exceptions import ProviderError
 
 _SIMPLE_SCHEMA = {
     "type": "object",

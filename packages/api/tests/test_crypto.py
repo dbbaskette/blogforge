@@ -2,7 +2,7 @@
 import pytest
 from cryptography.fernet import InvalidToken
 
-from pencraft.auth.crypto import SecretCipher
+from blogforge.auth.crypto import SecretCipher
 
 
 def test_round_trip():

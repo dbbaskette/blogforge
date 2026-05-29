@@ -16,7 +16,7 @@ dist/
 # Node / web
 node_modules/
 packages/web/dist/
-packages/api/pencraft/static/
+packages/api/blogforge/static/
 *.tsbuildinfo
 packages/web/vite.config.js
 packages/web/vite.config.d.ts
@@ -41,7 +41,7 @@ e2e/test-results/
 .playwright-mcp/
 
 # Local config (user secrets)
-~/.pencraft/
+~/.blogforge/
 
 # Stale artifacts from before this repo existed
 myvoice-centered-check.png

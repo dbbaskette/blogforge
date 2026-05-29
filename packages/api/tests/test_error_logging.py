@@ -5,7 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from pencraft.errors import install_exception_handler
+from blogforge.errors import install_exception_handler
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_500_returns_error_id_in_body(boom_app):
 
 
 def test_500_logs_traceback_with_id_and_path(boom_app, caplog):
-    with caplog.at_level(logging.ERROR, logger="pencraft.errors"):
+    with caplog.at_level(logging.ERROR, logger="blogforge.errors"):
         with TestClient(boom_app, raise_server_exceptions=False) as c:
             r = c.get("/boom")
             err_id = r.json()["error"]["id"]

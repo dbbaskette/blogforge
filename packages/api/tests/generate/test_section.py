@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from pencraft.drafts.models import Draft, IdeaInput, OutlineProposal, OutlineSection, Section
-from pencraft.generate.section import _render_section_prompt, stream_section
-from pencraft.llm.base import StreamChunk
+from blogforge.drafts.models import Draft, IdeaInput, OutlineProposal, OutlineSection, Section
+from blogforge.generate.section import _render_section_prompt, stream_section
+from blogforge.llm.base import StreamChunk
 
 _STYLEPACK_YAML = """
 spec_version: '1.0'

@@ -11,10 +11,10 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from pencraft.config import get_settings
-from pencraft.db import reset_engine_for_tests
-from pencraft.db.base import Base
-from pencraft.server import create_app
+from blogforge.config import get_settings
+from blogforge.db import reset_engine_for_tests
+from blogforge.db.base import Base
+from blogforge.server import create_app
 
 
 @pytest.fixture(autouse=True)
@@ -26,15 +26,15 @@ def _force_sqlite_for_tests(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     tests) so the lifespan's admin-seed step can succeed."""
     import asyncio
 
-    monkeypatch.setenv("PENCRAFT_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setenv("PENCRAFT_SESSION_SECRET", "test-session-secret")
-    monkeypatch.setenv("PENCRAFT_RUN_MIGRATIONS_ON_BOOT", "false")
-    monkeypatch.setenv("PENCRAFT_S3_BOOTSTRAP_ON_BOOT", "false")
+    monkeypatch.setenv("BLOGFORGE_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("BLOGFORGE_SESSION_SECRET", "test-session-secret")
+    monkeypatch.setenv("BLOGFORGE_RUN_MIGRATIONS_ON_BOOT", "false")
+    monkeypatch.setenv("BLOGFORGE_S3_BOOTSTRAP_ON_BOOT", "false")
     get_settings.cache_clear()
     reset_engine_for_tests()
 
     async def _setup_schema() -> None:
-        from pencraft.db.engine import get_engine
+        from blogforge.db.engine import get_engine
 
         async with get_engine().begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -69,10 +69,10 @@ def client() -> Iterator[TestClient]:
         yield test_client
 
 
-from pencraft.auth.passwords import hash_password  # noqa: E402
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner  # noqa: E402
-from pencraft.db.engine import get_sessionmaker  # noqa: E402
-from pencraft.db.models import User  # noqa: E402
+from blogforge.auth.passwords import hash_password  # noqa: E402
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner  # noqa: E402
+from blogforge.db.engine import get_sessionmaker  # noqa: E402
+from blogforge.db.models import User  # noqa: E402
 
 
 async def _seed_approved_user(email: str = "test@user.com"):

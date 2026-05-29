@@ -1,5 +1,5 @@
 """argon2 hash + verify."""
-from pencraft.auth.passwords import hash_password, verify_password
+from blogforge.auth.passwords import hash_password, verify_password
 
 
 def test_round_trip():

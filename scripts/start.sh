@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Boot the Pencraft Docker stack (api + postgres + minio) detached, wait for
+# Boot the BlogForge Docker stack (api + postgres + minio) detached, wait for
 # the API to respond, then print useful URLs + credentials.
 #
 # Stop with `docker compose down` (or add `-v` to wipe data volumes).
@@ -15,7 +15,7 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "→ building + starting pencraft stack…"
+echo "→ building + starting blogforge stack…"
 docker compose up --build -d
 
 echo "→ waiting for the API at http://localhost:7880/api/health…"
@@ -32,12 +32,12 @@ done
 
 cat <<'BANNER'
 
-  ✓ Pencraft is up.
+  ✓ BlogForge is up.
 
   App         http://localhost:7880
   Health      http://localhost:7880/api/health
-  MinIO UI    http://localhost:9001  (login: pencraft / pencraft-minio-secret)
-  Postgres    localhost:5433         (db: pencraft, user/pass: pencraft / pencraft)
+  MinIO UI    http://localhost:9001  (login: blogforge / blogforge-minio-secret)
+  Postgres    localhost:5433         (db: blogforge, user/pass: blogforge / blogforge)
 
   Seeded admin
     email:    dbbaskette@gmail.com

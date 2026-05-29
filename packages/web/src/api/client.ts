@@ -1,5 +1,5 @@
 /**
- * Single source of truth for talking to the Pencraft API.
+ * Single source of truth for talking to the BlogForge API.
  * Every call rides the session cookie via `credentials: "include"` so
  * cross-origin dev (vite :7881 -> api :7880) works without manual config.
  */

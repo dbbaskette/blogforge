@@ -7,7 +7,7 @@
 
 ## What changed since v1
 
-Phase A replaced the JSON-on-disk `DraftStore` with a Postgres `SqlDraftStore` and stood up MinIO/S3 for object storage. The v1 spec described references as files under `~/.pencraft/drafts/<id>/references/`. That path no longer exists. Everything user-scoped now lives in the DB or S3.
+Phase A replaced the JSON-on-disk `DraftStore` with a Postgres `SqlDraftStore` and stood up MinIO/S3 for object storage. The v1 spec described references as files under `~/.blogforge/drafts/<id>/references/`. That path no longer exists. Everything user-scoped now lives in the DB or S3.
 
 This document re-specs the storage and data model accordingly. The **workflow**, **UI**, **prompts**, **endpoints**, **extraction**, and **error handling** are unchanged from v1 except where they touch the storage layer — re-read v1 for those sections.
 
@@ -89,7 +89,7 @@ The Phase A `0001_initial` migration set `stage` default to `"idea"`. We:
 
 ## Storage layout (S3)
 
-Per draft, in the configured bucket (`Settings.s3_bucket`, default `pencraft`):
+Per draft, in the configured bucket (`Settings.s3_bucket`, default `blogforge`):
 
 ```
 drafts/{draft_id}/references/
@@ -101,9 +101,9 @@ drafts/{draft_id}/references/
 
 No top-level `manifest.json` — the `references` table is the source of truth for metadata. Originals are kept for audit / re-extraction.
 
-**Lifespan setup.** A new `pencraft.s3.ensure_bucket()` runs at boot (after migrations, before the app accepts requests) to create the bucket if missing. Local dev (MinIO) and CF (SeaweedFS) both need this.
+**Lifespan setup.** A new `blogforge.s3.ensure_bucket()` runs at boot (after migrations, before the app accepts requests) to create the bucket if missing. Local dev (MinIO) and CF (SeaweedFS) both need this.
 
-**Client.** A new `pencraft.s3.S3Client` wraps `aiobotocore` with three methods we'll need: `put_object(key, body, content_type)`, `get_object(key) -> bytes`, `delete_prefix(key_prefix)`. Lifecycle: a single session per process, lazily-built; the same singleton pattern as `get_engine` / `get_sessionmaker`.
+**Client.** A new `blogforge.s3.S3Client` wraps `aiobotocore` with three methods we'll need: `put_object(key, body, content_type)`, `get_object(key) -> bytes`, `delete_prefix(key_prefix)`. Lifecycle: a single session per process, lazily-built; the same singleton pattern as `get_engine` / `get_sessionmaker`.
 
 ## Extraction (unchanged from v1)
 
@@ -136,7 +136,7 @@ The ideation stream reuses the existing `JobRegistry` + SSE pattern from section
 
 ## Prompt construction (revised: async S3 fetch)
 
-New helper `pencraft/generate/references.py`:
+New helper `blogforge/generate/references.py`:
 
 ```python
 REFERENCE_BUDGET_CHARS = 30_000

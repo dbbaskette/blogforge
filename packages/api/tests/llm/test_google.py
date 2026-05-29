@@ -5,8 +5,8 @@ import httpx
 import pytest
 import respx
 
-from pencraft.llm.exceptions import ProviderMissingKey, ProviderRateLimit
-from pencraft.llm.google import GoogleProvider
+from blogforge.llm.exceptions import ProviderMissingKey, ProviderRateLimit
+from blogforge.llm.google import GoogleProvider
 
 
 def test_missing_key_raises() -> None:

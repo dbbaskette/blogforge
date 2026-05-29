@@ -25,10 +25,10 @@ fmt:
 
 build:
 	cd packages/web && pnpm install && pnpm build
-	mkdir -p packages/api/pencraft/static
-	cp -R packages/web/dist/* packages/api/pencraft/static/
+	mkdir -p packages/api/blogforge/static
+	cp -R packages/web/dist/* packages/api/blogforge/static/
 	uv build
 
 clean:
-	rm -rf packages/web/dist packages/api/pencraft/static dist build *.egg-info
+	rm -rf packages/web/dist packages/api/blogforge/static dist build *.egg-info
 	rm -rf .pytest_cache .ruff_cache .mypy_cache

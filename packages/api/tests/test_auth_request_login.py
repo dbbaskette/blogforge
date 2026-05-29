@@ -3,10 +3,10 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.server import create_app
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.server import create_app
 
 
 @pytest_asyncio.fixture
@@ -88,7 +88,7 @@ async def test_login_approved_user_sets_cookie(client):
         json={"email": "go@user.com", "password": "secret123"},
     )
     assert r.status_code == 200
-    assert "pencraft_session" in r.cookies
+    assert "blogforge_session" in r.cookies
     me = client.get("/api/auth/me")
     assert me.status_code == 200
     assert me.json()["email"] == "go@user.com"

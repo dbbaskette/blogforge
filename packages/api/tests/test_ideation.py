@@ -3,18 +3,18 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-from pencraft.drafts.models import (
+from blogforge.drafts.models import (
     Draft,
     IdeaInput,
     IdeationMessage,
 )
-from pencraft.generate.ideation import (
+from blogforge.generate.ideation import (
     IDEATION_SYSTEM_BLOCK,
     build_ideation_prompt,
     parse_proposed_outline,
     stream_ideation,
 )
-from pencraft.llm.base import LLMResponse, StreamChunk
+from blogforge.llm.base import LLMResponse, StreamChunk
 
 
 def _idea() -> IdeaInput:

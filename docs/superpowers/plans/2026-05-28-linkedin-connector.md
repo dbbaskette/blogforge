@@ -15,7 +15,7 @@
 
 ## Architecture refinement (decided here)
 
-The connector ships as a **second app factory inside the existing `pencraft` package**, not a separate Python package — it reuses `SecretCipher`, the db engine/session, `SessionSigner`, and the ORM `Base`/`User`. "Separate container" is achieved by running the **same image with a different command** (`pencraft-linkedin serve`), which is still its own process / scaling unit / bound app. This maximizes code reuse and avoids a second wheel build. If the connector ever needs true isolation (own DB, own release cadence), extracting it to `packages/linkedin/` later is mechanical.
+The connector ships as a **second app factory inside the existing `blogforge` package**, not a separate Python package — it reuses `SecretCipher`, the db engine/session, `SessionSigner`, and the ORM `Base`/`User`. "Separate container" is achieved by running the **same image with a different command** (`blogforge-linkedin serve`), which is still its own process / scaling unit / bound app. This maximizes code reuse and avoids a second wheel build. If the connector ever needs true isolation (own DB, own release cadence), extracting it to `packages/linkedin/` later is mechanical.
 
 ## Prerequisites
 
@@ -27,15 +27,15 @@ The connector ships as a **second app factory inside the existing `pencraft` pac
 ## Section 1 — Connector foundation
 
 ### Task 1: LinkedIn Settings + app factory + health
-**Files:** `packages/api/pencraft/linkedin/__init__.py`, `packages/api/pencraft/linkedin/config.py`, `packages/api/pencraft/linkedin/app.py`, `packages/api/pencraft/cli.py` (add `serve-linkedin`), `packages/api/tests/linkedin/test_app.py`
-- `LinkedInSettings` (pydantic-settings, `LINKEDIN_`-prefixed): client_id, client_secret, redirect_uri, api_version (default current `YYYYMM`), plus reuse of `PENCRAFT_SESSION_SECRET` + `PENCRAFT_DATABASE_URL`.
+**Files:** `packages/api/blogforge/linkedin/__init__.py`, `packages/api/blogforge/linkedin/config.py`, `packages/api/blogforge/linkedin/app.py`, `packages/api/blogforge/cli.py` (add `serve-linkedin`), `packages/api/tests/linkedin/test_app.py`
+- `LinkedInSettings` (pydantic-settings, `LINKEDIN_`-prefixed): client_id, client_secret, redirect_uri, api_version (default current `YYYYMM`), plus reuse of `BLOGFORGE_SESSION_SECRET` + `BLOGFORGE_DATABASE_URL`.
 - `create_linkedin_app()` → FastAPI app, mounts the linkedin router, `/linkedin/health`.
-- CLI: `pencraft serve-linkedin --host --port` (uvicorn the linkedin app).
+- CLI: `blogforge serve-linkedin --host --port` (uvicorn the linkedin app).
 - Test: app boots, `/linkedin/health` → `{"status":"ok"}`.
 
 ### Task 2: Shared-cookie auth dependency
-**Files:** `packages/api/pencraft/linkedin/auth.py`, test in `test_app.py`
-- Reuse `pencraft.auth.dependencies.get_current_user` (it already validates the shared cookie + loads the user). Confirm it works mounted in the linkedin app.
+**Files:** `packages/api/blogforge/linkedin/auth.py`, test in `test_app.py`
+- Reuse `blogforge.auth.dependencies.get_current_user` (it already validates the shared cookie + loads the user). Confirm it works mounted in the linkedin app.
 - Test: a protected probe route 401s without cookie, 200 with a valid signed cookie for an approved user.
 
 ---
@@ -43,7 +43,7 @@ The connector ships as a **second app factory inside the existing `pencraft` pac
 ## Section 2 — Data model
 
 ### Task 3: ORM models + migration 0004
-**Files:** `packages/api/pencraft/db/models.py` (add `LinkedInConnection`, `LinkedInPost`), `packages/api/alembic/versions/0004_linkedin.py`, `packages/api/tests/test_linkedin_models.py`
+**Files:** `packages/api/blogforge/db/models.py` (add `LinkedInConnection`, `LinkedInPost`), `packages/api/alembic/versions/0004_linkedin.py`, `packages/api/tests/test_linkedin_models.py`
 - Per spec §"Data model". `linkedin_connections.user_id` PK+FK (one per user). `linkedin_posts.draft_id` FK SET NULL.
 - Migration adds both tables; verify `alembic upgrade head` on temp sqlite.
 - Tests: round-trip, encrypted-token column stores ciphertext, cascade on user delete.
@@ -53,18 +53,18 @@ The connector ships as a **second app factory inside the existing `pencraft` pac
 ## Section 3 — OAuth
 
 ### Task 4: Signed OAuth state
-**Files:** `packages/api/pencraft/linkedin/state.py`, `test_oauth_state.py`
+**Files:** `packages/api/blogforge/linkedin/state.py`, `test_oauth_state.py`
 - `sign_state(user_id) -> str` / `verify_state(token) -> UUID | None` via itsdangerous (reuse pattern from `SessionSigner`), short TTL (~10 min).
 - Tests: round-trip, tamper → None, expired → None, wrong-secret → None.
 
 ### Task 5: GET /linkedin/connect
-**Files:** `packages/api/pencraft/linkedin/routes.py`, `test_oauth_routes.py`
+**Files:** `packages/api/blogforge/linkedin/routes.py`, `test_oauth_routes.py`
 - Returns `{authorize_url}` with `scope=openid profile w_member_social`, signed `state`, configured `redirect_uri`.
 - Test: URL parses, has all scopes, state verifies back to the user.
 
 ### Task 6: GET /linkedin/callback
 **Files:** same routes; `test_oauth_routes.py`
-- Verify state → exchange code at token endpoint (respx mock) → fetch `/v2/userinfo` (respx mock) → upsert encrypted `LinkedInConnection` → 302 back to Pencraft (`LINKEDIN_POST_CONNECT_REDIRECT`, default `/settings`).
+- Verify state → exchange code at token endpoint (respx mock) → fetch `/v2/userinfo` (respx mock) → upsert encrypted `LinkedInConnection` → 302 back to BlogForge (`LINKEDIN_POST_CONNECT_REDIRECT`, default `/settings`).
 - Tests: happy path persists connection + redirects; bad state → 400; token-exchange failure → 502 + no row.
 
 ### Task 7: status + disconnect
@@ -78,7 +78,7 @@ The connector ships as a **second app factory inside the existing `pencraft` pac
 ## Section 4 — Publish + stats
 
 ### Task 8: LinkedIn API client
-**Files:** `packages/api/pencraft/linkedin/client.py`, `test_linkedin_client.py`
+**Files:** `packages/api/blogforge/linkedin/client.py`, `test_linkedin_client.py`
 - `LinkedInClient(access_token)` with `create_post(author_urn, commentary, visibility) -> post_urn` (POST `/rest/posts`, versioned header, URN from `x-restli-id`) and `social_actions(post_urn) -> {likes, comments}` (GET `/v2/socialActions/{urn}`).
 - A typed `LinkedInError` (with a `.stale_token: bool` for 401). respx-mock both endpoints.
 - Tests: post returns URN; 401 → LinkedInError(stale_token=True); socialActions parsed.
@@ -97,7 +97,7 @@ The connector ships as a **second app factory inside the existing `pencraft` pac
 
 ---
 
-## Section 5 — Pencraft web integration
+## Section 5 — BlogForge web integration
 
 ### Task 11: web API client
 **Files:** `packages/web/src/api/linkedin.ts`, `tests/api/linkedin.test.ts`
@@ -123,11 +123,11 @@ The connector ships as a **second app factory inside the existing `pencraft` pac
 
 ### Task 15: docker-compose service
 **Files:** `docker-compose.yml`
-- `linkedin` service: same image as `api`, command `pencraft serve-linkedin --host 0.0.0.0 --port 7890`, env `LINKEDIN_*` + shared `PENCRAFT_SESSION_SECRET`/`PENCRAFT_DATABASE_URL`, depends_on postgres healthy. Web `api` service gets the proxy target.
+- `linkedin` service: same image as `api`, command `blogforge serve-linkedin --host 0.0.0.0 --port 7890`, env `LINKEDIN_*` + shared `BLOGFORGE_SESSION_SECRET`/`BLOGFORGE_DATABASE_URL`, depends_on postgres healthy. Web `api` service gets the proxy target.
 
 ### Task 16: Tanzu manifest
 **Files:** `manifest.yml`
-- Second application `pencraft-linkedin`, same buildpack, command `pencraft serve-linkedin`, bound to `pencraft-postgres`. Document `cf set-env` for `LINKEDIN_CLIENT_ID/SECRET/REDIRECT_URI`.
+- Second application `blogforge-linkedin`, same buildpack, command `blogforge serve-linkedin`, bound to `blogforge-postgres`. Document `cf set-env` for `LINKEDIN_CLIENT_ID/SECRET/REDIRECT_URI`.
 
 ### Task 17: README + env docs
 **Files:** `README.md`

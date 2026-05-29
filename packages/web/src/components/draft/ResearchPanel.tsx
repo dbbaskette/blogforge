@@ -169,8 +169,8 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
           <ol className="flex-1 space-y-3 mb-4 overflow-y-auto" aria-label="Ideation transcript">
             {messages.length === 0 && (
               <li className="text-sm text-muted italic">
-                Start by describing what you want to write. Pencraft will propose an outline once it
-                has enough to work with.
+                Start by describing what you want to write. BlogForge will propose an outline once
+                it has enough to work with.
               </li>
             )}
             {messages.map((m) => (
@@ -199,7 +199,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
 
           <div className="border-t border-rule pt-3">
             <label htmlFor="ideation-composer" className="sr-only">
-              Message Pencraft
+              Message BlogForge
             </label>
             <textarea
               id="ideation-composer"
@@ -214,7 +214,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
               placeholder="Describe your angle, or ask for an outline…"
               rows={2}
               className="nb-textarea text-sm"
-              aria-label="Message Pencraft"
+              aria-label="Message BlogForge"
               disabled={streaming}
             />
             <div className="mt-2 flex items-center justify-end gap-2">
@@ -260,7 +260,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
               </div>
             ) : (
               <p className="text-xs text-muted italic">
-                Once Pencraft proposes one, it'll appear here.
+                Once BlogForge proposes one, it'll appear here.
               </p>
             )}
             <div className="mt-3 pt-3 border-t border-rule flex justify-end">

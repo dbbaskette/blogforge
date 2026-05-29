@@ -5,12 +5,12 @@ import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.server import create_app
 
 
 @pytest.fixture(autouse=True)
@@ -85,7 +85,7 @@ async def test_put_then_list_shows_configured_stored(setup, monkeypatch):
     """A successful PUT validates via list_models then persists."""
     # Stub the provider so we don't talk to Anthropic.
     monkeypatch.setattr(
-        "pencraft.api.admin_keys._validate_with_provider",
+        "blogforge.api.admin_keys._validate_with_provider",
         lambda provider, api_key: asyncio.sleep(0),
     )
     c = _client_as(setup["admin"])
@@ -111,7 +111,7 @@ async def test_put_invalid_key_returns_400_and_does_not_persist(setup, monkeypat
     def boom(provider, api_key):
         raise RuntimeError("invalid_api_key")
 
-    monkeypatch.setattr("pencraft.api.admin_keys._validate_with_provider", boom)
+    monkeypatch.setattr("blogforge.api.admin_keys._validate_with_provider", boom)
     c = _client_as(setup["admin"])
     with c:
         r = c.put("/api/admin/keys/anthropic", json={"api_key": "sk-bad"})
@@ -125,7 +125,7 @@ async def test_put_invalid_key_returns_400_and_does_not_persist(setup, monkeypat
 
 async def test_delete_removes_stored(setup, monkeypatch):
     monkeypatch.setattr(
-        "pencraft.api.admin_keys._validate_with_provider",
+        "blogforge.api.admin_keys._validate_with_provider",
         lambda p, k: None,
     )
     c = _client_as(setup["admin"])

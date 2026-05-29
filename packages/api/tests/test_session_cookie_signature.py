@@ -1,7 +1,7 @@
 """Cookie signer round-trips data and rejects tampered payloads."""
 from uuid import uuid4
 
-from pencraft.auth.sessions import SessionSigner
+from blogforge.auth.sessions import SessionSigner
 
 
 def test_round_trip():
