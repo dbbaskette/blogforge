@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { promoteToLibrary } from "../../api/library";
 import { type Reference, deleteReference, listReferences } from "../../api/references";
 import { AddReferenceForm } from "./AddReferenceForm";
+import { ReferenceLibraryPicker } from "./ReferenceLibraryPicker";
 
 interface ReferencesListProps {
   draftId: string;
@@ -30,6 +32,7 @@ export function ReferencesList({
   const [refs, setRefs] = useState<Reference[] | null>(null);
   const [open, setOpen] = useState<boolean>(defaultOpen);
   const [error, setError] = useState<string | null>(null);
+  const [savedLibId, setSavedLibId] = useState<string | null>(null);
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -59,6 +62,19 @@ export function ReferencesList({
   const handleAdded = useCallback((ref: Reference) => {
     setRefs((cur) => (cur ? [...cur, ref] : [ref]));
   }, []);
+
+  const handleSaveToLibrary = useCallback(
+    async (refId: string): Promise<void> => {
+      try {
+        await promoteToLibrary(draftId, refId);
+        setSavedLibId(refId);
+        setTimeout(() => setSavedLibId((cur) => (cur === refId ? null : cur)), 2000);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [draftId],
+  );
 
   const list = refs ?? [];
   const count = list.length;
@@ -99,6 +115,14 @@ export function ReferencesList({
               </span>
               <button
                 type="button"
+                onClick={() => void handleSaveToLibrary(r.id)}
+                aria-label={`Save reference ${r.name} to library`}
+                className="opacity-0 group-hover/ref:opacity-100 focus:opacity-100 transition-opacity text-[11px] text-muted hover:text-cobalt-600 px-1 shrink-0"
+              >
+                {savedLibId === r.id ? "✓ saved" : "save"}
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleRemove(r.id)}
                 aria-label={`Remove reference ${r.name}`}
                 className="opacity-0 group-hover/ref:opacity-100 focus:opacity-100 transition-opacity text-xs text-muted hover:text-rose px-1"
@@ -111,6 +135,11 @@ export function ReferencesList({
       )}
 
       <AddReferenceForm draftId={draftId} onAdded={handleAdded} />
+      <ReferenceLibraryPicker
+        draftId={draftId}
+        attachedNames={new Set(list.map((r) => r.name))}
+        onAdded={handleAdded}
+      />
     </>
   );
 
