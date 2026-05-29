@@ -42,6 +42,7 @@ export interface Draft {
   idea: IdeaInput;
   outline: OutlineProposal | null;
   sections: Section[];
+  tags: string[];
 }
 export interface DraftSummary {
   id: string;
@@ -50,6 +51,7 @@ export interface DraftSummary {
   pack_slug: string;
   updated_at: string;
   word_count: number;
+  tags: string[];
 }
 
 export async function listDrafts(init?: RequestInit): Promise<DraftSummary[]> {
@@ -69,6 +71,12 @@ export async function updateDraft(id: string, draft: Draft): Promise<Draft> {
 }
 export async function deleteDraft(id: string): Promise<void> {
   await api<void>(`/api/drafts/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+export async function setDraftTags(id: string, tags: string[]): Promise<Draft> {
+  return api<Draft>(`/api/drafts/${encodeURIComponent(id)}/tags`, {
+    method: "PATCH",
+    body: JSON.stringify({ tags }),
+  });
 }
 export async function listTrashedDrafts(init?: RequestInit): Promise<DraftSummary[]> {
   return api<DraftSummary[]>("/api/drafts/trash", init);

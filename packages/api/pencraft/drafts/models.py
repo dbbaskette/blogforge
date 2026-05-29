@@ -121,6 +121,7 @@ class Draft(BaseModel):
     sections: list[Section] = Field(default_factory=list)
     references: list[Reference] = Field(default_factory=list)
     ideation_messages: list[IdeationMessage] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
     @field_validator("stage", mode="before")
     @classmethod
@@ -146,3 +147,4 @@ class DraftSummary(BaseModel):
     pack_slug: str
     updated_at: datetime
     word_count: int
+    tags: list[str] = Field(default_factory=list)

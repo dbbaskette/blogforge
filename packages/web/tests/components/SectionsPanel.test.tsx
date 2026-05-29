@@ -25,6 +25,7 @@ function makeDraft(): Draft {
         word_count: 4,
       },
     ],
+    tags: [],
   };
 }
 

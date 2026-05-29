@@ -62,6 +62,8 @@ class Draft(Base):
     # SqlDraftStore boundary, and migration 0003 rewrites them in place.)
     idea: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     outline: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    # Free-form user labels for organizing the drafts list.
+    tags: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now
