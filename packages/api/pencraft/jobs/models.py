@@ -22,6 +22,9 @@ JobStatus = Literal["pending", "running", "succeeded", "failed", "cancelled"]
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex)
     type: JobType
+    # The draft this job operates on, when applicable — lets a reloaded
+    # client rediscover an in-flight job for a draft and re-attach.
+    draft_id: str | None = None
     status: JobStatus = "pending"
     stage: str = "queued"
     progress: float = 0.0

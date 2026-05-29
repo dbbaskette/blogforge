@@ -42,6 +42,7 @@ const baseProps = {
   onRevertSection: noop,
   onReorder: noop,
   onExpandUnfilled: noop,
+  onExpandNext: noop,
   onReviseDraft: noop,
 };
 
@@ -52,6 +53,21 @@ describe("SectionsPanel", () => {
     // The assembled read view renders the title as a heading.
     expect(screen.getByRole("heading", { name: /my essay/i })).toBeInTheDocument();
     expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
+  });
+
+  it("composes the next batch incrementally", () => {
+    const onExpandNext = vi.fn(async (): Promise<void> => {});
+    render(
+      <SectionsPanel
+        {...baseProps}
+        draft={makeDraft()}
+        unfilledCount={5}
+        onExpandNext={onExpandNext}
+        onReviseDraft={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /draft next 3/i }));
+    expect(onExpandNext).toHaveBeenCalledWith(3);
   });
 
   it("submits a holistic revision instruction", async () => {
