@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import type { Draft, IdeaInput, OutlineProposal } from "../../api/drafts";
+import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/drafts";
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
@@ -11,6 +11,7 @@ import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
 import { ResearchPanel } from "./ResearchPanel";
 import { SectionsPanel } from "./SectionsPanel";
+import { StageNav } from "./StageNav";
 import { SetupDisclosure } from "./SetupDisclosure";
 import { WorkspaceFooter } from "./WorkspaceFooter";
 
@@ -28,6 +29,7 @@ export interface DraftWorkspaceProps {
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReviseDraft: (instruction: string) => Promise<void>;
+  onJumpStage: (stage: DraftStage) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
   onJobComplete: () => void;
 }
@@ -46,6 +48,7 @@ export function DraftWorkspace({
   onRegenerateSection,
   onRevertSection,
   onReviseDraft,
+  onJumpStage,
   onReorder,
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
@@ -296,6 +299,8 @@ export function DraftWorkspace({
             )}
           </span>
         </div>
+
+        <StageNav draft={draft} onJump={onJumpStage} />
 
         {/* Hero — editable title */}
         <header className="mb-6">

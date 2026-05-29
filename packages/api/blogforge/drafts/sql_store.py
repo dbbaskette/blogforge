@@ -252,6 +252,34 @@ class SqlDraftStore:
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
 
+    async def set_stage(
+        self, draft_id: str, stage: str, *, user_id: UUID
+    ) -> Draft | None:
+        """Move a draft to a stage explicitly (allows regressing back to
+        'research' to rework). Only the stage pointer changes — outline,
+        sections, and ideation history are preserved. None if not found."""
+        try:
+            uuid = UUID(draft_id)
+        except ValueError:
+            return None
+        async with get_sessionmaker()() as session:
+            row = (
+                await session.execute(
+                    select(DraftRow).where(
+                        DraftRow.id == uuid,
+                        DraftRow.user_id == user_id,
+                        DraftRow.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            row.stage = stage
+            row.updated_at = datetime.now(UTC)
+            await session.commit()
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
+            return _draft_from_row(row)
+
     async def set_tags(
         self, draft_id: str, tags: list[str], *, user_id: UUID
     ) -> Draft | None:
