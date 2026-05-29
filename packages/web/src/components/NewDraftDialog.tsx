@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { type IdeaInput, createDraft } from "../api/drafts";
 import { type PackSummary, listPacks } from "../api/packs";
 import { type ModelInfo, listModels, listProviderAvailability } from "../api/providers";
+import { type Template, deleteTemplate, listTemplates } from "../api/templates";
+import { Icon } from "./ui/Icon";
 
 interface NewDraftDialogProps {
   open: boolean;
@@ -22,6 +24,11 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
   const [provider, setProvider] = useState<Provider>("anthropic");
   const [model, setModel] = useState("");
   const [targetWords, setTargetWords] = useState(1500);
+  // Carried from an applied template; folded into the idea on submit.
+  const [extras, setExtras] = useState<{ bullets: string[]; notes: string; format: string | null }>(
+    { bullets: [], notes: "", format: null },
+  );
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
@@ -34,7 +41,28 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
     listProviderAvailability()
       .then(setProviders)
       .catch(() => {});
+    listTemplates()
+      .then(setTemplates)
+      .catch(() => {});
   }, [open]);
+
+  const applyTemplate = (t: Template): void => {
+    setTopic(t.topic);
+    setPack(t.pack_slug);
+    setProvider(t.provider);
+    setModel(t.model);
+    setTargetWords(t.target_words);
+    setExtras({ bullets: t.bullets, notes: t.notes, format: t.format });
+  };
+
+  const removeTemplate = async (id: string): Promise<void> => {
+    try {
+      await deleteTemplate(id);
+      setTemplates((prev) => prev.filter((t) => t.id !== id));
+    } catch {
+      /* non-fatal */
+    }
+  };
 
   useEffect(() => {
     setModelsError(null);
@@ -79,6 +107,9 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
         provider,
         model,
         target_words: targetWords,
+        bullets: extras.bullets,
+        notes: extras.notes,
+        format: extras.format,
       };
       const draft = await createDraft(idea);
       onClose();
@@ -119,6 +150,36 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
         </header>
 
         <form onSubmit={submit} className="px-7 pt-5 pb-6 space-y-5">
+          {templates.length > 0 && (
+            <div>
+              <span className="nb-label">Start from a template</span>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {templates.map((t) => (
+                  <span
+                    key={t.id}
+                    className="group inline-flex items-center gap-1.5 rounded-full border border-rule bg-card pl-3 pr-1.5 py-1 text-sm hover:border-cobalt-300 transition-colors"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => applyTemplate(t)}
+                      className="text-ink-2 hover:text-cobalt-700 font-medium"
+                    >
+                      {t.name}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeTemplate(t.id)}
+                      className="nb-icon-btn !w-5 !h-5 opacity-40 group-hover:opacity-100"
+                      aria-label={`Delete template ${t.name}`}
+                    >
+                      <Icon name="x" size={12} title="" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <Field label="Topic" id="nd-topic">
             <input
               id="nd-topic"

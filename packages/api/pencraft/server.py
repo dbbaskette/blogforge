@@ -20,6 +20,7 @@ from pencraft.db.engine import get_engine, get_sessionmaker
 from pencraft.db.seed import ensure_admin_user
 from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.jobs.registry import JobRegistry
+from pencraft.templates.store import TemplateStore
 
 # Translate VCAP_SERVICES into PENCRAFT_* env vars before Settings is read.
 apply_vcap_services()
@@ -131,6 +132,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # 4) Per-request shared state.
     app.state.draft_store = SqlDraftStore()
+    app.state.template_store = TemplateStore()
     app.state.pack_store = PackStore(_resolve_pack_roots())
     app.state.job_registry = JobRegistry()
     app.state.event_bus = EventBus()
@@ -175,6 +177,7 @@ def create_app() -> FastAPI:
     from pencraft.api.references import router as references_router
     from pencraft.api.revise import router as revise_router
     from pencraft.api.section import router as section_router
+    from pencraft.api.templates import router as templates_router
 
     app.include_router(auth_router)
     app.include_router(admin_router)
@@ -188,6 +191,7 @@ def create_app() -> FastAPI:
     app.include_router(ideation_router)
     app.include_router(section_router)
     app.include_router(revise_router)
+    app.include_router(templates_router)
     app.include_router(jobs_router)
     app.include_router(download_router)
     app.include_router(lint_router)

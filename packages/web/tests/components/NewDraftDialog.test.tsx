@@ -37,6 +37,26 @@ vi.mock("../../src/api/drafts", () => ({
   createDraft: vi.fn(),
 }));
 
+vi.mock("../../src/api/templates", () => ({
+  listTemplates: vi.fn().mockResolvedValue([
+    {
+      id: "t1",
+      name: "Weekly roundup",
+      topic: "This week in AI",
+      pack_slug: "dan",
+      provider: "anthropic",
+      model: "claude-x",
+      target_words: 1200,
+      format: null,
+      bullets: [],
+      notes: "",
+      created_at: "2026-05-01T00:00:00Z",
+      updated_at: "2026-05-01T00:00:00Z",
+    },
+  ]),
+  deleteTemplate: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe("NewDraftDialog", () => {
   it("renders the selected pack's voice preview", async () => {
     render(
@@ -67,5 +87,19 @@ describe("NewDraftDialog", () => {
 
     // No preview text and no crash.
     expect(screen.queryByText(/punchy/i)).not.toBeInTheDocument();
+  });
+
+  it("applies a template to prefill the form", async () => {
+    render(
+      <MemoryRouter>
+        <NewDraftDialog open onClose={() => {}} />
+      </MemoryRouter>,
+    );
+
+    const chip = await screen.findByRole("button", { name: "Weekly roundup" });
+    fireEvent.click(chip);
+
+    expect(screen.getByLabelText(/topic/i)).toHaveValue("This week in AI");
+    expect(screen.getByLabelText(/voice pack/i)).toHaveValue("dan");
   });
 });
