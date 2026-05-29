@@ -37,6 +37,7 @@ const draft: Draft = {
   },
   outline: null,
   sections: [],
+  tags: [],
 };
 
 const sampleOutline = {

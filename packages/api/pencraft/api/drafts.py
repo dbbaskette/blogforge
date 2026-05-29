@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 
 from pencraft.auth.dependencies import get_current_user
 from pencraft.db.models import User
@@ -9,6 +10,32 @@ from pencraft.drafts.models import Draft, DraftSummary, IdeaInput
 from pencraft.drafts.sql_store import SqlDraftStore
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
+
+_MAX_TAGS = 20
+_MAX_TAG_LEN = 40
+
+
+class _TagsBody(BaseModel):
+    tags: list[str]
+
+
+def _normalize_tags(raw: list[str]) -> list[str]:
+    """Trim, drop blanks, cap length, dedupe case-insensitively (first wins),
+    and cap the count — so the list stays tidy regardless of client input."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for tag in raw:
+        cleaned = tag.strip()[:_MAX_TAG_LEN].strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cleaned)
+        if len(out) >= _MAX_TAGS:
+            break
+    return out
 
 
 def _store(request: Request) -> SqlDraftStore:
@@ -112,6 +139,26 @@ async def update_draft(
         draft.sections = existing.sections
 
     updated = await store.update(draft_id, draft, user_id=current.id)
+    if updated is None:
+        raise _not_found(draft_id)
+    await request.app.state.event_bus.emit(
+        {"type": "draft:updated", "id": updated.id, "title": updated.title}
+    )
+    return updated
+
+
+@router.patch("/{draft_id}/tags", response_model=Draft)
+async def set_draft_tags(
+    draft_id: str,
+    body: _TagsBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    """Replace a draft's tags. Lightweight — used by the drafts list to
+    organize without loading/saving the whole draft."""
+    updated = await _store(request).set_tags(
+        draft_id, _normalize_tags(body.tags), user_id=current.id
+    )
     if updated is None:
         raise _not_found(draft_id)
     await request.app.state.event_bus.emit(

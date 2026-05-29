@@ -87,6 +87,7 @@ def _draft_from_row(row: DraftRow) -> Draft:
             )
             for m in sorted(row.ideation_messages, key=lambda m: m.position)
         ],
+        tags=list(row.tags or []),
     )
 
 
@@ -130,6 +131,7 @@ def _summary_from_row(row: DraftRow) -> DraftSummary:
         pack_slug=row.idea.get("pack_slug", "") if row.idea else "",
         updated_at=row.updated_at,
         word_count=word_count,
+        tags=list(row.tags or []),
     )
 
 
@@ -202,6 +204,7 @@ class SqlDraftStore:
             row.stage = draft.stage
             row.idea = draft.idea.model_dump()
             row.outline = draft.outline.model_dump() if draft.outline else None
+            row.tags = list(draft.tags)
             row.updated_at = datetime.now(UTC)
 
             # Replace sections in bulk.
@@ -245,6 +248,33 @@ class SqlDraftStore:
             # Anything left in existing_by_id was removed by the user.
             for orphan in existing_by_id.values():
                 await session.delete(orphan)
+            await session.commit()
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
+            return _draft_from_row(row)
+
+    async def set_tags(
+        self, draft_id: str, tags: list[str], *, user_id: UUID
+    ) -> Draft | None:
+        """Replace a draft's tags (lightweight — doesn't touch sections).
+        Returns the updated draft, or None if not found / not owned."""
+        try:
+            uuid = UUID(draft_id)
+        except ValueError:
+            return None
+        async with get_sessionmaker()() as session:
+            row = (
+                await session.execute(
+                    select(DraftRow).where(
+                        DraftRow.id == uuid,
+                        DraftRow.user_id == user_id,
+                        DraftRow.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            row.tags = list(tags)
+            row.updated_at = datetime.now(UTC)
             await session.commit()
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)

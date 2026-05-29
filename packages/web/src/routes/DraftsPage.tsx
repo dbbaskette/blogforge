@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { type DraftSummary, deleteDraft, listDrafts } from "../api/drafts";
+import {
+  type DraftStage,
+  type DraftSummary,
+  deleteDraft,
+  listDrafts,
+  setDraftTags,
+} from "../api/drafts";
 import { listProviderAvailability } from "../api/providers";
 import { NewDraftDialog } from "../components/NewDraftDialog";
 import { Icon } from "../components/ui/Icon";
@@ -14,12 +20,24 @@ const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: str
   sections: { label: "Drafting", pillClass: "nb-pill nb-pill-gen" },
 };
 
+const STAGE_FILTERS: { value: DraftStage | "all"; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "research", label: "Researching" },
+  { value: "outline", label: "Outline" },
+  { value: "sections", label: "Drafting" },
+];
+
 export function DraftsPage(): JSX.Element {
   const { user } = useMe();
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [noKeys, setNoKeys] = useState(false);
+
+  // Filters (client-side over the loaded list).
+  const [query, setQuery] = useState("");
+  const [stageFilter, setStageFilter] = useState<DraftStage | "all">("all");
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
 
   const reload = useCallback(() => {
     listDrafts()
@@ -44,6 +62,39 @@ export function DraftsPage(): JSX.Element {
     reload();
   };
 
+  const onTagsChange = useCallback(async (id: string, tags: string[]): Promise<void> => {
+    const updated = await setDraftTags(id, tags);
+    setDrafts((cur) =>
+      cur ? cur.map((d) => (d.id === id ? { ...d, tags: updated.tags } : d)) : cur,
+    );
+  }, []);
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of drafts ?? []) for (const t of d.tags) set.add(t);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [drafts]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (drafts ?? []).filter((d) => {
+      if (stageFilter !== "all" && d.stage !== stageFilter) return false;
+      if (activeTags.size > 0 && !d.tags.some((t) => activeTags.has(t))) return false;
+      if (q && !`${d.title} ${d.pack_slug}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [drafts, query, stageFilter, activeTags]);
+
+  const toggleTag = (tag: string): void =>
+    setActiveTags((cur) => {
+      const next = new Set(cur);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+
+  const hasFilters = query.trim() !== "" || stageFilter !== "all" || activeTags.size > 0;
+
   return (
     <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10 animate-fade-up">
       <Hero onNew={() => setNewOpen(true)} />
@@ -56,7 +107,10 @@ export function DraftsPage(): JSX.Element {
           <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">Your drafts</h2>
           <div className="flex items-baseline gap-3">
             <span className="text-xs text-muted">
-              {drafts?.length ?? 0} {drafts?.length === 1 ? "piece" : "pieces"}
+              {hasFilters && drafts
+                ? `${filtered.length} of ${drafts.length}`
+                : (drafts?.length ?? 0)}{" "}
+              {(hasFilters ? filtered.length : (drafts?.length ?? 0)) === 1 ? "piece" : "pieces"}
             </span>
             <Link
               to="/trash"
@@ -67,16 +121,86 @@ export function DraftsPage(): JSX.Element {
           </div>
         </div>
 
+        {drafts && drafts.length > 0 && (
+          <div className="mb-4 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by title or pack…"
+                aria-label="Search drafts"
+                className="nb-input flex-1"
+              />
+              <div className="inline-flex rounded-nb-sm border border-rule overflow-hidden self-start">
+                {STAGE_FILTERS.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setStageFilter(s.value)}
+                    aria-pressed={stageFilter === s.value}
+                    className={`px-3 py-1.5 text-sm font-medium border-l border-rule first:border-l-0 transition-colors ${
+                      stageFilter === s.value
+                        ? "bg-cobalt-50 text-cobalt-700"
+                        : "bg-card text-muted hover:text-ink"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {allTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-muted mr-1">Tags:</span>
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    aria-pressed={activeTags.has(tag)}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      activeTags.has(tag)
+                        ? "border-cobalt-300 bg-cobalt-50 text-cobalt-700"
+                        : "border-rule bg-card text-muted hover:text-ink"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+                {activeTags.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTags(new Set())}
+                    className="text-xs text-muted hover:text-ink underline underline-offset-2 ml-1"
+                  >
+                    clear
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {drafts === null && !error && (
           <p className="text-center text-muted text-sm py-16">Loading…</p>
         )}
 
         {drafts && drafts.length === 0 && <EmptyState onNew={() => setNewOpen(true)} />}
 
-        {drafts && drafts.length > 0 && (
+        {drafts && drafts.length > 0 && filtered.length === 0 && (
+          <p className="nb-card p-8 text-center italic text-muted">No drafts match your filters.</p>
+        )}
+
+        {drafts && filtered.length > 0 && (
           <div className="space-y-3">
-            {drafts.map((d) => (
-              <DraftRow key={d.id} draft={d} onDelete={() => onDelete(d.id)} />
+            {filtered.map((d) => (
+              <DraftRow
+                key={d.id}
+                draft={d}
+                onDelete={() => onDelete(d.id)}
+                onTagsChange={(tags) => onTagsChange(d.id, tags)}
+              />
             ))}
           </div>
         )}
@@ -126,9 +250,11 @@ function Hero({ onNew }: { onNew: () => void }): JSX.Element {
 function DraftRow({
   draft,
   onDelete,
+  onTagsChange,
 }: {
   draft: DraftSummary;
   onDelete: () => void;
+  onTagsChange: (tags: string[]) => Promise<void>;
 }): JSX.Element {
   const stage = STAGE_LABEL[draft.stage];
   const updated = formatRelative(draft.updated_at);
@@ -136,24 +262,27 @@ function DraftRow({
   return (
     <article className="group nb-card nb-card-hover">
       <div className="flex items-start gap-4 p-5">
-        <Link to={`/drafts/${draft.id}`} className="flex-1 min-w-0">
-          <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight group-hover:text-cobalt-600 transition-colors">
-            {draft.title || <span className="italic text-muted-2">untitled draft</span>}
-          </h3>
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className={stage.pillClass}>
-              <span className="dot" />
-              {stage.label}
-            </span>
-            <span className="nb-pill nb-pill-empty">{draft.pack_slug}</span>
-            {draft.word_count > 0 && (
-              <span className="text-xs text-muted font-mono">
-                {draft.word_count.toLocaleString()} words
+        <div className="flex-1 min-w-0">
+          <Link to={`/drafts/${draft.id}`} className="block">
+            <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight group-hover:text-cobalt-600 transition-colors">
+              {draft.title || <span className="italic text-muted-2">untitled draft</span>}
+            </h3>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className={stage.pillClass}>
+                <span className="dot" />
+                {stage.label}
               </span>
-            )}
-            <span className="text-xs text-muted-2">· {updated}</span>
-          </div>
-        </Link>
+              <span className="nb-pill nb-pill-empty">{draft.pack_slug}</span>
+              {draft.word_count > 0 && (
+                <span className="text-xs text-muted font-mono">
+                  {draft.word_count.toLocaleString()} words
+                </span>
+              )}
+              <span className="text-xs text-muted-2">· {updated}</span>
+            </div>
+          </Link>
+          <TagEditor tags={draft.tags} onChange={onTagsChange} />
+        </div>
 
         <button
           type="button"
@@ -166,6 +295,89 @@ function DraftRow({
         </button>
       </div>
     </article>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
+// Inline tag editor (chips + add)
+
+function TagEditor({
+  tags,
+  onChange,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => Promise<void>;
+}): JSX.Element {
+  const [adding, setAdding] = useState(false);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const commit = async (next: string[]): Promise<void> => {
+    setBusy(true);
+    try {
+      await onChange(next);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const add = async (): Promise<void> => {
+    const t = value.trim();
+    setValue("");
+    setAdding(false);
+    if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) {
+      await commit([...tags, t]);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className="inline-flex items-center gap-1 rounded-full border border-rule bg-canvas px-2 py-0.5 text-xs text-ink-2"
+        >
+          {tag}
+          <button
+            type="button"
+            onClick={() => void commit(tags.filter((x) => x !== tag))}
+            disabled={busy}
+            aria-label={`Remove tag ${tag}`}
+            className="text-muted hover:text-rose"
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <input
+          // biome-ignore lint/a11y/noAutofocus: focus the inline tag field the moment it opens
+          autoFocus
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => void add()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void add();
+            if (e.key === "Escape") {
+              setValue("");
+              setAdding(false);
+            }
+          }}
+          placeholder="tag…"
+          aria-label="New tag"
+          className="w-24 bg-canvas border border-rule rounded-full px-2 py-0.5 text-xs focus:outline-none focus:border-cobalt-300"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="rounded-full border border-dashed border-rule px-2 py-0.5 text-xs text-muted hover:text-cobalt-600 hover:border-cobalt-300 transition-colors"
+        >
+          + tag
+        </button>
+      )}
+    </div>
   );
 }
 
