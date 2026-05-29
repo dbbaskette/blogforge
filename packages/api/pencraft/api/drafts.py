@@ -106,6 +106,22 @@ async def get_draft(
     return draft
 
 
+@router.get("/{draft_id}/active-job")
+async def get_active_job(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, str | None]:
+    """The id of an in-flight compose/revise job for this draft, if any —
+    so a reloaded client can re-attach to its SSE stream. `null` when idle."""
+    draft = await _store(request).get(draft_id, user_id=current.id)
+    if draft is None:
+        raise _not_found(draft_id)
+    reg = request.app.state.job_registry
+    job = reg.active_for_draft(draft_id)
+    return {"job_id": job.id if job else None}
+
+
 _STAGE_ORDER = {"research": 0, "outline": 1, "sections": 2}
 
 

@@ -105,7 +105,7 @@ async def revise_draft(
             },
         )
 
-    job = await reg.create(JobType.REVISE_DRAFT)
+    job = await reg.create(JobType.REVISE_DRAFT, draft_id=draft_id)
     background_tasks.add_task(
         _run_revise,
         reg,

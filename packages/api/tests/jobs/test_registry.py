@@ -18,6 +18,28 @@ async def test_create_and_get() -> None:
 
 
 @pytest.mark.asyncio
+async def test_active_for_draft_finds_running_job() -> None:
+    reg = JobRegistry()
+    job = await reg.create(JobType.EXPAND, draft_id="d1")
+    found = reg.active_for_draft("d1")
+    assert found is not None and found.id == job.id
+    # Other drafts don't match.
+    assert reg.active_for_draft("d2") is None
+    # Terminal jobs are excluded.
+    await reg.complete(job.id, {})
+    assert reg.active_for_draft("d1") is None
+
+
+@pytest.mark.asyncio
+async def test_active_for_draft_returns_newest() -> None:
+    reg = JobRegistry()
+    await reg.create(JobType.EXPAND, draft_id="d1")
+    newest = await reg.create(JobType.REGEN_SECTION, draft_id="d1")
+    found = reg.active_for_draft("d1")
+    assert found is not None and found.id == newest.id
+
+
+@pytest.mark.asyncio
 async def test_cancel_signals_event() -> None:
     reg = JobRegistry()
     job = await reg.create(JobType.EXPAND)

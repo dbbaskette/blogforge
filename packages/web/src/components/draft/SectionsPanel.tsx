@@ -20,6 +20,8 @@ interface SectionsPanelProps {
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
   onExpandUnfilled: () => Promise<void>;
+  /** Incremental drafting — compose only the next N unwritten sections. */
+  onExpandNext: (n: number) => Promise<void>;
   /** Holistic, whole-draft revision against a single author instruction. */
   onReviseDraft: (instruction: string) => Promise<void>;
   /** Optional right-rail block, typically a collapsible ReferencesList. */
@@ -40,9 +42,11 @@ export function SectionsPanel({
   onRevertSection,
   onReorder,
   onExpandUnfilled,
+  onExpandNext,
   onReviseDraft,
   references,
 }: SectionsPanelProps): JSX.Element {
+  const NEXT_BATCH = 3;
   const [view, setView] = useState<"edit" | "read">("edit");
   const [reviseOpen, setReviseOpen] = useState(false);
   const [reviseNote, setReviseNote] = useState("");
@@ -210,13 +214,24 @@ export function SectionsPanel({
             Compose them all in one go.
           </div>
           {!jobRunning && (
-            <button
-              type="button"
-              onClick={() => onExpandUnfilled()}
-              className="nb-btn nb-btn-primary nb-btn-sm"
-            >
-              Compose {unfilledCount} unfilled →
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              {unfilledCount > NEXT_BATCH && (
+                <button
+                  type="button"
+                  onClick={() => onExpandNext(NEXT_BATCH)}
+                  className="nb-btn nb-btn-sm"
+                >
+                  Draft next {NEXT_BATCH} →
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onExpandUnfilled()}
+                className="nb-btn nb-btn-primary nb-btn-sm"
+              >
+                Compose {unfilledCount > NEXT_BATCH ? `all ${unfilledCount}` : unfilledCount} →
+              </button>
+            </div>
           )}
         </div>
       )}

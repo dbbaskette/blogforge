@@ -5,6 +5,7 @@ import {
   type Draft,
   expandSections,
   generateOutline,
+  getActiveJob,
   getDraft,
   regenerateSection,
   reorderSections,
@@ -29,6 +30,13 @@ export function DraftPage(): JSX.Element {
     getDraft(id)
       .then(setDraft)
       .catch((e: Error) => setError(e.message));
+    // Resume-watching: if a compose/revise is in flight (e.g. after a page
+    // reload), re-attach to its SSE stream so progress keeps streaming.
+    getActiveJob(id)
+      .then(({ job_id }) => {
+        if (job_id) setJobId(job_id);
+      })
+      .catch(() => {});
   }, [id]);
 
   const onChange = useCallback(
@@ -65,6 +73,15 @@ export function DraftPage(): JSX.Element {
     const { job_id } = await expandSections(id);
     setJobId(job_id);
   }, [id]);
+
+  const onExpandNext = useCallback(
+    async (n: number) => {
+      if (!id) return;
+      const { job_id } = await expandSections(id, n);
+      setJobId(job_id);
+    },
+    [id],
+  );
 
   const onJobComplete = useCallback(() => {
     if (!id) return;
@@ -143,6 +160,7 @@ export function DraftPage(): JSX.Element {
       onGenerateOutline={onGenerateOutline}
       onExpandAll={onExpandAll}
       onExpandUnfilled={onExpandUnfilled}
+      onExpandNext={onExpandNext}
       onSectionSave={onSectionSave}
       onRegenerateSection={onRegenerateSection}
       onRevertSection={onRevertSection}

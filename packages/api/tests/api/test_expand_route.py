@@ -81,6 +81,24 @@ async def test_expand_returns_job_and_runs_sections(expand_client) -> None:
     assert all(s["content_md"].strip() for s in final["sections"])
 
 
+async def test_expand_limit_composes_only_next_section(expand_client) -> None:
+    """`?limit=1` composes just the next unwritten section, leaving the rest."""
+    did = _seed_outlined_draft(expand_client)
+    r = expand_client.post(f"/api/drafts/{did}/expand?limit=1")
+    assert r.status_code == 202
+    job_id = r.json()["job_id"]
+    with expand_client.stream("GET", f"/api/jobs/{job_id}/events") as resp:
+        body = b"".join(resp.iter_bytes()).decode()
+    assert '"type":"complete"' in body
+
+    secs = {s["id"]: s for s in expand_client.get(f"/api/drafts/{did}").json()["sections"]}
+    assert secs["s1"]["content_md"].strip()
+    assert secs["s1"]["status"] == "ready"
+    # s2 was left for a later pass.
+    assert not secs["s2"]["content_md"].strip()
+    assert secs["s2"]["status"] == "empty"
+
+
 async def test_expand_outline_missing_409(expand_client) -> None:
     created = expand_client.post(
         "/api/drafts",

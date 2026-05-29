@@ -32,8 +32,11 @@ async def expand_draft(
     draft_id: str,
     request: Request,
     background_tasks: BackgroundTasks,
+    limit: int | None = None,
     current: User = Depends(get_current_user),
 ) -> dict[str, str]:
+    """Compose the draft's unwritten sections. `?limit=N` composes only the
+    next N unwritten sections in document order (incremental drafting)."""
     store: SqlDraftStore = request.app.state.draft_store
     pack_store = request.app.state.pack_store
     reg: JobRegistry = request.app.state.job_registry
@@ -83,7 +86,7 @@ async def expand_draft(
             },
         )
 
-    job = await reg.create(JobType.EXPAND)
+    job = await reg.create(JobType.EXPAND, draft_id=draft_id)
     background_tasks.add_task(
         _run_expand,
         reg,
@@ -95,6 +98,7 @@ async def expand_draft(
         api_key,
         draft.idea.model,
         current.id,
+        limit,
     )
     return {"job_id": job.id}
 
@@ -109,6 +113,7 @@ async def _run_expand(
     api_key: str,
     model: str,
     user_id: UUID,
+    limit: int | None = None,
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
     started = time.monotonic()
@@ -202,6 +207,9 @@ async def _run_expand(
             for i, s in enumerate(draft.sections)
             if not (s.content_md.strip() and s.status in ("ready", "edited"))
         ]
+        # Incremental drafting: compose only the next `limit` unwritten sections.
+        if limit is not None and limit > 0:
+            targets = targets[:limit]
         await asyncio.gather(*[expand_one(i) for i in targets])
         if cancel_evt.is_set():
             return

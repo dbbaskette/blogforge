@@ -23,6 +23,7 @@ export interface DraftWorkspaceProps {
   onGenerateOutline: () => Promise<void>;
   onExpandAll: () => Promise<void>;
   onExpandUnfilled: () => Promise<void>;
+  onExpandNext: (n: number) => Promise<void>;
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
@@ -40,6 +41,7 @@ export function DraftWorkspace({
   onGenerateOutline,
   onExpandAll,
   onExpandUnfilled,
+  onExpandNext,
   onSectionSave,
   onRegenerateSection,
   onRevertSection,
@@ -205,6 +207,15 @@ export function DraftWorkspace({
     await onExpandUnfilled();
   }, [onExpandUnfilled]);
 
+  const handleExpandNext = useCallback(
+    async (n: number) => {
+      setLiveSectionId(null);
+      setLiveText("");
+      await onExpandNext(n);
+    },
+    [onExpandNext],
+  );
+
   // Holistic revise touches many sections — clear any single-section live
   // buffer so tokens aren't misattributed to one card.
   const handleReviseDraft = useCallback(
@@ -335,6 +346,7 @@ export function DraftWorkspace({
             onReviseDraft={handleReviseDraft}
             onReorder={onReorder}
             onExpandUnfilled={handleExpandUnfilled}
+            onExpandNext={handleExpandNext}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
         )}

@@ -161,7 +161,7 @@ async def regenerate_section(
             },
         )
 
-    job = await reg.create(JobType.REGEN_SECTION)
+    job = await reg.create(JobType.REGEN_SECTION, draft_id=draft_id)
     background_tasks.add_task(
         _run_regenerate,
         reg,

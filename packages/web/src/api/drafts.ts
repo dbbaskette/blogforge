@@ -91,8 +91,15 @@ export async function hardDeleteDraft(id: string): Promise<void> {
 export async function generateOutline(id: string): Promise<Draft> {
   return api<Draft>(`/api/drafts/${encodeURIComponent(id)}/outline`, { method: "POST" });
 }
-export async function expandSections(id: string): Promise<{ job_id: string }> {
-  return api(`/api/drafts/${encodeURIComponent(id)}/expand`, { method: "POST" });
+export async function expandSections(id: string, limit?: number): Promise<{ job_id: string }> {
+  const qs = limit != null ? `?limit=${limit}` : "";
+  return api(`/api/drafts/${encodeURIComponent(id)}/expand${qs}`, { method: "POST" });
+}
+export async function getActiveJob(
+  id: string,
+  init?: RequestInit,
+): Promise<{ job_id: string | null }> {
+  return api(`/api/drafts/${encodeURIComponent(id)}/active-job`, init);
 }
 export async function reviseDraft(id: string, instruction: string): Promise<{ job_id: string }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/revise`, {

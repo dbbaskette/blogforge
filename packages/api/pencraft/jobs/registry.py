@@ -25,9 +25,9 @@ class JobRegistry:
     # Public API
     # ------------------------------------------------------------------
 
-    async def create(self, type_: JobType) -> Job:
+    async def create(self, type_: JobType, draft_id: str | None = None) -> Job:
         """Create a new job, evict oldest finished job if at capacity."""
-        job = Job(type=type_)
+        job = Job(type=type_, draft_id=draft_id)
         async with self._lock:
             self._jobs[job.id] = job
             self._cancellation[job.id] = asyncio.Event()
@@ -38,6 +38,17 @@ class JobRegistry:
     async def get(self, job_id: str) -> Job | None:
         """Return the job or None if evicted/unknown."""
         return self._jobs.get(job_id)
+
+    def active_for_draft(self, draft_id: str) -> Job | None:
+        """The most-recent non-terminal job for a draft, or None.
+
+        Lets a reloaded client re-attach to an in-flight compose/revise so
+        progress keeps streaming after a refresh."""
+        found: Job | None = None
+        for job in self._jobs.values():  # insertion order: oldest → newest
+            if job.draft_id == draft_id and job.status not in _TERMINAL:
+                found = job
+        return found
 
     def cancellation_event(self, job_id: str) -> asyncio.Event:
         """Return the asyncio.Event that signals cancellation for this job."""
