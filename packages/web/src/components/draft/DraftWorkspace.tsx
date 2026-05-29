@@ -178,28 +178,6 @@ export function DraftWorkspace({
 
   const showFooter = draft.stage === "sections" && draft.sections.length > 0;
 
-  // Assembled markdown for the LinkedIn post body — mirrors the server's
-  // `assemble_markdown` (title + opening hook + each section).
-  const postText = useMemo(() => {
-    const parts: string[] = [];
-    if (draft.title) parts.push(`# ${draft.title}\n`);
-    if (draft.outline?.opening_hook) parts.push(`${draft.outline.opening_hook.trim()}\n`);
-    for (const section of draft.sections) {
-      parts.push(`## ${section.title}\n`);
-      if (section.content_md.trim()) parts.push(`${section.content_md.trim()}\n`);
-    }
-    return `${parts.join("\n")}\n`;
-  }, [draft.title, draft.outline, draft.sections]);
-
-  // The opening section, used as the "post as teaser" escape hatch when the
-  // full draft is over LinkedIn's 3000-char cap.
-  const teaserText = useMemo(() => {
-    const first = draft.sections[0];
-    const hook = draft.outline?.opening_hook?.trim() ?? "";
-    const body = first?.content_md.trim() ?? "";
-    return [hook, body].filter(Boolean).join("\n\n");
-  }, [draft.outline, draft.sections]);
-
   return (
     <div className="max-w-6xl mx-auto px-4 lg:px-8 py-8 grid lg:grid-cols-[220px_minmax(0,1fr)] gap-8">
       <OutlineSidebar
@@ -292,9 +270,6 @@ export function DraftWorkspace({
           draftedCount={draftedCount}
           sectionCount={draft.sections.length}
           onLint={() => setLintOpen(true)}
-          postText={postText}
-          teaserText={teaserText}
-          stage={draft.stage}
         />
       )}
 

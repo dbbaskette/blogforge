@@ -43,12 +43,6 @@ class User(Base):
     drafts: Mapped[list["Draft"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    linkedin_connection: Mapped["LinkedInConnection | None"] = relationship(
-        back_populates="user", cascade="all, delete-orphan", uselist=False
-    )
-    linkedin_posts: Mapped[list["LinkedInPost"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
 
 
 class Draft(Base):
@@ -86,11 +80,6 @@ class Draft(Base):
         back_populates="draft",
         cascade="all, delete-orphan",
         order_by="IdeationMessage.position",
-    )
-    # No delete-cascade: a published LinkedIn post outlives its draft; deleting
-    # the draft nulls LinkedInPost.draft_id (SET NULL) but keeps the post row.
-    linkedin_posts: Mapped[list["LinkedInPost"]] = relationship(
-        back_populates="draft"
     )
 
 
@@ -166,67 +155,16 @@ class ProviderKey(Base):
     )
 
 
-class LinkedInConnection(Base):
-    """A user's LinkedIn OAuth connection. One per user (user_id is the PK).
-
-    `encrypted_access_token` holds the SecretCipher ciphertext, never the raw
-    token. Deleted when the user is deleted (cascade) or on explicit disconnect.
-    """
-
-    __tablename__ = "linkedin_connections"
-
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
-    member_urn: Mapped[str] = mapped_column(String(128), nullable=False)
-    member_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    encrypted_access_token: Mapped[str] = mapped_column(Text, nullable=False)
-    scope: Mapped[str] = mapped_column(String(255), nullable=False, default="")
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_now, onupdate=_now
-    )
-
-    user: Mapped[User] = relationship(back_populates="linkedin_connection")
-
-
-class LinkedInPost(Base):
-    """A published LinkedIn post originating from a draft.
-
-    Survives draft deletion (draft_id SET NULL); deleted with the user.
-    `last_stats` caches the most recent like/comment counts.
-    """
-
-    __tablename__ = "linkedin_posts"
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    draft_id: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("drafts.id", ondelete="SET NULL"), nullable=True, index=True
-    )
-    post_urn: Mapped[str] = mapped_column(String(128), nullable=False)
-    commentary: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
-    last_stats: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    last_stats_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-
-    user: Mapped[User] = relationship(back_populates="linkedin_posts")
-    draft: Mapped[Draft | None] = relationship(back_populates="linkedin_posts")
-
-
 class Section(Base):
     __tablename__ = "sections"
     __table_args__ = (UniqueConstraint("draft_id", "position", name="uq_section_position"),)
 
+    # Slugged section id ("the-pattern", "01-the-tax", etc.). The LLM reuses
+    # slugs across drafts, so the id is only unique *within* a draft — the PK
+    # is composite (draft_id, id), not id alone.
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    # the existing slugged section id ("01-the-tax", etc.)
     draft_id: Mapped[UUID] = mapped_column(
-        Uuid, ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("drafts.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(500), nullable=False)
