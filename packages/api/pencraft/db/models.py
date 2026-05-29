@@ -139,6 +139,32 @@ class Reference(Base):
     draft: Mapped[Draft] = relationship(back_populates="references")
 
 
+class LibraryReference(Base):
+    """A reference promoted to the user's personal library so it can be
+    reused across drafts.
+
+    Mirrors ``Reference`` but is user-scoped, not draft-scoped. Its content
+    lives in S3 at ``library/{user_id}/{id}/{extracted.md,original{ext}}``.
+    Adding one to a draft copies those objects under the draft's prefix and
+    inserts a normal ``references`` row, so the prompt-builder is unchanged.
+    """
+
+    __tablename__ = "library_references"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    # one of: "url" | "file" | "text"
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    original_filename: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    original_ext: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    extracted_chars: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class IdeationMessage(Base):
     """A single message in the research-stage chat for a draft.
 
