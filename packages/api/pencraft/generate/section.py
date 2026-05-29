@@ -57,10 +57,15 @@ async def stream_section(
     *,
     model: str,
     reference_context: str = "",
+    instruction: str = "",
 ) -> AsyncIterator[StreamChunk]:
     """Stream a section's body. `reference_context` is the pre-assembled
     "## Reference Materials" block (see pencraft.generate.references);
-    when non-empty it's prepended to the user prompt with a `---`."""
+    when non-empty it's prepended to the user prompt with a `---`.
+
+    `instruction` is an optional author note steering this regeneration
+    ("tighten this", "add a concrete example", "less formal"); when set
+    it's appended to the user prompt as an explicit revision directive."""
     from myvoice import compose_prompt
 
     sample_ids = _auto_pick_samples(manifest, n=3)
@@ -73,6 +78,11 @@ async def stream_section(
     user = _render_section_prompt(draft, section)
     if reference_context:
         user = f"{reference_context}\n\n---\n\n{user}"
+    if instruction.strip():
+        user = (
+            f"{user}\n\n---\n\nREVISION DIRECTIVE — rewrite the section above "
+            f"following this instruction, staying in voice:\n{instruction.strip()}"
+        )
     full_prompt = f"{system}\n\n---\n\n{user}"
     async for chunk in provider.stream(model=model, prompt=full_prompt):
         yield chunk

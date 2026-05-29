@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Section } from "../../api/drafts";
 import { Icon } from "../ui/Icon";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { SectionVersionHistory } from "./SectionVersionHistory";
 
 interface SectionCardProps {
   section: Section;
@@ -11,8 +12,12 @@ interface SectionCardProps {
   /** Live streaming prose for this section (single-section regenerate). */
   liveText?: string;
   defaultOpen?: boolean;
+  /** Draft id — needed to load this section's version history. */
+  draftId: string;
   onSave: (content_md: string) => Promise<void>;
-  onRegenerate: () => Promise<void>;
+  /** `instruction` steers a guided regeneration ("tighten", "add an example"). */
+  onRegenerate: (instruction?: string) => Promise<void>;
+  onRevert: (versionId: string) => Promise<void>;
   onMoveUp: () => void;
   onMoveDown: () => void;
   canMoveUp: boolean;
@@ -65,8 +70,10 @@ export function SectionCard({
   isGenerating,
   liveText,
   defaultOpen,
+  draftId,
   onSave,
   onRegenerate,
+  onRevert,
   onMoveUp,
   onMoveDown,
   canMoveUp,
@@ -87,12 +94,15 @@ export function SectionCard({
   const [open, setOpen] = useState(initialOpen);
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
 
   const handleRegenerate = async (): Promise<void> => {
     setRegenerating(true);
     setRegenError(null);
     try {
-      await onRegenerate();
+      await onRegenerate(note.trim() || undefined);
+      setNote("");
     } catch (e) {
       setRegenError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -248,15 +258,50 @@ export function SectionCard({
           )}
 
           {section.content_md.trim() && !effectiveGenerating && (
-            <div className="mt-4 pt-4 border-t border-rule flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleRegenerate}
-                disabled={regenerating || effectiveGenerating}
-                className="nb-btn nb-btn-sm"
-              >
-                {regenerating ? "Regenerating…" : "Regenerate"}
-              </button>
+            <div className="mt-4 pt-4 border-t border-rule">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !regenerating) void handleRegenerate();
+                  }}
+                  placeholder="Optional: how should I revise this? e.g. “tighten”, “add an example”"
+                  aria-label="Revision note"
+                  className="flex-1 min-w-0 bg-canvas border border-rule rounded-nb-sm px-3 py-1.5 text-sm text-ink placeholder:text-muted-2 focus:outline-none focus:border-cobalt-300"
+                />
+                <button
+                  type="button"
+                  onClick={handleRegenerate}
+                  disabled={regenerating || effectiveGenerating}
+                  className="nb-btn nb-btn-sm shrink-0"
+                >
+                  {regenerating
+                    ? "Regenerating…"
+                    : note.trim()
+                      ? "Regenerate with note"
+                      : "Regenerate"}
+                </button>
+              </div>
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowHistory((v) => !v)}
+                  className="text-xs font-medium text-muted hover:text-ink underline underline-offset-2 hover:no-underline"
+                  aria-expanded={showHistory}
+                >
+                  {showHistory ? "Hide history" : "History"}
+                </button>
+              </div>
+              {showHistory && (
+                <SectionVersionHistory
+                  draftId={draftId}
+                  sectionId={section.id}
+                  refreshKey={section.content_md.length}
+                  onRevert={onRevert}
+                />
+              )}
             </div>
           )}
         </div>

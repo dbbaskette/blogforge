@@ -1,7 +1,46 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from pathlib import Path
+
+import pytest
+
 from pencraft.drafts.models import Draft, IdeaInput, OutlineProposal, OutlineSection, Section
-from pencraft.generate.section import _render_section_prompt
+from pencraft.generate.section import _render_section_prompt, stream_section
+from pencraft.llm.base import StreamChunk
+
+_STYLEPACK_YAML = """
+spec_version: '1.0'
+pack:
+  slug: dan
+  name: Dan
+  version: '1.0'
+  author: Dan
+persona:
+  identity: x
+  one_line: y
+"""
+
+
+def _fake_pack(tmp_path: Path) -> Path:
+    pack_root = tmp_path / "fakepack"
+    pack_root.mkdir()
+    (pack_root / "stylepack.yaml").write_text(_STYLEPACK_YAML)
+    (pack_root / "style-guide.md").write_text("Be brief.\n")
+    return pack_root
+
+
+class _PromptRecorder:
+    """Captures the prompt handed to .stream() for assertions."""
+
+    name = "recorder"
+
+    def __init__(self) -> None:
+        self.prompt = ""
+
+    async def stream(self, *, model: str, prompt: str) -> AsyncIterator[StreamChunk]:
+        self.prompt = prompt
+        yield StreamChunk(delta="ok")
 
 
 def _draft() -> Draft:
@@ -50,3 +89,43 @@ def test_render_section_prompt_middle_section() -> None:
     prompt = _render_section_prompt(draft, draft.sections[1])
     assert "**Second**" in prompt
     assert "Open and close mid-thought" in prompt
+
+
+@pytest.mark.asyncio
+async def test_stream_section_appends_instruction(tmp_path: Path) -> None:
+    """A guided-regen instruction becomes an explicit revision directive."""
+    draft = _draft()
+    rec = _PromptRecorder()
+    chunks = [
+        c
+        async for c in stream_section(
+            draft,
+            draft.sections[0],
+            _fake_pack(tmp_path),
+            {"samples": []},
+            rec,
+            model="m",
+            instruction="make it punchier",
+        )
+    ]
+    assert [c.delta for c in chunks] == ["ok"]
+    assert "REVISION DIRECTIVE" in rec.prompt
+    assert "make it punchier" in rec.prompt
+
+
+@pytest.mark.asyncio
+async def test_stream_section_no_instruction_has_no_directive(tmp_path: Path) -> None:
+    draft = _draft()
+    rec = _PromptRecorder()
+    [
+        c
+        async for c in stream_section(
+            draft,
+            draft.sections[0],
+            _fake_pack(tmp_path),
+            {"samples": []},
+            rec,
+            model="m",
+        )
+    ]
+    assert "REVISION DIRECTIVE" not in rec.prompt
