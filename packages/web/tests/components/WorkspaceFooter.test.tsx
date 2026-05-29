@@ -20,9 +20,20 @@ describe("WorkspaceFooter", () => {
   it("renders Copy, Download and Lint and fires onLint", () => {
     render(<WorkspaceFooter {...baseProps} />);
     expect(screen.getByRole("button", { name: /copy markdown/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /download \.md/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /download/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^lint$/i }));
     expect(baseProps.onLint).toHaveBeenCalled();
+  });
+
+  it("opens a menu with every export format", () => {
+    render(<WorkspaceFooter {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    const html = screen.getByRole("link", { name: /web page \(\.html\)/i });
+    const docx = screen.getByRole("link", { name: /word \(\.docx\)/i });
+    expect(screen.getByRole("link", { name: /^markdown \(\.md\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /frontmatter/i })).toBeInTheDocument();
+    expect(html).toHaveAttribute("href", expect.stringContaining("format=html"));
+    expect(docx).toHaveAttribute("href", expect.stringContaining("format=docx"));
   });
 
   it("shows the word + drafted-count stats", () => {
