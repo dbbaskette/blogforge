@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-E2E_DRAFTS="/tmp/pencraft-e2e-drafts"
-E2E_PACKS="/tmp/pencraft-e2e-packs"
-E2E_CFG="/tmp/pencraft-e2e-myvoice-config.yaml"
-E2E_MOCK_JSON="/tmp/pencraft-e2e-mock-outline.json"
+E2E_DRAFTS="/tmp/blogforge-e2e-drafts"
+E2E_PACKS="/tmp/blogforge-e2e-packs"
+E2E_CFG="/tmp/blogforge-e2e-myvoice-config.yaml"
+E2E_MOCK_JSON="/tmp/blogforge-e2e-mock-outline.json"
 MYVOICE_REPO="/Users/dbbaskette/Projects/myvoice"
 
 rm -rf "$E2E_DRAFTS" "$E2E_PACKS"

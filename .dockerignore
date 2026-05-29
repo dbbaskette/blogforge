@@ -12,4 +12,4 @@
 .idea
 .vscode
 *.log
-packages/api/pencraft/static
+packages/api/blogforge/static

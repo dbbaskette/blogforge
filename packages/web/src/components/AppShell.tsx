@@ -73,7 +73,7 @@ function TopBar(): JSX.Element {
             P
           </span>
           <span className="flex flex-col leading-tight">
-            <span className="font-semibold text-[15px] text-ink tracking-tight">Pencraft</span>
+            <span className="font-semibold text-[15px] text-ink tracking-tight">BlogForge</span>
             <span className="text-[11px] text-muted leading-none mt-0.5">a workshop</span>
           </span>
         </Link>

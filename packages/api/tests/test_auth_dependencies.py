@@ -3,12 +3,12 @@ import pytest_asyncio
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from pencraft.auth.dependencies import get_current_user, require_admin
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
+from blogforge.auth.dependencies import get_current_user, require_admin
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
 
 
 def _make_app():

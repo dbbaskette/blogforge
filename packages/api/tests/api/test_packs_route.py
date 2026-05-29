@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from pencraft.server import create_app
+from blogforge.server import create_app
 
 _MYVOICE_DAN = Path("/Users/dbbaskette/Projects/myvoice/packs/dan")
 
@@ -20,7 +20,7 @@ def client_with_packs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
     if _MYVOICE_DAN.exists():
         shutil.copytree(_MYVOICE_DAN, packs_root / "dan")
     monkeypatch.setenv("MYVOICE_PACKS_ROOT", str(packs_root))
-    monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
+    monkeypatch.setenv("BLOGFORGE_DRAFTS_ROOT", str(tmp_path / "drafts"))
     app = create_app()
     with TestClient(app) as c:
         yield c

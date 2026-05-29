@@ -8,7 +8,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from pencraft.server import create_app
+from blogforge.server import create_app
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def client_with_keys(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterato
         )
     )
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(cfg_path))
-    monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
+    monkeypatch.setenv("BLOGFORGE_DRAFTS_ROOT", str(tmp_path / "drafts"))
     app = create_app()
     with TestClient(app) as c:
         yield c
@@ -46,7 +46,7 @@ def test_providers_missing_config_returns_empty_map(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(tmp_path / "nonexistent.yaml"))
-    monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
+    monkeypatch.setenv("BLOGFORGE_DRAFTS_ROOT", str(tmp_path / "drafts"))
     app = create_app()
     with TestClient(app) as c:
         r = c.get("/api/providers")

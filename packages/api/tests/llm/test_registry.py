@@ -1,7 +1,7 @@
 import pytest
 
-from pencraft.llm.exceptions import ProviderError, ProviderMissingKey
-from pencraft.llm.registry import get_provider
+from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
+from blogforge.llm.registry import get_provider
 
 
 def test_unknown_provider_raises() -> None:

@@ -2,7 +2,7 @@
 
 > **Superseded by `2026-05-28-research-stage-references-v2-design.md`** (SQL + S3 revision).
 > Kept for history. The shape, workflow, prompt design, and out-of-scope sections still apply;
-> only the storage layer (references in `~/.pencraft/drafts/<id>/`) is obsolete after Phase A
+> only the storage layer (references in `~/.blogforge/drafts/<id>/`) is obsolete after Phase A
 > migrated to Postgres + S3.
 
 ---
@@ -92,7 +92,7 @@ class Draft(BaseModel):
 ## Storage layout per draft
 
 ```
-~/.pencraft/drafts/<id>/
+~/.blogforge/drafts/<id>/
   draft.json
   post.md
   references/
@@ -137,7 +137,7 @@ The ideation stream reuses the existing `JobRegistry` + SSE pattern from section
 
 ### Reference injection (shared helper)
 
-New file `pencraft/generate/references.py`:
+New file `blogforge/generate/references.py`:
 
 ```python
 REFERENCE_BUDGET_CHARS = 30_000
@@ -213,7 +213,7 @@ The assistant's reply is streamed back to the UI; on `done` the server parses th
 
 ## Job streaming
 
-Reuse `pencraft.jobs.registry.JobRegistry`. Ideation gets its own job kind `"ideation"`. The existing `useExpandJob` keeps its current shape (section-specific). A new `useStreamJob({ onDelta, onResult, onError })` hook is added for ideation; both endpoints emit the same frame shapes:
+Reuse `blogforge.jobs.registry.JobRegistry`. Ideation gets its own job kind `"ideation"`. The existing `useExpandJob` keeps its current shape (section-specific). A new `useStreamJob({ onDelta, onResult, onError })` hook is added for ideation; both endpoints emit the same frame shapes:
 - `event: stage` — `section:start:<id>` / `ideation:start`
 - `event: chunk` — `{ delta: string }`
 - `event: result` — final assembled payload (for ideation: `{ message_id, proposed_outline }`)

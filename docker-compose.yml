@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: pencraft
-      POSTGRES_PASSWORD: pencraft
-      POSTGRES_DB: pencraft
+      POSTGRES_USER: blogforge
+      POSTGRES_PASSWORD: blogforge
+      POSTGRES_DB: blogforge
     # Host-side mapped to 5433 to avoid colliding with a system Postgres on 5432.
     # API connects via the internal docker network as `postgres:5432`, unaffected.
     ports: ["5433:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "pencraft"]
+      test: ["CMD", "pg_isready", "-U", "blogforge"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -19,8 +19,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: pencraft
-      MINIO_ROOT_PASSWORD: pencraft-minio-secret
+      MINIO_ROOT_USER: blogforge
+      MINIO_ROOT_PASSWORD: blogforge-minio-secret
     ports: ["9000:9000", "9001:9001"]
     volumes: ["miniodata:/data"]
     healthcheck:
@@ -34,15 +34,15 @@ services:
       context: .
       dockerfile: packages/api/Dockerfile
     environment:
-      PENCRAFT_DATABASE_URL: "postgresql+asyncpg://pencraft:pencraft@postgres:5432/pencraft"
-      PENCRAFT_S3_ENDPOINT_URL: "http://minio:9000"
-      PENCRAFT_S3_ACCESS_KEY: pencraft
-      PENCRAFT_S3_SECRET_KEY: pencraft-minio-secret
-      PENCRAFT_S3_BUCKET: pencraft
-      PENCRAFT_SESSION_SECRET: dev-session-secret-change-me
-      PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
-      PENCRAFT_ADMIN_PASSWORD: VMware0!
-      PENCRAFT_CORS_ORIGINS: "http://localhost:7881"
+      BLOGFORGE_DATABASE_URL: "postgresql+asyncpg://blogforge:blogforge@postgres:5432/blogforge"
+      BLOGFORGE_S3_ENDPOINT_URL: "http://minio:9000"
+      BLOGFORGE_S3_ACCESS_KEY: blogforge
+      BLOGFORGE_S3_SECRET_KEY: blogforge-minio-secret
+      BLOGFORGE_S3_BUCKET: blogforge
+      BLOGFORGE_SESSION_SECRET: dev-session-secret-change-me
+      BLOGFORGE_ADMIN_EMAIL: dbbaskette@gmail.com
+      BLOGFORGE_ADMIN_PASSWORD: VMware0!
+      BLOGFORGE_CORS_ORIGINS: "http://localhost:7881"
     depends_on:
       postgres:
         condition: service_healthy

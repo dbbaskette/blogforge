@@ -1,34 +1,34 @@
-# Pencraft v1 — Design
+# BlogForge v1 — Design
 
 **Status:** Approved (brainstorm complete, awaiting implementation plan)
 **Date:** 2026-05-26
 **Author:** Dan Baskette (with Claude)
-**Parent reference:** myvoice's parent design at `/Users/dbbaskette/Projects/myvoice/docs/superpowers/specs/2026-05-22-myvoice-design.md` mentions Pencraft as a future consumer of style packs.
+**Parent reference:** myvoice's parent design at `/Users/dbbaskette/Projects/myvoice/docs/superpowers/specs/2026-05-22-myvoice-design.md` mentions BlogForge as a future consumer of style packs.
 
 ---
 
 ## Overview
 
-Pencraft is a local-first web app that drafts long-form blog posts in an author's voice using a [myvoice](https://github.com/dbbaskette/myvoice) style pack. Where myvoice's Compose & test rewrites a paragraph you wrote, Pencraft generates a full draft from a topic + a few bullets, in three stages: **idea → outline → sections**.
+BlogForge is a local-first web app that drafts long-form blog posts in an author's voice using a [myvoice](https://github.com/dbbaskette/myvoice) style pack. Where myvoice's Compose & test rewrites a paragraph you wrote, BlogForge generates a full draft from a topic + a few bullets, in three stages: **idea → outline → sections**.
 
 Each stage persists to disk. Drafts resume across browser closes. After generation the user has a Tiptap editor per section plus a "Regenerate this section" button, so iteration is per-section, not whole-document.
 
-Pencraft depends on myvoice as a Python library (Phase 7 published the public API). It reuses myvoice for: pack discovery (`PackStore`), prompt assembly (`compose_prompt`), and linting the output (`lint`). It does NOT reach into myvoice internals.
+BlogForge depends on myvoice as a Python library (Phase 7 published the public API). It reuses myvoice for: pack discovery (`PackStore`), prompt assembly (`compose_prompt`), and linting the output (`lint`). It does NOT reach into myvoice internals.
 
 **In scope (v1):**
 - 3-stage drafting workflow (idea → outline → sections), one draft at a time
 - All 3 LLM providers (Anthropic / OpenAI / Google), structured output for outline, streaming for sections
 - Per-section regenerate + per-section markdown edit (Tiptap)
 - Reorder sections in Stage 2 (outline); reorder also allowed in Stage 3 but does not invalidate content
-- Draft persistence to `~/.pencraft/drafts/<id>/`
-- Soft-delete drafts to `~/.pencraft/trash/<ts>-<id>/`
+- Draft persistence to `~/.blogforge/drafts/<id>/`
+- Soft-delete drafts to `~/.blogforge/trash/<ts>-<id>/`
 - Lint the assembled draft via `myvoice.lint` against the pack
 - Download / copy assembled markdown
-- API keys sourced from `~/.myvoice/config.yaml` (read-only; no Pencraft Settings page)
+- API keys sourced from `~/.myvoice/config.yaml` (read-only; no BlogForge Settings page)
 - All 3 providers' availability surfaced through `GET /api/providers` (which keys exist, never the keys themselves)
 
 **Out of scope (v2+):**
-- Pencraft's own config / Settings page (currently reads myvoice's config; future PR can fork)
+- BlogForge's own config / Settings page (currently reads myvoice's config; future PR can fork)
 - Publishing pipeline (Hugo / Substack / Ghost / WordPress)
 - Conversational chat editing
 - Add/remove sections during Stage 3 (only Stage 2 outline can restructure)
@@ -42,12 +42,12 @@ Pencraft depends on myvoice as a Python library (Phase 7 published the public AP
 
 # Part 1: Repo + dependency on myvoice
 
-Pencraft is a sibling Python project at `/Users/dbbaskette/Projects/Pencraft`. New git repo. Mirrors myvoice's two-package layout.
+BlogForge is a sibling Python project at `/Users/dbbaskette/Projects/BlogForge`. New git repo. Mirrors myvoice's two-package layout.
 
 ```
-pencraft/
+blogforge/
 ├── README.md
-├── pyproject.toml                  # `pencraft` CLI, declares myvoice>=0.1.0 dep
+├── pyproject.toml                  # `blogforge` CLI, declares myvoice>=0.1.0 dep
 ├── Makefile
 ├── biome.json
 ├── scripts/
@@ -56,9 +56,9 @@ pencraft/
 │   └── dev.sh                      # concurrent backend + Vite dev
 ├── packages/
 │   ├── api/                        # Python backend
-│   │   └── pencraft/
+│   │   └── blogforge/
 │   │       ├── __init__.py         # __version__ + future public surface
-│   │       ├── cli.py              # `pencraft serve`, `pencraft version`
+│   │       ├── cli.py              # `blogforge serve`, `blogforge version`
 │   │       ├── server.py           # FastAPI app factory + lifespan
 │   │       ├── drafts/
 │   │       │   ├── __init__.py
@@ -140,21 +140,21 @@ pencraft/
     └── draft-lifecycle.spec.ts
 ```
 
-**Dependency on myvoice:** `pyproject.toml` lists `myvoice>=0.1.0`. Pencraft imports only the public names from `myvoice/__init__.py` (post-Phase 7):
+**Dependency on myvoice:** `pyproject.toml` lists `myvoice>=0.1.0`. BlogForge imports only the public names from `myvoice/__init__.py` (post-Phase 7):
 
 ```python
 from myvoice import PackStore, compose_prompt, lint, validate_pack
 from myvoice import Manifest, Violation, LintHit
 ```
 
-If the user hasn't installed myvoice, Pencraft's pip install fails with a clear "requires myvoice" message. No graceful fallback — myvoice is a hard dep.
+If the user hasn't installed myvoice, BlogForge's pip install fails with a clear "requires myvoice" message. No graceful fallback — myvoice is a hard dep.
 
-**Pack discovery roots:** Pencraft uses the same root resolution as myvoice:
+**Pack discovery roots:** BlogForge uses the same root resolution as myvoice:
 1. `MYVOICE_PACKS_ROOT` env var if set (for tests + dev)
 2. `~/.myvoice/packs/` if it exists
-3. Repo `packs/` fallback (development only — Pencraft doesn't ship any packs)
+3. Repo `packs/` fallback (development only — BlogForge doesn't ship any packs)
 
-Pencraft does NOT support its own pack_paths config in v1. Users' packs live under myvoice.
+BlogForge does NOT support its own pack_paths config in v1. Users' packs live under myvoice.
 
 ---
 
@@ -162,7 +162,7 @@ Pencraft does NOT support its own pack_paths config in v1. Users' packs live und
 
 ## 2.1 Data shapes
 
-`packages/api/pencraft/drafts/models.py`:
+`packages/api/blogforge/drafts/models.py`:
 
 ```python
 from datetime import datetime
@@ -225,11 +225,11 @@ class DraftSummary(BaseModel):
 
 ## 2.2 DraftStore (filesystem-backed)
 
-`packages/api/pencraft/drafts/store.py`:
+`packages/api/blogforge/drafts/store.py`:
 
 ```python
 class DraftStore:
-    """Per-draft directory under ~/.pencraft/drafts/<id>/.
+    """Per-draft directory under ~/.blogforge/drafts/<id>/.
     Each draft dir contains:
       - draft.json   (atomic temp+rename writes)
       - post.md      (always-current assembled markdown snapshot)
@@ -257,7 +257,7 @@ Copied from myvoice's `packages/api/myvoice/llm/` directory (the Phase 4 + Phase
 
 Why copy and not import: myvoice doesn't expose `llm` publicly (Phase 7 only published `PackStore`, `compose_prompt`, `lint`, `validate_pack`, etc.). Either we expand myvoice's public API (deferred — would couple the projects' release cycles) or duplicate (chosen for v1).
 
-**Future cleanup:** when both myvoice and Pencraft are stable, extract a shared `style-llm` package. Not on the v1 critical path.
+**Future cleanup:** when both myvoice and BlogForge are stable, extract a shared `style-llm` package. Not on the v1 critical path.
 
 ## 2.4 Jobs module
 
@@ -454,11 +454,11 @@ No /settings route in v1.
 
 ## 3.2 AppShell
 
-Simple top bar with the Pencraft wordmark + a link back to "Drafts." Single-route app effectively; AppShell is thin.
+Simple top bar with the BlogForge wordmark + a link back to "Drafts." Single-route app effectively; AppShell is thin.
 
 ## 3.3 DraftsPage (home)
 
-Header: `Pencraft` wordmark + `+ New draft` button (top right).
+Header: `BlogForge` wordmark + `+ New draft` button (top right).
 
 Recent drafts list:
 ```
@@ -610,7 +610,7 @@ Generic debounced save hook used by Stages 1, 2, and per-section save in Stage 3
 6. Click "Download .md". Verify response body contains the assembled markdown.
 7. (Optional, if backend allows) Click "Regenerate this section" for one section. Verify spinner → ready transition.
 
-Same mock-provider pattern as myvoice: `MYVOICE_TEST_PROVIDER=mock` (or `PENCRAFT_TEST_PROVIDER=mock`) plus `MYVOICE_MOCK_OUTPUT_JSON` for the outline and `MYVOICE_MOCK_OUTPUT` for streamed section text.
+Same mock-provider pattern as myvoice: `MYVOICE_TEST_PROVIDER=mock` (or `BLOGFORGE_TEST_PROVIDER=mock`) plus `MYVOICE_MOCK_OUTPUT_JSON` for the outline and `MYVOICE_MOCK_OUTPUT` for streamed section text.
 
 ---
 
@@ -619,7 +619,7 @@ Same mock-provider pattern as myvoice: `MYVOICE_TEST_PROVIDER=mock` (or `PENCRAF
 Bottom-up by layer. Each PR <500 LOC where possible.
 
 ```
-PR1   chore: scaffold pencraft repo (pyproject + Makefile + scripts + README + biome + CI)
+PR1   chore: scaffold blogforge repo (pyproject + Makefile + scripts + README + biome + CI)
 PR2   feat(api): copy myvoice's LLM module (3 providers + structured output + retry)
 PR3   feat(api): copy myvoice's jobs module (JobRegistry + SSE)
 PR4   feat(api): drafts/models.py + drafts/store.py + GET/POST/PUT/DELETE /api/drafts
@@ -640,19 +640,19 @@ Actually 11. Comparable to myvoice Phase 6.
 
 - [ ] `make test` green (pytest + Vitest + Playwright)
 - [ ] mypy strict + ruff + biome + tsc all clean
-- [ ] `pipx install ./dist/pencraft-0.1.0-py3-none-any.whl && pencraft serve` opens browser at `:7880`
+- [ ] `pipx install ./dist/blogforge-0.1.0-py3-none-any.whl && blogforge serve` opens browser at `:7880`
 - [ ] With a real Claude key in `~/.myvoice/config.yaml`: create a new draft for a real topic, generate outline, edit a section title, expand all sections, edit one section by hand, regenerate another, download the .md, open the .md file — content is coherent, in voice, no banished words
 - [ ] Drafts persist across server restarts; home page lists them with correct stage indicators
 - [ ] All 3 LLM providers' mocked tests pass; opt-in live tests pass against real keys
-- [ ] `from pencraft import ...` is not yet a public API (v1 is app-only)
+- [ ] `from blogforge import ...` is not yet a public API (v1 is app-only)
 - [ ] README has install + first-run + a screenshot of the 3-stage flow
 
 ---
 
 # Part 7: Out of scope (v2+)
 
-- Pencraft's own config (default pack, default provider) — currently per-draft only
-- Pencraft Settings page (would manage Pencraft's own config above)
+- BlogForge's own config (default pack, default provider) — currently per-draft only
+- BlogForge Settings page (would manage BlogForge's own config above)
 - Publishing pipeline (Hugo / Substack / Ghost / WordPress)
 - Conversational chat editing
 - Add/remove sections during Stage 3 (only Stage 2 outline restructures)
@@ -661,6 +661,6 @@ Actually 11. Comparable to myvoice Phase 6.
 - Collaboration / sharing
 - Cost per-draft in the UI
 - Live re-lint during edit (lint is on-demand only)
-- Pencraft as a Python library (`from pencraft import ...`) — app-only in v1
+- BlogForge as a Python library (`from blogforge import ...`) — app-only in v1
 - Brand frontmatter (title/date/slug/tags YAML at the top of the download)
 - Multi-pack drafting (one pack per draft in v1)

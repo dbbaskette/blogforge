@@ -2,12 +2,12 @@
 
 import pytest
 
-from pencraft.auth.passwords import hash_password
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.drafts.models import IdeaInput, OutlineProposal, OutlineSection, Section
-from pencraft.drafts.sql_store import SqlDraftStore
+from blogforge.auth.passwords import hash_password
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.drafts.models import IdeaInput, OutlineProposal, OutlineSection, Section
+from blogforge.drafts.sql_store import SqlDraftStore
 
 
 @pytest.fixture

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from pencraft.drafts.models import IdeaInput, OutlineProposal
-from pencraft.generate.outline import _render_outline_prompt, propose_outline
+from blogforge.drafts.models import IdeaInput, OutlineProposal
+from blogforge.generate.outline import _render_outline_prompt, propose_outline
 
 _CANNED = {
     "opening_hook": "Most agents are demos.",
@@ -36,10 +36,10 @@ def test_render_outline_prompt_includes_topic_and_bullets() -> None:
 async def test_propose_outline_with_mock_provider(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("PENCRAFT_TEST_PROVIDER", "mock")
-    monkeypatch.setenv("PENCRAFT_MOCK_OUTPUT_JSON", json.dumps(_CANNED))
+    monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
+    monkeypatch.setenv("BLOGFORGE_MOCK_OUTPUT_JSON", json.dumps(_CANNED))
 
-    from pencraft.llm.registry import get_provider
+    from blogforge.llm.registry import get_provider
 
     provider = get_provider("anthropic", "sk-mock")
 

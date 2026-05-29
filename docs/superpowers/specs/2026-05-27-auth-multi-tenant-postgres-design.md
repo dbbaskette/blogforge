@@ -6,7 +6,7 @@
 
 ## Motivation
 
-Pencraft today is single-user and filesystem-backed (`~/.pencraft/drafts/`). To run as a hosted multi-tenant app on Tanzu Platform, every draft needs to be scoped to a user, every authenticated request needs a session, and storage needs to move to managed services (Postgres + S3-compatible object storage). This phase replaces the on-disk store, adds auth, and lays the foundation that Phase B (research/references) will build on.
+BlogForge today is single-user and filesystem-backed (`~/.blogforge/drafts/`). To run as a hosted multi-tenant app on Tanzu Platform, every draft needs to be scoped to a user, every authenticated request needs a session, and storage needs to move to managed services (Postgres + S3-compatible object storage). This phase replaces the on-disk store, adds auth, and lays the foundation that Phase B (research/references) will build on.
 
 ## Scope
 
@@ -47,7 +47,7 @@ Out: References / ideation / file uploads (Phase B). Forgot-password flow. Email
 | approved_by  | uuid?        | FK -> users.id (the admin who approved)                               |
 | last_login_at| timestamptz? |                                                                       |
 
-Seeded at app startup (idempotent): one user `dbbaskette@gmail.com` / `VMware0!` with `status=approved`, `role=admin`. Password is hashed at seed time; on every boot we check if the row exists and skip if so. (The plaintext password lives in an env var `PENCRAFT_ADMIN_PASSWORD` with default `VMware0!` for local dev — production overrides via Tanzu env var.)
+Seeded at app startup (idempotent): one user `dbbaskette@gmail.com` / `VMware0!` with `status=approved`, `role=admin`. Password is hashed at seed time; on every boot we check if the row exists and skip if so. (The plaintext password lives in an env var `BLOGFORGE_ADMIN_PASSWORD` with default `VMware0!` for local dev — production overrides via Tanzu env var.)
 
 ### `drafts`
 
@@ -88,11 +88,11 @@ Stays in-memory for v1 (single-process API server). Phase B may move this to Red
 
 Alembic. Single initial migration `0001_initial.sql` creates the three tables above plus indexes. `alembic upgrade head` runs at app startup (FastAPI lifespan event); on prod the migration runs once on first boot, on subsequent boots it's a no-op.
 
-Existing `~/.pencraft/drafts/` data is **not** migrated. The directory is left alone on disk (so the user can recover by hand if needed); we just stop reading from it.
+Existing `~/.blogforge/drafts/` data is **not** migrated. The directory is left alone on disk (so the user can recover by hand if needed); we just stop reading from it.
 
 ## Storage layer
 
-`pencraft.drafts.store.DraftStore` is replaced by `pencraft.drafts.store.SqlDraftStore`:
+`blogforge.drafts.store.DraftStore` is replaced by `blogforge.drafts.store.SqlDraftStore`:
 
 - Same public surface (`list_for_user`, `get`, `create`, `update`, `delete`, etc.) but every method takes a `user_id`.
 - Returns the same `Draft` / `DraftSummary` pydantic models — the rest of the API layer doesn't change shape.
@@ -139,7 +139,7 @@ Cross-cutting middleware: every non-auth route requires an authenticated, approv
 ### CORS
 
 `fastapi.middleware.cors.CORSMiddleware` with:
-- `allow_origins`: from `PENCRAFT_CORS_ORIGINS` env (comma-separated). Default in dev: `http://localhost:7881`. Empty in prod (API and web share origin).
+- `allow_origins`: from `BLOGFORGE_CORS_ORIGINS` env (comma-separated). Default in dev: `http://localhost:7881`. Empty in prod (API and web share origin).
 - `allow_credentials=True`
 - `allow_methods=["*"]`
 - `allow_headers=["*"]`
@@ -176,19 +176,19 @@ All API calls now include `credentials: "include"` so the session cookie rides a
 Env vars (loaded via pydantic-settings):
 
 ```
-PENCRAFT_DATABASE_URL          postgresql+asyncpg://user:pass@host:5432/pencraft
-PENCRAFT_ADMIN_EMAIL           dbbaskette@gmail.com           (seed)
-PENCRAFT_ADMIN_PASSWORD        VMware0!                       (seed, hashed at boot)
-PENCRAFT_SESSION_SECRET        random 64-char hex             (used to sign cookies)
-PENCRAFT_CORS_ORIGINS          http://localhost:7881          (dev only)
-PENCRAFT_S3_ENDPOINT_URL       http://minio:9000              (local) or SeaweedFS URL
-PENCRAFT_S3_ACCESS_KEY                                        (from binding in prod)
-PENCRAFT_S3_SECRET_KEY                                        (from binding in prod)
-PENCRAFT_S3_BUCKET             pencraft                        (created on boot if missing)
-PENCRAFT_S3_REGION             us-east-1                       (placeholder for S3 SDK; ignored by SeaweedFS)
+BLOGFORGE_DATABASE_URL          postgresql+asyncpg://user:pass@host:5432/blogforge
+BLOGFORGE_ADMIN_EMAIL           dbbaskette@gmail.com           (seed)
+BLOGFORGE_ADMIN_PASSWORD        VMware0!                       (seed, hashed at boot)
+BLOGFORGE_SESSION_SECRET        random 64-char hex             (used to sign cookies)
+BLOGFORGE_CORS_ORIGINS          http://localhost:7881          (dev only)
+BLOGFORGE_S3_ENDPOINT_URL       http://minio:9000              (local) or SeaweedFS URL
+BLOGFORGE_S3_ACCESS_KEY                                        (from binding in prod)
+BLOGFORGE_S3_SECRET_KEY                                        (from binding in prod)
+BLOGFORGE_S3_BUCKET             blogforge                        (created on boot if missing)
+BLOGFORGE_S3_REGION             us-east-1                       (placeholder for S3 SDK; ignored by SeaweedFS)
 ```
 
-On Tanzu, `PENCRAFT_DATABASE_URL`, `PENCRAFT_S3_*` are read from `VCAP_SERVICES` automatically by a small `pencraft.config.tanzu` adapter (parses the bound service credentials and exports them as env vars before pydantic-settings reads them).
+On Tanzu, `BLOGFORGE_DATABASE_URL`, `BLOGFORGE_S3_*` are read from `VCAP_SERVICES` automatically by a small `blogforge.config.tanzu` adapter (parses the bound service credentials and exports them as env vars before pydantic-settings reads them).
 
 ## Docker Compose
 
@@ -198,36 +198,36 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: pencraft
-      POSTGRES_PASSWORD: pencraft
-      POSTGRES_DB: pencraft
+      POSTGRES_USER: blogforge
+      POSTGRES_PASSWORD: blogforge
+      POSTGRES_DB: blogforge
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "pencraft"]
+      test: ["CMD", "pg_isready", "-U", "blogforge"]
       interval: 5s
 
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: pencraft
-      MINIO_ROOT_PASSWORD: pencraft-minio-secret
+      MINIO_ROOT_USER: blogforge
+      MINIO_ROOT_PASSWORD: blogforge-minio-secret
     ports: ["9000:9000", "9001:9001"]
     volumes: ["miniodata:/data"]
 
   api:
     build: ./packages/api
     environment:
-      PENCRAFT_DATABASE_URL: postgresql+asyncpg://pencraft:pencraft@postgres:5432/pencraft
-      PENCRAFT_S3_ENDPOINT_URL: http://minio:9000
-      PENCRAFT_S3_ACCESS_KEY: pencraft
-      PENCRAFT_S3_SECRET_KEY: pencraft-minio-secret
-      PENCRAFT_S3_BUCKET: pencraft
-      PENCRAFT_SESSION_SECRET: dev-session-secret-change-me
-      PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
-      PENCRAFT_ADMIN_PASSWORD: VMware0!
-      PENCRAFT_CORS_ORIGINS: http://localhost:7881
+      BLOGFORGE_DATABASE_URL: postgresql+asyncpg://blogforge:blogforge@postgres:5432/blogforge
+      BLOGFORGE_S3_ENDPOINT_URL: http://minio:9000
+      BLOGFORGE_S3_ACCESS_KEY: blogforge
+      BLOGFORGE_S3_SECRET_KEY: blogforge-minio-secret
+      BLOGFORGE_S3_BUCKET: blogforge
+      BLOGFORGE_SESSION_SECRET: dev-session-secret-change-me
+      BLOGFORGE_ADMIN_EMAIL: dbbaskette@gmail.com
+      BLOGFORGE_ADMIN_PASSWORD: VMware0!
+      BLOGFORGE_CORS_ORIGINS: http://localhost:7881
     depends_on:
       postgres: { condition: service_healthy }
       minio: { condition: service_started }
@@ -246,34 +246,34 @@ volumes:
 
 ```yaml
 applications:
-  - name: pencraft
+  - name: blogforge
     memory: 512M
     instances: 1
     buildpacks:
       - python_buildpack
-    command: pencraft serve --host 0.0.0.0 --port $PORT
+    command: blogforge serve --host 0.0.0.0 --port $PORT
     services:
-      - pencraft-postgres            # Tanzu Postgres on Demand instance
-      - pencraft-s3                  # SeaweedFS service instance
+      - blogforge-postgres            # Tanzu Postgres on Demand instance
+      - blogforge-s3                  # SeaweedFS service instance
     env:
-      PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
-      # PENCRAFT_ADMIN_PASSWORD, PENCRAFT_SESSION_SECRET set via `cf set-env`
+      BLOGFORGE_ADMIN_EMAIL: dbbaskette@gmail.com
+      # BLOGFORGE_ADMIN_PASSWORD, BLOGFORGE_SESSION_SECRET set via `cf set-env`
       # or a CredHub-backed UPS for the secret material.
-      PENCRAFT_S3_BUCKET: pencraft
-      PENCRAFT_S3_REGION: us-east-1
+      BLOGFORGE_S3_BUCKET: blogforge
+      BLOGFORGE_S3_REGION: us-east-1
 ```
 
-### `pencraft.config.tanzu` adapter
+### `blogforge.config.tanzu` adapter
 
 On import (before pydantic-settings reads env), if `VCAP_SERVICES` is set:
-- Find a service tagged `postgresql` / labeled `postgres` or named `pencraft-postgres`; extract `credentials.uri`; transform to `postgresql+asyncpg://…`; set `PENCRAFT_DATABASE_URL`.
-- Find a service tagged `s3` or labeled `seaweedfs` or named `pencraft-s3`; extract `endpoint`, `access_key`, `secret_key`; set the `PENCRAFT_S3_*` env vars.
+- Find a service tagged `postgresql` / labeled `postgres` or named `blogforge-postgres`; extract `credentials.uri`; transform to `postgresql+asyncpg://…`; set `BLOGFORGE_DATABASE_URL`.
+- Find a service tagged `s3` or labeled `seaweedfs` or named `blogforge-s3`; extract `endpoint`, `access_key`, `secret_key`; set the `BLOGFORGE_S3_*` env vars.
 
 Idempotent and silent if `VCAP_SERVICES` is absent (local dev).
 
 ### Buildpack notes
 
-The Python buildpack picks up `packages/api/pyproject.toml`. The web bundle is pre-built into `packages/api/pencraft/web/` (existing pattern — `scripts/install-local.sh` already builds + copies). We add a `pre-push` hook (or just document the build step) so `cf push` sees the bundled web assets.
+The Python buildpack picks up `packages/api/pyproject.toml`. The web bundle is pre-built into `packages/api/blogforge/web/` (existing pattern — `scripts/install-local.sh` already builds + copies). We add a `pre-push` hook (or just document the build step) so `cf push` sees the bundled web assets.
 
 ## Migration to Postgres-backed store
 
@@ -323,7 +323,7 @@ Routes NOT scoped (public or admin-only by design):
 
 ## Risks
 
-- **Lifespan + Alembic + multiple instances.** Running `alembic upgrade head` on every app start is fine for `instances: 1`. If we scale to N instances on Tanzu, all N will try to migrate; Alembic uses an advisory lock to serialise, but failures here will block boot. Mitigation: split migrate-on-boot behind an env flag (`PENCRAFT_RUN_MIGRATIONS=true`) so only one instance does it (or run migrations via a separate `cf run-task` step in CI).
+- **Lifespan + Alembic + multiple instances.** Running `alembic upgrade head` on every app start is fine for `instances: 1`. If we scale to N instances on Tanzu, all N will try to migrate; Alembic uses an advisory lock to serialise, but failures here will block boot. Mitigation: split migrate-on-boot behind an env flag (`BLOGFORGE_RUN_MIGRATIONS=true`) so only one instance does it (or run migrations via a separate `cf run-task` step in CI).
 
 - **Asyncpg + connection pooling under Tanzu's network.** Default pool size of 10 with a 30s timeout. Mitigation: surface pool metrics in /health/db, add a connection-retry on boot in case Postgres binding propagation lags.
 

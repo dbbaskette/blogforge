@@ -1,7 +1,7 @@
 from click.testing import CliRunner
 
-from pencraft import __version__
-from pencraft.cli import main
+from blogforge import __version__
+from blogforge.cli import main
 
 
 def test_version_command() -> None:

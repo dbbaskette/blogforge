@@ -1,7 +1,7 @@
 """Draft pydantic model coerces legacy stage='idea' → 'research'."""
 import pytest
 
-from pencraft.drafts.models import Draft, IdeaInput
+from blogforge.drafts.models import Draft, IdeaInput
 
 
 def _idea() -> IdeaInput:

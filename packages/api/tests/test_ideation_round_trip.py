@@ -8,14 +8,14 @@ import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.drafts.models import IdeaInput
-from pencraft.drafts.sql_store import SqlDraftStore
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.drafts.models import IdeaInput
+from blogforge.drafts.sql_store import SqlDraftStore
+from blogforge.server import create_app
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +71,7 @@ def _stub_llm(monkeypatch):
     deltas + a result event with a parsed proposed_outline."""
 
     async def _fake_stream_ideation(*args, **kwargs):
-        from pencraft.drafts.models import OutlineProposal, OutlineSection
+        from blogforge.drafts.models import OutlineProposal, OutlineSection
 
         deltas = [
             "Here's an outline:\n\n",
@@ -97,10 +97,10 @@ def _stub_llm(monkeypatch):
         return "sk-stub"
 
     monkeypatch.setattr(
-        "pencraft.api.ideation.stream_ideation", _fake_stream_ideation
+        "blogforge.api.ideation.stream_ideation", _fake_stream_ideation
     )
     monkeypatch.setattr(
-        "pencraft.keys.vault.KeyVault.get", _fake_get_key
+        "blogforge.keys.vault.KeyVault.get", _fake_get_key
     )
 
 
@@ -185,7 +185,7 @@ async def test_in_flight_lock_blocks_second_claim():
     handler calls _try_claim before adding the BG task and the BG task
     calls _release in its finally; together that's the 409 we promise
     when an ideation is in flight."""
-    from pencraft.api.ideation import _release, _try_claim
+    from blogforge.api.ideation import _release, _try_claim
 
     assert await _try_claim("d-test") is True
     assert await _try_claim("d-test") is False

@@ -1,4 +1,4 @@
-# Pencraft API — multi-stage build.
+# BlogForge API — multi-stage build.
 # 1) Build the web bundle.
 # 2) Install Python deps via uv.
 # 3) Slim runtime image with the web bundle baked in.
@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # Install uv (pinned via pip; smaller than the standalone installer).
 RUN pip install --no-cache-dir uv==0.5.0
 
-# Pencraft's pyproject.toml has `[tool.uv.sources]` pointing myvoice at
+# BlogForge's pyproject.toml has `[tool.uv.sources]` pointing myvoice at
 # ../myvoice (a sibling-repo editable install for local dev). Resolved
 # relative to /app, that's /myvoice — fetch it from GitHub so the source
 # override finds something at the expected path.
@@ -40,10 +40,10 @@ COPY pyproject.toml uv.lock README.md /app/
 COPY packages/api /app/packages/api
 
 # Copy the built web bundle into the API's static dir.
-COPY --from=web /work/packages/web/dist /app/packages/api/pencraft/static
+COPY --from=web /work/packages/web/dist /app/packages/api/blogforge/static
 
 # Install Python deps editable so the alembic/ + alembic.ini at the
-# source-tree's well-known paths (parents[1] of pencraft/server.py)
+# source-tree's well-known paths (parents[1] of blogforge/server.py)
 # remain reachable at runtime. With a non-editable wheel install
 # `__file__` points into site-packages/ and the migrations dir lookup
 # resolves to alembic's own library directory, which crashes on boot.
@@ -53,4 +53,4 @@ RUN uv pip install --system --no-cache -e .
 ENV PORT=7880
 EXPOSE 7880
 
-CMD ["sh", "-c", "pencraft serve --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "blogforge serve --host 0.0.0.0 --port ${PORT}"]

@@ -5,8 +5,8 @@ import httpx
 import pytest
 import respx
 
-from pencraft.llm.exceptions import ProviderMissingKey, ProviderRateLimit
-from pencraft.llm.openai import OpenAIProvider
+from blogforge.llm.exceptions import ProviderMissingKey, ProviderRateLimit
+from blogforge.llm.openai import OpenAIProvider
 
 
 def test_missing_key_raises() -> None:

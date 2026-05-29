@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from pencraft.llm.cost import usd
+from blogforge.llm.cost import usd
 
 
 def test_anthropic_sonnet_cost() -> None:

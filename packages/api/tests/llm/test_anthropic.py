@@ -5,9 +5,9 @@ import httpx
 import pytest
 import respx
 
-from pencraft.llm.anthropic import AnthropicProvider
-from pencraft.llm.base import StreamChunk
-from pencraft.llm.exceptions import ProviderMissingKey, ProviderRateLimit
+from blogforge.llm.anthropic import AnthropicProvider
+from blogforge.llm.base import StreamChunk
+from blogforge.llm.exceptions import ProviderMissingKey, ProviderRateLimit
 
 
 @pytest.mark.asyncio

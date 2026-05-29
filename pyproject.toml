@@ -1,5 +1,5 @@
 [project]
-name = "pencraft"
+name = "blogforge"
 version = "0.1.0"
 description = "Local-first long-form drafting tool that uses myvoice style packs"
 readme = "README.md"
@@ -41,17 +41,17 @@ dependencies = [
 ]
 
 [project.scripts]
-pencraft = "pencraft.cli:main"
+blogforge = "blogforge.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-artifacts = ["packages/api/pencraft/static/**/*"]
+artifacts = ["packages/api/blogforge/static/**/*"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["packages/api/pencraft"]
+packages = ["packages/api/blogforge"]
 
 [dependency-groups]
 dev = [
@@ -80,7 +80,7 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 ignore = ["B008"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["pencraft"]
+known-first-party = ["blogforge"]
 
 [tool.mypy]
 strict = true

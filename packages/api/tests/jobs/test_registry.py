@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from pencraft.jobs.models import JobType
-from pencraft.jobs.registry import JobRegistry
+from blogforge.jobs.models import JobType
+from blogforge.jobs.registry import JobRegistry
 
 
 @pytest.mark.asyncio

@@ -2,11 +2,11 @@
 import pytest_asyncio
 from moto.server import ThreadedMotoServer
 
-from pencraft.config import get_settings
-from pencraft.drafts.models import Reference
-from pencraft.generate.references import REFERENCE_BUDGET_CHARS, get_reference_context
-from pencraft.s3 import get_s3_client, reset_s3_client_for_tests
-from pencraft.s3.lifespan import ensure_bucket
+from blogforge.config import get_settings
+from blogforge.drafts.models import Reference
+from blogforge.generate.references import REFERENCE_BUDGET_CHARS, get_reference_context
+from blogforge.s3 import get_s3_client, reset_s3_client_for_tests
+from blogforge.s3.lifespan import ensure_bucket
 
 
 @pytest_asyncio.fixture
@@ -20,10 +20,10 @@ async def stack():
     from unittest import mock
 
     with mock.patch.dict(os.environ, {
-        "PENCRAFT_S3_ENDPOINT_URL": endpoint,
-        "PENCRAFT_S3_ACCESS_KEY": "test",
-        "PENCRAFT_S3_SECRET_KEY": "test",
-        "PENCRAFT_S3_BUCKET": "ctx-test",
+        "BLOGFORGE_S3_ENDPOINT_URL": endpoint,
+        "BLOGFORGE_S3_ACCESS_KEY": "test",
+        "BLOGFORGE_S3_SECRET_KEY": "test",
+        "BLOGFORGE_S3_BUCKET": "ctx-test",
     }, clear=False):
         get_settings.cache_clear()
         reset_s3_client_for_tests()

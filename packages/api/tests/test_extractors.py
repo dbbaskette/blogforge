@@ -6,7 +6,7 @@ from unittest import mock
 
 import pytest
 
-from pencraft.references.extractors import (
+from blogforge.references.extractors import (
     EXTRACTED_CHAR_CAP,
     ExtractionResult,
     UnsupportedFileType,
@@ -27,9 +27,9 @@ async def test_extract_url_returns_clean_markdown() -> None:
         "<body><article><h1>Heading</h1><p>Body text.</p></article></body></html>"
     )
     with (
-        mock.patch("pencraft.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
         mock.patch(
-            "pencraft.references.extractors.trafilatura.extract",
+            "blogforge.references.extractors.trafilatura.extract",
             return_value="Heading\n\nBody text.",
         ),
     ):
@@ -44,9 +44,9 @@ async def test_extract_url_returns_clean_markdown() -> None:
 async def test_extract_url_falls_back_to_url_when_title_unavailable() -> None:
     html = "<html><body><p>Just a paragraph.</p></body></html>"
     with (
-        mock.patch("pencraft.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
         mock.patch(
-            "pencraft.references.extractors.trafilatura.extract",
+            "blogforge.references.extractors.trafilatura.extract",
             return_value="Just a paragraph.",
         ),
     ):
@@ -57,7 +57,7 @@ async def test_extract_url_falls_back_to_url_when_title_unavailable() -> None:
 
 async def test_extract_url_fetch_failure_raises() -> None:
     with mock.patch(
-        "pencraft.references.extractors.trafilatura.fetch_url", return_value=None
+        "blogforge.references.extractors.trafilatura.fetch_url", return_value=None
     ):
         with pytest.raises(ValueError):
             await extract_url("https://example.com/nope")
@@ -67,8 +67,8 @@ async def test_extract_url_truncates_at_cap() -> None:
     html = "<html><head><title>big</title></head><body><p>x</p></body></html>"
     big = "a" * (EXTRACTED_CHAR_CAP + 5_000)
     with (
-        mock.patch("pencraft.references.extractors.trafilatura.fetch_url", return_value=html),
-        mock.patch("pencraft.references.extractors.trafilatura.extract", return_value=big),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.extract", return_value=big),
     ):
         result = await extract_url("https://example.com/big")
     assert result.extracted.endswith("[truncated]")

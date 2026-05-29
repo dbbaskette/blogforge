@@ -10,10 +10,10 @@ def test_event_bus_in_app_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     """Verify EventBus is wired into app state during lifespan."""
     from fastapi.testclient import TestClient
 
-    from pencraft.api.events import EventBus
-    from pencraft.server import create_app
+    from blogforge.api.events import EventBus
+    from blogforge.server import create_app
 
-    monkeypatch.setenv("PENCRAFT_DRAFTS_ROOT", str(tmp_path / "drafts"))
+    monkeypatch.setenv("BLOGFORGE_DRAFTS_ROOT", str(tmp_path / "drafts"))
     app = create_app()
     with TestClient(app):
         assert isinstance(app.state.event_bus, EventBus)
@@ -23,7 +23,7 @@ def test_event_bus_subscribe_and_emit() -> None:
     """Verify EventBus subscribe/emit works correctly (unit test)."""
     import asyncio
 
-    from pencraft.api.events import EventBus
+    from blogforge.api.events import EventBus
 
     async def _run() -> None:
         bus = EventBus()

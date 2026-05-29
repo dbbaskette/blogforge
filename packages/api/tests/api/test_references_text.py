@@ -9,14 +9,14 @@ import pytest_asyncio
 from fastapi.testclient import TestClient
 from moto.server import ThreadedMotoServer
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.config import get_settings
-from pencraft.db.engine import get_sessionmaker
-from pencraft.db.models import User
-from pencraft.s3 import get_s3_client, reset_s3_client_for_tests
-from pencraft.s3.lifespan import ensure_bucket
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.config import get_settings
+from blogforge.db.engine import get_sessionmaker
+from blogforge.db.models import User
+from blogforge.s3 import get_s3_client, reset_s3_client_for_tests
+from blogforge.s3.lifespan import ensure_bucket
+from blogforge.server import create_app
 
 
 @pytest_asyncio.fixture
@@ -26,11 +26,11 @@ async def s3_env() -> AsyncIterator[str]:
     host, port = server.get_host_and_port()
     endpoint = f"http://{host}:{port}"
     env = {
-        "PENCRAFT_S3_ENDPOINT_URL": endpoint,
-        "PENCRAFT_S3_ACCESS_KEY": "test",
-        "PENCRAFT_S3_SECRET_KEY": "test",
-        "PENCRAFT_S3_BUCKET": "pencraft-test",
-        "PENCRAFT_S3_REGION": "us-east-1",
+        "BLOGFORGE_S3_ENDPOINT_URL": endpoint,
+        "BLOGFORGE_S3_ACCESS_KEY": "test",
+        "BLOGFORGE_S3_SECRET_KEY": "test",
+        "BLOGFORGE_S3_BUCKET": "blogforge-test",
+        "BLOGFORGE_S3_REGION": "us-east-1",
     }
     with mock.patch.dict(os.environ, env, clear=False):
         get_settings.cache_clear()
@@ -92,7 +92,7 @@ async def test_post_text_round_trips(authed) -> None:
     draft_id = _create_draft(client)
     r = client.post(
         f"/api/drafts/{draft_id}/references/text",
-        json={"name": "Background notes", "content": "Pencraft is fun."},
+        json={"name": "Background notes", "content": "BlogForge is fun."},
     )
     assert r.status_code == 201, r.text
     body = r.json()
@@ -100,7 +100,7 @@ async def test_post_text_round_trips(authed) -> None:
     assert body["name"] == "Background notes"
     assert body["url"] is None
     assert body["original_filename"] is None
-    assert body["extracted_chars"] == len("Pencraft is fun.")
+    assert body["extracted_chars"] == len("BlogForge is fun.")
 
     ref_id = body["id"]
     s3 = get_s3_client()
@@ -108,11 +108,11 @@ async def test_post_text_round_trips(authed) -> None:
     raw = await s3.get_object(
         f"drafts/{draft_id}/references/originals/{ref_id}.txt"
     )
-    assert raw.decode("utf-8") == "Pencraft is fun."
+    assert raw.decode("utf-8") == "BlogForge is fun."
     extracted = await s3.get_object(
         f"drafts/{draft_id}/references/extracted/{ref_id}.md"
     )
-    assert extracted.decode("utf-8") == "Pencraft is fun."
+    assert extracted.decode("utf-8") == "BlogForge is fun."
 
 
 async def test_post_text_empty_content_rejected(authed) -> None:

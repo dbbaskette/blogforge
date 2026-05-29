@@ -4,10 +4,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout pencraft
+      - name: Checkout blogforge
         uses: actions/checkout@v4
         with:
-          path: pencraft
+          path: blogforge
       - name: Checkout myvoice (sibling — referenced via [tool.uv.sources])
         uses: actions/checkout@v4
         with:
@@ -15,17 +15,17 @@ jobs:
           path: myvoice
       - uses: astral-sh/setup-uv@v3
       - name: Set up Python
-        working-directory: pencraft
+        working-directory: blogforge
         run: uv python install 3.11
       - name: Sync deps (resolves myvoice from ../myvoice via tool.uv.sources)
-        working-directory: pencraft
+        working-directory: blogforge
         run: uv sync
       - name: Pytest
-        working-directory: pencraft
+        working-directory: blogforge
         run: uv run pytest packages/api/tests -q
       - name: Ruff
-        working-directory: pencraft
+        working-directory: blogforge
         run: uv run ruff check packages/api
       - name: Mypy
-        working-directory: pencraft
+        working-directory: blogforge
         run: uv run mypy packages/api

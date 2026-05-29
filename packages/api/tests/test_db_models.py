@@ -5,8 +5,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from pencraft.db.base import Base
-from pencraft.db.models import Draft, Section, User
+from blogforge.db.base import Base
+from blogforge.db.models import Draft, Section, User
 
 
 @pytest.fixture

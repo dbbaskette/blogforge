@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace Pencraft's single-user JSON-on-disk store with a multi-tenant Postgres-backed app: email/password auth with admin approval, per-user data isolation, Docker Compose for local dev, manifest for Tanzu deployment.
+**Goal:** Replace BlogForge's single-user JSON-on-disk store with a multi-tenant Postgres-backed app: email/password auth with admin approval, per-user data isolation, Docker Compose for local dev, manifest for Tanzu deployment.
 
 **Architecture:** FastAPI + SQLAlchemy 2.0 async + asyncpg + Alembic on the API side. React + RequireAuth guard + session cookies on the web side. argon2 password hashing, itsdangerous-signed HTTP-only cookies for sessions. Existing on-disk store is replaced by `SqlDraftStore`; every existing route gains a `current_user` dependency and scopes by `user_id`.
 
@@ -19,7 +19,7 @@
 - [ ] **Confirm clean main and create branch**
 
 ```bash
-cd /Users/dbbaskette/Projects/Pencraft
+cd /Users/dbbaskette/Projects/BlogForge
 git switch main
 git pull --ff-only
 git switch -c auth-multi-tenant-postgres
@@ -103,8 +103,8 @@ git commit -m "deps: add sqlalchemy/asyncpg/alembic/argon2/itsdangerous/aiobotoc
 ### Task 2: Configuration module (pydantic-settings)
 
 **Files:**
-- Create: `packages/api/pencraft/config/__init__.py`
-- Create: `packages/api/pencraft/config/settings.py`
+- Create: `packages/api/blogforge/config/__init__.py`
+- Create: `packages/api/blogforge/config/settings.py`
 - Test: `packages/api/tests/test_settings.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -116,7 +116,7 @@ Create `packages/api/tests/test_settings.py`:
 import os
 from unittest import mock
 
-from pencraft.config.settings import Settings
+from blogforge.config.settings import Settings
 
 
 def test_defaults_when_no_env():
@@ -128,15 +128,15 @@ def test_defaults_when_no_env():
     assert s.admin_password == "VMware0!"
     assert s.session_secret  # non-empty default
     assert s.cors_origins == ["http://localhost:7881"]
-    assert s.s3_bucket == "pencraft"
+    assert s.s3_bucket == "blogforge"
 
 
 def test_env_overrides():
-    """PENCRAFT_-prefixed env vars override defaults."""
+    """BLOGFORGE_-prefixed env vars override defaults."""
     env = {
-        "PENCRAFT_DATABASE_URL": "postgresql+asyncpg://u:p@h/db",
-        "PENCRAFT_ADMIN_EMAIL": "root@example.com",
-        "PENCRAFT_CORS_ORIGINS": "http://a.com,http://b.com",
+        "BLOGFORGE_DATABASE_URL": "postgresql+asyncpg://u:p@h/db",
+        "BLOGFORGE_ADMIN_EMAIL": "root@example.com",
+        "BLOGFORGE_CORS_ORIGINS": "http://a.com,http://b.com",
     }
     with mock.patch.dict(os.environ, env, clear=True):
         s = Settings()
@@ -148,23 +148,23 @@ def test_env_overrides():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_settings.py -v`
-Expected: ImportError on `pencraft.config.settings`.
+Expected: ImportError on `blogforge.config.settings`.
 
 - [ ] **Step 3: Implement the settings module**
 
-Create `packages/api/pencraft/config/__init__.py`:
+Create `packages/api/blogforge/config/__init__.py`:
 
 ```python
-"""Pencraft runtime config."""
-from pencraft.config.settings import Settings, get_settings
+"""BlogForge runtime config."""
+from blogforge.config.settings import Settings, get_settings
 
 __all__ = ["Settings", "get_settings"]
 ```
 
-Create `packages/api/pencraft/config/settings.py`:
+Create `packages/api/blogforge/config/settings.py`:
 
 ```python
-"""Application settings, loaded from PENCRAFT_*-prefixed env vars."""
+"""Application settings, loaded from BLOGFORGE_*-prefixed env vars."""
 from functools import lru_cache
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -179,7 +179,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_prefix="PENCRAFT_",
+        env_prefix="BLOGFORGE_",
         env_file=None,  # never auto-load .env; tests would be flaky
         extra="ignore",
     )
@@ -191,9 +191,9 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:7881"])
 
     s3_endpoint_url: str = "http://localhost:9000"
-    s3_access_key: str = "pencraft"
-    s3_secret_key: str = "pencraft-minio-secret"
-    s3_bucket: str = "pencraft"
+    s3_access_key: str = "blogforge"
+    s3_secret_key: str = "blogforge-minio-secret"
+    s3_bucket: str = "blogforge"
     s3_region: str = "us-east-1"
 
     run_migrations_on_boot: bool = True
@@ -201,7 +201,7 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def split_csv(cls, v: object) -> object:
-        """Accept comma-separated string from env: PENCRAFT_CORS_ORIGINS=a,b,c."""
+        """Accept comma-separated string from env: BLOGFORGE_CORS_ORIGINS=a,b,c."""
         if isinstance(v, str):
             return [s.strip() for s in v.split(",") if s.strip()]
         return v
@@ -221,8 +221,8 @@ Expected: 2 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/config packages/api/tests/test_settings.py
-git commit -m "feat(config): pydantic-settings module with PENCRAFT_-prefixed env"
+git add packages/api/blogforge/config packages/api/tests/test_settings.py
+git commit -m "feat(config): pydantic-settings module with BLOGFORGE_-prefixed env"
 ```
 
 ---
@@ -230,7 +230,7 @@ git commit -m "feat(config): pydantic-settings module with PENCRAFT_-prefixed en
 ### Task 3: Tanzu VCAP_SERVICES adapter
 
 **Files:**
-- Create: `packages/api/pencraft/config/tanzu.py`
+- Create: `packages/api/blogforge/config/tanzu.py`
 - Test: `packages/api/tests/test_tanzu_config_adapter.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -243,19 +243,19 @@ import json
 import os
 from unittest import mock
 
-from pencraft.config.tanzu import apply_vcap_services
+from blogforge.config.tanzu import apply_vcap_services
 
 
 VCAP = {
     "postgresql": [
         {
-            "name": "pencraft-postgres",
+            "name": "blogforge-postgres",
             "credentials": {"uri": "postgres://u:p@h:5432/db"},
         }
     ],
     "seaweedfs": [
         {
-            "name": "pencraft-s3",
+            "name": "blogforge-s3",
             "credentials": {
                 "endpoint": "https://seaweed.example.com",
                 "access_key": "AK",
@@ -269,7 +269,7 @@ VCAP = {
 def test_translates_postgres_uri_to_asyncpg():
     with mock.patch.dict(os.environ, {"VCAP_SERVICES": json.dumps(VCAP)}, clear=True):
         apply_vcap_services()
-    assert os.environ["PENCRAFT_DATABASE_URL"] == (
+    assert os.environ["BLOGFORGE_DATABASE_URL"] == (
         "postgresql+asyncpg://u:p@h:5432/db"
     )
 
@@ -277,9 +277,9 @@ def test_translates_postgres_uri_to_asyncpg():
 def test_translates_s3_credentials():
     with mock.patch.dict(os.environ, {"VCAP_SERVICES": json.dumps(VCAP)}, clear=True):
         apply_vcap_services()
-    assert os.environ["PENCRAFT_S3_ENDPOINT_URL"] == "https://seaweed.example.com"
-    assert os.environ["PENCRAFT_S3_ACCESS_KEY"] == "AK"
-    assert os.environ["PENCRAFT_S3_SECRET_KEY"] == "SK"
+    assert os.environ["BLOGFORGE_S3_ENDPOINT_URL"] == "https://seaweed.example.com"
+    assert os.environ["BLOGFORGE_S3_ACCESS_KEY"] == "AK"
+    assert os.environ["BLOGFORGE_S3_SECRET_KEY"] == "SK"
 
 
 def test_silent_when_vcap_absent():
@@ -288,34 +288,34 @@ def test_silent_when_vcap_absent():
 
 
 def test_does_not_overwrite_already_set_env():
-    """If the operator set PENCRAFT_DATABASE_URL explicitly, keep it."""
+    """If the operator set BLOGFORGE_DATABASE_URL explicitly, keep it."""
     env = {
         "VCAP_SERVICES": json.dumps(VCAP),
-        "PENCRAFT_DATABASE_URL": "sqlite+aiosqlite:///./override.db",
+        "BLOGFORGE_DATABASE_URL": "sqlite+aiosqlite:///./override.db",
     }
     with mock.patch.dict(os.environ, env, clear=True):
         apply_vcap_services()
-    assert os.environ["PENCRAFT_DATABASE_URL"] == "sqlite+aiosqlite:///./override.db"
+    assert os.environ["BLOGFORGE_DATABASE_URL"] == "sqlite+aiosqlite:///./override.db"
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_tanzu_config_adapter.py -v`
-Expected: ImportError on `pencraft.config.tanzu`.
+Expected: ImportError on `blogforge.config.tanzu`.
 
 - [ ] **Step 3: Implement the adapter**
 
-Create `packages/api/pencraft/config/tanzu.py`:
+Create `packages/api/blogforge/config/tanzu.py`:
 
 ```python
-"""Translate Cloud Foundry's VCAP_SERVICES into PENCRAFT_* env vars.
+"""Translate Cloud Foundry's VCAP_SERVICES into BLOGFORGE_* env vars.
 
 Called once at process import (before pydantic-settings reads env). On
 local dev where VCAP_SERVICES is absent this is a no-op.
 
 Matches services by service-type label first (postgresql / seaweedfs)
 and falls back to instance name. Never overwrites an env var the operator
-already set explicitly — so `cf set-env PENCRAFT_DATABASE_URL ...` always
+already set explicitly — so `cf set-env BLOGFORGE_DATABASE_URL ...` always
 wins over bound-service inference.
 """
 import json
@@ -326,7 +326,7 @@ _log = logging.getLogger(__name__)
 
 
 def apply_vcap_services() -> None:
-    """Read VCAP_SERVICES and set PENCRAFT_* env vars for bound services."""
+    """Read VCAP_SERVICES and set BLOGFORGE_* env vars for bound services."""
     raw = os.environ.get("VCAP_SERVICES")
     if not raw:
         return
@@ -351,7 +351,7 @@ def apply_vcap_services() -> None:
 
 def _apply_postgres(instances: list[tuple[str, dict]]) -> None:
     for label, inst in instances:
-        if label not in ("postgresql", "postgres") and inst.get("name") != "pencraft-postgres":
+        if label not in ("postgresql", "postgres") and inst.get("name") != "blogforge-postgres":
             continue
         creds = inst.get("credentials", {})
         uri = creds.get("uri") or creds.get("url")
@@ -362,24 +362,24 @@ def _apply_postgres(instances: list[tuple[str, dict]]) -> None:
             uri = "postgresql+asyncpg://" + uri[len("postgres://") :]
         elif uri.startswith("postgresql://"):
             uri = "postgresql+asyncpg://" + uri[len("postgresql://") :]
-        _set_if_unset("PENCRAFT_DATABASE_URL", uri)
+        _set_if_unset("BLOGFORGE_DATABASE_URL", uri)
         return
 
 
 def _apply_s3(instances: list[tuple[str, dict]]) -> None:
     for label, inst in instances:
-        if label not in ("seaweedfs", "s3") and inst.get("name") != "pencraft-s3":
+        if label not in ("seaweedfs", "s3") and inst.get("name") != "blogforge-s3":
             continue
         creds = inst.get("credentials", {})
         endpoint = creds.get("endpoint") or creds.get("endpoint_url")
         access = creds.get("access_key") or creds.get("accessKey")
         secret = creds.get("secret_key") or creds.get("secretKey")
         if endpoint:
-            _set_if_unset("PENCRAFT_S3_ENDPOINT_URL", endpoint)
+            _set_if_unset("BLOGFORGE_S3_ENDPOINT_URL", endpoint)
         if access:
-            _set_if_unset("PENCRAFT_S3_ACCESS_KEY", access)
+            _set_if_unset("BLOGFORGE_S3_ACCESS_KEY", access)
         if secret:
-            _set_if_unset("PENCRAFT_S3_SECRET_KEY", secret)
+            _set_if_unset("BLOGFORGE_S3_SECRET_KEY", secret)
         return
 
 
@@ -397,7 +397,7 @@ Expected: 4 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/config/tanzu.py packages/api/tests/test_tanzu_config_adapter.py
+git add packages/api/blogforge/config/tanzu.py packages/api/tests/test_tanzu_config_adapter.py
 git commit -m "feat(config): Tanzu VCAP_SERVICES adapter for bound Postgres + S3"
 ```
 
@@ -406,13 +406,13 @@ git commit -m "feat(config): Tanzu VCAP_SERVICES adapter for bound Postgres + S3
 ### Task 4: Database engine + session factory
 
 **Files:**
-- Create: `packages/api/pencraft/db/__init__.py`
-- Create: `packages/api/pencraft/db/engine.py`
-- Create: `packages/api/pencraft/db/base.py`
+- Create: `packages/api/blogforge/db/__init__.py`
+- Create: `packages/api/blogforge/db/engine.py`
+- Create: `packages/api/blogforge/db/base.py`
 
 - [ ] **Step 1: Implement the declarative base**
 
-Create `packages/api/pencraft/db/base.py`:
+Create `packages/api/blogforge/db/base.py`:
 
 ```python
 """SQLAlchemy declarative base.
@@ -424,12 +424,12 @@ from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
-    """Declarative base for all Pencraft ORM models."""
+    """Declarative base for all BlogForge ORM models."""
 ```
 
 - [ ] **Step 2: Implement the engine + session factory**
 
-Create `packages/api/pencraft/db/engine.py`:
+Create `packages/api/blogforge/db/engine.py`:
 
 ```python
 """Async SQLAlchemy engine + session factory.
@@ -450,7 +450,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from pencraft.config import get_settings
+from blogforge.config import get_settings
 
 
 @lru_cache(maxsize=1)
@@ -497,12 +497,12 @@ def reset_engine_for_tests() -> None:
 
 - [ ] **Step 3: Re-export from package init**
 
-Create `packages/api/pencraft/db/__init__.py`:
+Create `packages/api/blogforge/db/__init__.py`:
 
 ```python
 """Database layer."""
-from pencraft.db.base import Base
-from pencraft.db.engine import (
+from blogforge.db.base import Base
+from blogforge.db.engine import (
     get_engine,
     get_sessionmaker,
     reset_engine_for_tests,
@@ -520,13 +520,13 @@ __all__ = [
 
 - [ ] **Step 4: Smoke-import check**
 
-Run: `uv run python -c "from pencraft.db import Base, get_engine; print(get_engine())"`
+Run: `uv run python -c "from blogforge.db import Base, get_engine; print(get_engine())"`
 Expected: prints `Engine(sqlite+aiosqlite:///:memory:)`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/db
+git add packages/api/blogforge/db
 git commit -m "feat(db): async SQLAlchemy engine + session factory"
 ```
 
@@ -535,7 +535,7 @@ git commit -m "feat(db): async SQLAlchemy engine + session factory"
 ### Task 5: ORM models — User, Draft, Section
 
 **Files:**
-- Create: `packages/api/pencraft/db/models.py`
+- Create: `packages/api/blogforge/db/models.py`
 - Test: `packages/api/tests/test_db_models.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -550,8 +550,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from pencraft.db.base import Base
-from pencraft.db.models import Draft, Section, User
+from blogforge.db.base import Base
+from blogforge.db.models import Draft, Section, User
 
 
 @pytest.fixture
@@ -615,11 +615,11 @@ async def test_section_belongs_to_draft(session):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_db_models.py -v`
-Expected: ImportError on `pencraft.db.models`.
+Expected: ImportError on `blogforge.db.models`.
 
 - [ ] **Step 3: Implement the models**
 
-Create `packages/api/pencraft/db/models.py`:
+Create `packages/api/blogforge/db/models.py`:
 
 ```python
 """ORM models — User, Draft, Section.
@@ -636,7 +636,7 @@ from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, Unique
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
-from pencraft.db.base import Base
+from blogforge.db.base import Base
 
 
 def _now() -> datetime:
@@ -726,7 +726,7 @@ Expected: 3 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/db/models.py packages/api/tests/test_db_models.py
+git add packages/api/blogforge/db/models.py packages/api/tests/test_db_models.py
 git commit -m "feat(db): User/Draft/Section ORM models"
 ```
 
@@ -791,17 +791,17 @@ datefmt = %H:%M:%S
 Create `packages/api/alembic/env.py`:
 
 ```python
-"""Alembic env — uses Pencraft's Settings + Base.metadata."""
+"""Alembic env — uses BlogForge's Settings + Base.metadata."""
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from pencraft.config import get_settings
-from pencraft.db.base import Base
+from blogforge.config import get_settings
+from blogforge.db.base import Base
 
 # Make sure model metadata is populated before autogenerate inspects it.
-from pencraft.db import models  # noqa: F401
+from blogforge.db import models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
@@ -967,18 +967,18 @@ def downgrade() -> None:
 
 Run:
 ```bash
-PENCRAFT_DATABASE_URL="sqlite:///tmp/pencraft-migration-test.db" \
+BLOGFORGE_DATABASE_URL="sqlite:///tmp/blogforge-migration-test.db" \
   uv run alembic -c packages/api/alembic.ini upgrade head
 ```
 Expected: `INFO  [alembic.runtime.migration] Running upgrade  -> 0001_initial`. No errors.
 
 Verify the tables exist:
 ```bash
-uv run python -c "import sqlite3; c=sqlite3.connect('/tmp/pencraft-migration-test.db'); print([r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()])"
+uv run python -c "import sqlite3; c=sqlite3.connect('/tmp/blogforge-migration-test.db'); print([r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()])"
 ```
 Expected: prints a list containing `users`, `drafts`, `sections`.
 
-Clean up: `rm /tmp/pencraft-migration-test.db`
+Clean up: `rm /tmp/blogforge-migration-test.db`
 
 - [ ] **Step 6: Commit**
 
@@ -1007,18 +1007,18 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from pencraft.config import get_settings
-from pencraft.db import reset_engine_for_tests
-from pencraft.db.base import Base
+from blogforge.config import get_settings
+from blogforge.db import reset_engine_for_tests
+from blogforge.db.base import Base
 
 
 @pytest.fixture(autouse=True)
 def _force_sqlite_for_tests(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Every test runs against a fresh in-memory sqlite. Module-level singletons
     are reset between tests so the new URL takes effect."""
-    monkeypatch.setenv("PENCRAFT_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    monkeypatch.setenv("PENCRAFT_SESSION_SECRET", "test-session-secret")
-    monkeypatch.setenv("PENCRAFT_RUN_MIGRATIONS_ON_BOOT", "false")
+    monkeypatch.setenv("BLOGFORGE_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("BLOGFORGE_SESSION_SECRET", "test-session-secret")
+    monkeypatch.setenv("BLOGFORGE_RUN_MIGRATIONS_ON_BOOT", "false")
     get_settings.cache_clear()
     reset_engine_for_tests()
     yield
@@ -1057,8 +1057,8 @@ git commit -m "test: async db fixtures with in-memory sqlite"
 ### Task 8: Password hashing
 
 **Files:**
-- Create: `packages/api/pencraft/auth/__init__.py`
-- Create: `packages/api/pencraft/auth/passwords.py`
+- Create: `packages/api/blogforge/auth/__init__.py`
+- Create: `packages/api/blogforge/auth/passwords.py`
 - Test: `packages/api/tests/test_password_hash.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1067,7 +1067,7 @@ Create `packages/api/tests/test_password_hash.py`:
 
 ```python
 """argon2 hash + verify."""
-from pencraft.auth.passwords import hash_password, verify_password
+from blogforge.auth.passwords import hash_password, verify_password
 
 
 def test_round_trip():
@@ -1093,17 +1093,17 @@ def test_handles_empty_string():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_password_hash.py -v`
-Expected: ImportError on `pencraft.auth.passwords`.
+Expected: ImportError on `blogforge.auth.passwords`.
 
 - [ ] **Step 3: Implement**
 
-Create `packages/api/pencraft/auth/__init__.py`:
+Create `packages/api/blogforge/auth/__init__.py`:
 
 ```python
 """Authentication primitives."""
 ```
 
-Create `packages/api/pencraft/auth/passwords.py`:
+Create `packages/api/blogforge/auth/passwords.py`:
 
 ```python
 """Argon2id password hashing. Defaults are the argon2-cffi v23 defaults."""
@@ -1135,7 +1135,7 @@ Expected: 3 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/auth/__init__.py packages/api/pencraft/auth/passwords.py packages/api/tests/test_password_hash.py
+git add packages/api/blogforge/auth/__init__.py packages/api/blogforge/auth/passwords.py packages/api/tests/test_password_hash.py
 git commit -m "feat(auth): argon2 password hashing"
 ```
 
@@ -1144,7 +1144,7 @@ git commit -m "feat(auth): argon2 password hashing"
 ### Task 9: Session cookie signing
 
 **Files:**
-- Create: `packages/api/pencraft/auth/sessions.py`
+- Create: `packages/api/blogforge/auth/sessions.py`
 - Test: `packages/api/tests/test_session_cookie_signature.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1156,7 +1156,7 @@ Create `packages/api/tests/test_session_cookie_signature.py`:
 import pytest
 from uuid import uuid4
 
-from pencraft.auth.sessions import SessionSigner
+from blogforge.auth.sessions import SessionSigner
 
 
 def test_round_trip():
@@ -1191,11 +1191,11 @@ def test_garbage_returns_none():
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_session_cookie_signature.py -v`
-Expected: ImportError on `pencraft.auth.sessions`.
+Expected: ImportError on `blogforge.auth.sessions`.
 
 - [ ] **Step 3: Implement**
 
-Create `packages/api/pencraft/auth/sessions.py`:
+Create `packages/api/blogforge/auth/sessions.py`:
 
 ```python
 """Signed session cookies.
@@ -1209,7 +1209,7 @@ from uuid import UUID
 
 from itsdangerous import BadSignature, URLSafeSerializer
 
-COOKIE_NAME = "pencraft_session"
+COOKIE_NAME = "blogforge_session"
 COOKIE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60  # 14 days
 
 
@@ -1217,7 +1217,7 @@ class SessionSigner:
     """Wraps itsdangerous to sign/unsign a user UUID."""
 
     def __init__(self, secret: str) -> None:
-        self._serializer = URLSafeSerializer(secret, salt="pencraft-session")
+        self._serializer = URLSafeSerializer(secret, salt="blogforge-session")
 
     def sign(self, user_id: UUID) -> str:
         return self._serializer.dumps(str(user_id))
@@ -1243,7 +1243,7 @@ Expected: 4 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/auth/sessions.py packages/api/tests/test_session_cookie_signature.py
+git add packages/api/blogforge/auth/sessions.py packages/api/tests/test_session_cookie_signature.py
 git commit -m "feat(auth): itsdangerous session cookie signer"
 ```
 
@@ -1252,7 +1252,7 @@ git commit -m "feat(auth): itsdangerous session cookie signer"
 ### Task 10: Admin seeding
 
 **Files:**
-- Create: `packages/api/pencraft/db/seed.py`
+- Create: `packages/api/blogforge/db/seed.py`
 - Test: `packages/api/tests/test_admin_seed.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1264,9 +1264,9 @@ Create `packages/api/tests/test_admin_seed.py`:
 import pytest
 from sqlalchemy import select
 
-from pencraft.auth.passwords import verify_password
-from pencraft.db.models import User
-from pencraft.db.seed import ensure_admin_user
+from blogforge.auth.passwords import verify_password
+from blogforge.db.models import User
+from blogforge.db.seed import ensure_admin_user
 
 
 async def test_creates_admin_on_first_call(session):
@@ -1299,11 +1299,11 @@ async def test_lowercases_email_for_uniqueness(session):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_admin_seed.py -v`
-Expected: ImportError on `pencraft.db.seed`.
+Expected: ImportError on `blogforge.db.seed`.
 
 - [ ] **Step 3: Implement**
 
-Create `packages/api/pencraft/db/seed.py`:
+Create `packages/api/blogforge/db/seed.py`:
 
 ```python
 """Seed the configured admin user. Called from the FastAPI lifespan event."""
@@ -1312,8 +1312,8 @@ from datetime import datetime, UTC
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pencraft.auth.passwords import hash_password
-from pencraft.db.models import User
+from blogforge.auth.passwords import hash_password
+from blogforge.db.models import User
 
 
 async def ensure_admin_user(session: AsyncSession, *, email: str, password: str) -> User:
@@ -1344,7 +1344,7 @@ Expected: 3 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/db/seed.py packages/api/tests/test_admin_seed.py
+git add packages/api/blogforge/db/seed.py packages/api/tests/test_admin_seed.py
 git commit -m "feat(db): idempotent admin user seeding"
 ```
 
@@ -1353,7 +1353,7 @@ git commit -m "feat(db): idempotent admin user seeding"
 ### Task 11: `get_current_user` and `require_admin` dependencies
 
 **Files:**
-- Create: `packages/api/pencraft/auth/dependencies.py`
+- Create: `packages/api/blogforge/auth/dependencies.py`
 - Test: `packages/api/tests/test_auth_dependencies.py`
 
 - [ ] **Step 1: Write the failing test**
@@ -1367,12 +1367,12 @@ from fastapi import FastAPI, Depends
 from fastapi.testclient import TestClient
 from uuid import uuid4
 
-from pencraft.auth.dependencies import get_current_user, require_admin
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.base import Base
-from pencraft.db.models import User
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.auth.dependencies import get_current_user, require_admin
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.base import Base
+from blogforge.db.models import User
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
 
 
 def _make_app():
@@ -1480,11 +1480,11 @@ async def test_require_admin_allows_admin(setup_db_and_user):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_auth_dependencies.py -v`
-Expected: ImportError on `pencraft.auth.dependencies`.
+Expected: ImportError on `blogforge.auth.dependencies`.
 
 - [ ] **Step 3: Implement**
 
-Create `packages/api/pencraft/auth/dependencies.py`:
+Create `packages/api/blogforge/auth/dependencies.py`:
 
 ```python
 """FastAPI dependencies: get_current_user, require_admin.
@@ -1499,10 +1499,10 @@ from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.config import get_settings
-from pencraft.db.engine import get_sessionmaker
-from pencraft.db.models import User
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.config import get_settings
+from blogforge.db.engine import get_sessionmaker
+from blogforge.db.models import User
 
 
 async def _get_session() -> AsyncIterator[AsyncSession]:
@@ -1516,13 +1516,13 @@ def _get_signer() -> SessionSigner:
 
 
 async def get_current_user(
-    pencraft_session: str | None = Cookie(default=None, alias=COOKIE_NAME),
+    blogforge_session: str | None = Cookie(default=None, alias=COOKIE_NAME),
     session: AsyncSession = Depends(_get_session),
 ) -> User:
     """Resolve the currently-signed-in, approved user, or raise."""
-    if not pencraft_session:
+    if not blogforge_session:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="not_authenticated")
-    user_id = _get_signer().unsign(pencraft_session)
+    user_id = _get_signer().unsign(blogforge_session)
     if user_id is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_session")
     user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
@@ -1547,7 +1547,7 @@ Expected: 6 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/auth/dependencies.py packages/api/tests/test_auth_dependencies.py
+git add packages/api/blogforge/auth/dependencies.py packages/api/tests/test_auth_dependencies.py
 git commit -m "feat(auth): get_current_user + require_admin dependencies"
 ```
 
@@ -1558,7 +1558,7 @@ git commit -m "feat(auth): get_current_user + require_admin dependencies"
 ### Task 12: POST /api/auth/request
 
 **Files:**
-- Create: `packages/api/pencraft/api/auth.py`
+- Create: `packages/api/blogforge/api/auth.py`
 - Test: `packages/api/tests/test_auth_request_login.py`
 
 - [ ] **Step 1: Write the failing test (request endpoint only)**
@@ -1571,10 +1571,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.server import create_app
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.server import create_app
 
 
 @pytest.fixture
@@ -1637,11 +1637,11 @@ async def test_request_rejects_short_password(client):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_auth_request_login.py::test_request_creates_pending_user -v`
-Expected: ImportError on `pencraft.api.auth` or AttributeError missing route.
+Expected: ImportError on `blogforge.api.auth` or AttributeError missing route.
 
 - [ ] **Step 3: Implement the auth router (request route)**
 
-Create `packages/api/pencraft/api/auth.py`:
+Create `packages/api/blogforge/api/auth.py`:
 
 ```python
 """Auth endpoints: /api/auth/request, /login, /logout, /me."""
@@ -1653,10 +1653,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pencraft.auth.dependencies import get_current_user, _get_session, _get_signer
-from pencraft.auth.passwords import hash_password, verify_password
-from pencraft.auth.sessions import COOKIE_MAX_AGE_SECONDS, COOKIE_NAME
-from pencraft.db.models import User
+from blogforge.auth.dependencies import get_current_user, _get_session, _get_signer
+from blogforge.auth.passwords import hash_password, verify_password
+from blogforge.auth.sessions import COOKIE_MAX_AGE_SECONDS, COOKIE_NAME
+from blogforge.db.models import User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -1704,11 +1704,11 @@ async def request_access(
 
 - [ ] **Step 4: Wire router into server (provisional — login routes added next task)**
 
-Modify `packages/api/pencraft/server.py` (read the file first; add the import + include_router for auth). Specifically:
+Modify `packages/api/blogforge/server.py` (read the file first; add the import + include_router for auth). Specifically:
 
 ```python
 # at the top with other route imports
-from pencraft.api import auth as auth_routes
+from blogforge.api import auth as auth_routes
 
 # inside create_app() where other routers are included
 app.include_router(auth_routes.router)
@@ -1722,7 +1722,7 @@ Expected: 4 passed.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/api/pencraft/api/auth.py packages/api/pencraft/server.py packages/api/tests/test_auth_request_login.py
+git add packages/api/blogforge/api/auth.py packages/api/blogforge/server.py packages/api/tests/test_auth_request_login.py
 git commit -m "feat(auth): POST /api/auth/request — create pending account"
 ```
 
@@ -1731,7 +1731,7 @@ git commit -m "feat(auth): POST /api/auth/request — create pending account"
 ### Task 13: POST /api/auth/login + /logout + GET /me
 
 **Files:**
-- Modify: `packages/api/pencraft/api/auth.py` (add routes)
+- Modify: `packages/api/blogforge/api/auth.py` (add routes)
 - Modify: `packages/api/tests/test_auth_request_login.py` (add tests)
 
 - [ ] **Step 1: Add tests for login / logout / me**
@@ -1757,7 +1757,7 @@ async def test_login_approved_user_sets_cookie(client):
         json={"email": "go@user.com", "password": "secret123"},
     )
     assert r.status_code == 200
-    assert "pencraft_session" in r.cookies
+    assert "blogforge_session" in r.cookies
     me = client.get("/api/auth/me")
     assert me.status_code == 200
     assert me.json()["email"] == "go@user.com"
@@ -1829,7 +1829,7 @@ Expected: 4 pass (request-related), 5 fail (login/logout/me).
 
 - [ ] **Step 3: Add login/logout/me to the auth router**
 
-Append to `packages/api/pencraft/api/auth.py`:
+Append to `packages/api/blogforge/api/auth.py`:
 
 ```python
 @router.post("/login")
@@ -1889,7 +1889,7 @@ Expected: 9 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/api/auth.py packages/api/tests/test_auth_request_login.py
+git add packages/api/blogforge/api/auth.py packages/api/tests/test_auth_request_login.py
 git commit -m "feat(auth): POST /login, /logout, GET /me"
 ```
 
@@ -1910,12 +1910,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.server import create_app
 
 
 @pytest.fixture
@@ -1979,8 +1979,8 @@ git commit -m "test(auth): pending user is blocked from data routes"
 ### Task 15: Admin user-management endpoints
 
 **Files:**
-- Create: `packages/api/pencraft/api/admin.py`
-- Modify: `packages/api/pencraft/server.py` (register router)
+- Create: `packages/api/blogforge/api/admin.py`
+- Modify: `packages/api/blogforge/server.py` (register router)
 - Test: `packages/api/tests/test_admin_authorization.py`
 - Test: `packages/api/tests/test_admin_users.py`
 
@@ -1993,12 +1993,12 @@ Create `packages/api/tests/test_admin_authorization.py`:
 import pytest
 from fastapi.testclient import TestClient
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.server import create_app
 
 
 @pytest.fixture
@@ -2054,12 +2054,12 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.server import create_app
 
 
 @pytest.fixture
@@ -2145,11 +2145,11 @@ async def test_404_on_unknown_user(setup):
 - [ ] **Step 2: Run to verify failure**
 
 Run: `uv run pytest packages/api/tests/test_admin_authorization.py packages/api/tests/test_admin_users.py -v`
-Expected: collection errors (no `pencraft.api.admin` module yet).
+Expected: collection errors (no `blogforge.api.admin` module yet).
 
 - [ ] **Step 3: Implement the admin router**
 
-Create `packages/api/pencraft/api/admin.py`:
+Create `packages/api/blogforge/api/admin.py`:
 
 ```python
 """Admin user-management endpoints. All require role=admin."""
@@ -2161,8 +2161,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from pencraft.auth.dependencies import _get_session, require_admin
-from pencraft.db.models import User
+from blogforge.auth.dependencies import _get_session, require_admin
+from blogforge.db.models import User
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -2257,10 +2257,10 @@ async def promote(
 
 - [ ] **Step 4: Register router**
 
-In `packages/api/pencraft/server.py`, add the import and include statement next to the auth router lines.
+In `packages/api/blogforge/server.py`, add the import and include statement next to the auth router lines.
 
 ```python
-from pencraft.api import admin as admin_routes
+from blogforge.api import admin as admin_routes
 # inside create_app():
 app.include_router(admin_routes.router)
 ```
@@ -2273,7 +2273,7 @@ Expected: all passing (2 + 6 = 8 tests).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/api/pencraft/api/admin.py packages/api/pencraft/server.py packages/api/tests/test_admin_authorization.py packages/api/tests/test_admin_users.py
+git add packages/api/blogforge/api/admin.py packages/api/blogforge/server.py packages/api/tests/test_admin_authorization.py packages/api/tests/test_admin_users.py
 git commit -m "feat(admin): user-management endpoints (list/approve/reject/disable/promote)"
 ```
 
@@ -2284,7 +2284,7 @@ git commit -m "feat(admin): user-management endpoints (list/approve/reject/disab
 ### Task 16: SqlDraftStore
 
 **Files:**
-- Create: `packages/api/pencraft/drafts/sql_store.py`
+- Create: `packages/api/blogforge/drafts/sql_store.py`
 - Test: `packages/api/tests/test_drafts_scoped_by_user.py`
 
 - [ ] **Step 1: Write the scope test**
@@ -2296,12 +2296,12 @@ Create `packages/api/tests/test_drafts_scoped_by_user.py`:
 import pytest
 from uuid import uuid4
 
-from pencraft.auth.passwords import hash_password
-from pencraft.db.base import Base
-from pencraft.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
-from pencraft.db.models import User
-from pencraft.drafts.models import IdeaInput
-from pencraft.drafts.sql_store import SqlDraftStore
+from blogforge.auth.passwords import hash_password
+from blogforge.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
+from blogforge.db.models import User
+from blogforge.drafts.models import IdeaInput
+from blogforge.drafts.sql_store import SqlDraftStore
 
 
 @pytest.fixture
@@ -2376,11 +2376,11 @@ async def test_update_rejects_cross_user(two_users):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `uv run pytest packages/api/tests/test_drafts_scoped_by_user.py -v`
-Expected: ImportError on `pencraft.drafts.sql_store`.
+Expected: ImportError on `blogforge.drafts.sql_store`.
 
 - [ ] **Step 3: Implement SqlDraftStore**
 
-Create `packages/api/pencraft/drafts/sql_store.py`:
+Create `packages/api/blogforge/drafts/sql_store.py`:
 
 ```python
 """Postgres-backed draft store. Replaces the JSON-on-disk DraftStore.
@@ -2395,10 +2395,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 
-from pencraft.db.engine import get_sessionmaker
-from pencraft.db.models import Draft as DraftRow
-from pencraft.db.models import Section as SectionRow
-from pencraft.drafts.models import (
+from blogforge.db.engine import get_sessionmaker
+from blogforge.db.models import Draft as DraftRow
+from blogforge.db.models import Section as SectionRow
+from blogforge.drafts.models import (
     Draft,
     DraftSummary,
     IdeaInput,
@@ -2578,7 +2578,7 @@ Expected: 5 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/drafts/sql_store.py packages/api/tests/test_drafts_scoped_by_user.py
+git add packages/api/blogforge/drafts/sql_store.py packages/api/tests/test_drafts_scoped_by_user.py
 git commit -m "feat(drafts): SqlDraftStore with per-user scoping"
 ```
 
@@ -2587,21 +2587,21 @@ git commit -m "feat(drafts): SqlDraftStore with per-user scoping"
 ### Task 17: Wire SqlDraftStore into /api/drafts routes
 
 **Files:**
-- Modify: `packages/api/pencraft/api/drafts.py` (current routes)
-- Modify: `packages/api/pencraft/server.py` (store instantiation)
+- Modify: `packages/api/blogforge/api/drafts.py` (current routes)
+- Modify: `packages/api/blogforge/server.py` (store instantiation)
 
 - [ ] **Step 1: Read existing drafts.py to find what to change**
 
-Run: `uv run grep -n "store\|DraftStore\|request.app.state" packages/api/pencraft/api/drafts.py`
+Run: `uv run grep -n "store\|DraftStore\|request.app.state" packages/api/blogforge/api/drafts.py`
 Take note of every line that references the old `DraftStore`. Expect ~6-8 references.
 
 - [ ] **Step 2: Update routes to accept current_user and use SqlDraftStore**
 
-For every function in `packages/api/pencraft/api/drafts.py`:
+For every function in `packages/api/blogforge/api/drafts.py`:
 
-1. Add `from pencraft.auth.dependencies import get_current_user`
-2. Add `from pencraft.drafts.sql_store import SqlDraftStore`
-3. Add `from pencraft.db.models import User` to the imports
+1. Add `from blogforge.auth.dependencies import get_current_user`
+2. Add `from blogforge.drafts.sql_store import SqlDraftStore`
+3. Add `from blogforge.db.models import User` to the imports
 4. Replace the existing store retrieval with:
    ```python
    def _get_store(request: Request) -> SqlDraftStore:
@@ -2617,10 +2617,10 @@ The complete new file (replace entirely):
 """Draft CRUD routes — user-scoped via Postgres."""
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from pencraft.auth.dependencies import get_current_user
-from pencraft.db.models import User
-from pencraft.drafts.models import Draft, DraftSummary, IdeaInput
-from pencraft.drafts.sql_store import SqlDraftStore
+from blogforge.auth.dependencies import get_current_user
+from blogforge.db.models import User
+from blogforge.drafts.models import Draft, DraftSummary, IdeaInput
+from blogforge.drafts.sql_store import SqlDraftStore
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
@@ -2692,15 +2692,15 @@ async def delete_draft(
 
 - [ ] **Step 3: Update server.py to attach the new store**
 
-In `packages/api/pencraft/server.py`, find where `draft_store` is set on app state. Replace `DraftStore(...)` with `SqlDraftStore()`:
+In `packages/api/blogforge/server.py`, find where `draft_store` is set on app state. Replace `DraftStore(...)` with `SqlDraftStore()`:
 
 ```python
 # inside create_app(), where the old DraftStore is created:
-from pencraft.drafts.sql_store import SqlDraftStore
+from blogforge.drafts.sql_store import SqlDraftStore
 app.state.draft_store = SqlDraftStore()
 ```
 
-Remove the now-unused import of the old `DraftStore`. Leave the old `pencraft/drafts/store.py` file in place for one more commit (we'll delete in a later task once all routes have migrated).
+Remove the now-unused import of the old `DraftStore`. Leave the old `blogforge/drafts/store.py` file in place for one more commit (we'll delete in a later task once all routes have migrated).
 
 - [ ] **Step 4: Run tests**
 
@@ -2711,7 +2711,7 @@ The scope test should still pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/api/drafts.py packages/api/pencraft/server.py
+git add packages/api/blogforge/api/drafts.py packages/api/blogforge/server.py
 git commit -m "feat(drafts): /api/drafts wired to SqlDraftStore + current_user"
 ```
 
@@ -2731,10 +2731,10 @@ Append to `packages/api/tests/conftest.py`:
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
-from pencraft.auth.passwords import hash_password
-from pencraft.auth.sessions import COOKIE_NAME, SessionSigner
-from pencraft.db.models import User
-from pencraft.server import create_app
+from blogforge.auth.passwords import hash_password
+from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
+from blogforge.db.models import User
+from blogforge.server import create_app
 
 
 @pytest_asyncio.fixture
@@ -2763,8 +2763,8 @@ async def authed_client():
 You'll need to add the imports at the top of conftest if not already present:
 
 ```python
-from pencraft.db.engine import get_engine, get_sessionmaker
-from pencraft.db.base import Base
+from blogforge.db.engine import get_engine, get_sessionmaker
+from blogforge.db.base import Base
 ```
 
 - [ ] **Step 2: Update test_drafts.py to use the new fixture**
@@ -2805,17 +2805,17 @@ git commit -m "test(drafts): use authed_client fixture against SQL store"
 ### Task 19: Wire user-scoping into outline / section / expand / download / lint routes
 
 **Files:**
-- Modify: `packages/api/pencraft/api/outline.py`
-- Modify: `packages/api/pencraft/api/section.py`
-- Modify: `packages/api/pencraft/api/expand.py`
-- Modify: `packages/api/pencraft/api/download.py`
-- Modify: `packages/api/pencraft/api/lint.py`
+- Modify: `packages/api/blogforge/api/outline.py`
+- Modify: `packages/api/blogforge/api/section.py`
+- Modify: `packages/api/blogforge/api/expand.py`
+- Modify: `packages/api/blogforge/api/download.py`
+- Modify: `packages/api/blogforge/api/lint.py`
 - Modify: all their tests (`tests/test_outline_route.py`, `test_section_route.py`, `test_expand_route.py`, `test_download_route.py`, `test_lint_route.py`)
 
 The change is mechanical and identical across all five route files:
 
-1. Add `from pencraft.auth.dependencies import get_current_user` import.
-2. Add `from pencraft.db.models import User` import.
+1. Add `from blogforge.auth.dependencies import get_current_user` import.
+2. Add `from blogforge.db.models import User` import.
 3. Every handler signature gains `current: User = Depends(get_current_user)`.
 4. Every `store.get(draft_id)` becomes `await store.get(draft_id, user_id=current.id)`.
 5. Every `store.update(draft_id, draft)` becomes `await store.update(draft_id, draft, user_id=current.id)`.
@@ -2825,7 +2825,7 @@ Tests: every existing test gets the `authed_client` fixture instead of `client`,
 
 - [ ] **Step 1: Modify outline.py and run its tests**
 
-Edit `packages/api/pencraft/api/outline.py` per the pattern above.
+Edit `packages/api/blogforge/api/outline.py` per the pattern above.
 Edit `packages/api/tests/test_outline_route.py` to use `authed_client`.
 
 Run: `uv run pytest packages/api/tests/test_outline_route.py -v`
@@ -2857,7 +2857,7 @@ Expected: all passing.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add packages/api/pencraft/api packages/api/tests
+git add packages/api/blogforge/api packages/api/tests
 git commit -m "feat(api): user-scope outline/section/expand/download/lint routes"
 ```
 
@@ -2866,17 +2866,17 @@ git commit -m "feat(api): user-scope outline/section/expand/download/lint routes
 ### Task 20: Delete the legacy JSON DraftStore
 
 **Files:**
-- Delete: `packages/api/pencraft/drafts/store.py`
+- Delete: `packages/api/blogforge/drafts/store.py`
 
 - [ ] **Step 1: Verify nothing else imports it**
 
-Run: `uv run grep -rn "from pencraft.drafts.store\|pencraft.drafts.store" packages/api`
+Run: `uv run grep -rn "from blogforge.drafts.store\|blogforge.drafts.store" packages/api`
 Expected: no results.
 
 - [ ] **Step 2: Delete**
 
 ```bash
-rm packages/api/pencraft/drafts/store.py
+rm packages/api/blogforge/drafts/store.py
 uv run pytest packages/api/tests -v
 ```
 Expected: still passing.
@@ -2884,7 +2884,7 @@ Expected: still passing.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add -A packages/api/pencraft/drafts
+git add -A packages/api/blogforge/drafts
 git commit -m "chore(drafts): delete legacy JSON DraftStore"
 ```
 
@@ -2893,11 +2893,11 @@ git commit -m "chore(drafts): delete legacy JSON DraftStore"
 ### Task 21: Wire CORS + auth middleware + lifespan into server.py
 
 **Files:**
-- Modify: `packages/api/pencraft/server.py`
+- Modify: `packages/api/blogforge/server.py`
 
 - [ ] **Step 1: Read the current server.py**
 
-Run: `cat packages/api/pencraft/server.py` and review. Note the existing helpers:
+Run: `cat packages/api/blogforge/server.py` and review. Note the existing helpers:
 - `_resolve_pack_roots()`, `_resolve_static_dir()`, `_is_dev_mode()`, `_read_myvoice_pack_paths()`
 - A `_lifespan` that builds `DraftStore`, `PackStore`, `JobRegistry`, `EventBus`
 - An inline `/api/health` route (no separate `health` router module)
@@ -2908,7 +2908,7 @@ The rewrite **preserves** all of the above and **layers** auth/admin/db/migratio
 
 - [ ] **Step 2: Rewrite server.py preserving existing helpers, layering on auth + DB**
 
-Replace `packages/api/pencraft/server.py` with:
+Replace `packages/api/blogforge/server.py` with:
 
 ```python
 """FastAPI application factory."""
@@ -2925,16 +2925,16 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from myvoice import PackStore
 
-from pencraft import __version__
-from pencraft.api.events import EventBus
-from pencraft.config import get_settings
-from pencraft.config.tanzu import apply_vcap_services
-from pencraft.db.engine import get_engine, get_sessionmaker
-from pencraft.db.seed import ensure_admin_user
-from pencraft.drafts.sql_store import SqlDraftStore
-from pencraft.jobs.registry import JobRegistry
+from blogforge import __version__
+from blogforge.api.events import EventBus
+from blogforge.config import get_settings
+from blogforge.config.tanzu import apply_vcap_services
+from blogforge.db.engine import get_engine, get_sessionmaker
+from blogforge.db.seed import ensure_admin_user
+from blogforge.drafts.sql_store import SqlDraftStore
+from blogforge.jobs.registry import JobRegistry
 
-# Translate VCAP_SERVICES into PENCRAFT_* env vars before Settings is read.
+# Translate VCAP_SERVICES into BLOGFORGE_* env vars before Settings is read.
 apply_vcap_services()
 
 
@@ -2943,12 +2943,12 @@ def _default_static_dir() -> Path:
 
 
 def _resolve_static_dir() -> Path:
-    env = os.environ.get("PENCRAFT_STATIC_DIR")
+    env = os.environ.get("BLOGFORGE_STATIC_DIR")
     return Path(env) if env else _default_static_dir()
 
 
 def _is_dev_mode() -> bool:
-    return os.environ.get("PENCRAFT_DEV", "").lower() in ("1", "true", "yes")
+    return os.environ.get("BLOGFORGE_DEV", "").lower() in ("1", "true", "yes")
 
 
 def _resolve_pack_roots() -> list[Path]:
@@ -3029,7 +3029,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     """Build and return the FastAPI app."""
     settings = get_settings()
-    app = FastAPI(title="pencraft", version=__version__, lifespan=_lifespan)
+    app = FastAPI(title="blogforge", version=__version__, lifespan=_lifespan)
 
     if settings.cors_origins:
         app.add_middleware(
@@ -3041,18 +3041,18 @@ def create_app() -> FastAPI:
             expose_headers=["x-job-id"],
         )
 
-    from pencraft.api.admin import router as admin_router
-    from pencraft.api.auth import router as auth_router
-    from pencraft.api.download import router as download_router
-    from pencraft.api.drafts import router as drafts_router
-    from pencraft.api.events import router as events_router
-    from pencraft.api.expand import router as expand_router
-    from pencraft.api.jobs import router as jobs_router
-    from pencraft.api.lint import router as lint_router
-    from pencraft.api.outline import router as outline_router
-    from pencraft.api.packs import router as packs_router
-    from pencraft.api.providers import router as providers_router
-    from pencraft.api.section import router as section_router
+    from blogforge.api.admin import router as admin_router
+    from blogforge.api.auth import router as auth_router
+    from blogforge.api.download import router as download_router
+    from blogforge.api.drafts import router as drafts_router
+    from blogforge.api.events import router as events_router
+    from blogforge.api.expand import router as expand_router
+    from blogforge.api.jobs import router as jobs_router
+    from blogforge.api.lint import router as lint_router
+    from blogforge.api.outline import router as outline_router
+    from blogforge.api.packs import router as packs_router
+    from blogforge.api.providers import router as providers_router
+    from blogforge.api.section import router as section_router
 
     app.include_router(auth_router)
     app.include_router(admin_router)
@@ -3083,14 +3083,14 @@ def create_app() -> FastAPI:
     else:
         @app.get("/", response_class=HTMLResponse)
         def root_dev() -> str:
-            return "<!doctype html><html><body><h1>pencraft dev</h1></body></html>"
+            return "<!doctype html><html><body><h1>blogforge dev</h1></body></html>"
 
     return app
 ```
 
 - [ ] **Step 3: Disable migrations-on-boot for tests**
 
-The conftest already sets `PENCRAFT_RUN_MIGRATIONS_ON_BOOT=false` via env. Verify by running the full suite:
+The conftest already sets `BLOGFORGE_RUN_MIGRATIONS_ON_BOOT=false` via env. Verify by running the full suite:
 
 Run: `uv run pytest packages/api/tests -v`
 Expected: all passing.
@@ -3099,11 +3099,11 @@ Expected: all passing.
 
 Run:
 ```bash
-PENCRAFT_DATABASE_URL="sqlite+aiosqlite:////tmp/pencraft-boot.db" \
-  PENCRAFT_RUN_MIGRATIONS_ON_BOOT=true \
+BLOGFORGE_DATABASE_URL="sqlite+aiosqlite:////tmp/blogforge-boot.db" \
+  BLOGFORGE_RUN_MIGRATIONS_ON_BOOT=true \
   uv run python -c "
 import asyncio
-from pencraft.server import create_app
+from blogforge.server import create_app
 app = create_app()
 async def boot():
     async with app.router.lifespan_context(app):
@@ -3114,16 +3114,16 @@ print('lifespan ran ok')
 ```
 Expected: prints `lifespan ran ok`. Verify with sqlite that the `users` table now contains the admin user:
 ```bash
-uv run python -c "import sqlite3; print(sqlite3.connect('/tmp/pencraft-boot.db').execute('SELECT email,status,role FROM users').fetchall())"
+uv run python -c "import sqlite3; print(sqlite3.connect('/tmp/blogforge-boot.db').execute('SELECT email,status,role FROM users').fetchall())"
 ```
 Expected: `[('dbbaskette@gmail.com', 'approved', 'admin')]`.
 
-Cleanup: `rm /tmp/pencraft-boot.db`
+Cleanup: `rm /tmp/blogforge-boot.db`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add packages/api/pencraft/server.py
+git add packages/api/blogforge/server.py
 git commit -m "feat(server): lifespan runs migrations + seeds admin; CORS configured"
 ```
 
@@ -3145,7 +3145,7 @@ Create `packages/web/src/api/client.ts`:
 
 ```typescript
 /**
- * Single source of truth for talking to the Pencraft API.
+ * Single source of truth for talking to the BlogForge API.
  * Every call rides the session cookie via `credentials: "include"` so
  * cross-origin dev (vite :7881 -> api :7880) works without manual config.
  */
@@ -3606,7 +3606,7 @@ export function LoginPage(): JSX.Element {
           <div className="w-10 h-10 mx-auto rounded-[10px] bg-gradient-to-br from-cobalt-500 to-cobalt-300 grid place-items-center text-white font-serif italic font-semibold text-lg shadow-nb-cobalt mb-3">
             P
           </div>
-          <h1 className="font-serif text-2xl font-medium text-ink tracking-tight">Pencraft</h1>
+          <h1 className="font-serif text-2xl font-medium text-ink tracking-tight">BlogForge</h1>
           <p className="text-sm text-muted mt-1">A workshop for long-form writing.</p>
         </header>
 
@@ -4053,7 +4053,7 @@ function TopBar(): JSX.Element {
             P
           </span>
           <span className="flex flex-col leading-tight">
-            <span className="font-semibold text-[15px] text-ink tracking-tight">Pencraft</span>
+            <span className="font-semibold text-[15px] text-ink tracking-tight">BlogForge</span>
             <span className="text-[11px] text-muted leading-none mt-0.5">a workshop</span>
           </span>
         </Link>
@@ -4076,7 +4076,7 @@ function TopBar(): JSX.Element {
 }
 ```
 
-- [ ] **Step 2: Existing App.test.tsx still expects "Pencraft" — verify**
+- [ ] **Step 2: Existing App.test.tsx still expects "BlogForge" — verify**
 
 Run: `cd packages/web && pnpm exec vitest run tests/App.test.tsx`
 Expected: still passing (the wordmark is still in the brand link).
@@ -4199,7 +4199,7 @@ git commit -m "feat(web): wire /login, /admin, and RequireAuth around routes"
 Create `packages/api/Dockerfile`:
 
 ```dockerfile
-# Pencraft API — multi-stage build.
+# BlogForge API — multi-stage build.
 # 1) Build the web bundle.
 # 2) Install Python deps via uv.
 # 3) Slim runtime image with the web bundle baked in.
@@ -4228,7 +4228,7 @@ COPY pyproject.toml uv.lock /app/
 COPY packages/api /app/packages/api
 
 # Copy the built web bundle into the API's static dir.
-COPY --from=web /work/packages/web/dist /app/packages/api/pencraft/static
+COPY --from=web /work/packages/web/dist /app/packages/api/blogforge/static
 
 # Install Python deps (system install — production image, no venv).
 RUN uv pip install --system --no-cache .
@@ -4237,7 +4237,7 @@ RUN uv pip install --system --no-cache .
 ENV PORT=7880
 EXPOSE 7880
 
-CMD ["sh", "-c", "pencraft serve --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "blogforge serve --host 0.0.0.0 --port ${PORT}"]
 ```
 
 Create `.dockerignore` at repo root:
@@ -4261,7 +4261,7 @@ Create `.dockerignore` at repo root:
 
 - [ ] **Step 2: Build the image locally**
 
-Run: `docker build -f packages/api/Dockerfile -t pencraft-api:dev .`
+Run: `docker build -f packages/api/Dockerfile -t blogforge-api:dev .`
 Expected: build succeeds in ~2-3 minutes; final image ~250MB.
 
 - [ ] **Step 3: Commit**
@@ -4287,13 +4287,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: pencraft
-      POSTGRES_PASSWORD: pencraft
-      POSTGRES_DB: pencraft
+      POSTGRES_USER: blogforge
+      POSTGRES_PASSWORD: blogforge
+      POSTGRES_DB: blogforge
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "pencraft"]
+      test: ["CMD", "pg_isready", "-U", "blogforge"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -4302,8 +4302,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: pencraft
-      MINIO_ROOT_PASSWORD: pencraft-minio-secret
+      MINIO_ROOT_USER: blogforge
+      MINIO_ROOT_PASSWORD: blogforge-minio-secret
     ports: ["9000:9000", "9001:9001"]
     volumes: ["miniodata:/data"]
     healthcheck:
@@ -4317,15 +4317,15 @@ services:
       context: .
       dockerfile: packages/api/Dockerfile
     environment:
-      PENCRAFT_DATABASE_URL: "postgresql+asyncpg://pencraft:pencraft@postgres:5432/pencraft"
-      PENCRAFT_S3_ENDPOINT_URL: "http://minio:9000"
-      PENCRAFT_S3_ACCESS_KEY: pencraft
-      PENCRAFT_S3_SECRET_KEY: pencraft-minio-secret
-      PENCRAFT_S3_BUCKET: pencraft
-      PENCRAFT_SESSION_SECRET: dev-session-secret-change-me
-      PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
-      PENCRAFT_ADMIN_PASSWORD: VMware0!
-      PENCRAFT_CORS_ORIGINS: "http://localhost:7881"
+      BLOGFORGE_DATABASE_URL: "postgresql+asyncpg://blogforge:blogforge@postgres:5432/blogforge"
+      BLOGFORGE_S3_ENDPOINT_URL: "http://minio:9000"
+      BLOGFORGE_S3_ACCESS_KEY: blogforge
+      BLOGFORGE_S3_SECRET_KEY: blogforge-minio-secret
+      BLOGFORGE_S3_BUCKET: blogforge
+      BLOGFORGE_SESSION_SECRET: dev-session-secret-change-me
+      BLOGFORGE_ADMIN_EMAIL: dbbaskette@gmail.com
+      BLOGFORGE_ADMIN_PASSWORD: VMware0!
+      BLOGFORGE_CORS_ORIGINS: "http://localhost:7881"
     depends_on:
       postgres:
         condition: service_healthy
@@ -4355,7 +4355,7 @@ Expected: `401`.
 Log in as admin:
 Run:
 ```bash
-curl -s -c /tmp/pencraft-cookie.txt -X POST \
+curl -s -c /tmp/blogforge-cookie.txt -X POST \
   -H 'Content-Type: application/json' \
   -d '{"email":"dbbaskette@gmail.com","password":"VMware0!"}' \
   http://localhost:7880/api/auth/login
@@ -4363,13 +4363,13 @@ curl -s -c /tmp/pencraft-cookie.txt -X POST \
 Expected: `{"status":"ok"}`.
 
 Hit /api/auth/me with cookie:
-Run: `curl -s -b /tmp/pencraft-cookie.txt http://localhost:7880/api/auth/me`
+Run: `curl -s -b /tmp/blogforge-cookie.txt http://localhost:7880/api/auth/me`
 Expected: JSON with `"role":"admin","status":"approved"`.
 
 - [ ] **Step 3: Tear down**
 
 Run: `docker compose down`
-Run: `rm /tmp/pencraft-cookie.txt`
+Run: `rm /tmp/blogforge-cookie.txt`
 
 - [ ] **Step 4: Commit**
 
@@ -4392,27 +4392,27 @@ Create `manifest.yml`:
 ```yaml
 ---
 applications:
-  - name: pencraft
+  - name: blogforge
     memory: 512M
     instances: 1
     buildpacks:
       - python_buildpack
-    command: pencraft serve --host 0.0.0.0 --port $PORT
+    command: blogforge serve --host 0.0.0.0 --port $PORT
     services:
-      - pencraft-postgres
-      - pencraft-s3
+      - blogforge-postgres
+      - blogforge-s3
     env:
       # Required at deploy time:
-      #   cf set-env pencraft PENCRAFT_ADMIN_PASSWORD <strong-secret>
-      #   cf set-env pencraft PENCRAFT_SESSION_SECRET <64-char-hex>
+      #   cf set-env blogforge BLOGFORGE_ADMIN_PASSWORD <strong-secret>
+      #   cf set-env blogforge BLOGFORGE_SESSION_SECRET <64-char-hex>
       # The Tanzu config adapter translates VCAP_SERVICES into
-      # PENCRAFT_DATABASE_URL and PENCRAFT_S3_* at startup.
-      PENCRAFT_ADMIN_EMAIL: dbbaskette@gmail.com
-      PENCRAFT_S3_BUCKET: pencraft
-      PENCRAFT_S3_REGION: us-east-1
-      PENCRAFT_RUN_MIGRATIONS_ON_BOOT: "true"
+      # BLOGFORGE_DATABASE_URL and BLOGFORGE_S3_* at startup.
+      BLOGFORGE_ADMIN_EMAIL: dbbaskette@gmail.com
+      BLOGFORGE_S3_BUCKET: blogforge
+      BLOGFORGE_S3_REGION: us-east-1
+      BLOGFORGE_RUN_MIGRATIONS_ON_BOOT: "true"
       # Empty by default — when api and web share an origin, CORS is unnecessary.
-      PENCRAFT_CORS_ORIGINS: ""
+      BLOGFORGE_CORS_ORIGINS: ""
 ```
 
 - [ ] **Step 2: Verify yaml syntax**
@@ -4461,15 +4461,15 @@ Run Postgres and MinIO via Docker, but the API/web from your host:
 
 ```bash
 docker compose up postgres minio -d
-PENCRAFT_DATABASE_URL="postgresql+asyncpg://pencraft:pencraft@localhost:5432/pencraft" \
-PENCRAFT_S3_ENDPOINT_URL="http://localhost:9000" \
-PENCRAFT_S3_ACCESS_KEY=pencraft \
-PENCRAFT_S3_SECRET_KEY=pencraft-minio-secret \
-PENCRAFT_S3_BUCKET=pencraft \
-PENCRAFT_ADMIN_EMAIL=dbbaskette@gmail.com \
-PENCRAFT_ADMIN_PASSWORD=VMware0! \
-PENCRAFT_CORS_ORIGINS=http://localhost:7881 \
-  uv run pencraft serve --port 7880
+BLOGFORGE_DATABASE_URL="postgresql+asyncpg://blogforge:blogforge@localhost:5432/blogforge" \
+BLOGFORGE_S3_ENDPOINT_URL="http://localhost:9000" \
+BLOGFORGE_S3_ACCESS_KEY=blogforge \
+BLOGFORGE_S3_SECRET_KEY=blogforge-minio-secret \
+BLOGFORGE_S3_BUCKET=blogforge \
+BLOGFORGE_ADMIN_EMAIL=dbbaskette@gmail.com \
+BLOGFORGE_ADMIN_PASSWORD=VMware0! \
+BLOGFORGE_CORS_ORIGINS=http://localhost:7881 \
+  uv run blogforge serve --port 7880
 ```
 
 In another terminal, the web dev server:
@@ -4482,15 +4482,15 @@ cd packages/web && pnpm dev
 ## Tanzu Platform deployment
 
 ```bash
-cf create-service postgres on-demand-postgres-small pencraft-postgres
-cf create-service seaweedfs default pencraft-s3
+cf create-service postgres on-demand-postgres-small blogforge-postgres
+cf create-service seaweedfs default blogforge-s3
 cf push -f manifest.yml
-cf set-env pencraft PENCRAFT_ADMIN_PASSWORD '<your-strong-secret>'
-cf set-env pencraft PENCRAFT_SESSION_SECRET "$(openssl rand -hex 32)"
-cf restage pencraft
+cf set-env blogforge BLOGFORGE_ADMIN_PASSWORD '<your-strong-secret>'
+cf set-env blogforge BLOGFORGE_SESSION_SECRET "$(openssl rand -hex 32)"
+cf restage blogforge
 ```
 
-The `pencraft.config.tanzu` adapter translates `VCAP_SERVICES` into the
+The `blogforge.config.tanzu` adapter translates `VCAP_SERVICES` into the
 env vars the app reads, so no manual database / S3 wiring is needed.
 ````
 
@@ -4572,8 +4572,8 @@ Implements the Phase A foundation per
 - AppShell gains current-user chip + sign-out + admin link.
 - Alembic migrations run on boot (configurable).
 - \`docker-compose.yml\` brings up api + postgres + minio.
-- \`manifest.yml\` for Tanzu with bound \`pencraft-postgres\` +
-  \`pencraft-s3\` (SeaweedFS) services; \`pencraft.config.tanzu\`
+- \`manifest.yml\` for Tanzu with bound \`blogforge-postgres\` +
+  \`blogforge-s3\` (SeaweedFS) services; \`blogforge.config.tanzu\`
   adapter translates \`VCAP_SERVICES\` -> env vars.
 
 Phase B (research stage + references) is unblocked once this merges.
@@ -4621,7 +4621,7 @@ Cross-referencing the spec sections against tasks:
 | `require_admin` dependency | Task 11 |
 | CORS | Task 21 |
 | Tanzu VCAP adapter | Task 3 |
-| `pencraft.config.Settings` | Task 2 |
+| `blogforge.config.Settings` | Task 2 |
 | Alembic migrations | Task 6 + Task 21 (lifespan) |
 | `SqlDraftStore` replaces filesystem | Task 16 |
 | All existing routes scoped by user | Tasks 17, 19 |
@@ -4635,7 +4635,7 @@ Cross-referencing the spec sections against tasks:
 | Docker Compose (postgres + minio + api) | Task 30 |
 | Multi-stage Dockerfile | Task 29 |
 | Tanzu `manifest.yml` | Task 31 |
-| Drop existing `~/.pencraft/drafts/` data | Inherent — Task 16 doesn't migrate, Task 20 deletes the loader |
+| Drop existing `~/.blogforge/drafts/` data | Inherent — Task 16 doesn't migrate, Task 20 deletes the loader |
 | README updates | Task 32 |
 | Tests: auth_request_login | Task 12, 13 |
 | Tests: auth_pending_blocked | Task 14 |

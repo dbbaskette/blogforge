@@ -2,7 +2,7 @@
 import os
 from unittest import mock
 
-from pencraft.config.settings import Settings
+from blogforge.config.settings import Settings
 
 
 def test_defaults_when_no_env():
@@ -14,15 +14,15 @@ def test_defaults_when_no_env():
     assert s.admin_password == "VMware0!"
     assert s.session_secret  # non-empty default
     assert s.cors_origins == ["http://localhost:7881"]
-    assert s.s3_bucket == "pencraft"
+    assert s.s3_bucket == "blogforge"
 
 
 def test_env_overrides():
-    """PENCRAFT_-prefixed env vars override defaults."""
+    """BLOGFORGE_-prefixed env vars override defaults."""
     env = {
-        "PENCRAFT_DATABASE_URL": "postgresql+asyncpg://u:p@h/db",
-        "PENCRAFT_ADMIN_EMAIL": "root@example.com",
-        "PENCRAFT_CORS_ORIGINS": "http://a.com,http://b.com",
+        "BLOGFORGE_DATABASE_URL": "postgresql+asyncpg://u:p@h/db",
+        "BLOGFORGE_ADMIN_EMAIL": "root@example.com",
+        "BLOGFORGE_CORS_ORIGINS": "http://a.com,http://b.com",
     }
     with mock.patch.dict(os.environ, env, clear=True):
         s = Settings()

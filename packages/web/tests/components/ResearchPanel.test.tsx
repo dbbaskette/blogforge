@@ -75,7 +75,7 @@ describe("ResearchPanel", () => {
 
     await waitFor(() => expect(screen.getByText("Hi there")).toBeInTheDocument());
     expect(screen.getByText("Hello!")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Message Pencraft/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Message BlogForge/i)).toBeInTheDocument();
   });
 
   it("posts an ideation message on Send", async () => {
@@ -85,8 +85,8 @@ describe("ResearchPanel", () => {
 
     render(<ResearchPanel draft={draft} onJobComplete={vi.fn()} />);
 
-    await waitFor(() => expect(screen.getByLabelText(/Message Pencraft/i)).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText(/Message Pencraft/i), {
+    await waitFor(() => expect(screen.getByLabelText(/Message BlogForge/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/Message BlogForge/i), {
       target: { value: "What do you think?" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^Send$/ }));

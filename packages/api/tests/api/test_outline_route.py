@@ -37,8 +37,8 @@ async def outline_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setenv("MYVOICE_PACKS_ROOT", str(packs_root))
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(cfg_path))
-    monkeypatch.setenv("PENCRAFT_TEST_PROVIDER", "mock")
-    monkeypatch.setenv("PENCRAFT_MOCK_OUTPUT_JSON", json.dumps(_CANNED))
+    monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
+    monkeypatch.setenv("BLOGFORGE_MOCK_OUTPUT_JSON", json.dumps(_CANNED))
 
     uid = await _seed_approved_user()
     with _signed_client(uid) as c:

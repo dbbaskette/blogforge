@@ -145,7 +145,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
             What's this one about?
           </h2>
           <p className="text-sm text-muted mt-1.5 leading-relaxed">
-            Pencraft will draft an outline first, then compose each section in your voice.
+            BlogForge will draft an outline first, then compose each section in your voice.
           </p>
         </header>
 

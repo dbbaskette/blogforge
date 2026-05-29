@@ -24,8 +24,8 @@ async def expand_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     cfg.write_text(yaml.safe_dump({"providers": {"anthropic": {"api_key": "sk-mock"}}}))
     monkeypatch.setenv("MYVOICE_PACKS_ROOT", str(packs_root))
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(cfg))
-    monkeypatch.setenv("PENCRAFT_TEST_PROVIDER", "mock")
-    monkeypatch.setenv("PENCRAFT_MOCK_OUTPUT", "Section body content here.")
+    monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
+    monkeypatch.setenv("BLOGFORGE_MOCK_OUTPUT", "Section body content here.")
 
     uid = await _seed_approved_user()
     with _signed_client(uid) as c:

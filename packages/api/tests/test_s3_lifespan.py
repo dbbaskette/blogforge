@@ -2,9 +2,9 @@
 import pytest_asyncio
 from moto.server import ThreadedMotoServer
 
-from pencraft.config import get_settings
-from pencraft.s3 import get_s3_client, reset_s3_client_for_tests
-from pencraft.s3.lifespan import ensure_bucket
+from blogforge.config import get_settings
+from blogforge.s3 import get_s3_client, reset_s3_client_for_tests
+from blogforge.s3.lifespan import ensure_bucket
 
 
 @pytest_asyncio.fixture
@@ -18,11 +18,11 @@ async def s3_endpoint():
     from unittest import mock
 
     env = {
-        "PENCRAFT_S3_ENDPOINT_URL": endpoint,
-        "PENCRAFT_S3_ACCESS_KEY": "test",
-        "PENCRAFT_S3_SECRET_KEY": "test",
-        "PENCRAFT_S3_BUCKET": "lifespan-test",
-        "PENCRAFT_S3_REGION": "us-east-1",
+        "BLOGFORGE_S3_ENDPOINT_URL": endpoint,
+        "BLOGFORGE_S3_ACCESS_KEY": "test",
+        "BLOGFORGE_S3_SECRET_KEY": "test",
+        "BLOGFORGE_S3_BUCKET": "lifespan-test",
+        "BLOGFORGE_S3_REGION": "us-east-1",
     }
     with mock.patch.dict(os.environ, env, clear=False):
         get_settings.cache_clear()

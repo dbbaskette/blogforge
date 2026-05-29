@@ -13,4 +13,4 @@ def test_root_dev_mode_returns_placeholder(client: TestClient) -> None:
     """When no static bundle exists, root returns the dev placeholder."""
     r = client.get("/")
     assert r.status_code == 200
-    assert "pencraft" in r.text.lower()
+    assert "blogforge" in r.text.lower()

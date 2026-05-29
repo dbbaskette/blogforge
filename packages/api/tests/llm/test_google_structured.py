@@ -8,8 +8,8 @@ import httpx
 import pytest
 import respx
 
-from pencraft.llm.exceptions import ProviderError
-from pencraft.llm.google import GoogleProvider, to_google_schema
+from blogforge.llm.exceptions import ProviderError
+from blogforge.llm.google import GoogleProvider, to_google_schema
 
 _SIMPLE_SCHEMA = {
     "type": "object",
