@@ -158,6 +158,33 @@ class ProviderKey(Base):
     )
 
 
+class SectionVersion(Base):
+    """A point-in-time snapshot of a section's prose, captured just before
+    an action (regenerate / save / revert) overwrote it.
+
+    Lets the author browse prior drafts of a section and revert to one.
+    Not FK'd to ``sections`` (the slug can be re-created across outline
+    edits); it carries ``draft_id`` for cascade-on-draft-delete and a loose
+    ``section_id`` slug. Capped to the last N per (draft_id, section_id) —
+    older rows are pruned on insert.
+    """
+
+    __tablename__ = "section_versions"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    draft_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    section_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    content_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    word_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="ready")
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="regenerate")
+    # one of: "regenerate" | "save" | "revert" — the action that displaced this content.
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Section(Base):
     __tablename__ = "sections"
     __table_args__ = (UniqueConstraint("draft_id", "position", name="uq_section_position"),)

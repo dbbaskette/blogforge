@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from pencraft.auth.dependencies import get_current_user
 from pencraft.db.models import User
-from pencraft.drafts.models import Draft
+from pencraft.drafts.models import Draft, SectionVersion
 from pencraft.drafts.sql_store import SqlDraftStore
 from pencraft.generate.references import get_reference_context
 from pencraft.generate.section import stream_section
@@ -34,6 +34,13 @@ class _SaveBody(BaseModel):
 
 class _ReorderBody(BaseModel):
     section_ids: list[str]
+
+
+class _RegenerateBody(BaseModel):
+    """Optional author note steering the regeneration ("tighten this",
+    "add a concrete example", "less formal"). Empty/absent = plain regen."""
+
+    instruction: str = ""
 
 
 def _section_not_found(section_id: str) -> HTTPException:
@@ -65,6 +72,17 @@ async def save_section(
     section = next((s for s in draft.sections if s.id == section_id), None)
     if section is None:
         raise _section_not_found(section_id)
+    # Snapshot the prior content so a manual edit can be undone.
+    await store.add_section_version(
+        draft.id,
+        section_id,
+        user_id=current.id,
+        title=section.title,
+        content_md=section.content_md,
+        word_count=section.word_count,
+        status=section.status,
+        source="save",
+    )
     section.content_md = body.content_md
     section.status = "edited"
     section.last_error = None
@@ -110,6 +128,7 @@ async def regenerate_section(
     section_id: str,
     request: Request,
     background_tasks: BackgroundTasks,
+    body: _RegenerateBody | None = None,
     current: User = Depends(get_current_user),
 ) -> dict[str, str]:
     store: SqlDraftStore = request.app.state.draft_store
@@ -155,8 +174,50 @@ async def regenerate_section(
         api_key,
         draft.idea.model,
         current.id,
+        body.instruction if body else "",
     )
     return {"job_id": job.id}
+
+
+@router.get("/api/drafts/{draft_id}/sections/{section_id}/versions")
+async def list_section_versions(
+    draft_id: str,
+    section_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> list[SectionVersion]:
+    store: SqlDraftStore = request.app.state.draft_store
+    draft = await store.get(draft_id, user_id=current.id)
+    if draft is None:
+        raise _draft_not_found(draft_id)
+    if not any(s.id == section_id for s in draft.sections):
+        raise _section_not_found(section_id)
+    return await store.list_section_versions(draft_id, section_id, user_id=current.id)
+
+
+@router.post("/api/drafts/{draft_id}/sections/{section_id}/versions/{version_id}/revert")
+async def revert_section_version(
+    draft_id: str,
+    section_id: str,
+    version_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    store: SqlDraftStore = request.app.state.draft_store
+    reverted = await store.revert_section(
+        draft_id, section_id, version_id, user_id=current.id
+    )
+    if reverted is None:
+        raise HTTPException(
+            404,
+            detail={
+                "error": {
+                    "code": "version_not_found",
+                    "message": f"No version '{version_id}' for section '{section_id}'",
+                }
+            },
+        )
+    return reverted
 
 
 async def _run_regenerate(
@@ -170,6 +231,7 @@ async def _run_regenerate(
     api_key: str,
     model: str,
     user_id: UUID,
+    instruction: str = "",
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
     try:
@@ -187,6 +249,19 @@ async def _run_regenerate(
         ) or {}
         provider = get_provider(provider_name, api_key)
 
+        # Snapshot the prior content before it's overwritten so the author
+        # can compare against — or revert to — the pre-regeneration version.
+        await store.add_section_version(
+            draft.id,
+            section_id,
+            user_id=user_id,
+            title=section.title,
+            content_md=section.content_md,
+            word_count=section.word_count,
+            status=section.status,
+            source="regenerate",
+        )
+
         section.status = "generating"
         section.last_error = None
         await store.update(draft.id, draft, user_id=user_id)
@@ -202,6 +277,7 @@ async def _run_regenerate(
                 provider,
                 model=model,
                 reference_context=reference_context,
+                instruction=instruction,
             ):
                 if cancel_evt.is_set():
                     section.status = "failed"

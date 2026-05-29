@@ -53,6 +53,23 @@ class Section(BaseModel):
     word_count: int = 0
 
 
+VersionSource = Literal["regenerate", "save", "revert"]
+
+
+class SectionVersion(BaseModel):
+    """A stored snapshot of a section's prior content, surfaced in the
+    section version-history panel."""
+
+    id: str
+    section_id: str
+    title: str = ""
+    content_md: str = ""
+    word_count: int = 0
+    status: SectionStatus = "ready"
+    source: VersionSource = "regenerate"
+    created_at: datetime = Field(default_factory=_now)
+
+
 DraftStage = Literal["research", "outline", "sections"]
 
 ReferenceKind = Literal["url", "file", "text"]

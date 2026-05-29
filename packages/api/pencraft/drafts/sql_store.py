@@ -8,10 +8,12 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from pencraft.db.engine import get_sessionmaker
 from pencraft.db.models import Draft as DraftRow
 from pencraft.db.models import Section as SectionRow
+from pencraft.db.models import SectionVersion as SectionVersionRow
 from pencraft.drafts.models import (
     Draft,
     DraftSummary,
@@ -20,7 +22,11 @@ from pencraft.drafts.models import (
     OutlineProposal,
     Reference,
     Section,
+    SectionVersion,
 )
+
+# Per-section cap on stored version snapshots; older rows are pruned on insert.
+_MAX_VERSIONS_PER_SECTION = 10
 
 
 def _coerce_stage(raw: str) -> str:
@@ -82,6 +88,37 @@ def _draft_from_row(row: DraftRow) -> Draft:
             for m in sorted(row.ideation_messages, key=lambda m: m.position)
         ],
     )
+
+
+def _section_version_from_row(row: SectionVersionRow) -> SectionVersion:
+    return SectionVersion(
+        id=str(row.id),
+        section_id=row.section_id,
+        title=row.title,
+        content_md=row.content_md,
+        word_count=row.word_count,
+        status=row.status,  # type: ignore[arg-type]
+        source=row.source,  # type: ignore[arg-type]
+        created_at=row.created_at,
+    )
+
+
+async def _prune_section_versions(
+    session: AsyncSession, draft_uuid: UUID, section_id: str
+) -> None:
+    """Delete all but the most-recent _MAX_VERSIONS_PER_SECTION snapshots."""
+    rows = (
+        await session.execute(
+            select(SectionVersionRow)
+            .where(
+                SectionVersionRow.draft_id == draft_uuid,
+                SectionVersionRow.section_id == section_id,
+            )
+            .order_by(SectionVersionRow.created_at.desc())
+        )
+    ).scalars().all()
+    for old in rows[_MAX_VERSIONS_PER_SECTION:]:
+        await session.delete(old)
 
 
 def _summary_from_row(row: DraftRow) -> DraftSummary:
@@ -303,3 +340,141 @@ class SqlDraftStore:
             await session.delete(row)
             await session.commit()
             return True
+
+    async def _owns_draft(self, session: AsyncSession, draft_uuid: UUID, user_id: UUID) -> bool:
+        owner = (
+            await session.execute(
+                select(DraftRow.id).where(
+                    DraftRow.id == draft_uuid, DraftRow.user_id == user_id
+                )
+            )
+        ).scalar_one_or_none()
+        return owner is not None
+
+    async def add_section_version(
+        self,
+        draft_id: str,
+        section_id: str,
+        *,
+        user_id: UUID,
+        title: str,
+        content_md: str,
+        word_count: int,
+        status: str,
+        source: str,
+    ) -> None:
+        """Snapshot a section's prior state before it's overwritten.
+
+        No-op when the draft isn't owned by ``user_id`` or when ``content_md``
+        is blank (an empty section has nothing worth keeping)."""
+        if not content_md.strip():
+            return
+        try:
+            duuid = UUID(draft_id)
+        except ValueError:
+            return
+        async with get_sessionmaker()() as session:
+            if not await self._owns_draft(session, duuid, user_id):
+                return
+            session.add(
+                SectionVersionRow(
+                    draft_id=duuid,
+                    section_id=section_id,
+                    title=title,
+                    content_md=content_md,
+                    word_count=word_count,
+                    status=status,
+                    source=source,
+                )
+            )
+            await session.flush()
+            await _prune_section_versions(session, duuid, section_id)
+            await session.commit()
+
+    async def list_section_versions(
+        self, draft_id: str, section_id: str, *, user_id: UUID
+    ) -> list[SectionVersion]:
+        """Stored snapshots for a section, newest first. [] if not owned."""
+        try:
+            duuid = UUID(draft_id)
+        except ValueError:
+            return []
+        async with get_sessionmaker()() as session:
+            if not await self._owns_draft(session, duuid, user_id):
+                return []
+            rows = (
+                await session.execute(
+                    select(SectionVersionRow)
+                    .where(
+                        SectionVersionRow.draft_id == duuid,
+                        SectionVersionRow.section_id == section_id,
+                    )
+                    .order_by(SectionVersionRow.created_at.desc())
+                )
+            ).scalars().all()
+            return [_section_version_from_row(r) for r in rows]
+
+    async def revert_section(
+        self, draft_id: str, section_id: str, version_id: str, *, user_id: UUID
+    ) -> Draft | None:
+        """Restore a section to a stored version. Snapshots the current
+        content first (source='revert') so the revert is itself undoable.
+
+        Returns the updated draft, or None if the draft / section / version
+        isn't found or isn't owned by ``user_id``."""
+        try:
+            duuid = UUID(draft_id)
+            vuuid = UUID(version_id)
+        except ValueError:
+            return None
+        async with get_sessionmaker()() as session:
+            row = (
+                await session.execute(
+                    select(DraftRow).where(
+                        DraftRow.id == duuid,
+                        DraftRow.user_id == user_id,
+                        DraftRow.deleted_at.is_(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            version = (
+                await session.execute(
+                    select(SectionVersionRow).where(
+                        SectionVersionRow.id == vuuid,
+                        SectionVersionRow.draft_id == duuid,
+                        SectionVersionRow.section_id == section_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if version is None:
+                return None
+            await session.refresh(row, ["sections"])
+            section = next((s for s in row.sections if s.id == section_id), None)
+            if section is None:
+                return None
+            # Snapshot the live content first so the revert can be undone.
+            if section.content_md.strip():
+                session.add(
+                    SectionVersionRow(
+                        draft_id=duuid,
+                        section_id=section_id,
+                        title=section.title,
+                        content_md=section.content_md,
+                        word_count=section.word_count,
+                        status=section.status,
+                        source="revert",
+                    )
+                )
+                await session.flush()
+                await _prune_section_versions(session, duuid, section_id)
+            # Apply the chosen version.
+            section.content_md = version.content_md
+            section.word_count = version.word_count
+            section.status = "edited"
+            section.last_error = None
+            row.updated_at = datetime.now(UTC)
+            await session.commit()
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
+            return _draft_from_row(row)

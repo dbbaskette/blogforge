@@ -8,6 +8,7 @@ import {
   getDraft,
   regenerateSection,
   reorderSections,
+  revertSectionVersion,
   saveSection,
   updateDraft,
 } from "../api/drafts";
@@ -80,10 +81,18 @@ export function DraftPage(): JSX.Element {
   );
 
   const onRegenerateSection = useCallback(
-    async (sectionId: string) => {
+    async (sectionId: string, instruction?: string) => {
       if (!id) return;
-      const { job_id } = await regenerateSection(id, sectionId);
+      const { job_id } = await regenerateSection(id, sectionId, instruction ?? "");
       setJobId(job_id);
+    },
+    [id],
+  );
+
+  const onRevertSection = useCallback(
+    async (sectionId: string, versionId: string) => {
+      if (!id) return;
+      setDraft(await revertSectionVersion(id, sectionId, versionId));
     },
     [id],
   );
@@ -126,6 +135,7 @@ export function DraftPage(): JSX.Element {
       onExpandUnfilled={onExpandUnfilled}
       onSectionSave={onSectionSave}
       onRegenerateSection={onRegenerateSection}
+      onRevertSection={onRevertSection}
       onReorder={onReorder}
       onJobComplete={onJobComplete}
     />

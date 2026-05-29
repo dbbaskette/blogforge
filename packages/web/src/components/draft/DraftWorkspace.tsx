@@ -23,7 +23,8 @@ export interface DraftWorkspaceProps {
   onExpandAll: () => Promise<void>;
   onExpandUnfilled: () => Promise<void>;
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
-  onRegenerateSection: (sectionId: string) => Promise<void>;
+  onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
+  onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
   onJobComplete: () => void;
 }
@@ -39,6 +40,7 @@ export function DraftWorkspace({
   onExpandUnfilled,
   onSectionSave,
   onRegenerateSection,
+  onRevertSection,
   onReorder,
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
@@ -200,12 +202,13 @@ export function DraftWorkspace({
   }, [onExpandUnfilled]);
 
   // Single-section regenerate — arm the live buffer for this section before
-  // the job's token frames start arriving.
+  // the job's token frames start arriving. `instruction` steers a guided
+  // revision when the author supplied a note.
   const handleRegenerateSection = useCallback(
-    async (sectionId: string) => {
+    async (sectionId: string, instruction?: string) => {
       setLiveSectionId(sectionId);
       setLiveText("");
-      await onRegenerateSection(sectionId);
+      await onRegenerateSection(sectionId, instruction);
     },
     [onRegenerateSection],
   );
@@ -292,6 +295,7 @@ export function DraftWorkspace({
             liveText={liveText}
             onSectionSave={onSectionSave}
             onRegenerateSection={handleRegenerateSection}
+            onRevertSection={onRevertSection}
             onReorder={onReorder}
             onExpandUnfilled={handleExpandUnfilled}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}

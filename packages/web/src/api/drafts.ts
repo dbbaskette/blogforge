@@ -89,9 +89,44 @@ export async function expandSections(id: string): Promise<{ job_id: string }> {
 export async function regenerateSection(
   id: string,
   sectionId: string,
+  instruction = "",
 ): Promise<{ job_id: string }> {
   return api(
     `/api/drafts/${encodeURIComponent(id)}/sections/${encodeURIComponent(sectionId)}/regenerate`,
+    { method: "POST", body: JSON.stringify({ instruction }) },
+  );
+}
+
+export type VersionSource = "regenerate" | "save" | "revert";
+export interface SectionVersion {
+  id: string;
+  section_id: string;
+  title: string;
+  content_md: string;
+  word_count: number;
+  status: SectionStatus;
+  source: VersionSource;
+  created_at: string;
+}
+export async function listSectionVersions(
+  id: string,
+  sectionId: string,
+  init?: RequestInit,
+): Promise<SectionVersion[]> {
+  return api<SectionVersion[]>(
+    `/api/drafts/${encodeURIComponent(id)}/sections/${encodeURIComponent(sectionId)}/versions`,
+    init,
+  );
+}
+export async function revertSectionVersion(
+  id: string,
+  sectionId: string,
+  versionId: string,
+): Promise<Draft> {
+  return api<Draft>(
+    `/api/drafts/${encodeURIComponent(id)}/sections/${encodeURIComponent(
+      sectionId,
+    )}/versions/${encodeURIComponent(versionId)}/revert`,
     { method: "POST" },
   );
 }
