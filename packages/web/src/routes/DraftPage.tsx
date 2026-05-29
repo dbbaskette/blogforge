@@ -9,6 +9,7 @@ import {
   regenerateSection,
   reorderSections,
   revertSectionVersion,
+  reviseDraft,
   saveSection,
   updateDraft,
 } from "../api/drafts";
@@ -97,6 +98,15 @@ export function DraftPage(): JSX.Element {
     [id],
   );
 
+  const onReviseDraft = useCallback(
+    async (instruction: string) => {
+      if (!id) return;
+      const { job_id } = await reviseDraft(id, instruction);
+      setJobId(job_id);
+    },
+    [id],
+  );
+
   const onReorder = useCallback(
     async (section_ids: string[]) => {
       if (!id) return;
@@ -136,6 +146,7 @@ export function DraftPage(): JSX.Element {
       onSectionSave={onSectionSave}
       onRegenerateSection={onRegenerateSection}
       onRevertSection={onRevertSection}
+      onReviseDraft={onReviseDraft}
       onReorder={onReorder}
       onJobComplete={onJobComplete}
     />
