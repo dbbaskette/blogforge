@@ -33,12 +33,16 @@ async def get_current_user(
     """Resolve the currently-signed-in, approved user, or raise."""
     if not pencraft_session:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="not_authenticated")
-    user_id = _get_signer().unsign(pencraft_session)
-    if user_id is None:
+    unsigned = _get_signer().unsign(pencraft_session)
+    if unsigned is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_session")
+    user_id, session_version = unsigned
     user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
+    if session_version != user.session_version:
+        # Cookie predates a sign-out-everywhere / password change.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="session_revoked")
     if user.status != "approved":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"status_{user.status}")
     return user

@@ -8,6 +8,10 @@ interface SectionsPanelProps {
   onDismissJobError: () => void;
   unfilledCount: number;
   jobRunning: boolean;
+  /** Section currently streaming live prose (single-section regenerate). */
+  liveSectionId?: string | null;
+  /** Accumulated live token text for liveSectionId. */
+  liveText?: string;
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onRegenerateSection: (sectionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
@@ -23,6 +27,8 @@ export function SectionsPanel({
   onDismissJobError,
   unfilledCount,
   jobRunning,
+  liveSectionId,
+  liveText,
   onSectionSave,
   onRegenerateSection,
   onReorder,
@@ -126,6 +132,7 @@ export function SectionsPanel({
             section={section}
             index={i}
             isGenerating={generatingIds.has(section.id)}
+            liveText={liveSectionId === section.id ? liveText : undefined}
             onSave={(md) => onSectionSave(section.id, md)}
             onRegenerate={() => onRegenerateSection(section.id)}
             onMoveUp={() => moveSection(i, -1)}

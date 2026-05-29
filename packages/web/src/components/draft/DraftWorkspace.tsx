@@ -49,6 +49,10 @@ export function DraftWorkspace({
   // independent of generatingIds, which stays empty during the latency
   // window before the first SSE section:start event arrives.
   const [jobActive, setJobActive] = useState(false);
+  // When set, exactly one section is being regenerated (not a bulk expand),
+  // so we can stream the token deltas straight into the matching card.
+  const [liveSectionId, setLiveSectionId] = useState<string | null>(null);
+  const [liveText, setLiveText] = useState("");
 
   // Stable handlers for the expand-job SSE stream.
   const handlersRef = useRef<ExpandJobHandlers>({
@@ -66,26 +70,36 @@ export function DraftWorkspace({
           next.delete(id);
           return next;
         }),
+      // Only buffer tokens when a single section is regenerating; bulk expand
+      // interleaves tokens from concurrent sections with no attribution.
+      onToken: (delta) => {
+        if (liveSectionId) setLiveText((prev) => prev + delta);
+      },
       onComplete: () => {
         setGeneratingIds(new Set());
         setJobError(null);
         setJobActive(false);
+        setLiveSectionId(null);
+        setLiveText("");
         onJobComplete();
       },
       onError: (_code, message, hint) => {
         setGeneratingIds(new Set());
         setJobError({ message, hint });
         setJobActive(false);
+        setLiveSectionId(null);
+        setLiveText("");
         onJobComplete();
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onJobComplete],
+    [onJobComplete, liveSectionId],
   );
   const stableHandlers = useMemo<ExpandJobHandlers>(
     () => ({
       onSectionStart: (id) => handlersRef.current.onSectionStart(id),
       onSectionDone: (id) => handlersRef.current.onSectionDone(id),
+      onToken: (d) => handlersRef.current.onToken?.(d),
       onComplete: (r) => handlersRef.current.onComplete(r),
       onError: (c, m, h) => handlersRef.current.onError(c, m, h),
     }),
@@ -169,12 +183,32 @@ export function DraftWorkspace({
 
   const handleExpandAll = useCallback(async () => {
     setAdvancing(true);
+    // Bulk expand — clear any single-section streaming state.
+    setLiveSectionId(null);
+    setLiveText("");
     try {
       await onExpandAll();
     } finally {
       setAdvancing(false);
     }
   }, [onExpandAll]);
+
+  const handleExpandUnfilled = useCallback(async () => {
+    setLiveSectionId(null);
+    setLiveText("");
+    await onExpandUnfilled();
+  }, [onExpandUnfilled]);
+
+  // Single-section regenerate — arm the live buffer for this section before
+  // the job's token frames start arriving.
+  const handleRegenerateSection = useCallback(
+    async (sectionId: string) => {
+      setLiveSectionId(sectionId);
+      setLiveText("");
+      await onRegenerateSection(sectionId);
+    },
+    [onRegenerateSection],
+  );
 
   const showFooter = draft.stage === "sections" && draft.sections.length > 0;
 
@@ -254,10 +288,12 @@ export function DraftWorkspace({
             onDismissJobError={() => setJobError(null)}
             unfilledCount={unfilledCount}
             jobRunning={jobRunning}
+            liveSectionId={liveSectionId}
+            liveText={liveText}
             onSectionSave={onSectionSave}
-            onRegenerateSection={onRegenerateSection}
+            onRegenerateSection={handleRegenerateSection}
             onReorder={onReorder}
-            onExpandUnfilled={onExpandUnfilled}
+            onExpandUnfilled={handleExpandUnfilled}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
         )}

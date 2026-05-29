@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { deleteDraft } from "../api/drafts";
 
@@ -63,12 +64,15 @@ export function DeleteDraftDialog({
 
         <div className="px-7 py-5 space-y-3">
           <p className="text-sm text-ink-2 leading-relaxed">
-            <em className="font-serif italic text-ink">{draftTitle || draftId}</em> will go to the
-            wastebasket. You can recover it manually from{" "}
-            <code className="font-mono text-xs text-cobalt-700 bg-canvas border border-rule px-1.5 py-0.5 rounded">
-              ~/.pencraft/trash/
-            </code>
-            .
+            <em className="font-serif italic text-ink">{draftTitle || draftId}</em> will move to
+            Trash. You can restore it any time from the{" "}
+            <Link
+              to="/trash"
+              className="text-cobalt-700 font-medium underline underline-offset-2 hover:text-cobalt-600"
+            >
+              Trash
+            </Link>{" "}
+            view.
           </p>
           {error && (
             <p

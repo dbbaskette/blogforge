@@ -32,6 +32,12 @@ class MeResponse(BaseModel):
     email: str
     role: str
     status: str
+    last_login_at: datetime | None = None
+
+
+class ChangePasswordBody(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=8, max_length=200)
 
 
 @router.post("/request", status_code=status.HTTP_201_CREATED)
@@ -78,7 +84,7 @@ async def login(
     await session.commit()
 
     settings = get_settings()
-    cookie = _get_signer().sign(user.id)
+    cookie = _get_signer().sign(user.id, user.session_version)
     response.set_cookie(
         key=COOKIE_NAME,
         value=cookie,
@@ -105,4 +111,57 @@ async def me(current: User = Depends(get_current_user)) -> MeResponse:
         email=current.email,
         role=current.role,
         status=current.status,
+        last_login_at=current.last_login_at,
     )
+
+
+@router.post("/change-password")
+async def change_password(
+    body: ChangePasswordBody,
+    response: Response,
+    current: User = Depends(get_current_user),
+    session: AsyncSession = Depends(_get_session),
+) -> dict[str, str]:
+    """Verify the old password, set the new hash, and bump session_version
+    so every *other* session is signed out. Re-issues this session's cookie
+    at the new version so the caller stays logged in."""
+    db_user = (
+        await session.execute(select(User).where(User.id == current.id))
+    ).scalar_one()
+    if not verify_password(body.old_password, db_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_old_password"
+        )
+    db_user.password_hash = hash_password(body.new_password)
+    db_user.session_version += 1
+    await session.commit()
+
+    settings = get_settings()
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=_get_signer().sign(db_user.id, db_user.session_version),
+        max_age=COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=cast(Literal["lax", "strict", "none"], settings.cookie_samesite),
+        path="/",
+    )
+    return {"status": "ok"}
+
+
+@router.post("/sessions/revoke-all", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_all_sessions(
+    response: Response,
+    current: User = Depends(get_current_user),
+    session: AsyncSession = Depends(_get_session),
+) -> Response:
+    """Bump session_version — every existing cookie (including this one)
+    stops validating, forcing a fresh login everywhere."""
+    db_user = (
+        await session.execute(select(User).where(User.id == current.id))
+    ).scalar_one()
+    db_user.session_version += 1
+    await session.commit()
+    response.delete_cookie(COOKIE_NAME, path="/")
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response

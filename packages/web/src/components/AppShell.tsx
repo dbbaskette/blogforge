@@ -1,16 +1,50 @@
+import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { logout } from "../api/auth";
 import { useMe } from "../hooks/useMe";
+import { useVersionCheck } from "../hooks/useVersionCheck";
 
 export function AppShell(): JSX.Element {
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
+      <VersionBanner />
       <TopBar />
       <main className="flex-1">
         <Outlet />
       </main>
     </div>
+  );
+}
+
+function VersionBanner(): JSX.Element | null {
+  const { stale } = useVersionCheck();
+  const [dismissed, setDismissed] = useState(false);
+
+  if (!stale || dismissed) return null;
+
+  return (
+    <output
+      className="block px-4 py-2.5 flex items-center justify-center gap-3 text-sm animate-fade-up"
+      style={{ background: "#fdf6e6", borderBottom: "1px solid #f0d5a4", color: "#8a5d18" }}
+    >
+      <span>A new version is available.</span>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="nb-btn nb-btn-sm nb-btn-primary"
+      >
+        Reload
+      </button>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label="Dismiss"
+        className="text-muted hover:text-ink transition-colors"
+      >
+        ✕
+      </button>
+    </output>
   );
 }
 

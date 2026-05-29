@@ -39,6 +39,9 @@ class User(Base):
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Bumped to invalidate all existing session cookies (sign-out-everywhere,
+    # password change). Cookies carry the version they were issued at.
+    session_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     drafts: Mapped[list["Draft"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

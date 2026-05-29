@@ -8,7 +8,14 @@ def test_round_trip():
     s = SessionSigner("secret-a")
     uid = uuid4()
     cookie = s.sign(uid)
-    assert s.unsign(cookie) == uid
+    assert s.unsign(cookie) == (uid, 0)
+
+
+def test_round_trip_with_session_version():
+    s = SessionSigner("secret-a")
+    uid = uuid4()
+    cookie = s.sign(uid, 7)
+    assert s.unsign(cookie) == (uid, 7)
 
 
 def test_tampered_cookie_rejected():

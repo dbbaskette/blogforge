@@ -145,6 +145,10 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="pencraft", version=__version__, lifespan=_lifespan)
 
+    from pencraft.errors import install_exception_handler
+
+    install_exception_handler(app)
+
     if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,

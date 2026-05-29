@@ -7,6 +7,7 @@ import { DraftPage } from "./routes/DraftPage";
 import { DraftsPage } from "./routes/DraftsPage";
 import { LoginPage } from "./routes/LoginPage";
 import { SettingsPage } from "./routes/SettingsPage";
+import { TrashPage } from "./routes/TrashPage";
 
 export function App(): JSX.Element {
   return (
@@ -26,6 +27,14 @@ export function App(): JSX.Element {
           element={
             <RequireAuth>
               <DraftPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/trash"
+          element={
+            <RequireAuth>
+              <TrashPage />
             </RequireAuth>
           }
         />

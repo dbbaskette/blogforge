@@ -8,6 +8,8 @@ interface SectionCardProps {
   section: Section;
   index: number;
   isGenerating: boolean;
+  /** Live streaming prose for this section (single-section regenerate). */
+  liveText?: string;
   defaultOpen?: boolean;
   onSave: (content_md: string) => Promise<void>;
   onRegenerate: () => Promise<void>;
@@ -61,6 +63,7 @@ export function SectionCard({
   section,
   index,
   isGenerating,
+  liveText,
   defaultOpen,
   onSave,
   onRegenerate,
@@ -69,6 +72,7 @@ export function SectionCard({
   canMoveUp,
   canMoveDown,
 }: SectionCardProps): JSX.Element {
+  const hasLiveText = liveText !== undefined && liveText.length > 0;
   const effectiveGenerating = isGenerating || section.status === "generating";
   const displayStatus: Section["status"] = effectiveGenerating ? "generating" : section.status;
 
@@ -193,7 +197,21 @@ export function SectionCard({
             </div>
           )}
 
-          {effectiveGenerating ? (
+          {hasLiveText ? (
+            <div className="mt-3" aria-live="polite" aria-busy="true">
+              <div className="flex items-center gap-2 text-amber mb-2">
+                <span
+                  aria-hidden
+                  className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"
+                />
+                <span className="text-xs font-medium uppercase tracking-wider">Composing…</span>
+              </div>
+              <p className="whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-ink-2">
+                {liveText}
+                <span className="inline-block w-1.5 h-4 -mb-0.5 ml-0.5 bg-amber animate-pulse align-middle" />
+              </p>
+            </div>
+          ) : effectiveGenerating ? (
             <div className="flex items-center gap-3 py-10 justify-center text-amber">
               <span
                 aria-hidden

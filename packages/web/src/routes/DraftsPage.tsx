@@ -54,9 +54,17 @@ export function DraftsPage(): JSX.Element {
       <section className="mt-10">
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">Your drafts</h2>
-          <span className="text-xs text-muted">
-            {drafts?.length ?? 0} {drafts?.length === 1 ? "piece" : "pieces"}
-          </span>
+          <div className="flex items-baseline gap-3">
+            <span className="text-xs text-muted">
+              {drafts?.length ?? 0} {drafts?.length === 1 ? "piece" : "pieces"}
+            </span>
+            <Link
+              to="/trash"
+              className="text-xs text-muted hover:text-cobalt-600 underline underline-offset-2 transition-colors"
+            >
+              Trash
+            </Link>
+          </div>
         </div>
 
         {drafts === null && !error && (

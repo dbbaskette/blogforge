@@ -36,6 +36,16 @@ def test_list_packs(client_with_packs: TestClient) -> None:
 
 
 @pytest.mark.skipif(not _MYVOICE_DAN.exists(), reason="requires myvoice's dan pack")
+def test_list_packs_includes_voice_preview(client_with_packs: TestClient) -> None:
+    """Each pack carries a short voice preview for the picker."""
+    dan = next(p for p in client_with_packs.get("/api/packs").json() if p["slug"] == "dan")
+    assert "description" in dan and "one_line" in dan
+    # dan's stylepack has both populated.
+    assert dan["description"]
+    assert dan["one_line"]
+
+
+@pytest.mark.skipif(not _MYVOICE_DAN.exists(), reason="requires myvoice's dan pack")
 def test_get_manifest(client_with_packs: TestClient) -> None:
     r = client_with_packs.get("/api/packs/dan/manifest")
     assert r.status_code == 200
