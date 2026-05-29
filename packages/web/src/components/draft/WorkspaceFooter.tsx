@@ -53,13 +53,60 @@ export function WorkspaceFooter({
         <button type="button" onClick={handleCopy} className="nb-btn nb-btn-sm">
           {copyMessage ?? "Copy markdown"}
         </button>
-        <a href={downloadDraftUrl(draftId)} download className="nb-btn nb-btn-sm no-underline">
-          Download .md
-        </a>
+        <DownloadMenu draftId={draftId} />
         <button type="button" onClick={onLint} className="nb-btn nb-btn-sm">
           Lint
         </button>
       </footer>
+    </div>
+  );
+}
+
+const DOWNLOAD_OPTIONS: { label: string; opts: Parameters<typeof downloadDraftUrl>[1] }[] = [
+  { label: "Markdown (.md)", opts: { format: "md" } },
+  { label: "Markdown + frontmatter", opts: { format: "md", frontmatter: true } },
+  { label: "Web page (.html)", opts: { format: "html" } },
+  { label: "Word (.docx)", opts: { format: "docx" } },
+];
+
+function DownloadMenu({ draftId }: { draftId: string }): JSX.Element {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      {open && (
+        <>
+          {/* click-away backdrop */}
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-0 cursor-default"
+          />
+          <div className="absolute bottom-full right-0 mb-2 z-10 w-52 nb-card shadow-nb-pop py-1.5 animate-fade-in">
+            {DOWNLOAD_OPTIONS.map((o) => (
+              <a
+                key={o.label}
+                href={downloadDraftUrl(draftId, o.opts)}
+                download
+                onClick={() => setOpen(false)}
+                className="block px-4 py-1.5 text-sm text-ink hover:bg-card-2 no-underline"
+              >
+                {o.label}
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="nb-btn nb-btn-sm"
+      >
+        Download ▾
+      </button>
     </div>
   );
 }

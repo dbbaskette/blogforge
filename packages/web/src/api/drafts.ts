@@ -170,8 +170,16 @@ export async function reorderSections(id: string, section_ids: string[]): Promis
     body: JSON.stringify({ section_ids }),
   });
 }
-export function downloadDraftUrl(id: string): string {
-  return `/api/drafts/${encodeURIComponent(id)}/download`;
+export type ExportFormat = "md" | "html" | "docx";
+export function downloadDraftUrl(
+  id: string,
+  opts?: { format?: ExportFormat; frontmatter?: boolean },
+): string {
+  const params = new URLSearchParams();
+  if (opts?.format) params.set("format", opts.format);
+  if (opts?.frontmatter) params.set("frontmatter", "true");
+  const qs = params.toString();
+  return `/api/drafts/${encodeURIComponent(id)}/download${qs ? `?${qs}` : ""}`;
 }
 export async function lintDraft(id: string): Promise<{ violations: unknown[]; hits: unknown[] }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
