@@ -242,3 +242,64 @@ class SqlDraftStore:
                 return
             row.deleted_at = datetime.now(UTC)
             await session.commit()
+
+    async def list_trashed(self, user_id: UUID) -> list[DraftSummary]:
+        """Soft-deleted drafts, most-recently-trashed first."""
+        async with get_sessionmaker()() as session:
+            rows = (
+                await session.execute(
+                    select(DraftRow)
+                    .where(DraftRow.user_id == user_id, DraftRow.deleted_at.is_not(None))
+                    .order_by(DraftRow.deleted_at.desc())
+                )
+            ).scalars().all()
+            for r in rows:
+                await session.refresh(r, ["sections"])
+            return [_summary_from_row(r) for r in rows]
+
+    async def restore(self, draft_id: str, *, user_id: UUID) -> Draft | None:
+        """Clear deleted_at on a trashed draft. Returns the restored draft,
+        or None if not found / not owned / not actually trashed."""
+        try:
+            uuid = UUID(draft_id)
+        except ValueError:
+            return None
+        async with get_sessionmaker()() as session:
+            row = (
+                await session.execute(
+                    select(DraftRow).where(
+                        DraftRow.id == uuid,
+                        DraftRow.user_id == user_id,
+                        DraftRow.deleted_at.is_not(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            row.deleted_at = None
+            await session.commit()
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
+            return _draft_from_row(row)
+
+    async def hard_delete(self, draft_id: str, *, user_id: UUID) -> bool:
+        """Permanently remove a draft (and its cascaded children). Returns
+        True if a row was deleted. Only operates on already-trashed drafts."""
+        try:
+            uuid = UUID(draft_id)
+        except ValueError:
+            return False
+        async with get_sessionmaker()() as session:
+            row = (
+                await session.execute(
+                    select(DraftRow).where(
+                        DraftRow.id == uuid,
+                        DraftRow.user_id == user_id,
+                        DraftRow.deleted_at.is_not(None),
+                    )
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return False
+            await session.delete(row)
+            await session.commit()
+            return True

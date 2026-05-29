@@ -30,6 +30,30 @@ async def list_drafts(
     return await _store(request).list_for_user(current.id)
 
 
+# NOTE: declared before GET /{draft_id} so "trash" isn't captured as an id.
+@router.get("/trash", response_model=list[DraftSummary])
+async def list_trashed(
+    request: Request, current: User = Depends(get_current_user)
+) -> list[DraftSummary]:
+    """Soft-deleted drafts, recoverable via POST /{id}/restore."""
+    return await _store(request).list_trashed(current.id)
+
+
+@router.post("/{draft_id}/restore", response_model=Draft)
+async def restore_draft(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    restored = await _store(request).restore(draft_id, user_id=current.id)
+    if restored is None:
+        raise _not_found(draft_id)
+    await request.app.state.event_bus.emit(
+        {"type": "draft:restored", "id": draft_id, "title": restored.title}
+    )
+    return restored
+
+
 @router.post("", response_model=Draft, status_code=status.HTTP_201_CREATED)
 async def create_draft(
     idea: IdeaInput,
@@ -100,9 +124,20 @@ async def update_draft(
 async def delete_draft(
     draft_id: str,
     request: Request,
+    hard: bool = False,
     current: User = Depends(get_current_user),
 ) -> None:
+    """Soft-delete (move to trash) by default. `?hard=true` permanently
+    removes an already-trashed draft."""
     store = _store(request)
+    if hard:
+        ok = await store.hard_delete(draft_id, user_id=current.id)
+        if not ok:
+            raise _not_found(draft_id)
+        await request.app.state.event_bus.emit(
+            {"type": "draft:purged", "id": draft_id}
+        )
+        return
     draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise _not_found(draft_id)
