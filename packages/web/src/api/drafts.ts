@@ -206,6 +206,18 @@ export async function inlineEdit(
   });
 }
 
+/** Alternative titles or opening hooks for a draft (headline lab). */
+export async function generateHeadlines(
+  draftId: string,
+  kind: "title" | "hook",
+  n = 5,
+): Promise<{ kind: string; options: string[] }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/headlines`, {
+    method: "POST",
+    body: JSON.stringify({ kind, n }),
+  });
+}
+
 export interface RepurposeFormat {
   id: string;
   label: string;

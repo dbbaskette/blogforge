@@ -329,6 +329,7 @@ export function DraftWorkspace({
           <OutlinePanel
             draft={draft}
             onChange={handleOutlineChange}
+            onApplyTitle={(title) => onChange({ ...draft, title })}
             onAdvance={handleExpandAll}
             onRegenerate={handleGenerate}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
