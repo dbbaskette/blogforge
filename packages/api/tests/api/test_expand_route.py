@@ -25,7 +25,13 @@ async def expand_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("MYVOICE_PACKS_ROOT", str(packs_root))
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(cfg))
     monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
-    monkeypatch.setenv("BLOGFORGE_MOCK_OUTPUT", "Section body content here.")
+    # Single-pass expand calls provider.complete() once for the whole document,
+    # then splits by H2 heading — so the mock must return headed markdown that
+    # matches the seeded outline's section titles ("First", "Second").
+    monkeypatch.setenv(
+        "BLOGFORGE_MOCK_OUTPUT",
+        "## First\nFirst section body.\n\n## Second\nSecond section body.\n",
+    )
 
     uid = await _seed_approved_user()
     with _signed_client(uid) as c:
@@ -81,8 +87,9 @@ async def test_expand_returns_job_and_runs_sections(expand_client) -> None:
     assert all(s["content_md"].strip() for s in final["sections"])
 
 
-async def test_expand_limit_composes_only_next_section(expand_client) -> None:
-    """`?limit=1` composes just the next unwritten section, leaving the rest."""
+async def test_expand_single_pass_composes_all_ignoring_limit(expand_client) -> None:
+    """Single-pass writes the whole document in one call: `?limit=1` is accepted
+    for API compatibility but composes ALL sections, not just the first."""
     did = _seed_outlined_draft(expand_client)
     r = expand_client.post(f"/api/drafts/{did}/expand?limit=1")
     assert r.status_code == 202
@@ -92,11 +99,9 @@ async def test_expand_limit_composes_only_next_section(expand_client) -> None:
     assert '"type":"complete"' in body
 
     secs = {s["id"]: s for s in expand_client.get(f"/api/drafts/{did}").json()["sections"]}
-    assert secs["s1"]["content_md"].strip()
-    assert secs["s1"]["status"] == "ready"
-    # s2 was left for a later pass.
-    assert not secs["s2"]["content_md"].strip()
-    assert secs["s2"]["status"] == "empty"
+    # Both sections filled from the single-pass split, despite limit=1.
+    assert secs["s1"]["content_md"].strip() and secs["s1"]["status"] == "ready"
+    assert secs["s2"]["content_md"].strip() and secs["s2"]["status"] == "ready"
 
 
 async def test_expand_outline_missing_409(expand_client) -> None:

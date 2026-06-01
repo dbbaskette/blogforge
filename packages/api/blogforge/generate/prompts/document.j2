@@ -1,0 +1,20 @@
+You are writing a COMPLETE blog post in a single pass, in the author's voice (described in the SYSTEM context). Write the whole piece end to end as ONE coherent, flowing argument — not a stack of independent sections.
+
+Title: {{ title }}
+{% if opening_hook %}
+The post already opens with this hook (shown to the reader before your text). Do NOT repeat or paraphrase it — continue from where it leaves off:
+{{ opening_hook }}
+{% endif %}
+Follow this outline exactly, in order. Each item is one section: use its title verbatim as a markdown H2 (`## `), then write the prose beneath it, covering the brief.
+
+{% for s in sections %}## {{ s.title }}
+{% if s.brief %}— {{ s.brief }}{% endif %}
+{% endfor %}
+
+Rules — this is the whole article, written straight through:
+- Write it as one continuous read. Each section advances the argument and builds on what came before. NEVER restate a point an earlier section already made; never reuse the same example, metaphor, or stock phrase twice.
+- Use each section's title verbatim as an `## ` heading, in the given order. Do NOT add, drop, merge, rename, or reorder sections. Do NOT write an H1 title. Do NOT repeat the opening hook.
+- Open each section differently and use natural transitions between them, so the seams disappear and it reads as a single essay.
+- Aim for ~{{ target_words }} words total, distributed sensibly — denser where the argument needs it, not padded to hit a number.
+
+Output ONLY the post body in markdown: the `## ` section headings and their prose, nothing else. Use the author's voice; banished words/phrases never appear.
