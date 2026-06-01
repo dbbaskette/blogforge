@@ -71,6 +71,22 @@ describe("SectionsPanel", () => {
     expect(screen.queryByRole("button", { name: /draft next/i })).not.toBeInTheDocument();
   });
 
+  it("shows one unified composing state (not per-section) during a single-pass compose", () => {
+    render(
+      <SectionsPanel
+        {...baseProps}
+        draft={makeDraft()}
+        jobRunning
+        composingWholeDraft
+        onReviseDraft={noop}
+      />,
+    );
+    expect(screen.getByText(/composing your full draft/i)).toBeInTheDocument();
+    // The per-section card and the N/total per-section banner are suppressed.
+    expect(screen.queryByText(/the first section prose/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sections$/i)).not.toBeInTheDocument();
+  });
+
   it("submits a holistic revision instruction", async () => {
     const onReviseDraft = vi.fn(async (): Promise<void> => {});
     render(<SectionsPanel {...baseProps} draft={makeDraft()} onReviseDraft={onReviseDraft} />);

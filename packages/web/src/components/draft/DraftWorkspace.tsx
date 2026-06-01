@@ -64,6 +64,11 @@ export function DraftWorkspace({
   // so we can stream the token deltas straight into the matching card.
   const [liveSectionId, setLiveSectionId] = useState<string | null>(null);
   const [liveText, setLiveText] = useState("");
+  // True while a single-pass whole-draft compose is running. Expand writes the
+  // entire post in ONE call, so we show one unified "composing the full draft"
+  // state instead of every section card spinning (which looked section-by-
+  // section). Per-section regenerate/revise leave this false.
+  const [composingWholeDraft, setComposingWholeDraft] = useState(false);
 
   // Stable handlers for the expand-job SSE stream.
   const handlersRef = useRef<ExpandJobHandlers>({
@@ -92,6 +97,7 @@ export function DraftWorkspace({
         setJobActive(false);
         setLiveSectionId(null);
         setLiveText("");
+        setComposingWholeDraft(false);
         onJobComplete();
       },
       onError: (_code, message, hint) => {
@@ -100,6 +106,7 @@ export function DraftWorkspace({
         setJobActive(false);
         setLiveSectionId(null);
         setLiveText("");
+        setComposingWholeDraft(false);
         onJobComplete();
       },
     }),
@@ -194,9 +201,10 @@ export function DraftWorkspace({
 
   const handleExpandAll = useCallback(async () => {
     setAdvancing(true);
-    // Bulk expand — clear any single-section streaming state.
+    // Single-pass whole-draft compose — clear single-section streaming state.
     setLiveSectionId(null);
     setLiveText("");
+    setComposingWholeDraft(true);
     try {
       await onExpandAll();
     } finally {
@@ -207,6 +215,7 @@ export function DraftWorkspace({
   const handleExpandUnfilled = useCallback(async () => {
     setLiveSectionId(null);
     setLiveText("");
+    setComposingWholeDraft(true);
     await onExpandUnfilled();
   }, [onExpandUnfilled]);
 
@@ -334,6 +343,7 @@ export function DraftWorkspace({
             onDismissJobError={() => setJobError(null)}
             unfilledCount={unfilledCount}
             jobRunning={jobRunning}
+            composingWholeDraft={composingWholeDraft}
             liveSectionId={liveSectionId}
             liveText={liveText}
             onSectionSave={onSectionSave}
