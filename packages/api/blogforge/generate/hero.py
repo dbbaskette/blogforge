@@ -19,8 +19,10 @@ from blogforge.drafts.models import Draft
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey, ProviderRateLimit
 
 _BASE = "https://generativelanguage.googleapis.com/v1beta"
-# Override at the call site if needed; Imagen 3 is the current hero-quality model.
-DEFAULT_IMAGE_MODEL = "imagen-3.0-generate-002"
+# Imagen 4 via the :predict endpoint — verified available on the Gemini API
+# (imagen-3.0-* 404s on v1beta). Use -fast-generate-001 for a cheaper/quicker
+# variant. Override at the call site if a key exposes different models.
+DEFAULT_IMAGE_MODEL = "imagen-4.0-generate-001"
 
 
 def build_hero_prompt(draft: Draft) -> str:
