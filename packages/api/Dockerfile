@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # BlogForge API — multi-stage build.
 # 1) Build the web bundle.
 # 2) Install Python deps via uv.
@@ -47,7 +48,14 @@ COPY --from=web /work/packages/web/dist /app/packages/api/blogforge/static
 # remain reachable at runtime. With a non-editable wheel install
 # `__file__` points into site-packages/ and the migrations dir lookup
 # resolves to alembic's own library directory, which crashes on boot.
-RUN uv pip install --system --no-cache -e .
+#
+# A persistent BuildKit cache mount holds uv's wheel/metadata cache across
+# builds. A code change still invalidates this layer, but the install then
+# pulls everything from the cache instead of re-hitting PyPI — so rebuilds
+# are fast and survive a flaky network (only the first cold build downloads).
+ENV UV_CACHE_DIR=/root/.cache/uv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -e .
 
 # Default port; override via $PORT in cloud envs.
 ENV PORT=7880
