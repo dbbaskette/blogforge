@@ -1,4 +1,4 @@
-You are planning a blog post in the author's voice (described in the SYSTEM context). The author's banished words / phrases / rules are non-negotiable.
+You are planning a SINGLE, coherent blog post in the author's voice (described in the SYSTEM context). The author's banished words / phrases / rules are non-negotiable.
 
 Topic: {{ idea.topic }}
 
@@ -12,9 +12,17 @@ Supporting points the author wants to make:
 
 Target length: ~{{ idea.target_words }} words total.
 
-Propose a complete outline as a JSON object matching the OutlineProposal schema:
-- opening_hook: one sentence that opens the post (Conflict & Resolution style if the voice uses that pattern)
-- sections: 5-9 entries; each with a short H2-style `title` and a 1-3 sentence `brief` describing what the section argues
-- estimated_words: your honest estimate of total prose length
+This is ONE continuous argument, not a list of standalone essays. The sections are movements in a single throughline that builds from start to finish: each one picks up where the previous left off and takes the reader somewhere genuinely new. A reader must never feel a section restating a point an earlier section already made.
+
+Design the outline so that:
+- The sections form a clear PROGRESSION — e.g. set up the problem → complicate it → explain the mechanism → draw out the implication → resolve. Each section has a DISTINCT job that depends on the ones before it.
+- NO two sections make the same core point or cover the same ground. If two ideas overlap, merge them into one section.
+- Each `brief` names what THIS section uniquely contributes and how it advances the argument from the previous section — and, where useful, what it deliberately leaves to a later section.
+- Use the FEWEST sections that carry the argument without overlap: aim for {{ min_sections }}–{{ max_sections }} sections at this length (~{{ words_per_section }} words each). Fewer, meatier sections beat many thin ones — thin sections are what cause repetition.
+
+Return a JSON object matching the OutlineProposal schema:
+- opening_hook: one sentence that opens the post (Conflict & Resolution style if the voice uses that pattern). Section 1 must NOT restate or paraphrase the hook — it picks up from there.
+- sections: each with a short H2-style `title` and a 1-3 sentence `brief` (the section's unique job + how it builds on the prior one).
+- estimated_words: your honest estimate of total prose length.
 
 Use the author's voice. Banished words/phrases never appear.

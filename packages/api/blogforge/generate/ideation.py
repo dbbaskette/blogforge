@@ -34,8 +34,23 @@ Each of your replies has two parts:
 2. A JSON block matching the OutlineProposal schema, fenced with ```json,
    containing:
      - opening_hook: one sentence that opens the piece
-     - sections: 5-9 entries; each with `id` (slug), `title`, `brief`
+     - sections: each with `id` (slug), `title`, `brief`
      - estimated_words: integer
+
+The outline must describe ONE continuous argument, not a list of standalone
+essays. Hold yourself to these rules:
+
+- The sections form a single PROGRESSION that builds start to finish (e.g.
+  problem → complication → mechanism → implication → resolution). Each
+  section has a DISTINCT job and depends on the ones before it.
+- NO two sections make the same core point or cover the same ground. If two
+  ideas overlap, merge them.
+- Each `brief` says what that section uniquely contributes and how it builds
+  on the previous one.
+- Use the FEWEST sections that carry the argument without overlap — roughly
+  one section per ~400 words (typically 3–6). Fewer, meatier sections beat
+  many thin ones; thin sections are what cause repetition.
+- Section 1 must not restate the opening_hook.
 
 The author may reference materials they've shared (under "## Reference
 Materials" above). Draw on them for facts, examples, and angle. Stay in

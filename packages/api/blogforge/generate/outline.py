@@ -15,10 +15,31 @@ from blogforge.llm.base import LLMProvider
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "outline.j2"
 
+# Bias toward fewer, meatier sections. Thin sections (~150-250 words) are what
+# breed cross-section repetition: there isn't room to say something distinct,
+# so each one restates the thesis. ~400 words/section gives each a real job.
+_WORDS_PER_SECTION = 400
+
+
+def _section_budget(target_words: int) -> tuple[int, int, int]:
+    """Return (min_sections, max_sections, words_per_section) for a length.
+
+    Scales the section count to the word budget and clamps to 3–7 so short
+    posts don't get sliced into thin, overlapping fragments and long ones
+    don't sprawl."""
+    ideal = min(7, max(3, round(target_words / _WORDS_PER_SECTION)))
+    return max(3, ideal - 1), ideal + 1, round(target_words / ideal)
+
 
 def _render_outline_prompt(idea: IdeaInput) -> str:
     template = Template(_PROMPT_PATH.read_text(encoding="utf-8"))
-    return template.render(idea=idea)
+    min_sections, max_sections, words_per_section = _section_budget(idea.target_words)
+    return template.render(
+        idea=idea,
+        min_sections=min_sections,
+        max_sections=max_sections,
+        words_per_section=words_per_section,
+    )
 
 
 def _auto_pick_samples(manifest: dict[str, Any], n: int = 2) -> list[str]:
