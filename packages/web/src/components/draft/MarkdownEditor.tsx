@@ -1,14 +1,18 @@
 import Link from "@tiptap/extension-link";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { marked } from "marked";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import TurndownService from "turndown";
 
+import { type InlineAction, inlineEdit } from "../../api/drafts";
+
 export interface MarkdownEditorProps {
   initialMarkdown: string;
   onSave: (md: string) => Promise<void>;
   onChange?: (md: string) => void;
+  /** When set, the rich editor shows a floating AI toolbar on text selection. */
+  draftId?: string;
 }
 
 type Mode = "rich" | "raw";
@@ -17,12 +21,16 @@ export function MarkdownEditor({
   initialMarkdown,
   onSave,
   onChange,
+  draftId,
 }: MarkdownEditorProps): JSX.Element {
   const [raw, setRaw] = useState<string>(initialMarkdown);
   const [mode, setMode] = useState<Mode>("rich");
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Anchor for the floating AI toolbar; null when nothing is selected.
+  const [aiAnchor, setAiAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const turndown = useMemo(
     () =>
@@ -47,6 +55,20 @@ export function MarkdownEditor({
         const md = turndown.turndown(e.getHTML());
         onChange(md);
       }
+    },
+    onSelectionUpdate: ({ editor: e }) => {
+      // Surface the AI toolbar only for a real, non-empty selection.
+      const { from, to, empty } = e.state.selection;
+      if (empty || !draftId) {
+        setAiAnchor(null);
+        return;
+      }
+      const start = e.view.coordsAtPos(from);
+      const end = e.view.coordsAtPos(to);
+      setAiAnchor({
+        top: Math.min(start.top, end.top),
+        left: (start.left + end.right) / 2,
+      });
     },
   });
 
@@ -80,8 +102,37 @@ export function MarkdownEditor({
     } else {
       editor.commands.setContent(marked.parse(raw) as string);
     }
+    setAiAnchor(null);
     setMode(next);
   };
+
+  const runInlineAction = useCallback(
+    async (action: InlineAction): Promise<void> => {
+      if (!editor || !draftId) return;
+      const { from, to } = editor.state.selection;
+      const text = editor.state.doc.textBetween(from, to, "\n");
+      if (!text.trim()) return;
+      let instruction: string | undefined;
+      if (action === "custom") {
+        const asked = window.prompt("How should I rewrite the selection?");
+        if (!asked?.trim()) return;
+        instruction = asked.trim();
+      }
+      setAiBusy(true);
+      setError(null);
+      try {
+        const { text: rewritten } = await inlineEdit(draftId, { text, action, instruction });
+        const html = marked.parse(rewritten) as string;
+        editor.chain().focus().insertContentAt({ from, to }, html).run();
+        setAiAnchor(null);
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setAiBusy(false);
+      }
+    },
+    [editor, draftId],
+  );
 
   const handleRawChange = (val: string): void => {
     setRaw(val);
@@ -135,6 +186,9 @@ export function MarkdownEditor({
           <div className="bg-white">
             <EditorContent editor={editor} />
           </div>
+          {draftId && aiAnchor && (
+            <AiSelectionToolbar anchor={aiAnchor} busy={aiBusy} onAction={runInlineAction} />
+          )}
         </>
       )}
       {mode === "raw" && (
@@ -148,8 +202,53 @@ export function MarkdownEditor({
   );
 }
 
+interface AiSelectionToolbarProps {
+  anchor: { top: number; left: number };
+  busy: boolean;
+  onAction: (action: InlineAction) => void;
+}
+
+const AI_ACTIONS: { action: InlineAction; label: string }[] = [
+  { action: "rephrase", label: "Rephrase" },
+  { action: "shorten", label: "Shorten" },
+  { action: "expand", label: "Expand" },
+  { action: "fix", label: "Fix" },
+  { action: "custom", label: "Ask…" },
+];
+
+/** Floating voice-aware AI bar shown above the current selection. Dependency-
+ * free (no @tiptap BubbleMenu); positioned with viewport coords from the
+ * editor. `onMouseDown` is suppressed so clicking a button keeps the
+ * selection alive. */
+function AiSelectionToolbar({ anchor, busy, onAction }: AiSelectionToolbarProps): JSX.Element {
+  return (
+    <div
+      className="fixed z-50 -translate-x-1/2 -translate-y-full flex items-center gap-0.5 bg-ink text-white rounded-nb-sm shadow-nb-pop px-1 py-1 animate-fade-in"
+      style={{ top: anchor.top - 8, left: anchor.left }}
+      onMouseDown={(e) => e.preventDefault()}
+      role="toolbar"
+      aria-label="AI editing actions"
+    >
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/50 px-1.5">
+        {busy ? "…" : "AI"}
+      </span>
+      {AI_ACTIONS.map(({ action, label }) => (
+        <button
+          key={action}
+          type="button"
+          disabled={busy}
+          onClick={() => onAction(action)}
+          className="px-2 py-1 text-xs font-medium rounded hover:bg-white/15 disabled:opacity-40 transition-colors"
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface ToolbarProps {
-  editor: ReturnType<typeof useEditor>;
+  editor: Editor | null;
 }
 
 function Toolbar({ editor }: ToolbarProps): JSX.Element | null {

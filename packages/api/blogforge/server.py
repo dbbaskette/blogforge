@@ -169,6 +169,7 @@ def create_app() -> FastAPI:
     from blogforge.api.events import router as events_router
     from blogforge.api.expand import router as expand_router
     from blogforge.api.ideation import router as ideation_router
+    from blogforge.api.inline import router as inline_router
     from blogforge.api.jobs import router as jobs_router
     from blogforge.api.library import router as library_router
     from blogforge.api.lint import router as lint_router
@@ -190,6 +191,7 @@ def create_app() -> FastAPI:
     app.include_router(providers_router)
     app.include_router(expand_router)
     app.include_router(ideation_router)
+    app.include_router(inline_router)
     app.include_router(section_router)
     app.include_router(revise_router)
     app.include_router(templates_router)

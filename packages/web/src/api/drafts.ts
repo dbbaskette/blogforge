@@ -192,3 +192,16 @@ export async function lintDraft(
 ): Promise<{ violations: unknown[]; hits: unknown[]; repetitions: unknown[] }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
 }
+
+export type InlineAction = "rephrase" | "shorten" | "expand" | "fix" | "custom";
+
+/** Voice-aware rewrite of a selected passage (inline AI editing). */
+export async function inlineEdit(
+  draftId: string,
+  body: { text: string; action: InlineAction; instruction?: string },
+): Promise<{ text: string }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/inline`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
