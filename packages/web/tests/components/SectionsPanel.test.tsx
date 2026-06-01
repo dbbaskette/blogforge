@@ -26,6 +26,7 @@ function makeDraft(): Draft {
       },
     ],
     tags: [],
+    hero_image_key: null,
   };
 }
 

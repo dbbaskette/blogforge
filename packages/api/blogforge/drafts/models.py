@@ -122,6 +122,9 @@ class Draft(BaseModel):
     references: list[Reference] = Field(default_factory=list)
     ideation_messages: list[IdeationMessage] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    # S3 key of the AI-generated hero image, if any. Served via the hero-image
+    # endpoint; included in HTML/frontmatter export.
+    hero_image_key: str | None = None
 
     @field_validator("stage", mode="before")
     @classmethod

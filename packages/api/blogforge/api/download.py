@@ -51,8 +51,20 @@ async def download_draft(
             headers={"Content-Disposition": f'attachment; filename="{base}.docx"'},
         )
     if format == "html":
+        # Embed the hero image as a data URI so the exported file is self-contained.
+        hero_data_uri: str | None = None
+        if draft.hero_image_key:
+            try:
+                import base64
+
+                from blogforge.s3.client import get_s3_client
+
+                raw = await get_s3_client().get_object(draft.hero_image_key)
+                hero_data_uri = f"data:image/png;base64,{base64.b64encode(raw).decode()}"
+            except Exception:  # noqa: BLE001 — export still works without the hero
+                hero_data_uri = None
         return Response(
-            content=to_html(draft),
+            content=to_html(draft, hero_data_uri=hero_data_uri),
             media_type="text/html; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{base}.html"'},
         )

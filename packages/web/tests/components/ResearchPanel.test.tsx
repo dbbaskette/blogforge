@@ -38,6 +38,7 @@ const draft: Draft = {
   outline: null,
   sections: [],
   tags: [],
+  hero_image_key: null,
 };
 
 const sampleOutline = {

@@ -28,6 +28,8 @@ def frontmatter_block(draft: Draft) -> str:
     }
     if draft.tags:
         data["tags"] = list(draft.tags)
+    if draft.hero_image_key:
+        data["image"] = draft.hero_image_key
     dumped = yaml.safe_dump(data, sort_keys=False, allow_unicode=True).strip()
     return f"---\n{dumped}\n---\n\n"
 
@@ -37,14 +39,21 @@ def to_markdown(draft: Draft, *, frontmatter: bool = False) -> str:
     return frontmatter_block(draft) + body if frontmatter else body
 
 
-def to_html(draft: Draft) -> str:
-    """A standalone, self-styled HTML document."""
+def to_html(draft: Draft, *, hero_data_uri: str | None = None) -> str:
+    """A standalone, self-styled HTML document. When `hero_data_uri` is given
+    (a base64 data: URI of the hero image), it's embedded at the top so the
+    exported file stays self-contained."""
     import markdown as md_lib  # type: ignore[import-untyped]
 
     body_md = SqlDraftStore.assemble_markdown(draft)
     body_html = md_lib.markdown(body_md, extensions=["extra", "sane_lists", "smarty"])
     title = _html.escape(draft.title or draft.idea.topic or "Untitled")
-    return _HTML_TEMPLATE.format(title=title, body=body_html)
+    hero = (
+        f'<figure class="hero"><img src="{hero_data_uri}" alt="{title}"></figure>\n'
+        if hero_data_uri
+        else ""
+    )
+    return _HTML_TEMPLATE.format(title=title, hero=hero, body=body_html)
 
 
 def to_docx(draft: Draft) -> bytes:
@@ -110,10 +119,12 @@ _HTML_TEMPLATE = """<!doctype html>
   a {{ color: #2647c0; }}
   blockquote {{ margin: 1.1rem 0; padding-left: 1rem; border-left: 3px solid #ccc; color: #555; }}
   code {{ font: 0.9em ui-monospace, Menlo, monospace; background: #f3f3f3; padding: 0.1em 0.3em; }}
+  figure.hero {{ margin: 0 0 2rem; }}
+  figure.hero img {{ width: 100%; height: auto; border-radius: 8px; display: block; }}
 </style>
 </head>
 <body>
-{body}
+{hero}{body}
 </body>
 </html>
 """

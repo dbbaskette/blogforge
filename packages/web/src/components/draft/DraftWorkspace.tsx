@@ -5,6 +5,7 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { HeroImage } from "./HeroImage";
 import { LintPanel } from "./LintPanel";
 import { RepurposePanel } from "./RepurposePanel";
 import { OutlinePanel } from "./OutlinePanel";
@@ -334,6 +335,16 @@ export function DraftWorkspace({
             onRegenerate={handleGenerate}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
+        )}
+
+        {draft.stage === "sections" && (
+          <div className="mb-4">
+            <HeroImage
+              draftId={draft.id}
+              heroKey={draft.hero_image_key}
+              onChanged={onJobComplete}
+            />
+          </div>
         )}
 
         {draft.stage === "sections" && (

@@ -43,6 +43,7 @@ export interface Draft {
   outline: OutlineProposal | null;
   sections: Section[];
   tags: string[];
+  hero_image_key: string | null;
 }
 export interface DraftSummary {
   id: string;
@@ -191,6 +192,26 @@ export async function lintDraft(
   id: string,
 ): Promise<{ violations: unknown[]; hits: unknown[]; repetitions: unknown[] }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
+}
+
+/** Generate an AI hero image for the draft (Google Imagen). */
+export async function generateHeroImage(
+  draftId: string,
+  prompt = "",
+): Promise<{ hero_image_key: string }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/hero-image`, {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+}
+
+export async function deleteHeroImage(draftId: string): Promise<void> {
+  await api(`/api/drafts/${encodeURIComponent(draftId)}/hero-image`, { method: "DELETE" });
+}
+
+/** Same-origin URL for the stored hero image; `v` busts cache on regenerate. */
+export function heroImageUrl(draftId: string, version: string): string {
+  return `/api/drafts/${encodeURIComponent(draftId)}/hero-image?v=${encodeURIComponent(version)}`;
 }
 
 export interface ClaimResult {
