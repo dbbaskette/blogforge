@@ -41,10 +41,13 @@ async def lint_draft(
             detail={"error": {"code": "pack_invalid", "message": "Manifest validation failed."}},
         )
 
+    from blogforge.drafts.repetition import analyze_repetition
+
     md = store.assemble_markdown(draft)
     violations = lint_to_hits(result.manifest, md)
     hits = detect_positive_hits(md)
     return {
         "violations": [dataclasses.asdict(v) for v in violations],
         "hits": [dataclasses.asdict(h) for h in hits],
+        "repetitions": analyze_repetition(draft),
     }

@@ -1,7 +1,6 @@
 """POST /api/drafts/{id}/expand — async pipeline expanding all sections."""
 from __future__ import annotations
 
-import asyncio
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -23,8 +22,6 @@ from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.registry import get_provider
 
 router = APIRouter(tags=["expand"])
-
-_CONCURRENCY = 2
 
 
 @router.post("/api/drafts/{draft_id}/expand", status_code=202)
@@ -130,7 +127,6 @@ async def _run_expand(
         # Build reference context once per expand job (every section in this
         # draft sees the same materials), not per-section.
         reference_context = await get_reference_context(draft.id, draft.references)
-        semaphore = asyncio.Semaphore(_CONCURRENCY)
 
         # Captured per-section failures. Inner expand_one no longer calls
         # reg.fail directly — the outer code decides whether the whole job
@@ -145,62 +141,61 @@ async def _run_expand(
             # (saved while blank) should still be retried by a bulk expand.
             if section.content_md.strip() and section.status in ("ready", "edited"):
                 return
-            async with semaphore:
-                if cancel_evt.is_set():
-                    return
-                section.status = "generating"
-                section.last_error = None
+            if cancel_evt.is_set():
+                return
+            section.status = "generating"
+            section.last_error = None
+            await store.update(draft.id, draft, user_id=user_id)
+            await reg.set_stage(job_id, f"section:start:{section.id}")
+            buf = ""
+            try:
+                async for chunk in stream_section(
+                    draft,
+                    section,
+                    pack_info.root_path,
+                    manifest,
+                    provider,
+                    model=model,
+                    reference_context=reference_context,
+                ):
+                    if cancel_evt.is_set():
+                        section.status = "failed"
+                        section.last_error = "Cancelled before completion."
+                        await store.update(draft.id, draft, user_id=user_id)
+                        return
+                    if chunk.delta:
+                        buf += chunk.delta
+            except ProviderMissingKey as e:
+                section.status = "failed"
+                section.last_error = e.message
                 await store.update(draft.id, draft, user_id=user_id)
-                await reg.set_stage(job_id, f"section:start:{section.id}")
-                buf = ""
-                try:
-                    async for chunk in stream_section(
-                        draft,
-                        section,
-                        pack_info.root_path,
-                        manifest,
-                        provider,
-                        model=model,
-                        reference_context=reference_context,
-                    ):
-                        if cancel_evt.is_set():
-                            section.status = "failed"
-                            section.last_error = "Cancelled before completion."
-                            await store.update(draft.id, draft, user_id=user_id)
-                            return
-                        if chunk.delta:
-                            buf += chunk.delta
-                except ProviderMissingKey as e:
-                    section.status = "failed"
-                    section.last_error = e.message
-                    await store.update(draft.id, draft, user_id=user_id)
-                    section_errors.append((e.code, e.message, e.hint))
-                    return
-                except ProviderError as e:
-                    section.status = "failed"
-                    section.last_error = e.message
-                    await store.update(draft.id, draft, user_id=user_id)
-                    section_errors.append((e.code, e.message, e.hint))
-                    return
-                except ComposeError as e:
-                    section.status = "failed"
-                    section.last_error = str(e)
-                    await store.update(draft.id, draft, user_id=user_id)
-                    section_errors.append(
-                        (
-                            "compose_error",
-                            str(e),
-                            "Check the draft's format/samples against the pack manifest.",
-                        )
+                section_errors.append((e.code, e.message, e.hint))
+                return
+            except ProviderError as e:
+                section.status = "failed"
+                section.last_error = e.message
+                await store.update(draft.id, draft, user_id=user_id)
+                section_errors.append((e.code, e.message, e.hint))
+                return
+            except ComposeError as e:
+                section.status = "failed"
+                section.last_error = str(e)
+                await store.update(draft.id, draft, user_id=user_id)
+                section_errors.append(
+                    (
+                        "compose_error",
+                        str(e),
+                        "Check the draft's format/samples against the pack manifest.",
                     )
-                    return
-                section.content_md = buf.strip() + "\n"
-                section.word_count = len(buf.split())
-                section.status = "ready"
-                section.last_error = None
-                section.last_generated_at = datetime.now(UTC)
-                await store.update(draft.id, draft, user_id=user_id)
-                await reg.set_stage(job_id, f"section:done:{section.id}")
+                )
+                return
+            section.content_md = buf.strip() + "\n"
+            section.word_count = len(buf.split())
+            section.status = "ready"
+            section.last_error = None
+            section.last_generated_at = datetime.now(UTC)
+            await store.update(draft.id, draft, user_id=user_id)
+            await reg.set_stage(job_id, f"section:done:{section.id}")
 
         targets = [
             i
@@ -210,7 +205,16 @@ async def _run_expand(
         # Incremental drafting: compose only the next `limit` unwritten sections.
         if limit is not None and limit > 0:
             targets = targets[:limit]
-        await asyncio.gather(*[expand_one(i) for i in targets])
+        # Compose sequentially in document order. Coherence depends on it: each
+        # section's prompt includes the prose of the sections before it (see
+        # stream_section / _render_story_so_far), so section N can only build on
+        # N-1 if N-1 is already written. The old parallel gather wrote sections
+        # blind to each other, which is what made the post read like the same
+        # essay restarted N times. Slower wall-clock, one coherent article.
+        for idx in targets:
+            if cancel_evt.is_set():
+                break
+            await expand_one(idx)
         if cancel_evt.is_set():
             return
         # Persist final stage

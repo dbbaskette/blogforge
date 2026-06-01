@@ -53,4 +53,4 @@ RUN uv pip install --system --no-cache -e .
 ENV PORT=7880
 EXPOSE 7880
 
-CMD ["sh", "-c", "blogforge serve --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "blogforge serve --host 0.0.0.0 --port ${PORT} --no-browser"]

@@ -12,6 +12,8 @@ class ModelInfo(BaseModel):
     label: str
     context_window: int
     supports_streaming: bool
+    input_per_million_usd: float | None = None
+    output_per_million_usd: float | None = None
 
 
 class Usage(BaseModel):

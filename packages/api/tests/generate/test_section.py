@@ -88,7 +88,37 @@ def test_render_section_prompt_middle_section() -> None:
     draft = _draft()
     prompt = _render_section_prompt(draft, draft.sections[1])
     assert "**Second**" in prompt
-    assert "Open and close mid-thought" in prompt
+    assert "Pick up the thread from the previous section" in prompt
+
+
+def test_section_prompt_threads_prior_prose_for_continuity() -> None:
+    """A section sees the already-written prose of the sections before it, plus
+    the briefs of the sections after it, so it continues one coherent piece."""
+    draft = _draft()
+    draft.sections[0].content_md = "The HiDock betrayal is where this starts."
+    draft.sections[0].status = "ready"
+    prompt = _render_section_prompt(draft, draft.sections[1])
+    # Story-so-far carries section one's actual prose, not just its title.
+    assert "The HiDock betrayal is where this starts." in prompt
+    assert "already been written" in prompt
+    # What's-next lists the later section by title so this one doesn't pre-empt it.
+    assert "Third" in prompt
+    # And the single-coherent-piece framing is present.
+    assert "SINGLE, continuous blog post" in prompt
+
+
+def test_section_prompt_omits_unwritten_prior_sections() -> None:
+    """Empty preceding sections contribute no story-so-far block (nothing to
+    continue from yet)."""
+    draft = _draft()  # all sections empty
+    prompt = _render_section_prompt(draft, draft.sections[1])
+    assert "already been written" not in prompt
+
+
+def test_first_section_warned_off_repeating_hook() -> None:
+    draft = _draft()
+    prompt = _render_section_prompt(draft, draft.sections[0])
+    assert "do NOT repeat or paraphrase it" in prompt
 
 
 @pytest.mark.asyncio

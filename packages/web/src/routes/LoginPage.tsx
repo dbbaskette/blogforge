@@ -79,7 +79,7 @@ export function LoginPage(): JSX.Element {
       <div className="nb-card w-full max-w-md p-8 animate-fade-up">
         <header className="mb-6 text-center">
           <div className="w-10 h-10 mx-auto rounded-[10px] bg-gradient-to-br from-cobalt-500 to-cobalt-300 grid place-items-center text-white font-serif italic font-semibold text-lg shadow-nb-cobalt mb-3">
-            P
+            B
           </div>
           <h1 className="font-serif text-2xl font-medium text-ink tracking-tight">BlogForge</h1>
           <p className="text-sm text-muted mt-1">A workshop for long-form writing.</p>

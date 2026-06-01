@@ -187,6 +187,8 @@ export function downloadDraftUrl(
   const qs = params.toString();
   return `/api/drafts/${encodeURIComponent(id)}/download${qs ? `?${qs}` : ""}`;
 }
-export async function lintDraft(id: string): Promise<{ violations: unknown[]; hits: unknown[] }> {
+export async function lintDraft(
+  id: string,
+): Promise<{ violations: unknown[]; hits: unknown[]; repetitions: unknown[] }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
 }

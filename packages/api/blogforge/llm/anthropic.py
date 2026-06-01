@@ -44,6 +44,8 @@ class AnthropicProvider:
                 label=(rate["label"] if rate else None) or m.get("display_name") or m["id"],
                 context_window=int(rate["context_window"] if rate else 200_000),
                 supports_streaming=bool(rate["supports_streaming"] if rate else True),
+                input_per_million_usd=float(rate["input_per_million_usd"]) if rate else None,
+                output_per_million_usd=float(rate["output_per_million_usd"]) if rate else None,
             ))
         return result
 

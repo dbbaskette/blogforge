@@ -18,7 +18,7 @@ def main() -> None:
 @click.option("--host", default="127.0.0.1", show_default=True)
 @click.option("--port", default=7880, show_default=True, type=int)
 @click.option("--dev/--prod", default=False, help="Dev mode: skip browser open.")
-@click.option("--no-browser/--browser", default=False)
+@click.option("--no-browser/--browser", default=True, help="Open a browser tab on start.")
 def serve(host: str, port: int, dev: bool, no_browser: bool) -> None:
     """Start the BlogForge server."""
     app = create_app()

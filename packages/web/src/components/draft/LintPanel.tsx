@@ -23,6 +23,7 @@ function itemKey(item: LintItem, prefix: string, idx: number): string {
 export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [violations, setViolations] = useState<LintItem[]>([]);
+  const [repetitions, setRepetitions] = useState<LintItem[]>([]);
   const [hits, setHits] = useState<LintItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +32,7 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
     lintDraft(draftId)
       .then((result) => {
         setViolations(result.violations as LintItem[]);
+        setRepetitions((result.repetitions ?? []) as LintItem[]);
         setHits(result.hits as LintItem[]);
       })
       .catch((e: Error) => setError(e.message))
@@ -111,6 +113,47 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                         </span>
                       )}
                       <span className="text-ink-2">{v.message ?? v.text ?? JSON.stringify(v)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <hr className="nb-rule" />
+
+            <section>
+              <div className="flex items-baseline justify-between mb-3">
+                <h3 className="font-serif text-lg font-medium text-ink tracking-tight">
+                  Repetition
+                </h3>
+                <span
+                  className="nb-pill"
+                  style={{
+                    background: repetitions.length === 0 ? "#e3f5ec" : "#fdf6e6",
+                    color: repetitions.length === 0 ? "#1f7752" : "#8a5d18",
+                  }}
+                >
+                  {repetitions.length.toString().padStart(2, "0")}
+                </span>
+              </div>
+              {repetitions.length === 0 ? (
+                <p className="text-sm text-muted italic font-serif">
+                  No recycled phrasing across sections.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {repetitions.map((r, i) => (
+                    <li
+                      key={itemKey(r, "rep", i)}
+                      className="nb-card p-3 text-sm"
+                      style={{ borderColor: "#f0d5a4" }}
+                    >
+                      {r.rule && (
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-amber-700 mr-2">
+                          [{r.rule}]
+                        </span>
+                      )}
+                      <span className="text-ink-2">{r.message ?? r.text ?? JSON.stringify(r)}</span>
                     </li>
                   ))}
                 </ul>
