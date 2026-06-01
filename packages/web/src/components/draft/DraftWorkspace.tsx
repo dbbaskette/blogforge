@@ -6,6 +6,7 @@ import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { LintPanel } from "./LintPanel";
+import { RepurposePanel } from "./RepurposePanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
@@ -53,6 +54,7 @@ export function DraftWorkspace({
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
   const [lintOpen, setLintOpen] = useState(false);
+  const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
@@ -364,10 +366,14 @@ export function DraftWorkspace({
           draftedCount={draftedCount}
           sectionCount={draft.sections.length}
           onLint={() => setLintOpen(true)}
+          onRepurpose={() => setRepurposeOpen(true)}
         />
       )}
 
       {lintOpen && <LintPanel draftId={draft.id} onClose={() => setLintOpen(false)} />}
+      {repurposeOpen && (
+        <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
+      )}
     </div>
   );
 }

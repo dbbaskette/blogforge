@@ -205,3 +205,23 @@ export async function inlineEdit(
     body: JSON.stringify(body),
   });
 }
+
+export interface RepurposeFormat {
+  id: string;
+  label: string;
+}
+
+export async function listRepurposeFormats(): Promise<RepurposeFormat[]> {
+  return api("/api/repurpose/formats");
+}
+
+/** Turn a finished draft into another channel (X thread, LinkedIn, etc.). */
+export async function repurposeDraft(
+  draftId: string,
+  format: string,
+): Promise<{ format: string; text: string }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/repurpose`, {
+    method: "POST",
+    body: JSON.stringify({ format }),
+  });
+}
