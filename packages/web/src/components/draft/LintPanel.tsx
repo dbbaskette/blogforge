@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { lintDraft } from "../../api/drafts";
+import { type ClaimResult, checkClaims, lintDraft } from "../../api/drafts";
 import { Icon } from "../ui/Icon";
 
 interface LintItem {
@@ -27,6 +27,13 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
   const [hits, setHits] = useState<LintItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Claims are an LLM call (unlike the fast rule-based lint above), so they
+  // run on demand — not on every panel open.
+  const [claims, setClaims] = useState<ClaimResult[] | null>(null);
+  const [claimsLoading, setClaimsLoading] = useState(false);
+  const [claimsError, setClaimsError] = useState<string | null>(null);
+  const [hasRefs, setHasRefs] = useState(true);
+
   useEffect(() => {
     setLoading(true);
     lintDraft(draftId)
@@ -38,6 +45,20 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [draftId]);
+
+  const runClaims = async (): Promise<void> => {
+    setClaimsLoading(true);
+    setClaimsError(null);
+    try {
+      const { claims: c, has_references } = await checkClaims(draftId);
+      setClaims(c);
+      setHasRefs(has_references);
+    } catch (e) {
+      setClaimsError((e as Error).message);
+    } finally {
+      setClaimsLoading(false);
+    }
+  };
 
   return (
     <div
@@ -192,9 +213,101 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                 </ul>
               )}
             </section>
+
+            <hr className="nb-rule" />
+
+            <section>
+              <div className="flex items-baseline justify-between mb-1">
+                <h3 className="font-serif text-lg font-medium text-ink tracking-tight">
+                  Fact-check
+                </h3>
+                {claims !== null && (
+                  <span
+                    className="nb-pill"
+                    style={{
+                      background: claims.some((c) => c.status !== "supported")
+                        ? "#fdf6e6"
+                        : "#e3f5ec",
+                      color: claims.some((c) => c.status !== "supported") ? "#8a5d18" : "#1f7752",
+                    }}
+                  >
+                    {claims.filter((c) => c.status !== "supported").length.toString().padStart(2, "0")}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted mb-3">
+                Checks the draft's factual claims against your attached references.
+              </p>
+              {claimsError && (
+                <p className="text-sm text-rose-ink mb-2">{claimsError}</p>
+              )}
+              {claims === null ? (
+                <button
+                  type="button"
+                  onClick={runClaims}
+                  disabled={claimsLoading}
+                  className="nb-btn nb-btn-sm"
+                >
+                  {claimsLoading ? "Checking…" : "Check claims"}
+                </button>
+              ) : (
+                <>
+                  {!hasRefs && (
+                    <p
+                      className="text-xs px-3 py-2 rounded-nb-sm mb-2"
+                      style={{ background: "#fdf6e6", color: "#8a5d18", border: "1px solid #f0d5a4" }}
+                    >
+                      No references attached — every claim is flagged as needing a source. Add
+                      references to verify against them.
+                    </p>
+                  )}
+                  {claims.length === 0 ? (
+                    <p className="text-sm text-muted italic font-serif">No checkable claims found.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {claims.map((c, i) => (
+                        <li
+                          key={`claim-${i}-${c.text.slice(0, 24)}`}
+                          className="nb-card p-3 text-sm"
+                          style={{ borderColor: CLAIM_BORDER[c.status] }}
+                        >
+                          <span
+                            className="font-mono text-[10px] uppercase tracking-wider mr-2"
+                            style={{ color: CLAIM_COLOR[c.status] }}
+                          >
+                            [{c.status}]
+                          </span>
+                          <span className="text-ink-2">{c.text}</span>
+                          {c.note && <p className="text-xs text-muted mt-1">{c.note}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    type="button"
+                    onClick={runClaims}
+                    disabled={claimsLoading}
+                    className="nb-btn nb-btn-ghost nb-btn-sm mt-2"
+                  >
+                    {claimsLoading ? "Checking…" : "Re-check"}
+                  </button>
+                </>
+              )}
+            </section>
           </div>
         )}
       </dialog>
     </div>
   );
 }
+
+const CLAIM_BORDER: Record<ClaimResult["status"], string> = {
+  supported: "#cde9da",
+  unsupported: "#f0d5a4",
+  contradicted: "#f7c7cf",
+};
+const CLAIM_COLOR: Record<ClaimResult["status"], string> = {
+  supported: "#1f7752",
+  unsupported: "#8a5d18",
+  contradicted: "#94293c",
+};

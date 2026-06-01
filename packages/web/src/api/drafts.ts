@@ -193,6 +193,19 @@ export async function lintDraft(
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
 }
 
+export interface ClaimResult {
+  text: string;
+  status: "supported" | "unsupported" | "contradicted";
+  note: string;
+}
+
+/** Fact-check the draft's claims against its attached references (LLM call). */
+export async function checkClaims(
+  draftId: string,
+): Promise<{ claims: ClaimResult[]; has_references: boolean }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/claims`, { method: "POST" });
+}
+
 export type InlineAction = "rephrase" | "shorten" | "expand" | "fix" | "custom";
 
 /** Voice-aware rewrite of a selected passage (inline AI editing). */

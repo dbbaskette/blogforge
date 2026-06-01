@@ -164,6 +164,7 @@ def create_app() -> FastAPI:
     from blogforge.api.admin import router as admin_router
     from blogforge.api.admin_keys import router as admin_keys_router
     from blogforge.api.auth import router as auth_router
+    from blogforge.api.claims import router as claims_router
     from blogforge.api.download import router as download_router
     from blogforge.api.drafts import router as drafts_router
     from blogforge.api.events import router as events_router
@@ -203,6 +204,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs_router)
     app.include_router(download_router)
     app.include_router(lint_router)
+    app.include_router(claims_router)
     app.include_router(events_router)
 
     @app.get("/api/health")
