@@ -34,28 +34,39 @@ ARG MYVOICE_REF=main
 RUN git clone --depth=1 --branch "${MYVOICE_REF}" \
         https://github.com/dbbaskette/myvoice /myvoice
 
-# Copy project metadata. README is required because pyproject.toml
-# declares `readme = "README.md"` and hatchling validates the file
-# exists at wheel-build time.
-COPY pyproject.toml uv.lock README.md /app/
+# Copy project metadata + the pinned dependency lock. README is required
+# because pyproject.toml declares `readme = "README.md"` and hatchling
+# validates the file at wheel-build time.
+COPY pyproject.toml uv.lock README.md requirements.lock /app/
+
+# Install PINNED dependencies BEFORE copying app source. Two reasons this
+# matters:
+#   1. Determinism — `uv pip install -e .` re-resolves to the latest matching
+#      releases on every build (e.g. idna 3.16 → 3.18), so a freshly-published
+#      transitive dep is a cache miss → fresh download → build breaks the moment
+#      the network hiccups. requirements.lock pins exact versions, so the
+#      BuildKit uv cache stays valid build-to-build.
+#   2. Layer caching — keyed only on the lockfiles, so editing application code
+#      never re-runs this step. Code-only rebuilds are fully offline.
+# `-e ../myvoice` in requirements.lock resolves to /myvoice (cloned above) from
+# WORKDIR /app. Regenerate the lock after changing deps with:
+#   uv export --frozen --no-emit-project --no-dev --no-hashes -o requirements.lock
+ENV UV_CACHE_DIR=/root/.cache/uv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -r requirements.lock
+
 COPY packages/api /app/packages/api
 
 # Copy the built web bundle into the API's static dir.
 COPY --from=web /work/packages/web/dist /app/packages/api/blogforge/static
 
-# Install Python deps editable so the alembic/ + alembic.ini at the
-# source-tree's well-known paths (parents[1] of blogforge/server.py)
-# remain reachable at runtime. With a non-editable wheel install
-# `__file__` points into site-packages/ and the migrations dir lookup
-# resolves to alembic's own library directory, which crashes on boot.
-#
-# A persistent BuildKit cache mount holds uv's wheel/metadata cache across
-# builds. A code change still invalidates this layer, but the install then
-# pulls everything from the cache instead of re-hitting PyPI — so rebuilds
-# are fast and survive a flaky network (only the first cold build downloads).
-ENV UV_CACHE_DIR=/root/.cache/uv
+# Install the project itself — editable so alembic/ + alembic.ini at the
+# source tree's well-known paths (parents[1] of blogforge/server.py) stay
+# reachable at runtime (a non-editable wheel puts __file__ in site-packages/
+# and the migrations lookup resolves into alembic's own dir, crashing on boot).
+# --no-deps: dependencies are already installed from requirements.lock above.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system -e .
+    uv pip install --system --no-deps -e .
 
 # Default port; override via $PORT in cloud envs.
 ENV PORT=7880
