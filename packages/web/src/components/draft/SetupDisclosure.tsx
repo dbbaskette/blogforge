@@ -63,9 +63,25 @@ export function SetupDisclosure({
       setModels([]);
       return;
     }
+    let cancelled = false;
     listModels(idea.provider)
-      .then(setModels)
-      .catch(() => setModels([]));
+      .then((ms) => {
+        if (cancelled) return;
+        setModels(ms);
+        // Switching provider can leave a model from the old provider selected
+        // (e.g. a Google model under claude-cli, which claude -p rejects).
+        // Reset to a valid model for the new provider.
+        if (ms.length > 0 && !ms.some((m) => m.id === idea.model)) {
+          onChange({ ...idea, model: ms[0].id });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setModels([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idea.provider, providers]);
 
   const summary = `pack ${idea.pack_slug || "—"} · ${idea.format || "no format"} · ${

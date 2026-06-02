@@ -26,6 +26,21 @@ from blogforge.llm.rates import models_for
 
 # Claude model aliases the CLI accepts for --model.
 _FALLBACK_MODELS = ("opus", "sonnet", "haiku")
+_DEFAULT_MODEL = "sonnet"
+
+
+def _map_model(model: str) -> str:
+    """Coerce the draft's model to something `claude -p` accepts.
+
+    A draft created under another provider can carry a non-Claude model (e.g.
+    `gemini-3.1-flash-lite`); passing that to `claude -p --model` fails with
+    "model may not exist". The CLI only takes Claude aliases (opus/sonnet/haiku)
+    or full `claude-*` names — anything else falls back to the default.
+    """
+    m = (model or "").strip()
+    if m.lower() in _FALLBACK_MODELS or m.lower().startswith("claude"):
+        return m
+    return _DEFAULT_MODEL
 # Tools Claude may use while writing (web search on, per product decision).
 _ALLOWED_TOOLS = ("WebSearch", "WebFetch")
 _TIMEOUT_SECONDS = 600
@@ -96,7 +111,7 @@ class ClaudeCliProvider:
             "--output-format", "json",
             "--no-session-persistence",
             "--append-system-prompt", _ENGINE_DIRECTIVE,
-            "--model", model or "sonnet",
+            "--model", _map_model(model),
             "--allowed-tools", *_ALLOWED_TOOLS,
         ]
         # Run in a throwaway dir so generation never inherits BlogForge's own
@@ -121,8 +136,18 @@ class ClaudeCliProvider:
             shutil.rmtree(workdir, ignore_errors=True)
 
         if proc.returncode != 0:
-            msg = stderr.decode("utf-8", "replace").strip() or "claude -p failed."
-            raise ProviderError(f"claude -p exited {proc.returncode}: {msg[:400]}")
+            # Surface the real reason: `claude -p` often writes its error (auth,
+            # usage limit, etc.) to STDOUT (as JSON) rather than stderr.
+            err_txt = stderr.decode("utf-8", "replace").strip()
+            out_txt = stdout.decode("utf-8", "replace").strip()
+            detail = err_txt or out_txt or "(no output on stdout or stderr)"
+            raise ProviderError(
+                f"claude -p exited {proc.returncode}: {detail[:600]}",
+                hint=(
+                    "Run this in the same shell that launched the server to check the CLI: "
+                    "printf 'hi' | claude -p --output-format json"
+                ),
+            )
         try:
             data: dict[str, Any] = json.loads(stdout.decode("utf-8", "replace"))
         except json.JSONDecodeError as e:
