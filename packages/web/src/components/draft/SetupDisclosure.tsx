@@ -5,7 +5,7 @@ import { type PackFormatEntry, type PackSummary, getManifest, listPacks } from "
 import { type ModelInfo, listModels, listProviderAvailability } from "../../api/providers";
 import { Icon } from "../ui/Icon";
 
-type Provider = "anthropic" | "openai" | "google";
+type Provider = "anthropic" | "openai" | "google" | "claude-cli";
 
 interface SetupDisclosureProps {
   draft: Draft;
@@ -125,11 +125,11 @@ export function SetupDisclosure({
             id="setup-provider"
             value={idea.provider}
             onChange={(v) => onChange({ ...idea, provider: v as Provider })}
-            options={(["anthropic", "openai", "google"] as Provider[]).map((p) => ({
-              value: p,
-              label: providers[p] ? p : `${p} (no key)`,
-              disabled: !providers[p],
-            }))}
+            options={(["anthropic", "openai", "google", "claude-cli"] as Provider[]).map((p) => {
+              const name = p === "claude-cli" ? "claude (CLI · subscription)" : p;
+              const missing = p === "claude-cli" ? "not installed" : "no key";
+              return { value: p, label: providers[p] ? name : `${name} (${missing})`, disabled: !providers[p] };
+            })}
           />
           <FieldSelect
             label="Model"

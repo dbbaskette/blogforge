@@ -88,6 +88,7 @@ def _draft_from_row(row: DraftRow) -> Draft:
             for m in sorted(row.ideation_messages, key=lambda m: m.position)
         ],
         tags=list(row.tags or []),
+        hero_image_key=row.hero_image_key,
     )
 
 
@@ -205,6 +206,7 @@ class SqlDraftStore:
             row.idea = draft.idea.model_dump()
             row.outline = draft.outline.model_dump() if draft.outline else None
             row.tags = list(draft.tags)
+            row.hero_image_key = draft.hero_image_key
             row.updated_at = datetime.now(UTC)
 
             # Replace sections in bulk.

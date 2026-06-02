@@ -70,7 +70,7 @@ function TopBar(): JSX.Element {
       <div className="max-w-6xl mx-auto px-6 lg:px-10 h-14 flex items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-2.5 group">
           <span className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-cobalt-500 to-cobalt-300 grid place-items-center text-white font-serif italic font-semibold text-base shadow-nb-cobalt">
-            P
+            B
           </span>
           <span className="flex flex-col leading-tight">
             <span className="font-semibold text-[15px] text-ink tracking-tight">BlogForge</span>

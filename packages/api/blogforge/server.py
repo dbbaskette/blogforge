@@ -164,11 +164,15 @@ def create_app() -> FastAPI:
     from blogforge.api.admin import router as admin_router
     from blogforge.api.admin_keys import router as admin_keys_router
     from blogforge.api.auth import router as auth_router
+    from blogforge.api.claims import router as claims_router
     from blogforge.api.download import router as download_router
     from blogforge.api.drafts import router as drafts_router
     from blogforge.api.events import router as events_router
     from blogforge.api.expand import router as expand_router
+    from blogforge.api.headlines import router as headlines_router
+    from blogforge.api.hero import router as hero_router
     from blogforge.api.ideation import router as ideation_router
+    from blogforge.api.inline import router as inline_router
     from blogforge.api.jobs import router as jobs_router
     from blogforge.api.library import router as library_router
     from blogforge.api.lint import router as lint_router
@@ -176,6 +180,7 @@ def create_app() -> FastAPI:
     from blogforge.api.packs import router as packs_router
     from blogforge.api.providers import router as providers_router
     from blogforge.api.references import router as references_router
+    from blogforge.api.repurpose import router as repurpose_router
     from blogforge.api.revise import router as revise_router
     from blogforge.api.section import router as section_router
     from blogforge.api.templates import router as templates_router
@@ -189,14 +194,19 @@ def create_app() -> FastAPI:
     app.include_router(packs_router)
     app.include_router(providers_router)
     app.include_router(expand_router)
+    app.include_router(headlines_router)
+    app.include_router(hero_router)
     app.include_router(ideation_router)
+    app.include_router(inline_router)
     app.include_router(section_router)
     app.include_router(revise_router)
+    app.include_router(repurpose_router)
     app.include_router(templates_router)
     app.include_router(library_router)
     app.include_router(jobs_router)
     app.include_router(download_router)
     app.include_router(lint_router)
+    app.include_router(claims_router)
     app.include_router(events_router)
 
     @app.get("/api/health")

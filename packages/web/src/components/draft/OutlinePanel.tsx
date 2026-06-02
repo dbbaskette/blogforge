@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { Draft, OutlineProposal, OutlineSection } from "../../api/drafts";
+import { HeadlineLab } from "./HeadlineLab";
 import { Icon } from "../ui/Icon";
 
 function newSection(): OutlineSection {
@@ -14,6 +15,7 @@ function newSection(): OutlineSection {
 interface OutlinePanelProps {
   draft: Draft;
   onChange: (outline: OutlineProposal) => void;
+  onApplyTitle: (title: string) => void;
   onAdvance: () => Promise<void>;
   onRegenerate: () => Promise<void>;
   /** Optional right-rail block, typically a collapsible ReferencesList. */
@@ -23,6 +25,7 @@ interface OutlinePanelProps {
 export function OutlinePanel({
   draft,
   onChange,
+  onApplyTitle,
   onAdvance,
   onRegenerate,
   references,
@@ -31,6 +34,7 @@ export function OutlinePanel({
   const [advancing, setAdvancing] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [labOpen, setLabOpen] = useState(false);
 
   const updateSection = (idx: number, patch: Partial<OutlineSection>): void => {
     onChange({
@@ -91,9 +95,18 @@ export function OutlinePanel({
         </p>
 
         <div className="mt-5">
-          <label htmlFor="hook" className="nb-label">
-            Opening hook
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="hook" className="nb-label !mb-0">
+              Opening hook
+            </label>
+            <button
+              type="button"
+              onClick={() => setLabOpen(true)}
+              className="text-xs font-medium text-cobalt-600 hover:text-cobalt-700"
+            >
+              ✨ Headline &amp; hook ideas
+            </button>
+          </div>
           <textarea
             id="hook"
             value={outline.opening_hook}
@@ -104,6 +117,15 @@ export function OutlinePanel({
           />
         </div>
       </header>
+
+      {labOpen && (
+        <HeadlineLab
+          draftId={draft.id}
+          onApplyTitle={onApplyTitle}
+          onApplyHook={(hook) => onChange({ ...outline, opening_hook: hook })}
+          onClose={() => setLabOpen(false)}
+        />
+      )}
 
       {references}
 

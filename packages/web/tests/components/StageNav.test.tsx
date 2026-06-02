@@ -20,6 +20,7 @@ function makeDraft(over: Partial<Draft> = {}): Draft {
       },
     ],
     tags: [],
+    hero_image_key: null,
     ...over,
   };
 }

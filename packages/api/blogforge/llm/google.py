@@ -61,6 +61,8 @@ class GoogleProvider:
                 label=rate["label"],
                 context_window=int(rate["context_window"]),
                 supports_streaming=bool(rate["supports_streaming"]),
+                input_per_million_usd=float(rate["input_per_million_usd"]),
+                output_per_million_usd=float(rate["output_per_million_usd"]),
             ))
         return result
 

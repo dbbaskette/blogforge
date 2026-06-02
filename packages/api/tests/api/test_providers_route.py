@@ -32,11 +32,15 @@ def client_with_keys(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterato
         yield c
 
 
-def test_providers_returns_availability_only(client_with_keys: TestClient) -> None:
+def test_providers_returns_availability_only(
+    client_with_keys: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Force the claude CLI "absent" so availability is deterministic across hosts.
+    monkeypatch.setattr("blogforge.llm.claude_cli.shutil.which", lambda _: None)
     r = client_with_keys.get("/api/providers")
     assert r.status_code == 200
     body = r.json()
-    assert body == {"anthropic": True, "openai": False, "google": True}
+    assert body == {"anthropic": True, "openai": False, "google": True, "claude-cli": False}
     # No key leak
     assert "sk-ant-test" not in r.text
     assert "g-test" not in r.text
@@ -47,11 +51,17 @@ def test_providers_missing_config_returns_empty_map(
 ) -> None:
     monkeypatch.setenv("MYVOICE_CONFIG_PATH", str(tmp_path / "nonexistent.yaml"))
     monkeypatch.setenv("BLOGFORGE_DRAFTS_ROOT", str(tmp_path / "drafts"))
+    monkeypatch.setattr("blogforge.llm.claude_cli.shutil.which", lambda _: None)
     app = create_app()
     with TestClient(app) as c:
         r = c.get("/api/providers")
     assert r.status_code == 200
-    assert r.json() == {"anthropic": False, "openai": False, "google": False}
+    assert r.json() == {
+        "anthropic": False,
+        "openai": False,
+        "google": False,
+        "claude-cli": False,
+    }
 
 
 def test_list_models_400_when_no_key(client_with_keys: TestClient) -> None:

@@ -21,7 +21,7 @@ class IdeaInput(BaseModel):
     bullets: list[str] = Field(default_factory=list)
     pack_slug: str = Field(min_length=1)
     format: str | None = None
-    provider: Literal["anthropic", "openai", "google"]
+    provider: Literal["anthropic", "openai", "google", "claude-cli"]
     model: str = Field(min_length=1)
     target_words: int = Field(default=1500, ge=300, le=10000)
     notes: str = ""
@@ -122,6 +122,9 @@ class Draft(BaseModel):
     references: list[Reference] = Field(default_factory=list)
     ideation_messages: list[IdeationMessage] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    # S3 key of the AI-generated hero image, if any. Served via the hero-image
+    # endpoint; included in HTML/frontmatter export.
+    hero_image_key: str | None = None
 
     @field_validator("stage", mode="before")
     @classmethod

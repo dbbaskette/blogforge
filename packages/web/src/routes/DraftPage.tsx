@@ -76,15 +76,6 @@ export function DraftPage(): JSX.Element {
     setJobId(job_id);
   }, [id]);
 
-  const onExpandNext = useCallback(
-    async (n: number) => {
-      if (!id) return;
-      const { job_id } = await expandSections(id, n);
-      setJobId(job_id);
-    },
-    [id],
-  );
-
   const onJobComplete = useCallback(() => {
     if (!id) return;
     getDraft(id)
@@ -170,7 +161,6 @@ export function DraftPage(): JSX.Element {
       onGenerateOutline={onGenerateOutline}
       onExpandAll={onExpandAll}
       onExpandUnfilled={onExpandUnfilled}
-      onExpandNext={onExpandNext}
       onSectionSave={onSectionSave}
       onRegenerateSection={onRegenerateSection}
       onRevertSection={onRevertSection}

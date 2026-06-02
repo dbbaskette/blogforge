@@ -26,6 +26,7 @@ function makeDraft(): Draft {
       },
     ],
     tags: [],
+    hero_image_key: null,
   };
 }
 
@@ -42,7 +43,6 @@ const baseProps = {
   onRevertSection: noop,
   onReorder: noop,
   onExpandUnfilled: noop,
-  onExpandNext: noop,
   onReviseDraft: noop,
 };
 
@@ -55,19 +55,37 @@ describe("SectionsPanel", () => {
     expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
   });
 
-  it("composes the next batch incrementally", () => {
-    const onExpandNext = vi.fn(async (): Promise<void> => {});
+  it("composes the whole draft in one pass", () => {
+    const onExpandUnfilled = vi.fn(async (): Promise<void> => {});
     render(
       <SectionsPanel
         {...baseProps}
         draft={makeDraft()}
         unfilledCount={5}
-        onExpandNext={onExpandNext}
+        onExpandUnfilled={onExpandUnfilled}
         onReviseDraft={noop}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /draft next 3/i }));
-    expect(onExpandNext).toHaveBeenCalledWith(3);
+    fireEvent.click(screen.getByRole("button", { name: /compose draft/i }));
+    expect(onExpandUnfilled).toHaveBeenCalled();
+    // The incremental "draft next N" button is gone — single-pass is whole-doc.
+    expect(screen.queryByRole("button", { name: /draft next/i })).not.toBeInTheDocument();
+  });
+
+  it("shows one unified composing state (not per-section) during a single-pass compose", () => {
+    render(
+      <SectionsPanel
+        {...baseProps}
+        draft={makeDraft()}
+        jobRunning
+        composingWholeDraft
+        onReviseDraft={noop}
+      />,
+    );
+    expect(screen.getByText(/composing your full draft/i)).toBeInTheDocument();
+    // The per-section card and the N/total per-section banner are suppressed.
+    expect(screen.queryByText(/the first section prose/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sections$/i)).not.toBeInTheDocument();
   });
 
   it("submits a holistic revision instruction", async () => {

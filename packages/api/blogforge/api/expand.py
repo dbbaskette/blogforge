@@ -1,7 +1,6 @@
 """POST /api/drafts/{id}/expand — async pipeline expanding all sections."""
 from __future__ import annotations
 
-import asyncio
 import time
 from datetime import UTC, datetime
 from typing import Any
@@ -14,8 +13,8 @@ from myvoice.compose import ComposeError
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
+from blogforge.generate.document import generate_document, split_document
 from blogforge.generate.references import get_reference_context
-from blogforge.generate.section import stream_section
 from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import JobRegistry
 from blogforge.keys import KeyVault
@@ -23,8 +22,6 @@ from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.registry import get_provider
 
 router = APIRouter(tags=["expand"])
-
-_CONCURRENCY = 2
 
 
 @router.post("/api/drafts/{draft_id}/expand", status_code=202)
@@ -130,101 +127,95 @@ async def _run_expand(
         # Build reference context once per expand job (every section in this
         # draft sees the same materials), not per-section.
         reference_context = await get_reference_context(draft.id, draft.references)
-        semaphore = asyncio.Semaphore(_CONCURRENCY)
 
-        # Captured per-section failures. Inner expand_one no longer calls
-        # reg.fail directly — the outer code decides whether the whole job
-        # failed (every target failed) or succeeded (some sections produced).
-        section_errors: list[tuple[str, str, str | None]] = []
+        async def _fail_all(message: str) -> None:
+            for s in draft.sections:
+                s.status = "failed"
+                s.last_error = message
+            await store.update(draft.id, draft, user_id=user_id)
 
-        async def expand_one(idx: int) -> None:
-            section = draft.sections[idx]
-            if cancel_evt.is_set():
-                return
-            # Skip only sections that have real content — empty "edited" sections
-            # (saved while blank) should still be retried by a bulk expand.
-            if section.content_md.strip() and section.status in ("ready", "edited"):
-                return
-            async with semaphore:
-                if cancel_evt.is_set():
-                    return
-                section.status = "generating"
-                section.last_error = None
-                await store.update(draft.id, draft, user_id=user_id)
-                await reg.set_stage(job_id, f"section:start:{section.id}")
-                buf = ""
-                try:
-                    async for chunk in stream_section(
-                        draft,
-                        section,
-                        pack_info.root_path,
-                        manifest,
-                        provider,
-                        model=model,
-                        reference_context=reference_context,
-                    ):
-                        if cancel_evt.is_set():
-                            section.status = "failed"
-                            section.last_error = "Cancelled before completion."
-                            await store.update(draft.id, draft, user_id=user_id)
-                            return
-                        if chunk.delta:
-                            buf += chunk.delta
-                except ProviderMissingKey as e:
-                    section.status = "failed"
-                    section.last_error = e.message
-                    await store.update(draft.id, draft, user_id=user_id)
-                    section_errors.append((e.code, e.message, e.hint))
-                    return
-                except ProviderError as e:
-                    section.status = "failed"
-                    section.last_error = e.message
-                    await store.update(draft.id, draft, user_id=user_id)
-                    section_errors.append((e.code, e.message, e.hint))
-                    return
-                except ComposeError as e:
-                    section.status = "failed"
-                    section.last_error = str(e)
-                    await store.update(draft.id, draft, user_id=user_id)
-                    section_errors.append(
-                        (
-                            "compose_error",
-                            str(e),
-                            "Check the draft's format/samples against the pack manifest.",
-                        )
-                    )
-                    return
-                section.content_md = buf.strip() + "\n"
-                section.word_count = len(buf.split())
-                section.status = "ready"
-                section.last_error = None
-                section.last_generated_at = datetime.now(UTC)
-                await store.update(draft.id, draft, user_id=user_id)
-                await reg.set_stage(job_id, f"section:done:{section.id}")
+        # Single-pass: compose the ENTIRE post in one LLM call from the outline.
+        # `limit` is accepted for API compatibility but ignored — single-pass
+        # always writes the whole draft (the model holds the full argument at
+        # once, which is what stops it restating itself section by section).
 
-        targets = [
-            i
-            for i, s in enumerate(draft.sections)
-            if not (s.content_md.strip() and s.status in ("ready", "edited"))
-        ]
-        # Incremental drafting: compose only the next `limit` unwritten sections.
-        if limit is not None and limit > 0:
-            targets = targets[:limit]
-        await asyncio.gather(*[expand_one(i) for i in targets])
+        # Snapshot any existing prose so a full re-compose stays revertible.
+        for section in draft.sections:
+            if section.content_md.strip():
+                await store.add_section_version(
+                    draft.id,
+                    section.id,
+                    user_id=user_id,
+                    title=section.title,
+                    content_md=section.content_md,
+                    word_count=section.word_count,
+                    status=section.status,
+                    source="regenerate",
+                )
+
+        # Mark every section composing up front (one pass fills them all).
+        for section in draft.sections:
+            section.status = "generating"
+            section.last_error = None
+        await store.update(draft.id, draft, user_id=user_id)
+        for section in draft.sections:
+            await reg.set_stage(job_id, f"section:start:{section.id}")
+
+        try:
+            document = await generate_document(
+                draft,
+                pack_info.root_path,
+                manifest,
+                provider,
+                model=model,
+                reference_context=reference_context,
+            )
+        except (ProviderMissingKey, ProviderError) as e:
+            await _fail_all(e.message)
+            await reg.fail(job_id, e.code, e.message, e.hint)
+            return
+        except ComposeError as e:
+            await _fail_all(str(e))
+            await reg.fail(
+                job_id,
+                "compose_error",
+                str(e),
+                "Check the draft's format/samples against the pack manifest.",
+            )
+            return
+
         if cancel_evt.is_set():
             return
-        # Persist final stage
+
+        # Split the one document back onto the section model by H2 heading.
+        by_id = split_document(document, draft.sections)
+        now = datetime.now(UTC)
+        for section in draft.sections:
+            body = (by_id.get(section.id) or "").strip()
+            if body:
+                section.content_md = body + "\n"
+                section.word_count = len(body.split())
+                section.status = "ready"
+                section.last_error = None
+                section.last_generated_at = now
+            else:
+                section.status = "failed"
+                section.last_error = "No content mapped to this section from the single-pass draft."
+            await reg.set_stage(job_id, f"section:done:{section.id}")
+
         draft.stage = "sections"
         await store.update(draft.id, draft, user_id=user_id)
+
         elapsed = time.monotonic() - started
         done = sum(1 for s in draft.sections if s.status == "ready")
         failed = sum(1 for s in draft.sections if s.status == "failed")
-        # If every target failed, surface that as a job-level failure with the
-        # FIRST per-section error's actual message (so the user sees what's
-        # wrong: missing key, bad format, etc.) instead of a generic "all failed".
-        if targets and done == 0 and section_errors:
-            code, message, hint = section_errors[0]
-            await reg.fail(job_id, code, message, hint)
+        if done == 0:
+            await reg.fail(
+                job_id,
+                "empty_generation",
+                "The single-pass draft produced no usable sections.",
+                "Try composing again, or check that the outline has section titles.",
+            )
             return
         await reg.complete(
             job_id,

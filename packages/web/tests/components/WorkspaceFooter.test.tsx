@@ -9,6 +9,7 @@ const baseProps = {
   draftedCount: 2,
   sectionCount: 2,
   onLint: vi.fn(),
+  onRepurpose: vi.fn(),
 };
 
 beforeEach(() => {
@@ -23,6 +24,12 @@ describe("WorkspaceFooter", () => {
     expect(screen.getByRole("button", { name: /download/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^lint$/i }));
     expect(baseProps.onLint).toHaveBeenCalled();
+  });
+
+  it("fires onRepurpose when the Repurpose button is clicked", () => {
+    render(<WorkspaceFooter {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /^repurpose$/i }));
+    expect(baseProps.onRepurpose).toHaveBeenCalled();
   });
 
   it("opens a menu with every export format", () => {

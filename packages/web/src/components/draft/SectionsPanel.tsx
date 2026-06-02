@@ -11,6 +11,9 @@ interface SectionsPanelProps {
   onDismissJobError: () => void;
   unfilledCount: number;
   jobRunning: boolean;
+  /** True while a single-pass whole-draft compose is running — show one
+   * unified "writing the full draft" state instead of per-section spinners. */
+  composingWholeDraft?: boolean;
   /** Section currently streaming live prose (single-section regenerate). */
   liveSectionId?: string | null;
   /** Accumulated live token text for liveSectionId. */
@@ -19,9 +22,8 @@ interface SectionsPanelProps {
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
+  /** Compose the whole post in a single pass from the outline. */
   onExpandUnfilled: () => Promise<void>;
-  /** Incremental drafting — compose only the next N unwritten sections. */
-  onExpandNext: (n: number) => Promise<void>;
   /** Holistic, whole-draft revision against a single author instruction. */
   onReviseDraft: (instruction: string) => Promise<void>;
   /** Optional right-rail block, typically a collapsible ReferencesList. */
@@ -35,6 +37,7 @@ export function SectionsPanel({
   onDismissJobError,
   unfilledCount,
   jobRunning,
+  composingWholeDraft = false,
   liveSectionId,
   liveText,
   onSectionSave,
@@ -42,11 +45,9 @@ export function SectionsPanel({
   onRevertSection,
   onReorder,
   onExpandUnfilled,
-  onExpandNext,
   onReviseDraft,
   references,
 }: SectionsPanelProps): JSX.Element {
-  const NEXT_BATCH = 3;
   const [view, setView] = useState<"edit" | "read">("edit");
   const [reviseOpen, setReviseOpen] = useState(false);
   const [reviseNote, setReviseNote] = useState("");
@@ -175,7 +176,7 @@ export function SectionsPanel({
         </div>
       )}
 
-      {jobRunning && (
+      {jobRunning && !composingWholeDraft && (
         <output
           className="block px-5 py-4 rounded-nb"
           style={{ background: "#eef2ff", border: "1px solid #c9d4fd" }}
@@ -211,25 +212,16 @@ export function SectionsPanel({
             <strong className="font-semibold">
               {unfilledCount} section{unfilledCount === 1 ? "" : "s"} unwritten.
             </strong>{" "}
-            Compose them all in one go.
+            Compose the whole post in one pass.
           </div>
           {!jobRunning && (
             <div className="flex items-center gap-2 shrink-0">
-              {unfilledCount > NEXT_BATCH && (
-                <button
-                  type="button"
-                  onClick={() => onExpandNext(NEXT_BATCH)}
-                  className="nb-btn nb-btn-sm"
-                >
-                  Draft next {NEXT_BATCH} →
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => onExpandUnfilled()}
                 className="nb-btn nb-btn-primary nb-btn-sm"
               >
-                Compose {unfilledCount > NEXT_BATCH ? `all ${unfilledCount}` : unfilledCount} →
+                Compose draft →
               </button>
             </div>
           )}
@@ -254,11 +246,13 @@ export function SectionsPanel({
         </div>
       )}
 
-      {draft.sections.length === 0 && (
+      {draft.sections.length === 0 && !composingWholeDraft && (
         <p className="nb-card p-8 text-center italic text-muted">No sections yet.</p>
       )}
 
-      {view === "read" ? (
+      {composingWholeDraft ? (
+        <ComposingDraftPanel titles={draft.sections.map((s) => s.title)} />
+      ) : view === "read" ? (
         <DraftReadView draft={draft} />
       ) : (
         <div className="space-y-3">
@@ -282,5 +276,45 @@ export function SectionsPanel({
         </div>
       )}
     </section>
+  );
+}
+
+/** Shown while the whole post is written in a single pass. One unified state —
+ * not N spinning cards — so it reads as "writing one document". The outline
+ * titles appear as a dimmed checklist so the author knows what's coming. */
+function ComposingDraftPanel({ titles }: { titles: string[] }): JSX.Element {
+  return (
+    <output
+      className="block nb-card p-8 text-center animate-fade-in"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div className="flex items-center justify-center gap-3 text-cobalt-700">
+        <span
+          aria-hidden
+          className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"
+        />
+        <span className="font-serif text-xl font-medium tracking-tight">
+          Composing your full draft…
+        </span>
+      </div>
+      <p className="text-sm text-muted mt-2 max-w-md mx-auto leading-relaxed">
+        Writing the whole post in one pass from your outline, so it reads as a single
+        coherent piece. All sections appear together when it's done.
+      </p>
+      {titles.length > 0 && (
+        <ul className="mt-5 inline-flex flex-col gap-1.5 text-left">
+          {titles.map((t, i) => (
+            <li
+              key={`${i}-${t}`}
+              className="flex items-center gap-2 text-sm text-muted-2 animate-pulse"
+            >
+              <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-cobalt-300" />
+              {t}
+            </li>
+          ))}
+        </ul>
+      )}
+    </output>
   );
 }

@@ -64,6 +64,8 @@ class Draft(Base):
     outline: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     # Free-form user labels for organizing the drafts list.
     tags: Mapped[list[Any]] = mapped_column(JSON, nullable=False, default=list)
+    # S3 key of the AI-generated hero image, if any.
+    hero_image_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now

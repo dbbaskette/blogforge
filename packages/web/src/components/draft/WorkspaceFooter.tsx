@@ -8,6 +8,7 @@ interface WorkspaceFooterProps {
   draftedCount: number;
   sectionCount: number;
   onLint: () => void;
+  onRepurpose: () => void;
 }
 
 export function WorkspaceFooter({
@@ -16,6 +17,7 @@ export function WorkspaceFooter({
   draftedCount,
   sectionCount,
   onLint,
+  onRepurpose,
 }: WorkspaceFooterProps): JSX.Element {
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
@@ -54,6 +56,9 @@ export function WorkspaceFooter({
           {copyMessage ?? "Copy markdown"}
         </button>
         <DownloadMenu draftId={draftId} />
+        <button type="button" onClick={onRepurpose} className="nb-btn nb-btn-sm">
+          Repurpose
+        </button>
         <button type="button" onClick={onLint} className="nb-btn nb-btn-sm">
           Lint
         </button>

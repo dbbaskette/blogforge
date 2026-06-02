@@ -230,7 +230,11 @@ export function SectionCard({
               <span className="text-sm font-medium">Composing this section…</span>
             </div>
           ) : section.content_md.trim() ? (
-            <MarkdownEditor initialMarkdown={section.content_md} onSave={onSave} />
+            <MarkdownEditor
+              initialMarkdown={section.content_md}
+              onSave={onSave}
+              draftId={draftId}
+            />
           ) : (
             <div
               className="nb-card p-6 text-center border-dashed"

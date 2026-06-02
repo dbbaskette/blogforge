@@ -12,7 +12,7 @@ interface NewDraftDialogProps {
   onClose: () => void;
 }
 
-type Provider = "anthropic" | "openai" | "google";
+type Provider = "anthropic" | "openai" | "google" | "claude-cli";
 
 export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Element | null {
   const navigate = useNavigate();
@@ -218,10 +218,10 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
                 onChange={(e) => setProvider(e.target.value as Provider)}
                 className="nb-select"
               >
-                {(["anthropic", "openai", "google"] as Provider[]).map((p) => (
+                {(["anthropic", "openai", "google", "claude-cli"] as Provider[]).map((p) => (
                   <option key={p} value={p} disabled={!providers[p]}>
-                    {p}
-                    {!providers[p] && " (no key)"}
+                    {p === "claude-cli" ? "claude (CLI · subscription)" : p}
+                    {!providers[p] && (p === "claude-cli" ? " (not installed)" : " (no key)")}
                   </option>
                 ))}
               </select>
@@ -237,11 +237,14 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label}
+                    {formatRateSuffix(m)}
                   </option>
                 ))}
               </select>
             </Field>
           </div>
+
+          <ModelCostHint model={models.find((m) => m.id === model)} targetWords={targetWords} />
 
           {modelsError && (
             <p
@@ -333,5 +336,44 @@ function Field({
       </label>
       {children}
     </div>
+  );
+}
+
+// Words → output tokens. English averages ~1.3-1.5 tokens/word; use 1.5 conservatively.
+const WORDS_TO_OUT_TOKENS = 1.5;
+// Typical pack-driven prompt overhead. Crude but consistent across models for comparison.
+const ASSUMED_INPUT_TOKENS = 2000;
+
+function formatRateSuffix(m: ModelInfo): string {
+  if (m.input_per_million_usd == null || m.output_per_million_usd == null) return "";
+  const fmt = (n: number): string =>
+    n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(2)}`;
+  return ` — ${fmt(m.input_per_million_usd)} in / ${fmt(m.output_per_million_usd)} out per 1M`;
+}
+
+function ModelCostHint({
+  model,
+  targetWords,
+}: {
+  model: ModelInfo | undefined;
+  targetWords: number;
+}): JSX.Element | null {
+  if (!model || model.input_per_million_usd == null || model.output_per_million_usd == null) {
+    return null;
+  }
+  const outTokens = Math.round(targetWords * WORDS_TO_OUT_TOKENS);
+  const inCost = (ASSUMED_INPUT_TOKENS / 1_000_000) * model.input_per_million_usd;
+  const outCost = (outTokens / 1_000_000) * model.output_per_million_usd;
+  const total = inCost + outCost;
+  const fmt = (n: number): string => (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
+  return (
+    <p className="text-xs text-muted leading-snug -mt-1">
+      Est. cost for ~{targetWords} words: <strong className="text-ink">{fmt(total)}</strong>
+      <span className="text-muted/80">
+        {" "}
+        ({fmt(inCost)} prompt + {fmt(outCost)} output · ~{ASSUMED_INPUT_TOKENS} in / {outTokens} out
+        tokens)
+      </span>
+    </p>
   );
 }

@@ -5,7 +5,9 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { HeroImage } from "./HeroImage";
 import { LintPanel } from "./LintPanel";
+import { RepurposePanel } from "./RepurposePanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
@@ -24,7 +26,6 @@ export interface DraftWorkspaceProps {
   onGenerateOutline: () => Promise<void>;
   onExpandAll: () => Promise<void>;
   onExpandUnfilled: () => Promise<void>;
-  onExpandNext: (n: number) => Promise<void>;
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
@@ -43,7 +44,6 @@ export function DraftWorkspace({
   onGenerateOutline,
   onExpandAll,
   onExpandUnfilled,
-  onExpandNext,
   onSectionSave,
   onRegenerateSection,
   onRevertSection,
@@ -53,6 +53,7 @@ export function DraftWorkspace({
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
   const [lintOpen, setLintOpen] = useState(false);
+  const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
@@ -64,6 +65,11 @@ export function DraftWorkspace({
   // so we can stream the token deltas straight into the matching card.
   const [liveSectionId, setLiveSectionId] = useState<string | null>(null);
   const [liveText, setLiveText] = useState("");
+  // True while a single-pass whole-draft compose is running. Expand writes the
+  // entire post in ONE call, so we show one unified "composing the full draft"
+  // state instead of every section card spinning (which looked section-by-
+  // section). Per-section regenerate/revise leave this false.
+  const [composingWholeDraft, setComposingWholeDraft] = useState(false);
 
   // Stable handlers for the expand-job SSE stream.
   const handlersRef = useRef<ExpandJobHandlers>({
@@ -92,6 +98,7 @@ export function DraftWorkspace({
         setJobActive(false);
         setLiveSectionId(null);
         setLiveText("");
+        setComposingWholeDraft(false);
         onJobComplete();
       },
       onError: (_code, message, hint) => {
@@ -100,6 +107,7 @@ export function DraftWorkspace({
         setJobActive(false);
         setLiveSectionId(null);
         setLiveText("");
+        setComposingWholeDraft(false);
         onJobComplete();
       },
     }),
@@ -194,9 +202,10 @@ export function DraftWorkspace({
 
   const handleExpandAll = useCallback(async () => {
     setAdvancing(true);
-    // Bulk expand — clear any single-section streaming state.
+    // Single-pass whole-draft compose — clear single-section streaming state.
     setLiveSectionId(null);
     setLiveText("");
+    setComposingWholeDraft(true);
     try {
       await onExpandAll();
     } finally {
@@ -207,17 +216,9 @@ export function DraftWorkspace({
   const handleExpandUnfilled = useCallback(async () => {
     setLiveSectionId(null);
     setLiveText("");
+    setComposingWholeDraft(true);
     await onExpandUnfilled();
   }, [onExpandUnfilled]);
-
-  const handleExpandNext = useCallback(
-    async (n: number) => {
-      setLiveSectionId(null);
-      setLiveText("");
-      await onExpandNext(n);
-    },
-    [onExpandNext],
-  );
 
   // Holistic revise touches many sections — clear any single-section live
   // buffer so tokens aren't misattributed to one card.
@@ -329,10 +330,21 @@ export function DraftWorkspace({
           <OutlinePanel
             draft={draft}
             onChange={handleOutlineChange}
+            onApplyTitle={(title) => onChange({ ...draft, title })}
             onAdvance={handleExpandAll}
             onRegenerate={handleGenerate}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
+        )}
+
+        {draft.stage === "sections" && (
+          <div className="mb-4">
+            <HeroImage
+              draftId={draft.id}
+              heroKey={draft.hero_image_key}
+              onChanged={onJobComplete}
+            />
+          </div>
         )}
 
         {draft.stage === "sections" && (
@@ -343,6 +355,7 @@ export function DraftWorkspace({
             onDismissJobError={() => setJobError(null)}
             unfilledCount={unfilledCount}
             jobRunning={jobRunning}
+            composingWholeDraft={composingWholeDraft}
             liveSectionId={liveSectionId}
             liveText={liveText}
             onSectionSave={onSectionSave}
@@ -351,7 +364,6 @@ export function DraftWorkspace({
             onReviseDraft={handleReviseDraft}
             onReorder={onReorder}
             onExpandUnfilled={handleExpandUnfilled}
-            onExpandNext={handleExpandNext}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
         )}
@@ -364,10 +376,14 @@ export function DraftWorkspace({
           draftedCount={draftedCount}
           sectionCount={draft.sections.length}
           onLint={() => setLintOpen(true)}
+          onRepurpose={() => setRepurposeOpen(true)}
         />
       )}
 
       {lintOpen && <LintPanel draftId={draft.id} onClose={() => setLintOpen(false)} />}
+      {repurposeOpen && (
+        <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
+      )}
     </div>
   );
 }

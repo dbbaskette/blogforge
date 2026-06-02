@@ -5,7 +5,7 @@ export interface IdeaInput {
   bullets?: string[];
   pack_slug: string;
   format?: string | null;
-  provider: "anthropic" | "openai" | "google";
+  provider: "anthropic" | "openai" | "google" | "claude-cli";
   model: string;
   target_words?: number;
   notes?: string;
@@ -43,6 +43,7 @@ export interface Draft {
   outline: OutlineProposal | null;
   sections: Section[];
   tags: string[];
+  hero_image_key: string | null;
 }
 export interface DraftSummary {
   id: string;
@@ -187,6 +188,86 @@ export function downloadDraftUrl(
   const qs = params.toString();
   return `/api/drafts/${encodeURIComponent(id)}/download${qs ? `?${qs}` : ""}`;
 }
-export async function lintDraft(id: string): Promise<{ violations: unknown[]; hits: unknown[] }> {
+export async function lintDraft(
+  id: string,
+): Promise<{ violations: unknown[]; hits: unknown[]; repetitions: unknown[] }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
+}
+
+/** Generate an AI hero image for the draft (Google Imagen). */
+export async function generateHeroImage(
+  draftId: string,
+  prompt = "",
+): Promise<{ hero_image_key: string }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/hero-image`, {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+}
+
+export async function deleteHeroImage(draftId: string): Promise<void> {
+  await api(`/api/drafts/${encodeURIComponent(draftId)}/hero-image`, { method: "DELETE" });
+}
+
+/** Same-origin URL for the stored hero image; `v` busts cache on regenerate. */
+export function heroImageUrl(draftId: string, version: string): string {
+  return `/api/drafts/${encodeURIComponent(draftId)}/hero-image?v=${encodeURIComponent(version)}`;
+}
+
+export interface ClaimResult {
+  text: string;
+  status: "supported" | "unsupported" | "contradicted";
+  note: string;
+}
+
+/** Fact-check the draft's claims against its attached references (LLM call). */
+export async function checkClaims(
+  draftId: string,
+): Promise<{ claims: ClaimResult[]; has_references: boolean }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/claims`, { method: "POST" });
+}
+
+export type InlineAction = "rephrase" | "shorten" | "expand" | "fix" | "custom";
+
+/** Voice-aware rewrite of a selected passage (inline AI editing). */
+export async function inlineEdit(
+  draftId: string,
+  body: { text: string; action: InlineAction; instruction?: string },
+): Promise<{ text: string }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/inline`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Alternative titles or opening hooks for a draft (headline lab). */
+export async function generateHeadlines(
+  draftId: string,
+  kind: "title" | "hook",
+  n = 5,
+): Promise<{ kind: string; options: string[] }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/headlines`, {
+    method: "POST",
+    body: JSON.stringify({ kind, n }),
+  });
+}
+
+export interface RepurposeFormat {
+  id: string;
+  label: string;
+}
+
+export async function listRepurposeFormats(): Promise<RepurposeFormat[]> {
+  return api("/api/repurpose/formats");
+}
+
+/** Turn a finished draft into another channel (X thread, LinkedIn, etc.). */
+export async function repurposeDraft(
+  draftId: string,
+  format: string,
+): Promise<{ format: string; text: string }> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/repurpose`, {
+    method: "POST",
+    body: JSON.stringify({ format }),
+  });
 }

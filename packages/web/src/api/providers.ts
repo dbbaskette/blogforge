@@ -5,6 +5,8 @@ export interface ModelInfo {
   label: string;
   context_window: number;
   supports_streaming: boolean;
+  input_per_million_usd: number | null;
+  output_per_million_usd: number | null;
 }
 
 export async function listProviderAvailability(): Promise<Record<string, boolean>> {
@@ -12,7 +14,7 @@ export async function listProviderAvailability(): Promise<Record<string, boolean
 }
 
 export async function listModels(
-  provider: "anthropic" | "openai" | "google",
+  provider: "anthropic" | "openai" | "google" | "claude-cli",
 ): Promise<ModelInfo[]> {
   return api(`/api/providers/${provider}/models`);
 }

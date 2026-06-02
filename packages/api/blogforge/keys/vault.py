@@ -68,7 +68,17 @@ class KeyVault:
 
     async def get(self, provider: str) -> str:
         """Decrypted key for `provider`, or "" if neither stored nor in
-        the myvoice config. Raises ValueError for unknown providers."""
+        the myvoice config. Raises ValueError for unknown providers.
+
+        `claude-cli` carries no key — it authenticates through the local
+        Claude Code CLI — so we return a non-empty sentinel when the binary is
+        present (and "" when it isn't). That lets the generation routes' key
+        checks pass without special-casing each one, and makes availability
+        track whether `claude` is actually installed."""
+        if provider == "claude-cli":
+            from blogforge.llm.claude_cli import claude_available
+
+            return "cli" if claude_available() else ""
         self._check_provider(provider)
         async with get_sessionmaker()() as session:
             row = await self._load(session, provider)

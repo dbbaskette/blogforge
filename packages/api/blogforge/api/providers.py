@@ -14,14 +14,25 @@ router = APIRouter(prefix="/api/providers", tags=["providers"])
 @router.get("")
 async def list_providers() -> dict[str, bool]:
     """Return availability map; never includes the keys themselves."""
+    from blogforge.llm.claude_cli import claude_available
+
     vault = KeyVault()
-    return {p: bool(await vault.get(p)) for p in SUPPORTED_PROVIDERS}
+    out = {p: bool(await vault.get(p)) for p in SUPPORTED_PROVIDERS}
+    # claude-cli isn't key-managed; it's available iff the binary is installed.
+    out["claude-cli"] = claude_available()
+    return out
 
 
 @router.get("/{provider}/models")
 async def list_models(provider: str) -> list[dict[str, Any]]:
     """Proxy to the provider's list_models, using the admin-managed key
     (or the myvoice fallback if nothing's stored)."""
+    # claude-cli is keyless (CLI auth) — list its models without a vault key.
+    if provider == "claude-cli":
+        from blogforge.llm.claude_cli import ClaudeCliProvider
+
+        models = await ClaudeCliProvider().list_models()
+        return [m.model_dump() for m in models]
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(
             404,
