@@ -108,4 +108,16 @@ async def generate_document(
         user = f"{reference_context}\n\n---\n\n{user}"
     full_prompt = f"{system}\n\n---\n\n{user}"
     resp = await provider.complete(model=model, prompt=full_prompt)
-    return resp.text.strip()
+    return _strip_preamble(resp.text.strip())
+
+
+def _strip_preamble(text: str) -> str:
+    """Drop anything before the first ``## `` heading.
+
+    The prompt mandates the body start at the first section heading, but some
+    models (notably the Claude Code CLI) prepend meta-commentary like "Proceeding
+    to the output." Left in place, split_document folds it into section one. The
+    real article always starts at the first H2, so trim to there.
+    """
+    m = _H2_RE.search(text)
+    return text[m.start() :] if m and m.start() > 0 else text

@@ -12,7 +12,7 @@ interface NewDraftDialogProps {
   onClose: () => void;
 }
 
-type Provider = "anthropic" | "openai" | "google";
+type Provider = "anthropic" | "openai" | "google" | "claude-cli";
 
 export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Element | null {
   const navigate = useNavigate();
@@ -218,10 +218,10 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
                 onChange={(e) => setProvider(e.target.value as Provider)}
                 className="nb-select"
               >
-                {(["anthropic", "openai", "google"] as Provider[]).map((p) => (
+                {(["anthropic", "openai", "google", "claude-cli"] as Provider[]).map((p) => (
                   <option key={p} value={p} disabled={!providers[p]}>
-                    {p}
-                    {!providers[p] && " (no key)"}
+                    {p === "claude-cli" ? "claude (CLI · subscription)" : p}
+                    {!providers[p] && (p === "claude-cli" ? " (not installed)" : " (no key)")}
                   </option>
                 ))}
               </select>

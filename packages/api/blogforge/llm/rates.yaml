@@ -77,3 +77,24 @@ google:
     output_per_million_usd: 0.40
     context_window: 1000000
     supports_streaming: true
+# Local Claude Code CLI (`claude -p`). No API key — uses the logged-in
+# subscription, so per-token pricing is N/A (left null). Web search is on.
+claude-cli:
+  opus:
+    label: "Claude Opus (CLI)"
+    input_per_million_usd: 0
+    output_per_million_usd: 0
+    context_window: 200000
+    supports_streaming: false
+  sonnet:
+    label: "Claude Sonnet (CLI)"
+    input_per_million_usd: 0
+    output_per_million_usd: 0
+    context_window: 200000
+    supports_streaming: false
+  haiku:
+    label: "Claude Haiku (CLI)"
+    input_per_million_usd: 0
+    output_per_million_usd: 0
+    context_window: 200000
+    supports_streaming: false

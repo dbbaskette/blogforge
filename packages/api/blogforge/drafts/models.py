@@ -21,7 +21,7 @@ class IdeaInput(BaseModel):
     bullets: list[str] = Field(default_factory=list)
     pack_slug: str = Field(min_length=1)
     format: str | None = None
-    provider: Literal["anthropic", "openai", "google"]
+    provider: Literal["anthropic", "openai", "google", "claude-cli"]
     model: str = Field(min_length=1)
     target_words: int = Field(default=1500, ge=300, le=10000)
     notes: str = ""

@@ -15,6 +15,7 @@ from blogforge.drafts.models import (
 )
 from blogforge.generate.document import (
     _render_document_prompt,
+    _strip_preamble,
     generate_document,
     split_document,
 )
@@ -98,6 +99,16 @@ def test_split_with_no_headings_dumps_into_first_section() -> None:
     out = split_document("Just one big blob, no headings.", _sections())
     assert out["s1"] == "Just one big blob, no headings."
     assert "s2" not in out
+
+
+def test_strip_preamble_drops_meta_before_first_heading() -> None:
+    # The Claude CLI sometimes prepends process commentary; it must not survive.
+    doc = "Proceeding directly to the output.\n\n---\n\n## The Betrayal\nReal body."
+    assert _strip_preamble(doc).startswith("## The Betrayal")
+    assert "Proceeding directly" not in _strip_preamble(doc)
+    # A doc that already starts at a heading is untouched.
+    clean = "## A\nbody"
+    assert _strip_preamble(clean) == clean
 
 
 def test_render_document_prompt_lists_sections_and_forbids_repetition() -> None:

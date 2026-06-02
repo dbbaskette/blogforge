@@ -14,7 +14,7 @@ export async function listProviderAvailability(): Promise<Record<string, boolean
 }
 
 export async function listModels(
-  provider: "anthropic" | "openai" | "google",
+  provider: "anthropic" | "openai" | "google" | "claude-cli",
 ): Promise<ModelInfo[]> {
   return api(`/api/providers/${provider}/models`);
 }

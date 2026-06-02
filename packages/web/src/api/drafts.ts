@@ -5,7 +5,7 @@ export interface IdeaInput {
   bullets?: string[];
   pack_slug: string;
   format?: string | null;
-  provider: "anthropic" | "openai" | "google";
+  provider: "anthropic" | "openai" | "google" | "claude-cli";
   model: string;
   target_words?: number;
   notes?: string;
