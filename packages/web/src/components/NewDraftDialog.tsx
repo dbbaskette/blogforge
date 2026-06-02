@@ -89,7 +89,12 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
   }, [provider, providers]);
 
   useEffect(() => {
-    if (!model && models.length > 0) setModel(models[0].id);
+    // Pick the first model when none is set OR when the current one isn't valid
+    // for the selected provider (e.g. switching to claude-cli while a Google
+    // model is still selected — claude -p would reject it).
+    if (models.length > 0 && !models.some((m) => m.id === model)) {
+      setModel(models[0].id);
+    }
   }, [models, model]);
 
   if (!open) return null;

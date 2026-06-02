@@ -3,7 +3,25 @@ from __future__ import annotations
 
 import pytest
 
-from blogforge.llm.claude_cli import ClaudeCliProvider, _coerce_json, claude_available
+from blogforge.llm.claude_cli import (
+    ClaudeCliProvider,
+    _coerce_json,
+    _map_model,
+    claude_available,
+)
+
+
+def test_map_model_rejects_non_claude_models() -> None:
+    # A stale Google/OpenAI model on the draft must NOT be passed to `claude -p`
+    # (it errors "model may not exist"); fall back to a Claude default.
+    assert _map_model("gemini-3.1-flash-lite") == "sonnet"
+    assert _map_model("gpt-5") == "sonnet"
+    assert _map_model("") == "sonnet"
+    # Valid Claude aliases and full names pass through.
+    assert _map_model("opus") == "opus"
+    assert _map_model("haiku") == "haiku"
+    assert _map_model("sonnet") == "sonnet"
+    assert _map_model("claude-sonnet-4-6") == "claude-sonnet-4-6"
 
 
 def test_coerce_json_strips_fences() -> None:
