@@ -125,11 +125,9 @@ body {
 
 /* ──────────────────────────── Components ──────────────────────────── */
 
-/* Card surface */
+/* Card surface — near-solid via --content-bg opacity (no blur needed at 92%) */
 .nb-card {
   background: var(--content-bg);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   border: 1px solid #e6e8ed;
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
@@ -324,7 +322,7 @@ body {
   border: none;
 }
 
-/* Range slider — cobalt accent */
+/* Range slider — electric-blue accent */
 input[type="range"] {
   accent-color: #2f6bff;
 }
