@@ -25,6 +25,7 @@ class IdeaInput(BaseModel):
     model: str = Field(min_length=1)
     target_words: int = Field(default=1500, ge=300, le=10000)
     notes: str = ""
+    use_voice_profile: bool = True
 
 
 class OutlineSection(BaseModel):

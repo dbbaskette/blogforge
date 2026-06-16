@@ -52,6 +52,7 @@ async def signed_admin_client():
         provider="anthropic",
         model="claude-test",
         target_words=1500,
+        use_voice_profile=False,
     )
     draft = await store.create(user_id=user_id, idea=idea)
 

@@ -47,6 +47,7 @@ def _seed_outlined_draft(client) -> str:
             "pack_slug": "dan",
             "provider": "anthropic",
             "model": "mock-1",
+            "use_voice_profile": False,
         },
     ).json()
     created["outline"] = {

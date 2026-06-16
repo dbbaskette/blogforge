@@ -30,7 +30,7 @@ async def lint_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 async def test_lint_returns_violations_and_hits(lint_client) -> None:
     created = lint_client.post(
         "/api/drafts",
-        json={"topic": "Test topic", "pack_slug": "dan", "provider": "anthropic", "model": "m"},
+        json={"topic": "Test topic", "pack_slug": "dan", "provider": "anthropic", "model": "m", "use_voice_profile": False},
     ).json()
     r = lint_client.post(f"/api/drafts/{created['id']}/lint")
     assert r.status_code == 200

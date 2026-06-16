@@ -54,6 +54,7 @@ async def test_generate_outline_happy_path(outline_client) -> None:
             "provider": "anthropic",
             "model": "mock-1",
             "target_words": 1200,
+            "use_voice_profile": False,
         },
     ).json()
     r = outline_client.post(f"/api/drafts/{created['id']}/outline")

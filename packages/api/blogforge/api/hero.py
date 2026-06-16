@@ -63,7 +63,9 @@ async def generate_hero(
     try:
         image_bytes, mime = await generate_hero_image(prompt, api_key)
     except ProviderMissingKey as e:
-        raise HTTPException(400, detail={"error": {"code": e.code, "message": e.message, "hint": e.hint}}) from e
+        raise HTTPException(
+            400, detail={"error": {"code": e.code, "message": e.message, "hint": e.hint}}
+        ) from e
     except ProviderError as e:
         raise HTTPException(
             502, detail={"error": {"code": e.code, "message": e.message, "hint": e.hint}}
@@ -79,7 +81,7 @@ async def generate_hero(
     if old:
         try:
             await get_s3_client().delete_object(old)
-        except Exception:  # noqa: BLE001 — cleanup is best-effort
+        except Exception:
             pass
     return {"hero_image_key": key}
 
@@ -118,6 +120,6 @@ async def delete_hero(
         await store.update(draft.id, draft, user_id=current.id)
         try:
             await get_s3_client().delete_object(key)
-        except Exception:  # noqa: BLE001 — cleanup is best-effort
+        except Exception:
             pass
     return Response(status_code=204)

@@ -24,6 +24,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
   const [provider, setProvider] = useState<Provider>("anthropic");
   const [model, setModel] = useState("");
   const [targetWords, setTargetWords] = useState(1500);
+  const [useVoiceProfile, setUseVoiceProfile] = useState(true);
   // Carried from an applied template; folded into the idea on submit.
   const [extras, setExtras] = useState<{ bullets: string[]; notes: string; format: string | null }>(
     { bullets: [], notes: "", format: null },
@@ -99,6 +100,9 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
 
   if (!open) return null;
 
+  // In profile mode we still need a valid pack_slug for backend validation.
+  // Keep the picker rendered so there's always a value; just hide it visually
+  // when profile mode is active by relabelling the section.
   const canSubmit = topic.trim() && pack && model && providers[provider] && !submitting;
 
   const submit = async (e: FormEvent): Promise<void> => {
@@ -115,6 +119,7 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
         bullets: extras.bullets,
         notes: extras.notes,
         format: extras.format,
+        use_voice_profile: useVoiceProfile,
       };
       const draft = await createDraft(idea);
       onClose();
@@ -196,24 +201,84 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
             />
           </Field>
 
-          <Field label="Voice pack" id="nd-pack">
-            <select
-              id="nd-pack"
-              value={pack}
-              onChange={(e) => setPack(e.target.value)}
-              className="nb-select"
-            >
-              <option value="">— pick a pack —</option>
-              {packs
-                .filter((p) => p.valid)
-                .map((p) => (
-                  <option key={p.slug} value={p.slug}>
-                    {p.slug}
-                  </option>
-                ))}
-            </select>
-            <PackPreview pack={packs.find((p) => p.slug === pack)} />
-          </Field>
+          <div>
+            <span className="nb-label">Voice source</span>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setUseVoiceProfile(true)}
+                className={`flex-1 px-3 py-2 text-sm rounded-nb-sm border transition-colors ${
+                  useVoiceProfile
+                    ? "border-cobalt-400 bg-cobalt-50 text-cobalt-800 font-medium"
+                    : "border-rule bg-card text-ink-2 hover:border-cobalt-300"
+                }`}
+                aria-pressed={useVoiceProfile}
+              >
+                My voice profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setUseVoiceProfile(false)}
+                className={`flex-1 px-3 py-2 text-sm rounded-nb-sm border transition-colors ${
+                  !useVoiceProfile
+                    ? "border-cobalt-400 bg-cobalt-50 text-cobalt-800 font-medium"
+                    : "border-rule bg-card text-ink-2 hover:border-cobalt-300"
+                }`}
+                aria-pressed={!useVoiceProfile}
+              >
+                A voice pack
+              </button>
+            </div>
+          </div>
+
+          {useVoiceProfile ? (
+            <div>
+              <p className="text-xs text-muted px-3 py-2 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200">
+                Generating in your saved voice profile.
+              </p>
+              {/* Keep pack picker rendered (hidden) so pack state stays populated for backend validation */}
+              <div className="hidden">
+                <select
+                  aria-hidden
+                  tabIndex={-1}
+                  value={pack}
+                  onChange={(e) => setPack(e.target.value)}
+                >
+                  <option value="">— pick a pack —</option>
+                  {packs
+                    .filter((p) => p.valid)
+                    .map((p) => (
+                      <option key={p.slug} value={p.slug}>
+                        {p.slug}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {/* Auto-select first valid pack when in profile mode so pack_slug is always set */}
+              {!pack && packs.filter((p) => p.valid).length > 0 && (
+                <AutoSelectPack packs={packs} onSelect={setPack} />
+              )}
+            </div>
+          ) : (
+            <Field label="Voice pack" id="nd-pack">
+              <select
+                id="nd-pack"
+                value={pack}
+                onChange={(e) => setPack(e.target.value)}
+                className="nb-select"
+              >
+                <option value="">— pick a pack —</option>
+                {packs
+                  .filter((p) => p.valid)
+                  .map((p) => (
+                    <option key={p.slug} value={p.slug}>
+                      {p.slug}
+                    </option>
+                  ))}
+              </select>
+              <PackPreview pack={packs.find((p) => p.slug === pack)} />
+            </Field>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Provider" id="nd-provider">
@@ -308,6 +373,21 @@ export function NewDraftDialog({ open, onClose }: NewDraftDialogProps): JSX.Elem
       </dialog>
     </div>
   );
+}
+
+/** Silently selects the first valid pack; used in profile mode so pack_slug is always set. */
+function AutoSelectPack({
+  packs,
+  onSelect,
+}: {
+  packs: PackSummary[];
+  onSelect: (slug: string) => void;
+}): null {
+  useEffect(() => {
+    const first = packs.find((p) => p.valid);
+    if (first) onSelect(first.slug);
+  }, [packs, onSelect]);
+  return null;
 }
 
 function PackPreview({ pack }: { pack: PackSummary | undefined }): JSX.Element | null {

@@ -9,6 +9,7 @@ export interface IdeaInput {
   model: string;
   target_words?: number;
   notes?: string;
+  use_voice_profile?: boolean;
 }
 
 export interface OutlineSection {

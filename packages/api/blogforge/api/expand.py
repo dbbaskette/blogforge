@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
 from uuid import UUID
 
 import yaml
@@ -20,6 +20,7 @@ from blogforge.jobs.registry import JobRegistry
 from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.registry import get_provider
+from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["expand"])
 
@@ -63,12 +64,17 @@ async def expand_draft(
         ]
         await store.update(draft.id, draft, user_id=current.id)
 
-    pack_info = pack_store.get(draft.idea.pack_slug)
-    if pack_info is None:
-        raise HTTPException(
-            404,
-            detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
-        )
+    if not draft.idea.use_voice_profile:
+        pack_info = pack_store.get(draft.idea.pack_slug)
+        if pack_info is None:
+            raise HTTPException(
+                404,
+                detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
+            )
+
+    pack_root = await resolve_voice(
+        draft, current.id, pack_store=pack_store
+    )
 
     api_key = await KeyVault().get(draft.idea.provider)
     if not api_key:
@@ -90,7 +96,7 @@ async def expand_draft(
         store,
         job.id,
         draft_id,
-        pack_info,
+        pack_root,
         draft.idea.provider,
         api_key,
         draft.idea.model,
@@ -105,7 +111,7 @@ async def _run_expand(
     store: SqlDraftStore,
     job_id: str,
     draft_id: str,
-    pack_info: Any,
+    pack_root: Path,
     provider_name: str,
     api_key: str,
     model: str,
@@ -121,7 +127,7 @@ async def _run_expand(
             return
 
         manifest = yaml.safe_load(
-            (pack_info.root_path / "stylepack.yaml").read_text(encoding="utf-8")
+            (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
         ) or {}
         provider = get_provider(provider_name, api_key)
         # Build reference context once per expand job (every section in this
@@ -164,7 +170,7 @@ async def _run_expand(
         try:
             document = await generate_document(
                 draft,
-                pack_info.root_path,
+                pack_root,
                 manifest,
                 provider,
                 model=model,

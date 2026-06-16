@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import secrets
 from datetime import UTC, datetime
-from typing import Any
+from pathlib import Path
 from uuid import UUID
 
 import yaml
@@ -28,6 +28,7 @@ from blogforge.jobs.registry import JobRegistry
 from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.registry import get_provider
+from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["ideation"])
 
@@ -98,12 +99,15 @@ async def post_ideation_message(
     if draft is None:
         raise _draft_not_found(draft_id)
 
-    pack_info = pack_store.get(draft.idea.pack_slug)
-    if pack_info is None:
-        raise HTTPException(
-            404,
-            detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
-        )
+    if not draft.idea.use_voice_profile:
+        pack_info = pack_store.get(draft.idea.pack_slug)
+        if pack_info is None:
+            raise HTTPException(
+                404,
+                detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
+            )
+
+    pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
     api_key = await KeyVault().get(draft.idea.provider)
     if not api_key:
@@ -153,7 +157,7 @@ async def post_ideation_message(
         job.id,
         draft_id,
         body.content,
-        pack_info,
+        pack_root,
         draft.idea.provider,
         api_key,
         draft.idea.model,
@@ -169,7 +173,7 @@ async def _run_ideation(
     job_id: str,
     draft_id: str,
     new_user_content: str,
-    pack_info: Any,
+    pack_root: Path,
     provider_name: str,
     api_key: str,
     model: str,
@@ -184,7 +188,7 @@ async def _run_ideation(
             return
 
         manifest = yaml.safe_load(
-            (pack_info.root_path / "stylepack.yaml").read_text(encoding="utf-8")
+            (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
         ) or {}
 
         reference_context = await get_reference_context(draft.id, draft.references)
@@ -201,7 +205,7 @@ async def _run_ideation(
                 reference_context=reference_context,
                 provider=provider,
                 model=model,
-                pack_root=pack_info.root_path,
+                pack_root=pack_root,
                 manifest=manifest,
             ):
                 if cancel_evt.is_set():

@@ -35,7 +35,7 @@ async def revise_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def _seed_written_draft(client, *, write: bool = True) -> str:
     created = client.post(
         "/api/drafts",
-        json={"topic": "AI", "pack_slug": "dan", "provider": "anthropic", "model": "mock-1"},
+        json={"topic": "AI", "pack_slug": "dan", "provider": "anthropic", "model": "mock-1", "use_voice_profile": False},
     ).json()
     created["outline"] = {
         "opening_hook": "Hook.",
