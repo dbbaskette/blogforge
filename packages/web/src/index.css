@@ -127,7 +127,9 @@ body {
 
 /* Card surface */
 .nb-card {
-  background: #ffffff;
+  background: var(--content-bg);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border: 1px solid #e6e8ed;
   border-radius: 12px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
@@ -137,6 +139,32 @@ body {
   box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.12);
   border-color: #d0d4dc;
 }
+
+/* Frosted chrome — sticky top bar / nav */
+.glass-bar {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 4px 16px -8px rgba(30, 60, 110, 0.22);
+}
+
+/* Frosted floating surface — side panels, tool cards, dialogs */
+.glass-card {
+  background: var(--glass-bg-card);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px -8px rgba(30, 60, 110, 0.22);
+}
+
+/* Color-coded accents — left border + soft tint */
+.accent-blue  { border-left: 3px solid #2f6bff; }
+.accent-teal  { border-left: 3px solid #16c2b3; }
+.accent-amber { border-left: 3px solid #f59e0b; }
+.accent-coral { border-left: 3px solid #e6492d; }
+.accent-green { border-left: 3px solid #15a06b; }
 
 /* Status pill */
 .nb-pill {
@@ -157,28 +185,11 @@ body {
   border-radius: 50%;
   background: currentColor;
 }
-.nb-pill-ready {
-  background: #e3f5ec;
-  color: #1f7752;
-}
-.nb-pill-empty {
-  background: #f6f7f9;
-  color: #6e7682;
-  border: 1px dashed #d0d4dc;
-  padding-block: 1px;
-}
-.nb-pill-failed {
-  background: #fde9ec;
-  color: #94293c;
-}
-.nb-pill-gen {
-  background: #fbf1de;
-  color: #8a5d18;
-}
-.nb-pill-edited {
-  background: #eaeefe;
-  color: #2b40a8;
-}
+.nb-pill-ready  { background: #e3f5ec; color: #0e7a50; }
+.nb-pill-empty  { background: #f6f7f9; color: #6e7682; border: 1px dashed #d0d4dc; padding-block: 1px; }
+.nb-pill-failed { background: #fde7e2; color: #b5321b; }
+.nb-pill-gen    { background: #fbf1de; color: #92600a; }
+.nb-pill-edited { background: #eaf0ff; color: #1741b8; }
 
 /* Buttons */
 .nb-btn {
@@ -210,18 +221,18 @@ body {
 }
 
 .nb-btn-primary {
-  background: #4f6df0;
-  border-color: #4f6df0;
+  background: #2f6bff;
+  border-color: #2f6bff;
   color: #ffffff;
-  box-shadow: 0 1px 2px rgba(79, 109, 240, 0.3), 0 4px 12px -2px rgba(79, 109, 240, 0.35);
+  box-shadow: 0 1px 2px rgba(47, 107, 255, 0.3), 0 4px 12px -2px rgba(47, 107, 255, 0.35);
 }
 .nb-btn-primary:hover:not(:disabled) {
-  background: #2b40a8;
-  border-color: #2b40a8;
+  background: #1741b8;
+  border-color: #1741b8;
 }
 .nb-btn-primary:disabled {
-  background: #aebbfa;
-  border-color: #aebbfa;
+  background: #adc6ff;
+  border-color: #adc6ff;
   color: #ffffff;
   box-shadow: none;
 }
@@ -288,8 +299,8 @@ body {
 .nb-select:focus,
 .nb-textarea:focus {
   outline: none;
-  border-color: #4f6df0;
-  box-shadow: 0 0 0 3px rgba(79, 109, 240, 0.12);
+  border-color: #2f6bff;
+  box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.12);
 }
 .nb-textarea {
   resize: vertical;
