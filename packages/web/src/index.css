@@ -7,6 +7,19 @@
    Soft, content-first, friendly. Inter UI, Lora prose, cobalt accent.
    ──────────────────────────────────────────────────────────────── */
 
+:root {
+  /* App wash (cool blue → teal → warm amber) */
+  --wash-1: #e6efff;
+  --wash-2: #e3f7f4;
+  --wash-3: #fff4e0;
+  /* Glass surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-card: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-blur: 14px;
+  --content-bg: rgba(255, 255, 255, 0.92); /* near-solid for prose/content */
+}
+
 html,
 body,
 #root {
@@ -23,18 +36,19 @@ html {
 }
 
 body {
-  background-color: #f6f7f9;
-  color: #1f2328;
+  background: linear-gradient(135deg, var(--wash-1) 0%, var(--wash-2) 55%, var(--wash-3) 100%);
+  background-attachment: fixed;
+  color: #15224a;
   line-height: 1.55;
 }
 
 ::selection {
-  background: rgba(79, 109, 240, 0.18);
-  color: #1f2328;
+  background: rgba(47, 107, 255, 0.18);
+  color: #15224a;
 }
 
 :focus-visible {
-  outline: 2px solid #4f6df0;
+  outline: 2px solid #2f6bff;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -68,7 +82,7 @@ body {
   border: 1px solid #e6e8ed;
   padding: 1px 5px;
   border-radius: 4px;
-  color: #2b40a8;
+  color: #1741b8;
 }
 .prose-body blockquote {
   margin: 1.2em 0;
@@ -100,13 +114,13 @@ body {
   margin: 0.25em 0;
 }
 .prose-body a {
-  color: #4f6df0;
+  color: #2f6bff;
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
 }
 .prose-body a:hover {
-  color: #2b40a8;
+  color: #1741b8;
 }
 
 /* ──────────────────────────── Components ──────────────────────────── */
@@ -301,5 +315,5 @@ body {
 
 /* Range slider — cobalt accent */
 input[type="range"] {
-  accent-color: #4f6df0;
+  accent-color: #2f6bff;
 }
