@@ -84,6 +84,9 @@ function TopBar(): JSX.Element {
                 Admin
               </Link>
             )}
+            <Link to="/voice" className="nb-btn-ghost nb-btn nb-btn-sm">
+              Your Voice
+            </Link>
             <Link to="/settings" className="nb-btn-ghost nb-btn nb-btn-sm">
               Settings
             </Link>
