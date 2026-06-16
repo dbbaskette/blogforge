@@ -19,6 +19,7 @@ from blogforge.generate.inline import transform_text
 from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.registry import get_provider
+from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["inline"])
 
@@ -46,11 +47,15 @@ async def inline_edit(
     draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
-    pack_info = pack_store.get(draft.idea.pack_slug)
-    if pack_info is None:
-        raise HTTPException(
-            404, detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}}
-        )
+
+    if not draft.idea.use_voice_profile:
+        pack_info = pack_store.get(draft.idea.pack_slug)
+        if pack_info is None:
+            raise HTTPException(
+                404, detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}}
+            )
+
+    pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
     api_key = await KeyVault().get(draft.idea.provider)
     if not api_key:
@@ -66,13 +71,13 @@ async def inline_edit(
         )
 
     manifest = yaml.safe_load(
-        (pack_info.root_path / "stylepack.yaml").read_text(encoding="utf-8")
+        (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
     ) or {}
     provider = get_provider(draft.idea.provider, api_key)
     try:
         result = await transform_text(
             draft,
-            pack_info.root_path,
+            pack_root,
             manifest,
             provider,
             model=draft.idea.model,
