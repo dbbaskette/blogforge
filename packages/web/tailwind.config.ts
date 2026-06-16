@@ -11,7 +11,7 @@ export default {
         card: "#ffffff",
         "card-2": "#fafbfc",
         ink: {
-          DEFAULT: "#1f2328",
+          DEFAULT: "#15224a",
           2: "#3a3f47",
         },
         muted: {
@@ -23,31 +23,48 @@ export default {
           2: "#d0d4dc",
         },
         cobalt: {
-          DEFAULT: "#4f6df0",
-          50: "#eaeefe",
-          100: "#d5dcfc",
-          200: "#aebbfa",
-          300: "#8094f6",
-          400: "#5b76f2",
-          500: "#4f6df0",
-          600: "#3a55d8",
-          700: "#2b40a8",
-          800: "#1e2d76",
-          900: "#121a45",
+          DEFAULT: "#2f6bff",
+          50: "#eaf0ff",
+          100: "#d6e2ff",
+          200: "#adc6ff",
+          300: "#7aa3ff",
+          400: "#4d84ff",
+          500: "#2f6bff",
+          600: "#1f54e6",
+          700: "#1741b8",
+          800: "#102e85",
+          900: "#0a1c54",
         },
-        // Status accents
-        leaf: {
-          DEFAULT: "#2f9968",
-          soft: "#e3f5ec",
+        // Semantic accents — color-coded to functions.
+        teal: {
+          DEFAULT: "#16c2b3",
+          soft: "#dff7f4",
+          ink: "#0e7a72",
         },
         amber: {
-          DEFAULT: "#c98a26",
+          DEFAULT: "#f59e0b",
           soft: "#fbf1de",
+          ink: "#92600a",
+        },
+        coral: {
+          DEFAULT: "#e6492d",
+          soft: "#fde7e2",
+          ink: "#b5321b",
+        },
+        green: {
+          DEFAULT: "#15a06b",
+          soft: "#e3f5ec",
+          ink: "#0e7a50",
+        },
+        // Back-compat aliases for existing className usages.
+        leaf: {
+          DEFAULT: "#15a06b",
+          soft: "#e3f5ec",
         },
         rose: {
-          DEFAULT: "#d4546b",
-          soft: "#fde9ec",
-          ink: "#94293c",
+          DEFAULT: "#e6492d",
+          soft: "#fde7e2",
+          ink: "#b5321b",
         },
       },
       fontFamily: {
@@ -63,7 +80,9 @@ export default {
         nb: "0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px -4px rgba(15, 23, 42, 0.06)",
         "nb-hover": "0 2px 4px rgba(15, 23, 42, 0.06), 0 12px 32px -8px rgba(15, 23, 42, 0.12)",
         "nb-pop": "0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 28px -8px rgba(15, 23, 42, 0.18)",
-        "nb-cobalt": "0 1px 2px rgba(79, 109, 240, 0.3), 0 4px 12px -2px rgba(79, 109, 240, 0.35)",
+        "nb-cobalt": "0 1px 2px rgba(47, 107, 255, 0.3), 0 4px 12px -2px rgba(47, 107, 255, 0.35)",
+        glass: "0 4px 16px -8px rgba(30, 60, 110, 0.22)",
+        "glass-lg": "0 8px 28px -10px rgba(30, 60, 110, 0.28)",
       },
       animation: {
         "fade-in": "fade-in 240ms ease-out both",
