@@ -111,10 +111,11 @@ class SqlVoiceStore:
             if row is None:
                 row = VoiceProfileRow(user_id=user_id)
                 session.add(row)
+                await session.flush()  # materialise column defaults (version, etc.)
             row.persona_identity = identity
             row.persona_one_line = one_line
             row.persona_tone = tone
-            row.version += 1
+            row.version = (row.version or 0) + 1
             row.updated_at = _now()
             await session.commit()
             await session.refresh(row, ["samples"])
@@ -131,8 +132,9 @@ class SqlVoiceStore:
             if row is None:
                 row = VoiceProfileRow(user_id=user_id)
                 session.add(row)
+                await session.flush()  # materialise column defaults (version, etc.)
             row.rules = rules.model_dump()
-            row.version += 1
+            row.version = (row.version or 0) + 1
             row.updated_at = _now()
             await session.commit()
             await session.refresh(row, ["samples"])
@@ -149,9 +151,10 @@ class SqlVoiceStore:
             if row is None:
                 row = VoiceProfileRow(user_id=user_id)
                 session.add(row)
+                await session.flush()  # materialise column defaults (version, etc.)
             row.distilled_style_md = distilled_style_md
             row.distilled_at = _now()
-            row.version += 1
+            row.version = (row.version or 0) + 1
             row.updated_at = _now()
             await session.commit()
             await session.refresh(row, ["samples"])

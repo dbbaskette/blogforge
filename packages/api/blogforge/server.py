@@ -21,6 +21,7 @@ from blogforge.db.seed import ensure_admin_user
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.jobs.registry import JobRegistry
 from blogforge.templates.store import TemplateStore
+from blogforge.voice.store import SqlVoiceStore
 
 # Translate VCAP_SERVICES into BLOGFORGE_* env vars before Settings is read.
 apply_vcap_services()
@@ -136,6 +137,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.pack_store = PackStore(_resolve_pack_roots())
     app.state.job_registry = JobRegistry()
     app.state.event_bus = EventBus()
+    app.state.voice_store = SqlVoiceStore()
 
     yield
 
@@ -184,6 +186,7 @@ def create_app() -> FastAPI:
     from blogforge.api.revise import router as revise_router
     from blogforge.api.section import router as section_router
     from blogforge.api.templates import router as templates_router
+    from blogforge.api.voice import router as voice_router
 
     app.include_router(auth_router)
     app.include_router(admin_router)
@@ -208,6 +211,7 @@ def create_app() -> FastAPI:
     app.include_router(lint_router)
     app.include_router(claims_router)
     app.include_router(events_router)
+    app.include_router(voice_router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
