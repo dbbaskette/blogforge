@@ -95,7 +95,7 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
         {error && (
           <div
             className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm"
-            style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+            style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
           >
             {error}
           </div>
@@ -111,8 +111,8 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                 <span
                   className="nb-pill"
                   style={{
-                    background: violations.length === 0 ? "#e3f5ec" : "#fde9ec",
-                    color: violations.length === 0 ? "#1f7752" : "#94293c",
+                    background: violations.length === 0 ? "#e3f5ec" : "#fde7e2",
+                    color: violations.length === 0 ? "#0e7a50" : "#b5321b",
                   }}
                 >
                   {violations.length.toString().padStart(2, "0")}
@@ -126,7 +126,7 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                     <li
                       key={itemKey(v, "violation", i)}
                       className="nb-card p-3 text-sm"
-                      style={{ borderColor: "#f7c7cf" }}
+                      style={{ borderColor: "#f7c3b6" }}
                     >
                       {v.rule && (
                         <span className="font-mono text-[10px] uppercase tracking-wider text-rose mr-2">
@@ -150,8 +150,8 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                 <span
                   className="nb-pill"
                   style={{
-                    background: repetitions.length === 0 ? "#e3f5ec" : "#fdf6e6",
-                    color: repetitions.length === 0 ? "#1f7752" : "#8a5d18",
+                    background: repetitions.length === 0 ? "#e3f5ec" : "#fbf1de",
+                    color: repetitions.length === 0 ? "#0e7a50" : "#92600a",
                   }}
                 >
                   {repetitions.length.toString().padStart(2, "0")}
@@ -167,7 +167,7 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                     <li
                       key={itemKey(r, "rep", i)}
                       className="nb-card p-3 text-sm"
-                      style={{ borderColor: "#f0d5a4" }}
+                      style={{ borderColor: "#f3d89b" }}
                     >
                       {r.rule && (
                         <span className="font-mono text-[10px] uppercase tracking-wider text-amber-ink mr-2">
@@ -200,7 +200,7 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                     <li
                       key={itemKey(h, "hit", i)}
                       className="nb-card p-3 text-sm"
-                      style={{ borderColor: "#cde9da" }}
+                      style={{ borderColor: "#c2e6d2" }}
                     >
                       {h.rule && (
                         <span className="font-mono text-[10px] uppercase tracking-wider text-leaf mr-2">
@@ -226,9 +226,9 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                     className="nb-pill"
                     style={{
                       background: claims.some((c) => c.status !== "supported")
-                        ? "#fdf6e6"
+                        ? "#fbf1de"
                         : "#e3f5ec",
-                      color: claims.some((c) => c.status !== "supported") ? "#8a5d18" : "#1f7752",
+                      color: claims.some((c) => c.status !== "supported") ? "#92600a" : "#0e7a50",
                     }}
                   >
                     {claims.filter((c) => c.status !== "supported").length.toString().padStart(2, "0")}
@@ -255,7 +255,7 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                   {!hasRefs && (
                     <p
                       className="text-xs px-3 py-2 rounded-nb-sm mb-2"
-                      style={{ background: "#fdf6e6", color: "#8a5d18", border: "1px solid #f0d5a4" }}
+                      style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
                     >
                       No references attached — every claim is flagged as needing a source. Add
                       references to verify against them.
@@ -302,12 +302,12 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
 }
 
 const CLAIM_BORDER: Record<ClaimResult["status"], string> = {
-  supported: "#cde9da",
-  unsupported: "#f0d5a4",
-  contradicted: "#f7c7cf",
+  supported: "#c2e6d2",
+  unsupported: "#f3d89b",
+  contradicted: "#f7c3b6",
 };
 const CLAIM_COLOR: Record<ClaimResult["status"], string> = {
-  supported: "#1f7752",
-  unsupported: "#8a5d18",
-  contradicted: "#94293c",
+  supported: "#0e7a50",
+  unsupported: "#92600a",
+  contradicted: "#b5321b",
 };

@@ -44,7 +44,7 @@ export function SamplesList({ profile, onChange, onRefresh }: SamplesListProps):
         {anyNeedsRedistill && (
           <div
             className="text-xs px-3 py-2 rounded-nb-sm"
-            style={{ background: "#fdf6e6", color: "#8a5d18", border: "1px solid #f0d5a4" }}
+            style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
           >
             Some samples were added after the last distillation — re-distill to include them.
           </div>
@@ -131,7 +131,7 @@ function SampleRow({
           {isNew && (
             <span
               className="ml-2 text-[10px] font-semibold uppercase tracking-wider"
-              style={{ color: "#8a5d18" }}
+              style={{ color: "#92600a" }}
             >
               · new since distill
             </span>
@@ -139,7 +139,7 @@ function SampleRow({
         </span>
       </div>
       {sample.status === "failed" && (
-        <span className="nb-pill" style={{ background: "#fde9ec", color: "#94293c" }}>
+        <span className="nb-pill" style={{ background: "#fde7e2", color: "#b5321b" }}>
           failed
         </span>
       )}
@@ -150,7 +150,7 @@ function SampleRow({
         aria-label={sample.exemplar ? "Remove exemplar" : "Mark as exemplar"}
         title={sample.exemplar ? "Remove exemplar" : "Mark as exemplar"}
         className="nb-icon-btn shrink-0"
-        style={{ color: sample.exemplar ? "#8a5d18" : undefined }}
+        style={{ color: sample.exemplar ? "#92600a" : undefined }}
       >
         ★
       </button>
@@ -299,7 +299,7 @@ function AddSampleRow({ onRefresh }: AddSampleRowProps): JSX.Element {
           {error && (
             <p
               className="text-sm px-3 py-2 rounded-nb-sm"
-              style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+              style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
             >
               {error}
             </p>
@@ -338,7 +338,7 @@ function AddSampleRow({ onRefresh }: AddSampleRowProps): JSX.Element {
           {error && (
             <p
               className="text-sm px-3 py-2 rounded-nb-sm"
-              style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+              style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
             >
               {error}
             </p>
@@ -387,7 +387,7 @@ function AddSampleRow({ onRefresh }: AddSampleRowProps): JSX.Element {
           {error && (
             <p
               className="text-sm px-3 py-2 rounded-nb-sm"
-              style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+              style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
             >
               {error}
             </p>

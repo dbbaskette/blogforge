@@ -142,7 +142,7 @@ export function DraftPage(): JSX.Element {
       <div className="max-w-3xl mx-auto px-6 py-10">
         <div
           className="px-4 py-3 rounded-nb"
-          style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
         >
           <p className="text-[11px] font-semibold uppercase tracking-wider">Error</p>
           <p className="text-sm mt-1">{error}</p>
