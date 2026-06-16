@@ -17,8 +17,7 @@ from sqlalchemy import select
 from blogforge.db.engine import get_sessionmaker
 from blogforge.db.models import VoiceProfile as VoiceProfileRow
 from blogforge.db.models import VoiceSample as VoiceSampleRow
-from blogforge.voice.models import VoiceProfile, VoiceSample, VoiceRules
-
+from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample
 
 # ---------------------------------------------------------------------------
 # Row → Pydantic mappers
