@@ -61,7 +61,7 @@ async def download_draft(
 
                 raw = await get_s3_client().get_object(draft.hero_image_key)
                 hero_data_uri = f"data:image/png;base64,{base64.b64encode(raw).decode()}"
-            except Exception:  # noqa: BLE001 — export still works without the hero
+            except Exception:
                 hero_data_uri = None
         return Response(
             content=to_html(draft, hero_data_uri=hero_data_uri),
