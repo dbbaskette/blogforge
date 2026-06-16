@@ -48,7 +48,7 @@ export function ProviderKeysSection(): JSX.Element {
       {error && (
         <div
           className="mb-4 p-3 rounded-nb-sm text-sm"
-          style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
         >
           {error}
         </div>

@@ -66,7 +66,7 @@ export function TrashPage(): JSX.Element {
       {error && (
         <div
           className="mb-6 rounded-nb p-4 flex items-start gap-3"
-          style={{ border: "1px solid #f7c7cf", background: "#fde9ec" }}
+          style={{ border: "1px solid #f7c3b6", background: "#fde7e2" }}
         >
           <span className="nb-pill nb-pill-failed">Error</span>
           <p className="text-sm text-rose-ink leading-relaxed">{error}</p>
@@ -136,7 +136,7 @@ function TrashRow({
             onClick={onHardDelete}
             disabled={busy}
             className="nb-btn nb-btn-sm"
-            style={{ background: "#d4546b", borderColor: "#d4546b", color: "#fff" }}
+            style={{ background: "#e6492d", borderColor: "#e6492d", color: "#fff" }}
           >
             Delete forever
           </button>

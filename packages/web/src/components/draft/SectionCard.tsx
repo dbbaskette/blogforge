@@ -116,7 +116,7 @@ export function SectionCard({
     <article
       id={`section-${section.id}`}
       className={`nb-card scroll-mt-20 ${isFailed ? "" : "nb-card-hover"}`}
-      style={isFailed ? { borderColor: "#f7c7cf" } : undefined}
+      style={isFailed ? { borderColor: "#f7c3b6" } : undefined}
     >
       {/* Toggle row — heading is a button, side controls live outside it. */}
       <div className="grid grid-cols-[1fr_auto] items-stretch">
@@ -198,7 +198,7 @@ export function SectionCard({
           {isFailed && section.last_error && (
             <div
               className="mb-4 px-3 py-2.5 rounded-nb-sm text-sm leading-snug"
-              style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+              style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
             >
               <p className="text-[11px] font-semibold uppercase tracking-wider mb-0.5">
                 Last attempt failed
@@ -255,7 +255,7 @@ export function SectionCard({
           {regenError && (
             <p
               className="mt-3 text-xs px-3 py-2 rounded-nb-sm"
-              style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+              style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
             >
               {regenError}
             </p>

@@ -411,7 +411,7 @@ function KeysBanner({ isAdmin }: { isAdmin: boolean }): JSX.Element {
   return (
     <div
       className="mt-6 rounded-nb p-4 flex items-start gap-3"
-      style={{ border: "1px solid #f0d5a4", background: "#fdf6e6" }}
+      style={{ border: "1px solid #f3d89b", background: "#fbf1de" }}
     >
       <span className="nb-pill nb-pill-gen">Heads up</span>
       <p className="text-sm text-ink-2 leading-relaxed">
@@ -439,7 +439,7 @@ function ErrorBanner({ message }: { message: string }): JSX.Element {
   return (
     <div
       className="mt-6 rounded-nb p-4 flex items-start gap-3"
-      style={{ border: "1px solid #f7c7cf", background: "#fde9ec" }}
+      style={{ border: "1px solid #f7c3b6", background: "#fde7e2" }}
     >
       <span className="nb-pill nb-pill-failed">Error</span>
       <p className="text-sm text-rose-ink leading-relaxed">{message}</p>

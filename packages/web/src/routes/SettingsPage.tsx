@@ -136,7 +136,7 @@ function ChangePasswordCard(): JSX.Element {
         {success && (
           <p
             className="text-sm px-3 py-2 rounded-nb-sm"
-            style={{ background: "#e3f5ec", color: "#1f7752", border: "1px solid #cde9da" }}
+            style={{ background: "#e3f5ec", color: "#0e7a50", border: "1px solid #c2e6d2" }}
           >
             Password changed
           </p>
@@ -144,7 +144,7 @@ function ChangePasswordCard(): JSX.Element {
         {error && (
           <p
             className="text-sm px-3 py-2 rounded-nb-sm"
-            style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+            style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
           >
             {error}
           </p>
@@ -189,7 +189,7 @@ function SessionsCard(): JSX.Element {
         {error && (
           <p
             className="text-sm px-3 py-2 rounded-nb-sm"
-            style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+            style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
           >
             {error}
           </p>
@@ -199,7 +199,7 @@ function SessionsCard(): JSX.Element {
           onClick={onRevokeAll}
           disabled={submitting}
           className="nb-btn"
-          style={{ background: "#d4546b", borderColor: "#d4546b", color: "#fff" }}
+          style={{ background: "#e6492d", borderColor: "#e6492d", color: "#fff" }}
         >
           {submitting ? "Signing out…" : "Sign out everywhere"}
         </button>

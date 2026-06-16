@@ -179,7 +179,7 @@ export function SectionsPanel({
       {jobRunning && !composingWholeDraft && (
         <output
           className="block px-5 py-4 rounded-nb"
-          style={{ background: "#eef2ff", border: "1px solid #c9d4fd" }}
+          style={{ background: "#eaf0ff", border: "1px solid #c2d4ff" }}
           aria-live="polite"
         >
           <div className="flex items-center justify-between gap-3 mb-2">
@@ -194,10 +194,10 @@ export function SectionsPanel({
               {doneCount} / {total} sections
             </span>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#c9d4fd" }}>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#c2d4ff" }}>
             <div
               className="h-full rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${pct}%`, background: "var(--cobalt-500, #3b5bdb)" }}
+              style={{ width: `${pct}%`, background: "var(--cobalt-500, #2f6bff)" }}
             />
           </div>
         </output>
@@ -206,7 +206,7 @@ export function SectionsPanel({
       {unfilledCount > 0 && (
         <div
           className="flex items-center justify-between gap-3 px-5 py-3.5 rounded-nb"
-          style={{ background: "#eaeefe", border: "1px solid #c9d4fd" }}
+          style={{ background: "#eaf0ff", border: "1px solid #c2d4ff" }}
         >
           <div className="text-sm text-cobalt-700">
             <strong className="font-semibold">
@@ -231,7 +231,7 @@ export function SectionsPanel({
       {jobError && (
         <div
           className="px-4 py-3 rounded-nb"
-          style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
         >
           <p className="text-[11px] font-semibold uppercase tracking-wider">Generation failed</p>
           <p className="text-sm mt-1">{jobError.message}</p>

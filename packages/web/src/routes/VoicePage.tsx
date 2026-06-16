@@ -65,7 +65,7 @@ export function VoicePage(): JSX.Element {
       <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10">
         <div
           className="px-4 py-3 rounded-nb-sm text-sm"
-          style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+          style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
         >
           Failed to load voice profile: {error}
         </div>

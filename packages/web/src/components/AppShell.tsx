@@ -26,7 +26,7 @@ function VersionBanner(): JSX.Element | null {
   return (
     <output
       className="block px-4 py-2.5 flex items-center justify-center gap-3 text-sm animate-fade-up"
-      style={{ background: "#fdf6e6", borderBottom: "1px solid #f0d5a4", color: "#8a5d18" }}
+      style={{ background: "#fbf1de", borderBottom: "1px solid #f3d89b", color: "#92600a" }}
     >
       <span>A new version is available.</span>
       <button

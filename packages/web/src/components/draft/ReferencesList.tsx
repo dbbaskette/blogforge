@@ -84,7 +84,7 @@ export function ReferencesList({
       {error && (
         <p
           className="text-xs px-3 py-2 rounded-nb-sm mb-3"
-          style={{ background: "#fde9ec", color: "#94293c", border: "1px solid #f7c7cf" }}
+          style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
         >
           {error}
         </p>

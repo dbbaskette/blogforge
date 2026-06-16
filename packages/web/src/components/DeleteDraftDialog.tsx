@@ -77,7 +77,7 @@ export function DeleteDraftDialog({
           {error && (
             <p
               className="text-sm px-3 py-2 rounded-nb-sm"
-              style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+              style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
             >
               {error}
             </p>
@@ -93,7 +93,7 @@ export function DeleteDraftDialog({
             onClick={confirm}
             disabled={submitting}
             className="nb-btn"
-            style={{ background: "#d4546b", borderColor: "#d4546b", color: "#fff" }}
+            style={{ background: "#e6492d", borderColor: "#e6492d", color: "#fff" }}
           >
             {submitting ? "Deleting…" : "Move to trash"}
           </button>

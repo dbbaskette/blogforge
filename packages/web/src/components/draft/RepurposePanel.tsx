@@ -96,7 +96,7 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
           {error && (
             <div
               className="px-3 py-2 rounded-nb-sm text-sm"
-              style={{ background: "#fde9ec", border: "1px solid #f7c7cf", color: "#94293c" }}
+              style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
             >
               {error}
             </div>
