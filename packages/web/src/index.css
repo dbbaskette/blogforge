@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 /* ────────────────────────────────────────────────────────────────
-   BlogForge — Notebook theme
-   Soft, content-first, friendly. Inter UI, Lora prose, cobalt accent.
+   BlogForge — Liquid-glass theme
+   Vibrant, content-first. Inter UI, Lora prose, electric-blue accent
+   on a cool blue→teal wash; frosted-glass chrome, near-solid prose.
    ──────────────────────────────────────────────────────────────── */
 
 :root {
@@ -36,8 +37,7 @@ html {
 }
 
 body {
-  background: linear-gradient(135deg, var(--wash-1) 0%, var(--wash-2) 55%, var(--wash-3) 100%);
-  background-attachment: fixed;
+  background: linear-gradient(135deg, var(--wash-1) 0%, var(--wash-2) 55%, var(--wash-3) 100%) fixed;
   color: #15224a;
   line-height: 1.55;
 }
