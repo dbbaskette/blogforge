@@ -75,7 +75,7 @@ export function LoginPage(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-canvas">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="nb-card w-full max-w-md p-8 animate-fade-up">
         <header className="mb-6 text-center">
           <div className="w-10 h-10 mx-auto rounded-[10px] bg-gradient-to-br from-cobalt-500 to-cobalt-300 grid place-items-center text-white font-serif italic font-semibold text-lg shadow-nb-cobalt mb-3">

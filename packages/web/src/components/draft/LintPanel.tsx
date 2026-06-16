@@ -170,7 +170,7 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
                       style={{ borderColor: "#f0d5a4" }}
                     >
                       {r.rule && (
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-amber-700 mr-2">
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-amber-ink mr-2">
                           [{r.rule}]
                         </span>
                       )}
