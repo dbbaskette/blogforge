@@ -19,6 +19,8 @@ export function SetupDisclosure({
   forceOpen = false,
 }: SetupDisclosureProps): JSX.Element {
   const idea = draft.idea;
+  // Default use_voice_profile to true when undefined (legacy drafts).
+  const useVoiceProfile = idea.use_voice_profile ?? true;
   const [open, setOpen] = useState(forceOpen);
   const [packs, setPacks] = useState<PackSummary[]>([]);
   const [formats, setFormats] = useState<PackFormatEntry[]>([]);
@@ -84,7 +86,11 @@ export function SetupDisclosure({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idea.provider, providers]);
 
-  const summary = `pack ${idea.pack_slug || "—"} · ${idea.format || "no format"} · ${
+  const voiceLabel = useVoiceProfile
+    ? "voice: my profile"
+    : `pack ${idea.pack_slug || "—"}`;
+
+  const summary = `${voiceLabel} · ${idea.format || "no format"} · ${
     idea.provider
   }/${idea.model || "—"} · ${idea.target_words ?? 1500} words`;
 
@@ -111,57 +117,99 @@ export function SetupDisclosure({
       </button>
 
       {open && (
-        <div className="px-5 pb-5 pt-1 border-t border-rule grid grid-cols-2 gap-4 animate-fade-in">
-          <FieldSelect
-            label="Voice pack"
-            id="setup-pack"
-            value={idea.pack_slug}
-            onChange={(v) => onChange({ ...idea, pack_slug: v })}
-            options={[
-              { value: "", label: "— pick a pack —" },
-              ...packs.filter((p) => p.valid).map((p) => ({ value: p.slug, label: p.slug })),
-            ]}
-          />
-          <FieldSelect
-            label="Format"
-            id="setup-format"
-            value={idea.format ?? ""}
-            onChange={(v) => onChange({ ...idea, format: v || null })}
-            disabled={formats.length === 0}
-            options={[
-              { value: "", label: "— none —" },
-              ...formats.map((f) => ({
-                value: f.name,
-                label: f.description ? `${f.name} — ${f.description}` : f.name,
-              })),
-            ]}
-          />
-          <FieldSelect
-            label="Provider"
-            id="setup-provider"
-            value={idea.provider}
-            onChange={(v) => onChange({ ...idea, provider: v as Provider })}
-            options={(["anthropic", "openai", "google", "claude-cli"] as Provider[]).map((p) => {
-              const name = p === "claude-cli" ? "claude (CLI · subscription)" : p;
-              const missing = p === "claude-cli" ? "not installed" : "no key";
-              return { value: p, label: providers[p] ? name : `${name} (${missing})`, disabled: !providers[p] };
-            })}
-          />
-          <FieldSelect
-            label="Model"
-            id="setup-model"
-            value={idea.model}
-            onChange={(v) => onChange({ ...idea, model: v })}
-            options={
-              models.length === 0
-                ? [{ value: "", label: "No models" }]
-                : models.map((m) => ({ value: m.id, label: m.label }))
-            }
-          />
-          <div className="col-span-2">
-            <PackPreview pack={packs.find((p) => p.slug === idea.pack_slug)} />
+        <div className="px-5 pb-5 pt-1 border-t border-rule space-y-4 animate-fade-in">
+          {/* Voice source toggle */}
+          <div>
+            <span className="nb-label">Voice source</span>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => onChange({ ...idea, use_voice_profile: true })}
+                className={`flex-1 px-3 py-2 text-sm rounded-nb-sm border transition-colors ${
+                  useVoiceProfile
+                    ? "border-cobalt-400 bg-cobalt-50 text-cobalt-800 font-medium"
+                    : "border-rule bg-card text-ink-2 hover:border-cobalt-300"
+                }`}
+                aria-pressed={useVoiceProfile}
+              >
+                My voice profile
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange({ ...idea, use_voice_profile: false })}
+                className={`flex-1 px-3 py-2 text-sm rounded-nb-sm border transition-colors ${
+                  !useVoiceProfile
+                    ? "border-cobalt-400 bg-cobalt-50 text-cobalt-800 font-medium"
+                    : "border-rule bg-card text-ink-2 hover:border-cobalt-300"
+                }`}
+                aria-pressed={!useVoiceProfile}
+              >
+                A voice pack
+              </button>
+            </div>
+            {useVoiceProfile && (
+              <p className="text-xs text-muted mt-1.5 px-1">
+                Pack picker below is not used for voice when profile mode is active.
+              </p>
+            )}
           </div>
-          <div className="col-span-2">
+
+          <div className="grid grid-cols-2 gap-4">
+            <FieldSelect
+              label={useVoiceProfile ? "Voice pack (unused — profile active)" : "Voice pack"}
+              id="setup-pack"
+              value={idea.pack_slug}
+              onChange={(v) => onChange({ ...idea, pack_slug: v })}
+              options={[
+                { value: "", label: "— pick a pack —" },
+                ...packs.filter((p) => p.valid).map((p) => ({ value: p.slug, label: p.slug })),
+              ]}
+            />
+            <FieldSelect
+              label="Format"
+              id="setup-format"
+              value={idea.format ?? ""}
+              onChange={(v) => onChange({ ...idea, format: v || null })}
+              disabled={formats.length === 0}
+              options={[
+                { value: "", label: "— none —" },
+                ...formats.map((f) => ({
+                  value: f.name,
+                  label: f.description ? `${f.name} — ${f.description}` : f.name,
+                })),
+              ]}
+            />
+            <FieldSelect
+              label="Provider"
+              id="setup-provider"
+              value={idea.provider}
+              onChange={(v) => onChange({ ...idea, provider: v as Provider })}
+              options={(["anthropic", "openai", "google", "claude-cli"] as Provider[]).map((p) => {
+                const name = p === "claude-cli" ? "claude (CLI · subscription)" : p;
+                const missing = p === "claude-cli" ? "not installed" : "no key";
+                return { value: p, label: providers[p] ? name : `${name} (${missing})`, disabled: !providers[p] };
+              })}
+            />
+            <FieldSelect
+              label="Model"
+              id="setup-model"
+              value={idea.model}
+              onChange={(v) => onChange({ ...idea, model: v })}
+              options={
+                models.length === 0
+                  ? [{ value: "", label: "No models" }]
+                  : models.map((m) => ({ value: m.id, label: m.label }))
+              }
+            />
+          </div>
+
+          {!useVoiceProfile && (
+            <div>
+              <PackPreview pack={packs.find((p) => p.slug === idea.pack_slug)} />
+            </div>
+          )}
+
+          <div>
             <label htmlFor="setup-words" className="nb-label">
               Target length ·{" "}
               <span className="text-ink-2 font-mono normal-case tracking-normal">

@@ -213,6 +213,7 @@ async def set_exemplar(
 
 _PROVIDER_DEFAULTS: dict[str, str] = {
     "anthropic": "claude-sonnet-4-6",
+    "openai": "gpt-5",
     "google": "gemini-2.5-flash",
     "claude-cli": "sonnet",
 }
@@ -258,7 +259,7 @@ async def distill(
         vault = KeyVault()
         provider_name = None
         api_key = ""
-        for candidate in ("anthropic", "google", "claude-cli"):
+        for candidate in ("anthropic", "openai", "google", "claude-cli"):
             key = await vault.get(candidate)
             if key:
                 provider_name = candidate

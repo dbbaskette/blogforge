@@ -363,13 +363,13 @@ function AddSampleRow({ onRefresh }: AddSampleRowProps): JSX.Element {
         <div className="space-y-3">
           <div>
             <label htmlFor="sample-file" className="nb-label">
-              File (PDF, DOCX, TXT…)
+              File (PDF, TXT, MD)
             </label>
             <input
               id="sample-file"
               ref={fileRef}
               type="file"
-              accept=".pdf,.docx,.doc,.txt,.md"
+              accept=".txt,.md,.pdf"
               onChange={(e) => void handleFileChange(e)}
               disabled={adding}
               className="nb-input"

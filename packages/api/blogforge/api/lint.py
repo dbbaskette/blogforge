@@ -24,17 +24,23 @@ async def lint_draft(
     draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
         raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
-    pack_info = pack_store.get(draft.idea.pack_slug)
-    if pack_info is None:
-        raise HTTPException(
-            404,
-            detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
-        )
+
+    # Guard for non-profile drafts: fail fast if the pack is missing.
+    if not draft.idea.use_voice_profile:
+        pack_info = pack_store.get(draft.idea.pack_slug)
+        if pack_info is None:
+            raise HTTPException(
+                404,
+                detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
+            )
 
     from myvoice import validate_pack
     from myvoice.lint import detect_positive_hits, lint_to_hits
 
-    result = validate_pack(pack_info.root_path)
+    from blogforge.voice.resolve import resolve_voice
+
+    pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
+    result = validate_pack(pack_root)
     if result.manifest is None:
         raise HTTPException(
             500,
