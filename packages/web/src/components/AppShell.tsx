@@ -7,7 +7,7 @@ import { useVersionCheck } from "../hooks/useVersionCheck";
 
 export function AppShell(): JSX.Element {
   return (
-    <div className="min-h-screen bg-canvas text-ink flex flex-col">
+    <div className="min-h-screen text-ink flex flex-col">
       <VersionBanner />
       <TopBar />
       <main className="flex-1">
@@ -66,7 +66,7 @@ function TopBar(): JSX.Element {
   if (location.pathname === "/login") return <></>;
 
   return (
-    <header className="border-b border-rule bg-white/60 backdrop-blur-sm sticky top-0 z-30">
+    <header className="glass-bar sticky top-0 z-30">
       <div className="max-w-6xl mx-auto px-6 lg:px-10 h-14 flex items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-2.5 group">
           <span className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-cobalt-500 to-cobalt-300 grid place-items-center text-white font-serif italic font-semibold text-base shadow-nb-cobalt">
