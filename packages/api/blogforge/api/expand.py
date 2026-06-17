@@ -120,6 +120,7 @@ async def _run_expand(
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
     started = time.monotonic()
+    draft = None
     try:
         draft = await store.get(draft_id, user_id=user_id)
         if draft is None:
@@ -234,3 +235,19 @@ async def _run_expand(
         )
     except Exception as e:
         await reg.fail(job_id, "internal_error", f"Unexpected: {e}")
+    finally:
+        # Don't leave any section stranded as "generating" (unexpected error or
+        # cancellation mid-pass) — the UI would show "Composing…" forever.
+        # Best-effort; boot-time recover_stranded_sections() is the backstop.
+        if draft is not None:
+            stranded = [s for s in draft.sections if s.status == "generating"]
+            if stranded:
+                for s in stranded:
+                    s.status = "failed"
+                    s.last_error = s.last_error or (
+                        "Generation was interrupted before it finished — please retry."
+                    )
+                try:
+                    await store.update(draft.id, draft, user_id=user_id)
+                except Exception:
+                    pass

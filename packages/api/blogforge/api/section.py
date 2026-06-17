@@ -240,6 +240,8 @@ async def _run_regenerate(
     instruction: str = "",
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
+    draft = None
+    section = None
     try:
         draft = await store.get(draft_id, user_id=user_id)
         if draft is None:
@@ -325,3 +327,18 @@ async def _run_regenerate(
         await reg.complete(job_id, {"section_id": section_id, "word_count": section.word_count})
     except Exception as e:
         await reg.fail(job_id, "internal_error", f"Unexpected: {e}")
+    finally:
+        # Never leave a section stranded as "generating" (unexpected error,
+        # cancellation, or a dropped task) — the UI would show "Composing…"
+        # forever. Mark it failed so the author gets a retry. Best-effort; the
+        # boot-time recover_stranded_sections() is the backstop.
+        if section is not None and section.status == "generating":
+            section.status = "failed"
+            section.last_error = (
+                section.last_error
+                or "Generation was interrupted before it finished — please retry."
+            )
+            try:
+                await store.update(draft.id, draft, user_id=user_id)
+            except Exception:
+                pass

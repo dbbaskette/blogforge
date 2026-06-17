@@ -131,6 +131,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         await session.commit()
 
+    # 3.5) Recover sections stranded mid-generation by a prior crash/restart —
+    # no generation survives a process restart, so any "generating" row is stale.
+    async with get_sessionmaker()() as session:
+        from blogforge.drafts.recovery import recover_stranded_sections
+
+        await recover_stranded_sections(session)
+
     # 4) Per-request shared state.
     app.state.draft_store = SqlDraftStore()
     app.state.template_store = TemplateStore()
