@@ -25,7 +25,7 @@ function stripMarkers(line: string): string {
  * no network, no LLM.
  */
 export function parseOutline(text: string): ParsedOutline {
-  const rawLines = text.split("\n");
+  const rawLines = text.split(/\r?\n/); // tolerate Windows/Word CRLF pastes
   const nonEmpty = rawLines.filter((l) => l.trim() !== "");
   if (nonEmpty.length === 0) return { title: "", sections: [] };
 

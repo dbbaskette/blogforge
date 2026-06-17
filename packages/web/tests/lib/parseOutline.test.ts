@@ -43,4 +43,19 @@ describe("parseOutline", () => {
   it("handles empty input", () => {
     expect(parseOutline("   \n  ")).toEqual({ title: "", sections: [] });
   });
+
+  it("tolerates CRLF line endings (Windows/Word paste)", () => {
+    const r = parseOutline("# Title\r\n## One\r\nbrief one\r\n## Two\r\n");
+    expect(r.title).toBe("Title");
+    expect(r.sections).toEqual([
+      { title: "One", brief: "brief one" },
+      { title: "Two", brief: "" },
+    ]);
+  });
+
+  it("uses the first heading as the title when there is no plain title line", () => {
+    const r = parseOutline("## Section One\n## Section Two");
+    expect(r.title).toBe("Section One");
+    expect(r.sections.map((s) => s.title)).toEqual(["Section Two"]);
+  });
 });
