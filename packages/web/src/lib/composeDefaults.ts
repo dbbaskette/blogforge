@@ -22,6 +22,8 @@ export function loadDefaults(): ComposeSettings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...FALLBACK };
+    // Trusting the stored shape: only our own saveDefaults writes this key.
+    // If that ever changes, add a runtime validator here.
     const parsed = JSON.parse(raw) as Partial<ComposeSettings>;
     return { ...FALLBACK, ...parsed };
   } catch {
