@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { type IdeaInput, createDraft } from "../../api/drafts";
+import {
+  type IdeaInput,
+  type OutlineProposal,
+  createDraft,
+  expandSections,
+  generateOutline,
+  updateDraft,
+} from "../../api/drafts";
 import { type Template, deleteTemplate, listTemplates } from "../../api/templates";
 import { loadDefaults, saveDefaults } from "../../lib/composeDefaults";
+import { parseOutline } from "../../lib/parseOutline";
 import { type ComposeSettings, SetupFields } from "../SetupFields";
+import { BlankPanel } from "./BlankPanel";
+import { ExpressPanel } from "./ExpressPanel";
 import { type ComposeMode, ModePicker } from "./ModePicker";
+import { OutlineInPanel } from "./OutlineInPanel";
+import { ProposePanel } from "./ProposePanel";
 import { VoiceIndicator } from "./VoiceIndicator";
 
 function ideaFrom(settings: ComposeSettings, topic: string, bullets: string[] = [], notes = ""): IdeaInput {
@@ -17,8 +29,7 @@ export function ComposeStudio(): JSX.Element {
   const [mode, setMode] = useState<ComposeMode | null>(null);
   const [settings, setSettings] = useState<ComposeSettings>(() => loadDefaults());
   const [topic, setTopic] = useState("");
-  // outlineText will be used in Task 5 (outline, propose, express modes)
-  const [outlineText, _setOutlineText] = useState("");
+  const [outlineText, setOutlineText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -55,11 +66,11 @@ export function ComposeStudio(): JSX.Element {
     }
   }
 
+  // BLANK
   async function runBlank(): Promise<void> {
     setBusy(true);
     setError(null);
     try {
-      // TODO (Task 5): outline/express/propose flows should also pass bullets, notes to ideaFrom
       const idea = ideaFrom(settings, topic.trim() || "Untitled", bullets, notes);
       const draft = await createDraft(idea);
       saveDefaults(settings);
@@ -71,9 +82,76 @@ export function ComposeStudio(): JSX.Element {
     }
   }
 
-  // Suppress unused variable warning for outlineText — it will be used in Task 5
-  void outlineText;
-  void _setOutlineText;
+  // OUTLINE-IN
+  async function runOutline(): Promise<void> {
+    const parsed = parseOutline(outlineText);
+    if (parsed.sections.length === 0) {
+      setError("Add at least one heading or bullet, or use Just write it.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const idea = ideaFrom(settings, parsed.title || "Untitled", bullets, notes);
+      const draft = await createDraft(idea);
+      const outline: OutlineProposal = {
+        opening_hook: "",
+        sections: parsed.sections.map((s) => ({
+          id: crypto.randomUUID().replace(/-/g, ""),
+          title: s.title,
+          brief: s.brief,
+        })),
+        estimated_words: 0,
+      };
+      const withOutline = {
+        ...draft,
+        title: parsed.title || draft.title,
+        outline,
+      };
+      await updateDraft(draft.id, withOutline);
+      await expandSections(draft.id);
+      saveDefaults(settings);
+      navigate(`/drafts/${draft.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // EXPRESS
+  async function runExpress(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const idea = ideaFrom(settings, topic.trim(), bullets, notes);
+      const draft = await createDraft(idea);
+      await generateOutline(draft.id);
+      await expandSections(draft.id);
+      saveDefaults(settings);
+      navigate(`/drafts/${draft.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // PROPOSE
+  async function runPropose(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const idea = ideaFrom(settings, topic.trim(), bullets, notes);
+      const draft = await createDraft(idea);
+      saveDefaults(settings);
+      navigate(`/drafts/${draft.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -121,32 +199,21 @@ export function ComposeStudio(): JSX.Element {
       {mode !== null && (
         <div className="glass-card p-4 space-y-3">
           {mode === "blank" && (
-            <>
-              <div>
-                <label htmlFor="compose-title" className="nb-label">
-                  Title
-                </label>
-                <input
-                  id="compose-title"
-                  type="text"
-                  className="nb-input w-full"
-                  placeholder="What are you writing about?"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                className="nb-btn nb-btn-primary"
-                onClick={runBlank}
-                disabled={busy}
-              >
-                {busy ? "Opening…" : "Open editor"}
-              </button>
-            </>
+            <BlankPanel topic={topic} onTopic={setTopic} onRun={runBlank} busy={busy} />
           )}
-          {(mode === "outline" || mode === "propose" || mode === "express") && (
-            <p className="text-muted text-sm">Coming in the next step.</p>
+          {mode === "express" && (
+            <ExpressPanel topic={topic} onTopic={setTopic} onRun={runExpress} busy={busy} />
+          )}
+          {mode === "propose" && (
+            <ProposePanel topic={topic} onTopic={setTopic} onRun={runPropose} busy={busy} />
+          )}
+          {mode === "outline" && (
+            <OutlineInPanel
+              outlineText={outlineText}
+              onOutlineText={setOutlineText}
+              onRun={runOutline}
+              busy={busy}
+            />
           )}
         </div>
       )}
