@@ -28,7 +28,8 @@ export function SetupDisclosure({
     idea.provider
   }/${idea.model || "—"} · ${idea.target_words ?? 1500} words`;
 
-  // Derive a ComposeSettings view from the draft's idea.
+  // Derive a ComposeSettings view from the draft's idea. A fresh object each
+  // render is fine — SetupFields effects key on primitive fields, not identity.
   const settings: ComposeSettings = {
     pack_slug: idea.pack_slug,
     format: idea.format ?? null,
