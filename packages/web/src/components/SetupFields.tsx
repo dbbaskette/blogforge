@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { type PackFormatEntry, type PackSummary, getManifest, listPacks } from "../api/packs";
 import { type ModelInfo, listModels, listProviderAvailability } from "../api/providers";
-import { type ComposeSettings } from "../lib/composeDefaults";
+import type { ComposeSettings } from "../lib/composeDefaults";
 
 export type { ComposeSettings };
 
@@ -171,7 +171,8 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
       });
   }, [value.provider, providers]);
 
-  // Auto-pick first model when current model is invalid for the selected provider
+  // Auto-pick first model when current model is invalid for the selected provider.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reads valueRef.current + stable onChange; only re-run when the model list / selected model changes
   useEffect(() => {
     if (models.length > 0 && !models.some((m) => m.id === value.model)) {
       onChange({ ...valueRef.current, model: models[0].id });
