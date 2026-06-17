@@ -1,0 +1,40 @@
+export interface ComposeSettings {
+  pack_slug: string;
+  format: string | null;
+  provider: "anthropic" | "openai" | "google" | "claude-cli";
+  model: string;
+  target_words: number;
+  use_voice_profile: boolean;
+}
+
+const KEY = "bf.compose.defaults";
+
+const FALLBACK: ComposeSettings = {
+  pack_slug: "",
+  format: null,
+  provider: "anthropic",
+  model: "",
+  target_words: 1500,
+  use_voice_profile: true,
+};
+
+export function loadDefaults(): ComposeSettings {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return { ...FALLBACK };
+    // Trusting the stored shape: only our own saveDefaults writes this key.
+    // If that ever changes, add a runtime validator here.
+    const parsed = JSON.parse(raw) as Partial<ComposeSettings>;
+    return { ...FALLBACK, ...parsed };
+  } catch {
+    return { ...FALLBACK };
+  }
+}
+
+export function saveDefaults(s: ComposeSettings): void {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(s));
+  } catch {
+    /* storage disabled — non-fatal */
+  }
+}

@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { Draft, IdeaInput } from "../../api/drafts";
-import { type PackFormatEntry, type PackSummary, getManifest, listPacks } from "../../api/packs";
-import { type ModelInfo, listModels, listProviderAvailability } from "../../api/providers";
+import { type ComposeSettings, SetupFields } from "../SetupFields";
 import { Icon } from "../ui/Icon";
-
-type Provider = "anthropic" | "openai" | "google" | "claude-cli";
 
 interface SetupDisclosureProps {
   draft: Draft;
@@ -22,69 +19,6 @@ export function SetupDisclosure({
   // Default use_voice_profile to true when undefined (legacy drafts).
   const useVoiceProfile = idea.use_voice_profile ?? true;
   const [open, setOpen] = useState(forceOpen);
-  const [packs, setPacks] = useState<PackSummary[]>([]);
-  const [formats, setFormats] = useState<PackFormatEntry[]>([]);
-  const [providers, setProviders] = useState<Record<string, boolean>>({});
-  const [models, setModels] = useState<ModelInfo[]>([]);
-
-  useEffect(() => {
-    listPacks()
-      .then(setPacks)
-      .catch(() => {});
-    listProviderAvailability()
-      .then(setProviders)
-      .catch(() => {});
-  }, []);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when pack_slug changes; reading idea.format inside is intentional
-  useEffect(() => {
-    if (!idea.pack_slug) {
-      setFormats([]);
-      return;
-    }
-    let cancelled = false;
-    getManifest(idea.pack_slug)
-      .then((m) => {
-        if (cancelled) return;
-        const raw = (m.formats as PackFormatEntry[] | undefined) ?? [];
-        setFormats(raw);
-        if (idea.format && !raw.some((f) => f.name === idea.format)) {
-          onChange({ ...idea, format: null });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setFormats([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [idea.pack_slug]);
-
-  useEffect(() => {
-    if (!idea.provider || !providers[idea.provider]) {
-      setModels([]);
-      return;
-    }
-    let cancelled = false;
-    listModels(idea.provider)
-      .then((ms) => {
-        if (cancelled) return;
-        setModels(ms);
-        // Switching provider can leave a model from the old provider selected
-        // (e.g. a Google model under claude-cli, which claude -p rejects).
-        // Reset to a valid model for the new provider.
-        if (ms.length > 0 && !ms.some((m) => m.id === idea.model)) {
-          onChange({ ...idea, model: ms[0].id });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setModels([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idea.provider, providers]);
 
   const voiceLabel = useVoiceProfile
     ? "voice: my profile"
@@ -93,6 +27,17 @@ export function SetupDisclosure({
   const summary = `${voiceLabel} · ${idea.format || "no format"} · ${
     idea.provider
   }/${idea.model || "—"} · ${idea.target_words ?? 1500} words`;
+
+  // Derive a ComposeSettings view from the draft's idea. A fresh object each
+  // render is fine — SetupFields effects key on primitive fields, not identity.
+  const settings: ComposeSettings = {
+    pack_slug: idea.pack_slug,
+    format: idea.format ?? null,
+    provider: idea.provider,
+    model: idea.model,
+    target_words: idea.target_words ?? 1500,
+    use_voice_profile: idea.use_voice_profile ?? true,
+  };
 
   return (
     <section className="nb-card overflow-hidden mb-5">
@@ -117,174 +62,13 @@ export function SetupDisclosure({
       </button>
 
       {open && (
-        <div className="px-5 pb-5 pt-1 border-t border-rule space-y-4 animate-fade-in">
-          {/* Voice source toggle */}
-          <div>
-            <span className="nb-label">Voice source</span>
-            <div className="flex gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => onChange({ ...idea, use_voice_profile: true })}
-                className={`flex-1 px-3 py-2 text-sm rounded-nb-sm border transition-colors ${
-                  useVoiceProfile
-                    ? "border-cobalt-400 bg-cobalt-50 text-cobalt-800 font-medium"
-                    : "border-rule bg-card text-ink-2 hover:border-cobalt-300"
-                }`}
-                aria-pressed={useVoiceProfile}
-              >
-                My voice profile
-              </button>
-              <button
-                type="button"
-                onClick={() => onChange({ ...idea, use_voice_profile: false })}
-                className={`flex-1 px-3 py-2 text-sm rounded-nb-sm border transition-colors ${
-                  !useVoiceProfile
-                    ? "border-cobalt-400 bg-cobalt-50 text-cobalt-800 font-medium"
-                    : "border-rule bg-card text-ink-2 hover:border-cobalt-300"
-                }`}
-                aria-pressed={!useVoiceProfile}
-              >
-                A voice pack
-              </button>
-            </div>
-            {useVoiceProfile && (
-              <p className="text-xs text-muted mt-1.5 px-1">
-                Pack picker below is not used for voice when profile mode is active.
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FieldSelect
-              label={useVoiceProfile ? "Voice pack (unused — profile active)" : "Voice pack"}
-              id="setup-pack"
-              value={idea.pack_slug}
-              onChange={(v) => onChange({ ...idea, pack_slug: v })}
-              options={[
-                { value: "", label: "— pick a pack —" },
-                ...packs.filter((p) => p.valid).map((p) => ({ value: p.slug, label: p.slug })),
-              ]}
-            />
-            <FieldSelect
-              label="Format"
-              id="setup-format"
-              value={idea.format ?? ""}
-              onChange={(v) => onChange({ ...idea, format: v || null })}
-              disabled={formats.length === 0}
-              options={[
-                { value: "", label: "— none —" },
-                ...formats.map((f) => ({
-                  value: f.name,
-                  label: f.description ? `${f.name} — ${f.description}` : f.name,
-                })),
-              ]}
-            />
-            <FieldSelect
-              label="Provider"
-              id="setup-provider"
-              value={idea.provider}
-              onChange={(v) => onChange({ ...idea, provider: v as Provider })}
-              options={(["anthropic", "openai", "google", "claude-cli"] as Provider[]).map((p) => {
-                const name = p === "claude-cli" ? "claude (CLI · subscription)" : p;
-                const missing = p === "claude-cli" ? "not installed" : "no key";
-                return { value: p, label: providers[p] ? name : `${name} (${missing})`, disabled: !providers[p] };
-              })}
-            />
-            <FieldSelect
-              label="Model"
-              id="setup-model"
-              value={idea.model}
-              onChange={(v) => onChange({ ...idea, model: v })}
-              options={
-                models.length === 0
-                  ? [{ value: "", label: "No models" }]
-                  : models.map((m) => ({ value: m.id, label: m.label }))
-              }
-            />
-          </div>
-
-          {!useVoiceProfile && (
-            <div>
-              <PackPreview pack={packs.find((p) => p.slug === idea.pack_slug)} />
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="setup-words" className="nb-label">
-              Target length ·{" "}
-              <span className="text-ink-2 font-mono normal-case tracking-normal">
-                {(idea.target_words ?? 1500).toLocaleString()} words
-              </span>
-            </label>
-            <input
-              id="setup-words"
-              type="range"
-              min={500}
-              max={3500}
-              step={100}
-              value={idea.target_words ?? 1500}
-              onChange={(e) =>
-                onChange({ ...idea, target_words: Number.parseInt(e.target.value, 10) })
-              }
-              className="w-full"
-            />
-          </div>
+        <div className="px-5 pb-5 pt-1 border-t border-rule animate-fade-in">
+          <SetupFields
+            value={settings}
+            onChange={(next) => onChange({ ...idea, ...next })}
+          />
         </div>
       )}
     </section>
-  );
-}
-
-function PackPreview({ pack }: { pack: PackSummary | undefined }): JSX.Element | null {
-  if (!pack) return null;
-  const description = pack.description?.trim();
-  const oneLine = pack.one_line?.trim();
-  if (!description && !oneLine) return null;
-  return (
-    <div className="px-3 py-2 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200 animate-fade-in">
-      {description && <p className="text-xs text-ink-2 leading-snug">{description}</p>}
-      {oneLine && (
-        <p className="text-xs font-serif italic text-cobalt-700 leading-snug mt-0.5">{oneLine}</p>
-      )}
-    </div>
-  );
-}
-
-interface FieldSelectProps {
-  label: string;
-  id: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string; disabled?: boolean }[];
-  disabled?: boolean;
-}
-
-function FieldSelect({
-  label,
-  id,
-  value,
-  onChange,
-  options,
-  disabled,
-}: FieldSelectProps): JSX.Element {
-  return (
-    <div>
-      <label htmlFor={id} className="nb-label">
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className="nb-select disabled:opacity-60"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value} disabled={o.disabled}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </div>
   );
 }
