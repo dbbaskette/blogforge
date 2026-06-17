@@ -103,6 +103,9 @@ export function ComposeStudio(): JSX.Element {
         })),
         estimated_words: 0,
       };
+      // Full-replace PUT: updateDraft takes the whole Draft. `draft` is fresh
+      // from createDraft, so spreading it back only echoes server values we
+      // just received; we override title + inject the parsed outline.
       const withOutline = {
         ...draft,
         title: parsed.title || draft.title,
@@ -120,6 +123,9 @@ export function ComposeStudio(): JSX.Element {
   }
 
   // EXPRESS
+  // Three sequential server calls under one busy flag. If generateOutline or
+  // expandSections fails the draft already exists; the user recovers via the
+  // Drafts list. A future retry/job-status flow could smooth this over.
   async function runExpress(): Promise<void> {
     setBusy(true);
     setError(null);
