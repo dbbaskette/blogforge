@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   type DraftStage,
@@ -9,7 +9,6 @@ import {
   setDraftTags,
 } from "../api/drafts";
 import { listProviderAvailability } from "../api/providers";
-import { NewDraftDialog } from "../components/NewDraftDialog";
 import { Icon } from "../components/ui/Icon";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
 import { useMe } from "../hooks/useMe";
@@ -29,9 +28,9 @@ const STAGE_FILTERS: { value: DraftStage | "all"; label: string }[] = [
 
 export function DraftsPage(): JSX.Element {
   const { user } = useMe();
+  const navigate = useNavigate();
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [newOpen, setNewOpen] = useState(false);
   const [noKeys, setNoKeys] = useState(false);
 
   // Filters (client-side over the loaded list).
@@ -97,7 +96,7 @@ export function DraftsPage(): JSX.Element {
 
   return (
     <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10 animate-fade-up">
-      <Hero onNew={() => setNewOpen(true)} />
+      <Hero onNew={() => navigate("/compose")} />
 
       {noKeys && <KeysBanner isAdmin={user?.role === "admin"} />}
       {error && <ErrorBanner message={error} />}
@@ -186,7 +185,7 @@ export function DraftsPage(): JSX.Element {
           <p className="text-center text-muted text-sm py-16">Loading…</p>
         )}
 
-        {drafts && drafts.length === 0 && <EmptyState onNew={() => setNewOpen(true)} />}
+        {drafts && drafts.length === 0 && <EmptyState onNew={() => navigate("/compose")} />}
 
         {drafts && drafts.length > 0 && filtered.length === 0 && (
           <p className="nb-card p-8 text-center italic text-muted">No drafts match your filters.</p>
@@ -206,7 +205,6 @@ export function DraftsPage(): JSX.Element {
         )}
       </section>
 
-      <NewDraftDialog open={newOpen} onClose={() => setNewOpen(false)} />
     </div>
   );
 }

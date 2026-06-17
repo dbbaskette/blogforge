@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { RequireAuth } from "./components/RequireAuth";
 import { AdminPage } from "./routes/AdminPage";
+import { ComposePage } from "./routes/ComposePage";
 import { DraftPage } from "./routes/DraftPage";
 import { DraftsPage } from "./routes/DraftsPage";
 import { LoginPage } from "./routes/LoginPage";
@@ -60,6 +61,14 @@ export function App(): JSX.Element {
           element={
             <RequireAuth requireAdmin>
               <AdminPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/compose"
+          element={
+            <RequireAuth>
+              <ComposePage />
             </RequireAuth>
           }
         />
