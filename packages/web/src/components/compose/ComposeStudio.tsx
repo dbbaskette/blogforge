@@ -22,6 +22,8 @@ export function ComposeStudio(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [bullets, setBullets] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
@@ -32,6 +34,8 @@ export function ComposeStudio(): JSX.Element {
 
   function applyTemplate(t: Template): void {
     setTopic(t.topic);
+    setBullets(t.bullets);
+    setNotes(t.notes);
     setSettings((prev) => ({
       ...prev,
       pack_slug: t.pack_slug,
@@ -45,17 +49,18 @@ export function ComposeStudio(): JSX.Element {
   async function removeTemplate(t: Template): Promise<void> {
     try {
       await deleteTemplate(t.id);
+      setTemplates((prev) => prev.filter((x) => x.id !== t.id));
     } catch {
-      /* ignore */
+      /* ignore — leave list unchanged so the template is not hidden on failure */
     }
-    setTemplates((prev) => prev.filter((x) => x.id !== t.id));
   }
 
   async function runBlank(): Promise<void> {
     setBusy(true);
     setError(null);
     try {
-      const idea = ideaFrom(settings, topic.trim() || "Untitled");
+      // TODO (Task 5): outline/express/propose flows should also pass bullets, notes to ideaFrom
+      const idea = ideaFrom(settings, topic.trim() || "Untitled", bullets, notes);
       const draft = await createDraft(idea);
       saveDefaults(settings);
       navigate(`/drafts/${draft.id}`);
@@ -125,7 +130,6 @@ export function ComposeStudio(): JSX.Element {
                   id="compose-title"
                   type="text"
                   className="nb-input w-full"
-                  aria-label="Title"
                   placeholder="What are you writing about?"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
@@ -162,6 +166,7 @@ export function ComposeStudio(): JSX.Element {
         <button
           type="button"
           className="nb-btn text-sm"
+          aria-expanded={advancedOpen}
           onClick={() => setAdvancedOpen((o) => !o)}
         >
           {advancedOpen ? "▲ Hide advanced" : "▼ Advanced"}
