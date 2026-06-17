@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { type PackFormatEntry, type PackSummary, getManifest, listPacks } from "../api/packs";
 import { type ModelInfo, listModels, listProviderAvailability } from "../api/providers";
@@ -108,6 +108,9 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [formats, setFormats] = useState<PackFormatEntry[]>([]);
 
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
   // Load packs and providers on mount
   useEffect(() => {
     listPacks()
@@ -132,7 +135,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
         const raw = (m.formats as PackFormatEntry[] | undefined) ?? [];
         setFormats(raw);
         if (value.format && !raw.some((f) => f.name === value.format)) {
-          onChange({ ...value, format: null });
+          onChange({ ...valueRef.current, format: null });
         }
       })
       .catch(() => {
@@ -171,7 +174,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
   // Auto-pick first model when current model is invalid for the selected provider
   useEffect(() => {
     if (models.length > 0 && !models.some((m) => m.id === value.model)) {
-      onChange({ ...value, model: models[0].id });
+      onChange({ ...valueRef.current, model: models[0].id });
     }
   }, [models, value.model]);
 
@@ -322,6 +325,15 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
           style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
         >
           {modelsError}
+        </p>
+      )}
+
+      {!providers[value.provider] && (
+        <p
+          className="text-xs px-3 py-2 rounded-nb-sm"
+          style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
+        >
+          No API key for {value.provider}. An admin can add one under /admin (API keys section).
         </p>
       )}
 

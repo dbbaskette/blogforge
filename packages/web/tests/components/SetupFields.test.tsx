@@ -35,6 +35,7 @@ describe("SetupFields", () => {
   it("emits use_voice_profile=false when 'A voice pack' is chosen", async () => {
     const onChange = vi.fn();
     render(<SetupFields value={base} onChange={onChange} />);
+    await waitFor(() => {});
     fireEvent.click(screen.getByRole("button", { name: /a voice pack/i }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ use_voice_profile: false }));
   });
