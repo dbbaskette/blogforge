@@ -98,7 +98,7 @@ function TopBar(): JSX.Element {
                   className="w-6 h-6 rounded-full"
                 />
               )}
-              <span className="text-xs text-muted">{user.github_login ?? user.email}</span>
+              <span className="text-xs text-muted">{user.github_login ?? user.email ?? "—"}</span>
             </span>
             <button type="button" onClick={onSignOut} className="nb-btn nb-btn-sm">
               Sign out

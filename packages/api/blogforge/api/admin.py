@@ -19,7 +19,9 @@ router = APIRouter(
 
 class UserOut(BaseModel):
     id: str
-    email: str
+    email: str | None
+    github_login: str | None
+    avatar_url: str | None
     status: str
     role: str
     created_at: datetime
@@ -31,6 +33,8 @@ class UserOut(BaseModel):
         return cls(
             id=str(u.id),
             email=u.email,
+            github_login=u.github_login,
+            avatar_url=u.avatar_url,
             status=u.status,
             role=u.role,
             created_at=u.created_at,
