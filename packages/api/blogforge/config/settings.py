@@ -30,6 +30,14 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:7881"]
     )
 
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_admin_login: str = ""
+    # Public base URL for the OAuth callback (e.g. https://blogforge.<tp-domain>).
+    # Empty -> derived from the incoming request (works on localhost).
+    public_url: str = ""
+    github_allowlist: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
     s3_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "blogforge"
     s3_secret_key: str = "blogforge-minio-secret"
@@ -53,6 +61,13 @@ class Settings(BaseSettings):
         """Accept comma-separated string from env: BLOGFORGE_CORS_ORIGINS=a,b,c."""
         if isinstance(v, str):
             return [s.strip() for s in v.split(",") if s.strip()]
+        return v
+
+    @field_validator("github_allowlist", mode="before")
+    @classmethod
+    def split_allowlist(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [s.strip().lower() for s in v.split(",") if s.strip()]
         return v
 
 

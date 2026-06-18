@@ -89,3 +89,23 @@ async def test_404_on_unknown_user(setup):
     with c:
         r = c.post(f"/api/admin/users/{uuid4()}/approve")
         assert r.status_code == 404
+
+
+async def test_list_includes_github_user_with_null_email(setup):
+    """A GitHub user with a private (null) email must serialize, not 500,
+    and the admin list must carry github_login."""
+    async with get_sessionmaker()() as session:
+        session.add(
+            User(
+                email=None, github_id=4242, github_login="ghuser",
+                status="approved", role="user",
+            )
+        )
+        await session.commit()
+    c = _admin_client(setup["admin"])
+    with c:
+        r = c.get("/api/admin/users")
+        assert r.status_code == 200
+        rows = {u["github_login"]: u for u in r.json() if u["github_login"]}
+        assert "ghuser" in rows
+        assert rows["ghuser"]["email"] is None

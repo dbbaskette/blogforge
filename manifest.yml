@@ -21,3 +21,9 @@ applications:
       BLOGFORGE_RUN_MIGRATIONS_ON_BOOT: "true"
       # Empty by default — when api and web share an origin, CORS is unnecessary.
       BLOGFORGE_CORS_ORIGINS: ""
+      BLOGFORGE_GITHUB_ALLOWLIST: dbbaskette
+      BLOGFORGE_GITHUB_ADMIN_LOGIN: dbbaskette
+      # GitHub OAuth secrets + public URL — set at deploy time, do not commit:
+      #   cf set-env blogforge BLOGFORGE_GITHUB_CLIENT_ID <client-id>
+      #   cf set-env blogforge BLOGFORGE_GITHUB_CLIENT_SECRET <client-secret>
+      #   cf set-env blogforge BLOGFORGE_PUBLIC_URL https://<app-route>

@@ -1,7 +1,7 @@
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { changePassword, revokeAllSessions } from "../api/auth";
+import { revokeAllSessions } from "../api/auth";
 import { useMe } from "../hooks/useMe";
 
 export function SettingsPage(): JSX.Element {
@@ -23,8 +23,8 @@ export function SettingsPage(): JSX.Element {
           {user ? (
             <dl className="space-y-2 text-sm">
               <div className="flex gap-2">
-                <dt className="text-muted w-28">Email</dt>
-                <dd className="text-ink font-medium">{user.email}</dd>
+                <dt className="text-muted w-28">GitHub</dt>
+                <dd className="text-ink font-medium">{user.github_login ?? user.email ?? "—"}</dd>
               </div>
               <div className="flex gap-2">
                 <dt className="text-muted w-28">Role</dt>
@@ -43,117 +43,8 @@ export function SettingsPage(): JSX.Element {
         </div>
       </section>
 
-      <ChangePasswordCard />
       <SessionsCard />
     </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────
-// Change password
-
-function ChangePasswordCard(): JSX.Element {
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const submit = async (e: FormEvent): Promise<void> => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(false);
-    if (newPassword.length < 8) {
-      setError("New password must be at least 8 characters.");
-      return;
-    }
-    if (newPassword !== confirm) {
-      setError("New passwords don't match.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await changePassword(oldPassword, newPassword);
-      setSuccess(true);
-      setOldPassword("");
-      setNewPassword("");
-      setConfirm("");
-    } catch (err) {
-      if (err instanceof Error && err.message.includes("invalid_old_password")) {
-        setError("Current password is incorrect.");
-      } else {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <section className="mt-8">
-      <h2 className="font-serif text-xl font-medium text-ink mb-3">Change password</h2>
-      <form onSubmit={submit} className="nb-card p-6 space-y-4 max-w-md">
-        <div>
-          <label htmlFor="cp-old" className="nb-label">
-            Current password
-          </label>
-          <input
-            id="cp-old"
-            type="password"
-            required
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            className="nb-input"
-          />
-        </div>
-        <div>
-          <label htmlFor="cp-new" className="nb-label">
-            New password
-          </label>
-          <input
-            id="cp-new"
-            type="password"
-            required
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="nb-input"
-          />
-        </div>
-        <div>
-          <label htmlFor="cp-confirm" className="nb-label">
-            Confirm new password
-          </label>
-          <input
-            id="cp-confirm"
-            type="password"
-            required
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className="nb-input"
-          />
-        </div>
-        {success && (
-          <p
-            className="text-sm px-3 py-2 rounded-nb-sm"
-            style={{ background: "#e3f5ec", color: "#0e7a50", border: "1px solid #c2e6d2" }}
-          >
-            Password changed
-          </p>
-        )}
-        {error && (
-          <p
-            className="text-sm px-3 py-2 rounded-nb-sm"
-            style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-          >
-            {error}
-          </p>
-        )}
-        <button type="submit" disabled={submitting} className="nb-btn nb-btn-primary">
-          {submitting ? "Saving…" : "Update password"}
-        </button>
-      </form>
-    </section>
   );
 }
 

@@ -69,7 +69,7 @@ export function AdminPage(): JSX.Element {
             {pending.map((u) => (
               <li key={u.id} className="nb-card p-4 flex items-center justify-between">
                 <div>
-                  <div className="font-medium text-ink">{u.email}</div>
+                  <div className="font-medium text-ink">{u.github_login ?? u.email ?? "—"}</div>
                   <div className="text-xs text-muted">
                     Requested {new Date(u.created_at).toLocaleString()}
                   </div>
@@ -104,7 +104,7 @@ export function AdminPage(): JSX.Element {
           {others.map((u) => (
             <li key={u.id} className="nb-card p-4 flex items-center justify-between">
               <div>
-                <div className="font-medium text-ink">{u.email}</div>
+                <div className="font-medium text-ink">{u.github_login ?? u.email ?? "—"}</div>
                 <div className="flex items-center gap-2 mt-1">
                   <span
                     className={`nb-pill nb-pill-${

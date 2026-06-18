@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -27,8 +27,11 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
-    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True, index=True)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    github_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, index=True, nullable=True)
+    github_login: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     # one of: "pending" | "approved" | "rejected" | "disabled"
     role: Mapped[str] = mapped_column(String(16), nullable=False, default="user")

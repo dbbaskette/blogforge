@@ -1,8 +1,8 @@
-"""change-password + sign-out-everywhere invalidate old session cookies."""
+"""session-revoke-all invalidates old session cookies; /me returns identity."""
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
-from blogforge.auth.passwords import hash_password, verify_password
+from blogforge.auth.passwords import hash_password
 from blogforge.auth.sessions import COOKIE_NAME, SessionSigner
 from blogforge.db.base import Base
 from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
@@ -33,33 +33,6 @@ async def client_uid():
         yield c, uid
 
 
-async def test_change_password_rejects_wrong_old(client_uid):
-    c, _ = client_uid
-    r = c.post(
-        "/api/auth/change-password",
-        json={"old_password": "wrong", "new_password": "brandnew123"},
-    )
-    assert r.status_code == 400
-    assert "invalid_old_password" in r.text
-
-
-async def test_change_password_updates_hash_and_bumps_version(client_uid):
-    c, uid = client_uid
-    r = c.post(
-        "/api/auth/change-password",
-        json={"old_password": "oldpassword", "new_password": "brandnew123"},
-    )
-    assert r.status_code == 200
-    async with get_sessionmaker()() as session:
-        from sqlalchemy import select
-
-        u = (await session.execute(select(User).where(User.id == uid))).scalar_one()
-        assert verify_password("brandnew123", u.password_hash)
-        assert u.session_version == 1
-    # The response re-issued a v1 cookie, so /me still works for this session.
-    assert c.get("/api/auth/me").status_code == 200
-
-
 async def test_old_cookie_invalid_after_revoke_all(client_uid):
     c, uid = client_uid
     # Confirm the session works first.
@@ -78,6 +51,6 @@ async def test_old_cookie_invalid_after_revoke_all(client_uid):
 
 async def test_me_includes_last_login(client_uid):
     c, _ = client_uid
-    # last_login_at is None until a real /login; the field is present regardless.
+    # last_login_at is None until a real login; the field is present regardless.
     body = c.get("/api/auth/me").json()
     assert "last_login_at" in body

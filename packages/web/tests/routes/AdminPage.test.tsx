@@ -36,6 +36,7 @@ describe("AdminPage", () => {
       {
         id: "u1",
         email: "wait@x.com",
+        github_login: "waituser",
         status: "pending" as const,
         role: "user" as const,
         created_at: "2026-05-27T00:00:00Z",
@@ -55,7 +56,7 @@ describe("AdminPage", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText(/wait@x\.com/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/waituser/)).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /approve/i }));
     await waitFor(() => expect(adm.approveUser).toHaveBeenCalledWith("u1"));
   });
