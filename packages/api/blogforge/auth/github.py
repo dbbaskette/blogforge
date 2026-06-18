@@ -64,7 +64,7 @@ async def resolve_github_user(session: AsyncSession, ident: GithubIdentity) -> U
         ).scalar_one_or_none()
 
     if user is None:
-        user = User(email=(ident.email or None), status="approved", role=role)
+        user = User(email=(ident.email.lower() if ident.email else None), status="approved", role=role)
         session.add(user)
 
     user.github_id = ident.id
