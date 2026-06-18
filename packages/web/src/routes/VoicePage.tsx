@@ -6,6 +6,7 @@ import { DistilledStyle } from "../components/voice/DistilledStyle";
 import { PersonaCard } from "../components/voice/PersonaCard";
 import { RulesCard } from "../components/voice/RulesCard";
 import { SamplesList } from "../components/voice/SamplesList";
+import { SourcesCard } from "../components/voice/SourcesCard";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -107,6 +108,7 @@ export function VoicePage(): JSX.Element {
       <PersonaCard profile={profile} onChange={handleChange} />
       <RulesCard profile={profile} onChange={handleChange} />
       <SamplesList profile={profile} onChange={handleChange} onRefresh={handleRefresh} />
+      <SourcesCard />
       <DistilledStyle profile={profile} onChange={handleChange} />
     </div>
   );

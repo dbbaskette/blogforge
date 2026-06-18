@@ -14,6 +14,9 @@ Routes:
   PUT  /api/voice/samples/{sample_id}/exemplar → VoiceProfile
   POST /api/voice/distill                   → VoiceProfile (runs LLM distillation)
   GET  /api/voice/export                    → ZIP download
+  POST /api/voice/sources                   → VoiceSource
+  GET  /api/voice/sources                   → list[VoiceSource]
+  DELETE /api/voice/sources/{source_id}     → 204
 """
 from __future__ import annotations
 
@@ -24,8 +27,8 @@ from pydantic import BaseModel
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
-from blogforge.voice.ingest import add_file_sample, add_text_sample, add_url_sample
-from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample
+from blogforge.voice.ingest import add_file_sample, add_text_sample, add_url_sample, add_url_source
+from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample, VoiceSource
 from blogforge.voice.pack import export_zip, materialize
 from blogforge.voice.store import SqlVoiceStore
 
@@ -59,6 +62,10 @@ class _UrlSampleBody(BaseModel):
 
 class _ExemplarBody(BaseModel):
     exemplar: bool
+
+
+class _UrlSourceBody(BaseModel):
+    url: str
 
 
 class _DistillBody(BaseModel):
@@ -205,6 +212,49 @@ async def set_exemplar(
     current: User = Depends(get_current_user),
 ) -> VoiceProfile:
     return await _store(request).set_exemplar(current.id, sample_id, body.exemplar)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/voice/sources
+# ---------------------------------------------------------------------------
+
+
+@router.post("/sources", status_code=status.HTTP_201_CREATED)
+async def add_source(
+    body: _UrlSourceBody,
+    current: User = Depends(get_current_user),
+) -> VoiceSource:
+    """Ingest a URL as a background/context source on the user's voice profile."""
+    return await add_url_source(current.id, url=body.url)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/voice/sources
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sources")
+async def list_sources(
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> list[VoiceSource]:
+    """List all background sources on the user's voice profile."""
+    return await _store(request).list_sources(current.id)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/voice/sources/{source_id}
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/sources/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_source(
+    source_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Response:
+    await _store(request).delete_source(current.id, source_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

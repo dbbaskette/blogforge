@@ -29,6 +29,15 @@ export interface VoiceSample {
   added_at: string;
 }
 
+export interface VoiceSource {
+  id: string;
+  url: string;
+  name: string;
+  status: "ready" | "failed";
+  extracted_chars: number;
+  added_at: string;
+}
+
 export interface VoiceProfile {
   id: string;
   user_id: string;
@@ -134,6 +143,25 @@ export function setExemplar(id: string, exemplar: boolean): Promise<VoiceProfile
     method: "PUT",
     body: JSON.stringify({ exemplar }),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Sources
+// ---------------------------------------------------------------------------
+
+export function listSources(): Promise<VoiceSource[]> {
+  return api<VoiceSource[]>("/api/voice/sources");
+}
+
+export function addUrlSource(url: string): Promise<VoiceSource> {
+  return api<VoiceSource>("/api/voice/sources", {
+    method: "POST",
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function deleteSource(id: string): Promise<void> {
+  return api<void>(`/api/voice/sources/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
 // ---------------------------------------------------------------------------

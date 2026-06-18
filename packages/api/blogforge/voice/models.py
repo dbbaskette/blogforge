@@ -20,6 +20,7 @@ class VoiceRules(BaseModel):
 
 SampleKind = Literal["text", "url", "file"]
 SampleStatus = Literal["ready", "failed"]
+SourceStatus = Literal["ready", "failed"]
 
 
 class VoiceSample(BaseModel):
@@ -32,6 +33,16 @@ class VoiceSample(BaseModel):
     extracted_chars: int = 0
     exemplar: bool = False
     status: SampleStatus = "ready"
+    added_at: datetime = Field(default_factory=_now)
+
+
+class VoiceSource(BaseModel):
+    id: str
+    url: str
+    name: str = ""
+    s3_key: str
+    extracted_chars: int = 0
+    status: SourceStatus = "ready"
     added_at: datetime = Field(default_factory=_now)
 
 

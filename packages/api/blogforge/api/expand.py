@@ -135,6 +135,12 @@ async def _run_expand(
         # draft sees the same materials), not per-section.
         reference_context = await get_reference_context(draft.id, draft.references)
 
+        # Prepend profile-level background sources (facts/terminology, not style).
+        from blogforge.voice.sources_context import build_background_context
+        bg = await build_background_context(user_id)
+        if bg:
+            reference_context = f"{bg}\n\n{reference_context}" if reference_context else bg
+
         async def _fail_all(message: str) -> None:
             for s in draft.sections:
                 s.status = "failed"
