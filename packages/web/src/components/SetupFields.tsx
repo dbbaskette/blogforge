@@ -187,7 +187,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
         <div className="flex gap-2 mt-1">
           <button
             type="button"
-            onClick={() => onChange({ ...value, use_voice_profile: true })}
+            onClick={() => onChange({ ...value, use_voice_profile: true, format: null })}
             className={`flex-1 px-3 py-2 text-sm rounded-nb-sm border transition-colors ${
               value.use_voice_profile
                 ? "border-cobalt-400 bg-cobalt-50 text-cobalt-800 font-medium"
@@ -265,13 +265,13 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
         </Field>
       )}
 
-      {/* Format select */}
+      {/* Format select — only for voice packs; profiles carry no named formats. */}
       <Field label="Format" id="sf-format">
         <select
           id="sf-format"
-          value={value.format ?? ""}
+          value={value.use_voice_profile ? "" : (value.format ?? "")}
           onChange={(e) => onChange({ ...value, format: e.target.value || null })}
-          disabled={formats.length === 0}
+          disabled={value.use_voice_profile || formats.length === 0}
           className="nb-select disabled:opacity-60"
         >
           <option value="">— none —</option>
@@ -281,6 +281,11 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
             </option>
           ))}
         </select>
+        {value.use_voice_profile && (
+          <p className="text-xs text-muted mt-1">
+            Named formats apply to voice packs — your profile writes in its distilled voice.
+          </p>
+        )}
       </Field>
 
       {/* Provider / Model grid */}

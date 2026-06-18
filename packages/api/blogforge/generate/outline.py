@@ -7,6 +7,7 @@ from typing import Any
 from jinja2 import Template
 
 from blogforge.drafts.models import IdeaInput, OutlineProposal
+from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
 
 # Reference context is built by the caller (route handler) and passed in
@@ -68,7 +69,7 @@ async def propose_outline(
     sample_ids = _auto_pick_samples(manifest, n=2)
     system = compose_prompt(
         pack_root,
-        format=idea.format,
+        format=resolve_format(pack_root, idea.format),
         samples=sample_ids if sample_ids else None,
         draft=None,
     )

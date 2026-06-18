@@ -8,6 +8,7 @@ from typing import Any
 from jinja2 import Template
 
 from blogforge.drafts.models import Draft, Section
+from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider, StreamChunk
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "section.j2"
@@ -116,7 +117,7 @@ async def stream_section(
     sample_ids = _auto_pick_samples(manifest, n=3)
     system = compose_prompt(
         pack_root,
-        format=draft.idea.format,
+        format=resolve_format(pack_root, draft.idea.format),
         samples=sample_ids if sample_ids else None,
         draft=None,
     )
