@@ -24,3 +24,18 @@ def test_callback_happy_path_sets_session(client, monkeypatch) -> None:
     r = client.get("/api/auth/github/callback?code=c&state=S", follow_redirects=False)
     assert r.status_code == 302 and r.headers["location"] == "/"
     assert "blogforge_session" in r.cookies
+
+
+def test_callback_oauth_denied(client) -> None:
+    client.cookies.set("bf_oauth_state", "S")
+    r = client.get("/api/auth/github/callback?state=S&error=access_denied", follow_redirects=False)
+    assert r.status_code == 302 and "error=oauth_denied" in r.headers["location"]
+
+def test_callback_missing_state_cookie(client) -> None:
+    # Ensure no state cookie is present — delete it if carried over from a prior test.
+    try:
+        client.cookies.delete("bf_oauth_state")
+    except Exception:
+        pass
+    r = client.get("/api/auth/github/callback?code=c&state=S", follow_redirects=False)
+    assert r.status_code == 302 and "error=bad_state" in r.headers["location"]

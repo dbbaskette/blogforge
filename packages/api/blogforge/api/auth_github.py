@@ -5,13 +5,14 @@ import secrets
 from typing import Literal, cast
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blogforge.auth.dependencies import _get_session, _get_signer
 from blogforge.auth.github import resolve_github_user
-from blogforge.auth.github_client import exchange_code, fetch_identity
+from blogforge.auth.github_client import GithubAuthError, exchange_code, fetch_identity
 from blogforge.auth.sessions import COOKIE_MAX_AGE_SECONDS, COOKIE_NAME
 from blogforge.config import get_settings
 
@@ -39,6 +40,9 @@ async def github_login(request: Request) -> RedirectResponse:
         "state": state,
     })
     resp = RedirectResponse(url=f"https://github.com/login/oauth/authorize?{params}", status_code=302)
+    # samesite=lax (not the configurable session value): the GitHub callback is a
+    # top-level GET navigation, so the state cookie must be sent on that cross-site
+    # redirect. Do not change to strict/none — it would break the OAuth handshake.
     resp.set_cookie(_STATE_COOKIE, state, max_age=600, httponly=True,
                     secure=s.cookie_secure, samesite="lax", path="/")
     return resp
@@ -46,17 +50,25 @@ async def github_login(request: Request) -> RedirectResponse:
 
 @router.get("/callback")
 async def github_callback(
-    request: Request, code: str = "", state: str = "",
+    request: Request,
+    code: str = "",
+    state: str = "",
+    error: str = "",
     session: AsyncSession = Depends(_get_session),
 ) -> RedirectResponse:
     s = get_settings()
     cookie_state = request.cookies.get(_STATE_COOKIE)
     if not state or not cookie_state or not secrets.compare_digest(state, cookie_state):
         return RedirectResponse(url="/login?error=bad_state", status_code=302)
+    # User cancelled on GitHub, or GitHub returned an error: no usable code.
+    if error or not code:
+        resp = RedirectResponse(url="/login?error=oauth_denied", status_code=302)
+        resp.delete_cookie(_STATE_COOKIE, path="/")
+        return resp
     try:
         token = await exchange_code(code, f"{_base_url(request)}/api/auth/github/callback")
         ident = await fetch_identity(token)
-    except Exception:
+    except (httpx.HTTPError, GithubAuthError, KeyError, ValueError):
         return RedirectResponse(url="/login?error=github_failed", status_code=302)
 
     user = await resolve_github_user(session, ident)
@@ -68,8 +80,12 @@ async def github_callback(
     resp = RedirectResponse(url="/", status_code=302)
     resp.delete_cookie(_STATE_COOKIE, path="/")
     resp.set_cookie(
-        COOKIE_NAME, _get_signer().sign(user.id, user.session_version),
-        max_age=COOKIE_MAX_AGE_SECONDS, httponly=True, secure=s.cookie_secure,
-        samesite=cast(Literal["lax", "strict", "none"], s.cookie_samesite), path="/",
+        COOKIE_NAME,
+        _get_signer().sign(user.id, user.session_version),
+        max_age=COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=s.cookie_secure,
+        samesite=cast(Literal["lax", "strict", "none"], s.cookie_samesite),
+        path="/",
     )
     return resp

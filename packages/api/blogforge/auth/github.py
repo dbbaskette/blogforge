@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blogforge.config import get_settings
@@ -28,6 +29,8 @@ async def resolve_github_user(session: AsyncSession, ident: GithubIdentity) -> U
 
     1) match by github_id, 2) reject if not allowlisted, 3) adopt the existing
     admin row for the admin login, else link-by-email or create a new user.
+    Denials (not allowlisted, disabled/rejected, or a row already bound to a
+    different GitHub identity) return None WITHOUT side effects.
     """
     settings = get_settings()
     now = datetime.now(UTC)
@@ -36,11 +39,13 @@ async def resolve_github_user(session: AsyncSession, ident: GithubIdentity) -> U
         await session.execute(select(User).where(User.github_id == ident.id))
     ).scalar_one_or_none()
     if existing is not None:
+        if existing.status in ("disabled", "rejected"):
+            return None
         existing.github_login = ident.login
         existing.avatar_url = ident.avatar_url
         existing.last_login_at = now
         await session.commit()
-        return existing if existing.status not in ("disabled", "rejected") else None
+        return existing
 
     if not is_allowlisted(ident.login):
         return None
@@ -63,16 +68,31 @@ async def resolve_github_user(session: AsyncSession, ident: GithubIdentity) -> U
             await session.execute(select(User).where(User.email == ident.email.lower()))
         ).scalar_one_or_none()
 
+    # Never rebind a row already tied to a different GitHub identity, and never
+    # revive a disabled/rejected row — both deny without side effects.
+    if user is not None:
+        if user.github_id is not None and user.github_id != ident.id:
+            return None
+        if user.status in ("disabled", "rejected"):
+            return None
+
     if user is None:
-        user = User(email=(ident.email.lower() if ident.email else None), status="approved", role=role)
+        user = User(
+            email=(ident.email.lower() if ident.email else None),
+            status="approved",
+            role=role,
+        )
         session.add(user)
 
     user.github_id = ident.id
     user.github_login = ident.login
     user.avatar_url = ident.avatar_url
     user.role = role
-    if user.status not in ("disabled", "rejected"):
-        user.status = "approved"
+    user.status = "approved"
     user.last_login_at = now
-    await session.commit()
-    return user if user.status not in ("disabled", "rejected") else None
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        return None
+    return user

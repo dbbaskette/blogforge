@@ -5,10 +5,12 @@ import httpx
 
 from blogforge.auth.github import GithubIdentity
 from blogforge.config import get_settings
-from blogforge.llm.exceptions import ProviderError  # reuse a generic error type
-
 _GH = "https://github.com"
 _API = "https://api.github.com"
+
+
+class GithubAuthError(Exception):
+    """A GitHub OAuth call failed (no token, or a malformed response)."""
 
 
 async def exchange_code(code: str, redirect_uri: str) -> str:
@@ -27,7 +29,7 @@ async def exchange_code(code: str, redirect_uri: str) -> str:
     resp.raise_for_status()
     token = resp.json().get("access_token")
     if not token:
-        raise ProviderError("GitHub did not return an access token")
+        raise GithubAuthError("GitHub did not return an access token")
     return token
 
 
