@@ -45,3 +45,6 @@ e2e/test-results/
 
 # Stale artifacts from before this repo existed
 myvoice-centered-check.png
+
+# run-local.sh standalone SQLite data
+local-data/
