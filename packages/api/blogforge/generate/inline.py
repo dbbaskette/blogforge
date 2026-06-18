@@ -11,6 +11,7 @@ prose.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Literal
 
@@ -19,6 +20,14 @@ from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
 
 InlineAction = Literal["rephrase", "shorten", "expand", "fix", "custom"]
+
+# Short self-correction notes a model sometimes leaks before redoing the answer
+# ("…schedules. Wait, I need to fix the em dashes. …schedules."). When present,
+# only the text AFTER the last such note is the real final version.
+_SELF_CORRECTION_RE = re.compile(
+    r"(?i)\b(?:wait|hold on|let me|i need to|i should|on second thought|oops|"
+    r"scratch that|correction|my mistake|here'?s the (?:corrected|fixed|revised))\b"
+)
 
 _ACTION_DIRECTIVE: dict[str, str] = {
     "rephrase": (
@@ -52,12 +61,34 @@ def _build_user_prompt(text: str, action: InlineAction, instruction: str) -> str
         directive = _ACTION_DIRECTIVE[action]
     return (
         f"{directive}\n\n"
-        "Return ONLY the rewritten passage as markdown — no preamble, no "
-        "surrounding quotes, no explanation. Match the surrounding style and "
-        "stay in the author's voice. Banished words/phrases never appear.\n\n"
+        "Return ONLY the final rewritten passage as markdown — output exactly "
+        "one version and nothing else: no preamble, no surrounding quotes, no "
+        "explanation, no alternatives, and no notes about what you changed. If "
+        "you catch a mistake (e.g. an em dash), silently correct it and output "
+        "only the fixed final version — never narrate the correction. Match the "
+        "surrounding style and stay in the author's voice; banished "
+        "words/phrases (including em dashes) never appear.\n\n"
         "PASSAGE:\n"
         f"{text.strip()}"
     )
+
+
+def _clean_inline_output(text: str) -> str:
+    """Strip stray quotes and any self-correction narration a model leaks.
+
+    If the reply narrates a correction and then redoes the answer, keep only the
+    text after the last short self-correction note — that's the real output.
+    """
+    s = text.strip().strip("\"'`“”").strip()
+    sentences = re.split(r"(?<=[.!?])\s+", s)
+    last_meta = -1
+    for i, sent in enumerate(sentences):
+        # A self-correction note is short and contains a meta marker.
+        if len(sent) < 80 and _SELF_CORRECTION_RE.search(sent):
+            last_meta = i
+    if 0 <= last_meta < len(sentences) - 1:
+        s = " ".join(sentences[last_meta + 1 :]).strip()
+    return s.strip("\"'`“”").strip()
 
 
 async def transform_text(
@@ -85,4 +116,4 @@ async def transform_text(
     user = _build_user_prompt(text, action, instruction)
     full_prompt = f"{system}\n\n---\n\n{user}"
     resp = await provider.complete(model=model, prompt=full_prompt)
-    return resp.text.strip()
+    return _clean_inline_output(resp.text)
