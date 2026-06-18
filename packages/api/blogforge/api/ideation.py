@@ -10,6 +10,7 @@ import asyncio
 import secrets
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 from uuid import UUID
 
 import yaml
@@ -41,6 +42,9 @@ _in_flight_lock = asyncio.Lock()
 
 class _MessageBody(BaseModel):
     content: str = Field(min_length=1, max_length=10_000)
+    # "ideate" (default): collaborative, author-led. "interview": AI-led, asks
+    # one question at a time and proposes an outline only once it has enough.
+    mode: Literal["ideate", "interview"] = "ideate"
 
 
 async def _try_claim(draft_id: str) -> bool:
@@ -163,6 +167,7 @@ async def post_ideation_message(
         draft.idea.model,
         current.id,
         next_pos + 1,  # assistant message position
+        body.mode,
     )
     return {"job_id": job.id}
 
@@ -179,6 +184,7 @@ async def _run_ideation(
     model: str,
     user_id: UUID,
     assistant_position: int,
+    mode: str = "ideate",
 ) -> None:
     cancel_evt = reg.cancellation_event(job_id)
     try:
@@ -207,6 +213,7 @@ async def _run_ideation(
                 model=model,
                 pack_root=pack_root,
                 manifest=manifest,
+                mode=mode,
             ):
                 if cancel_evt.is_set():
                     return

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Draft, OutlineProposal } from "../../api/drafts";
 import {
   type IdeationMessage,
+  type IdeationMode,
   acceptIdeation,
   listIdeation,
   postIdeationMessage,
@@ -40,6 +41,8 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
   const [streaming, setStreaming] = useState(false);
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "ideate": you lead the chat. "interview": the AI asks you questions.
+  const [mode, setMode] = useState<IdeationMode>("ideate");
 
   const reload = useCallback(async (): Promise<void> => {
     try {
@@ -103,27 +106,40 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
   );
   useStreamJob(jobId, stableHandlers);
 
+  const send = useCallback(
+    async (text: string, sendMode: IdeationMode): Promise<void> => {
+      if (!text.trim() || streaming) return;
+      setError(null);
+      // Optimistically append the user bubble immediately.
+      setMessages((cur) => [
+        ...cur,
+        { id: `__pending__-${cur.length}`, role: "user", content: text, proposed_outline: null },
+      ]);
+      setStreaming(true);
+      try {
+        const { job_id } = await postIdeationMessage(draft.id, text, sendMode);
+        setJobId(job_id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        setStreaming(false);
+        // Roll back: refetch from server so optimistic state is replaced with truth.
+        void reload();
+      }
+    },
+    [draft.id, reload, streaming],
+  );
+
   const handleSend = useCallback(async (): Promise<void> => {
     const text = composer.trim();
     if (!text || streaming) return;
-    setError(null);
     setComposer("");
-    // Optimistically append the user bubble immediately.
-    setMessages((cur) => [
-      ...cur,
-      { id: `__pending__-${cur.length}`, role: "user", content: text, proposed_outline: null },
-    ]);
-    setStreaming(true);
-    try {
-      const { job_id } = await postIdeationMessage(draft.id, text);
-      setJobId(job_id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setStreaming(false);
-      // Roll back: refetch from server so optimistic state is replaced with truth.
-      void reload();
-    }
-  }, [composer, draft.id, reload, streaming]);
+    await send(text, mode);
+  }, [composer, mode, send, streaming]);
+
+  const startInterview = useCallback((): void => {
+    setMode("interview");
+    void send("Interview me about this piece — ask me your first question.", "interview");
+  }, [send]);
 
   const handleAccept = useCallback(async (): Promise<void> => {
     if (accepting) return;
@@ -151,28 +167,66 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
   return (
     <section className="space-y-4 animate-fade-up">
       <header className="nb-card p-6">
-        <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600 mb-2">
-          Step 1 · Research
-        </p>
-        <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">
-          Talk it through.
-        </h2>
-        <p className="text-sm text-muted mt-1.5 leading-relaxed">
-          Add references on the right, chat to refine the angle, then accept the outline that feels
-          right.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600 mb-2">
+              Step 1 · Research
+            </p>
+            <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">
+              {mode === "interview" ? "Let me interview you." : "Talk it through."}
+            </h2>
+            <p className="text-sm text-muted mt-1.5 leading-relaxed">
+              {mode === "interview"
+                ? "I'll ask one question at a time and draft an outline once I have enough."
+                : "Add references on the right, chat to refine the angle, then accept the outline that feels right."}
+            </p>
+          </div>
+          <div className="flex rounded-nb-sm border border-rule overflow-hidden text-xs shrink-0">
+            <button
+              type="button"
+              onClick={() => setMode("ideate")}
+              className={`px-3 py-1.5 ${mode === "ideate" ? "bg-cobalt-50 text-cobalt-800 font-medium" : "bg-card text-muted hover:text-ink"}`}
+              aria-pressed={mode === "ideate"}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("interview")}
+              className={`px-3 py-1.5 border-l border-rule ${mode === "interview" ? "bg-cobalt-50 text-cobalt-800 font-medium" : "bg-card text-muted hover:text-ink"}`}
+              aria-pressed={mode === "interview"}
+            >
+              Interview me
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
         {/* LEFT — chat */}
         <div className="nb-card p-5 flex flex-col min-h-[420px]">
           <ol className="flex-1 space-y-3 mb-4 overflow-y-auto" aria-label="Ideation transcript">
-            {messages.length === 0 && (
-              <li className="text-sm text-muted italic">
-                Start by describing what you want to write. BlogForge will propose an outline once
-                it has enough to work with.
-              </li>
-            )}
+            {messages.length === 0 &&
+              (mode === "interview" ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={startInterview}
+                    disabled={streaming}
+                    className="nb-btn nb-btn-primary nb-btn-sm"
+                  >
+                    Start the interview →
+                  </button>
+                  <p className="text-xs text-muted italic mt-2">
+                    I'll ask you questions one at a time, then propose an outline to react to.
+                  </p>
+                </li>
+              ) : (
+                <li className="text-sm text-muted italic">
+                  Start by describing what you want to write. BlogForge will propose an outline once
+                  it has enough to work with.
+                </li>
+              ))}
             {messages.map((m) => (
               <li
                 key={m.id}
@@ -211,7 +265,11 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
                   void handleSend();
                 }
               }}
-              placeholder="Describe your angle, or ask for an outline…"
+              placeholder={
+                mode === "interview"
+                  ? "Answer the question…"
+                  : "Describe your angle, or ask for an outline…"
+              }
               rows={2}
               className="nb-textarea text-sm"
               aria-label="Message BlogForge"

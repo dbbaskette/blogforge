@@ -92,7 +92,7 @@ describe("ResearchPanel", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /^Send$/ }));
     await waitFor(() =>
-      expect(ide.postIdeationMessage).toHaveBeenCalledWith("d1", "What do you think?"),
+      expect(ide.postIdeationMessage).toHaveBeenCalledWith("d1", "What do you think?", "ideate"),
     );
   });
 

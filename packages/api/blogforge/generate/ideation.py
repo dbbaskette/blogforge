@@ -61,6 +61,35 @@ in response to feedback ("shorter", "add a section on X", "make 3
 punchier", "start with a different hook").
 """
 
+INTERVIEW_SYSTEM_BLOCK = """\
+You are interviewing the author to draw a long-form piece OUT of them, in their
+voice (defined above by ROLE / Humanizer / style guide). They want you to lead:
+you ask, they answer.
+
+How to run the interview:
+- Ask EXACTLY ONE focused question per reply. Keep it short and concrete.
+- Start broad (what's the piece about, who is it for, why now), then go deeper
+  (the central claim, the strongest concrete example, the objection to address,
+  the takeaway you want to leave them with).
+- Build on what they just said — react like a sharp editor, not a form.
+- Do NOT write the piece, and do NOT propose an outline while you are still
+  learning. Emit NO JSON during the interview.
+- After roughly 4–7 exchanges, once you understand the topic, angle, audience,
+  the central argument, and at least one concrete example, say so in one line
+  ("I think I've got enough — here's an outline to react to:") and ONLY THEN
+  include a JSON block matching the OutlineProposal schema, fenced with ```json:
+     - opening_hook: one sentence that opens the piece
+     - sections: each with `id` (slug), `title`, `brief`
+     - estimated_words: integer
+  The outline must describe ONE continuous argument (problem → complication →
+  mechanism → implication → resolution), with no two sections making the same
+  point — the same outline rules as a normal proposal.
+
+If the author has shared reference materials (under "## Reference Materials"
+above), let them inform your questions. Stay in the author's voice; banished
+words / phrases never appear.
+"""
+
 
 def _seed_user_message(draft: Draft) -> str:
     """Bootstrap message for the very first ideation turn.
@@ -173,6 +202,7 @@ async def stream_ideation(
     model: str,
     pack_root: Path | None,
     manifest: dict[str, Any],
+    mode: str = "ideate",
 ) -> AsyncIterator[IdeationEvent]:
     """Stream the assistant's reply.
 
@@ -193,7 +223,8 @@ async def stream_ideation(
     else:
         system = ""
 
-    system = f"{system}\n\n---\n\n{IDEATION_SYSTEM_BLOCK}" if system else IDEATION_SYSTEM_BLOCK
+    block = INTERVIEW_SYSTEM_BLOCK if mode == "interview" else IDEATION_SYSTEM_BLOCK
+    system = f"{system}\n\n---\n\n{block}" if system else block
     user = build_ideation_prompt(
         draft,
         new_user_content=new_user_content,
