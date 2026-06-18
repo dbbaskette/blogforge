@@ -59,8 +59,8 @@ export function WorkspaceFooter({
         <button type="button" onClick={onRepurpose} className="nb-btn nb-btn-sm">
           Repurpose
         </button>
-        <button type="button" onClick={onLint} className="nb-btn nb-btn-sm">
-          Lint
+        <button type="button" onClick={onLint} className="nb-btn nb-btn-primary nb-btn-sm">
+          Review
         </button>
       </footer>
     </div>

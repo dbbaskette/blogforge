@@ -326,3 +326,14 @@ body {
 input[type="range"] {
   accent-color: #2f6bff;
 }
+
+/* Proofreader: transient flash when jumping to a flagged section */
+@keyframes lint-flash {
+  0% { box-shadow: 0 0 0 3px rgba(47, 107, 255, 0); }
+  20% { box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.45); }
+  100% { box-shadow: 0 0 0 3px rgba(47, 107, 255, 0); }
+}
+.lint-flash {
+  animation: lint-flash 1.4s ease-out;
+  border-radius: 12px;
+}

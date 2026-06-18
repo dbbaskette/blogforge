@@ -189,9 +189,23 @@ export function downloadDraftUrl(
   const qs = params.toString();
   return `/api/drafts/${encodeURIComponent(id)}/download${qs ? `?${qs}` : ""}`;
 }
+export interface LintFinding {
+  /** Stable key used for dismissal persistence + React keys. */
+  id: string;
+  kind: "violation" | "repetition" | "hit";
+  /** Section the finding lives in (null only if it couldn't be located). */
+  section_id: string | null;
+  /** Section-local UTF-16 offsets of the flagged span (null if unlocated). */
+  start: number | null;
+  end: number | null;
+  /** Exact flagged text — used to highlight and to seed the AI fix. */
+  match: string;
+  rule: string;
+  message: string;
+}
 export async function lintDraft(
   id: string,
-): Promise<{ violations: unknown[]; hits: unknown[]; repetitions: unknown[] }> {
+): Promise<{ violations: LintFinding[]; hits: LintFinding[]; repetitions: LintFinding[] }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
 }
 
