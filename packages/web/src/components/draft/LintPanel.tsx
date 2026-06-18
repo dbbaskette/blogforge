@@ -60,6 +60,9 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimsError, setClaimsError] = useState<string | null>(null);
   const [hasRefs, setHasRefs] = useState(true);
+  // Findings the user just accepted/applied — hidden immediately so the list
+  // clears as you go; reset whenever a fresh lint replaces the truth.
+  const [resolved, setResolved] = useState<Set<string>>(new Set());
 
   const runLint = useCallback(() => {
     setLoading(true);
@@ -68,6 +71,7 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
         setViolations(r.violations);
         setRepetitions(r.repetitions ?? []);
         setHits(r.hits);
+        setResolved(new Set());
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -82,7 +86,7 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
     () => [...violations, ...repetitions],
     [violations, repetitions],
   );
-  const visible = actionable.filter((f) => !dismissed.has(f.id));
+  const visible = actionable.filter((f) => !dismissed.has(f.id) && !resolved.has(f.id));
   const hiddenCount = actionable.length - visible.length;
 
   const runClaims = async (): Promise<void> => {
@@ -150,6 +154,7 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
                   onSectionSave={onSectionSave}
                   onDismiss={() => onDismiss(f.id)}
                   onApplied={runLint}
+                  onResolved={() => setResolved((p) => new Set(p).add(f.id))}
                 />
               ))}
             </ul>
@@ -229,12 +234,14 @@ function FindingCard({
   onSectionSave,
   onDismiss,
   onApplied,
+  onResolved,
 }: {
   finding: LintFinding;
   draft: Draft;
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onDismiss: () => void;
   onApplied: () => void;
+  onResolved: () => void;
 }): JSX.Element {
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -292,7 +299,8 @@ function FindingCard({
         section.content_md.slice(0, span.s) + suggestion + section.content_md.slice(span.e);
       await onSectionSave(section.id, next);
       setSuggestion(null);
-      onApplied();
+      onResolved(); // remove this finding from the list right away
+      onApplied(); // re-lint to refresh the rest
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
