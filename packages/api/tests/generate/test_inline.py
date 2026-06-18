@@ -60,7 +60,7 @@ def test_build_user_prompt_embeds_passage_and_action() -> None:
     prompt = _build_user_prompt("the quick brown fox", "shorten", "")
     assert "the quick brown fox" in prompt
     assert "fewer words" in prompt  # the 'shorten' directive
-    assert "Return ONLY the rewritten passage" in prompt
+    assert "Return ONLY the final rewritten passage" in prompt
 
 
 def test_build_user_prompt_custom_uses_instruction() -> None:
