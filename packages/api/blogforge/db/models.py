@@ -302,6 +302,11 @@ class VoiceProfile(Base):
         cascade="all, delete-orphan",
         order_by="VoiceSample.added_at",
     )
+    sources: Mapped[list["VoiceSource"]] = relationship(
+        back_populates="profile",
+        cascade="all, delete-orphan",
+        order_by="VoiceSource.added_at",
+    )
 
 
 class VoiceSample(Base):
@@ -328,3 +333,29 @@ class VoiceSample(Base):
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     profile: Mapped["VoiceProfile"] = relationship(back_populates="samples")
+
+
+class VoiceSource(Base):
+    """A background/context source URL attached to a VoiceProfile.
+
+    Sources supply factual grounding (product info, terminology) for generation.
+    Kept separate from VoiceSample so sources never pollute style distillation.
+    """
+
+    __tablename__ = "voice_sources"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
+    profile_id: Mapped[UUID] = mapped_column(
+        Uuid,
+        ForeignKey("voice_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    url: Mapped[str] = mapped_column(String(2000), nullable=False)
+    name: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    s3_key: Mapped[str] = mapped_column(String(400), nullable=False)
+    extracted_chars: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="ready")
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    profile: Mapped["VoiceProfile"] = relationship(back_populates="sources")

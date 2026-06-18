@@ -1,50 +1,89 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { type ClaimResult, checkClaims, lintDraft } from "../../api/drafts";
+import {
+  type ClaimResult,
+  type Draft,
+  type LintFinding,
+  checkClaims,
+  inlineEdit,
+  lintDraft,
+} from "../../api/drafts";
+import { dismiss as dismissFinding, loadDismissed, restore } from "../../lib/lintDismissals";
 import { Icon } from "../ui/Icon";
 
-interface LintItem {
-  text?: string;
-  message?: string;
-  rule?: string;
-  [key: string]: unknown;
-}
-
 interface LintPanelProps {
-  draftId: string;
+  draft: Draft;
+  /** Persist a section's new markdown (applies an accepted fix). */
+  onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   onClose: () => void;
 }
 
-function itemKey(item: LintItem, prefix: string, idx: number): string {
-  const hint = item.rule ?? item.message ?? item.text ?? String(idx);
-  return `${prefix}-${idx}-${hint}`;
+/** Expand [start,end) to its enclosing sentence so the AI rewrites with context. */
+function enclosingSpan(text: string, start: number, end: number): { s: number; e: number } {
+  const boundary = (c: string): boolean => c === "." || c === "!" || c === "?" || c === "\n";
+  let s = start;
+  while (s > 0 && !boundary(text[s - 1])) s--;
+  while (s < start && /\s/.test(text[s])) s++;
+  let e = end;
+  while (e < text.length && !boundary(text[e])) e++;
+  if (e < text.length) e++; // include the closing punctuation
+  return { s, e };
 }
 
-export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
-  const [loading, setLoading] = useState(true);
-  const [violations, setViolations] = useState<LintItem[]>([]);
-  const [repetitions, setRepetitions] = useState<LintItem[]>([]);
-  const [hits, setHits] = useState<LintItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+/** Scroll the editor to a section and flash it. */
+function jumpToSection(sectionId: string): void {
+  const el = document.getElementById(`section-${sectionId}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  el.classList.add("lint-flash");
+  window.setTimeout(() => el.classList.remove("lint-flash"), 1600);
+}
 
-  // Claims are an LLM call (unlike the fast rule-based lint above), so they
-  // run on demand — not on every panel open.
+const FIX_INSTRUCTION: Record<string, string> = {
+  violation:
+    "Rewrite this sentence to avoid the flagged wording while keeping the meaning and the author's voice. Return only the rewritten sentence.",
+  repetition:
+    "Rewrite this sentence to remove the repeated phrasing while keeping the meaning and voice. Return only the rewritten sentence.",
+};
+
+export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JSX.Element {
+  const draftId = draft.id;
+  const [loading, setLoading] = useState(true);
+  const [violations, setViolations] = useState<LintFinding[]>([]);
+  const [repetitions, setRepetitions] = useState<LintFinding[]>([]);
+  const [hits, setHits] = useState<LintFinding[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed(draftId));
+  const [showDismissed, setShowDismissed] = useState(false);
+
   const [claims, setClaims] = useState<ClaimResult[] | null>(null);
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimsError, setClaimsError] = useState<string | null>(null);
   const [hasRefs, setHasRefs] = useState(true);
 
-  useEffect(() => {
+  const runLint = useCallback(() => {
     setLoading(true);
     lintDraft(draftId)
-      .then((result) => {
-        setViolations(result.violations as LintItem[]);
-        setRepetitions((result.repetitions ?? []) as LintItem[]);
-        setHits(result.hits as LintItem[]);
+      .then((r) => {
+        setViolations(r.violations);
+        setRepetitions(r.repetitions ?? []);
+        setHits(r.hits);
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [draftId]);
+
+  useEffect(() => runLint(), [runLint]);
+
+  const onDismiss = (id: string): void => setDismissed(dismissFinding(draftId, id));
+  const onRestore = (id: string): void => setDismissed(restore(draftId, id));
+
+  const actionable = useMemo(
+    () => [...violations, ...repetitions],
+    [violations, repetitions],
+  );
+  const visible = actionable.filter((f) => !dismissed.has(f.id));
+  const hiddenCount = actionable.length - visible.length;
 
   const runClaims = async (): Promise<void> => {
     setClaimsLoading(true);
@@ -61,243 +100,326 @@ export function LintPanel({ draftId, onClose }: LintPanelProps): JSX.Element {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex justify-end bg-ink/30 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
-      role="presentation"
+    <aside
+      className="fixed right-0 top-0 z-30 h-full w-[420px] max-w-full overflow-y-auto glass-card border-l border-rule shadow-glass-lg animate-slide-in-right"
+      aria-label="Proofreader"
     >
-      <dialog
-        open
-        className="w-[440px] max-w-full bg-canvas border-l border-rule-2 h-full overflow-y-auto shadow-nb-pop m-0 p-0 text-ink animate-slide-in-right"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        aria-label="Lint results"
-      >
-        <header className="px-6 pt-6 pb-4 border-b border-rule bg-white sticky top-0 z-10">
-          <div className="flex items-baseline justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600">
-              Proofreader
-            </p>
+      <header className="px-6 pt-6 pb-4 border-b border-rule glass-bar sticky top-0 z-10">
+        <div className="flex items-baseline justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600">
+            Proofreader
+          </p>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={runLint} className="nb-btn nb-btn-ghost nb-btn-sm" disabled={loading}>
+              {loading ? "Linting…" : "Re-lint"}
+            </button>
             <button type="button" onClick={onClose} className="nb-icon-btn" aria-label="Close">
               <Icon name="x" size={16} title="" />
             </button>
           </div>
-          <h2 className="font-serif text-2xl font-medium text-ink tracking-tight mt-1">
-            Lint results
-          </h2>
-        </header>
+        </div>
+        <h2 className="font-serif text-2xl font-medium text-ink tracking-tight mt-1">
+          Review {visible.length > 0 && <span className="text-coral">· {visible.length}</span>}
+        </h2>
+      </header>
 
-        {loading && <p className="px-6 py-12 text-center text-sm text-muted">Running lint…</p>}
+      {error && (
+        <div
+          className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm"
+          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
+        >
+          {error}
+        </div>
+      )}
 
-        {error && (
-          <div
-            className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm"
-            style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
-          >
-            {error}
-          </div>
-        )}
+      {!error && (
+        <div className="p-6 space-y-4">
+          {loading && visible.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted">Running lint…</p>
+          ) : visible.length === 0 ? (
+            <p className="text-sm text-muted italic font-serif py-6 text-center">
+              Nothing flagged — clean copy.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {visible.map((f) => (
+                <FindingCard
+                  key={f.id}
+                  finding={f}
+                  draft={draft}
+                  onSectionSave={onSectionSave}
+                  onDismiss={() => onDismiss(f.id)}
+                  onApplied={runLint}
+                />
+              ))}
+            </ul>
+          )}
 
-        {!loading && !error && (
-          <div className="p-6 space-y-6">
-            <section>
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className="font-serif text-lg font-medium text-ink tracking-tight">
-                  Violations
-                </h3>
-                <span
-                  className="nb-pill"
-                  style={{
-                    background: violations.length === 0 ? "#e3f5ec" : "#fde7e2",
-                    color: violations.length === 0 ? "#0e7a50" : "#b5321b",
-                  }}
-                >
-                  {violations.length.toString().padStart(2, "0")}
-                </span>
-              </div>
-              {violations.length === 0 ? (
-                <p className="text-sm text-muted italic font-serif">Clean copy.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {violations.map((v, i) => (
-                    <li
-                      key={itemKey(v, "violation", i)}
-                      className="nb-card p-3 text-sm"
-                      style={{ borderColor: "#f7c3b6" }}
-                    >
-                      {v.rule && (
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-rose mr-2">
-                          [{v.rule}]
-                        </span>
-                      )}
-                      <span className="text-ink-2">{v.message ?? v.text ?? JSON.stringify(v)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <hr className="nb-rule" />
-
-            <section>
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className="font-serif text-lg font-medium text-ink tracking-tight">
-                  Repetition
-                </h3>
-                <span
-                  className="nb-pill"
-                  style={{
-                    background: repetitions.length === 0 ? "#e3f5ec" : "#fbf1de",
-                    color: repetitions.length === 0 ? "#0e7a50" : "#92600a",
-                  }}
-                >
-                  {repetitions.length.toString().padStart(2, "0")}
-                </span>
-              </div>
-              {repetitions.length === 0 ? (
-                <p className="text-sm text-muted italic font-serif">
-                  No recycled phrasing across sections.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {repetitions.map((r, i) => (
-                    <li
-                      key={itemKey(r, "rep", i)}
-                      className="nb-card p-3 text-sm"
-                      style={{ borderColor: "#f3d89b" }}
-                    >
-                      {r.rule && (
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-amber-ink mr-2">
-                          [{r.rule}]
-                        </span>
-                      )}
-                      <span className="text-ink-2">{r.message ?? r.text ?? JSON.stringify(r)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <hr className="nb-rule" />
-
-            <section>
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className="font-serif text-lg font-medium text-ink tracking-tight">
-                  Positive hits
-                </h3>
-                <span className="nb-pill nb-pill-ready">
-                  {hits.length.toString().padStart(2, "0")}
-                </span>
-              </div>
-              {hits.length === 0 ? (
-                <p className="text-sm text-muted italic font-serif">No positive style hits.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {hits.map((h, i) => (
-                    <li
-                      key={itemKey(h, "hit", i)}
-                      className="nb-card p-3 text-sm"
-                      style={{ borderColor: "#c2e6d2" }}
-                    >
-                      {h.rule && (
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-leaf mr-2">
-                          [{h.rule}]
-                        </span>
-                      )}
-                      <span className="text-ink-2">{h.message ?? h.text ?? JSON.stringify(h)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <hr className="nb-rule" />
-
-            <section>
-              <div className="flex items-baseline justify-between mb-1">
-                <h3 className="font-serif text-lg font-medium text-ink tracking-tight">
-                  Fact-check
-                </h3>
-                {claims !== null && (
-                  <span
-                    className="nb-pill"
-                    style={{
-                      background: claims.some((c) => c.status !== "supported")
-                        ? "#fbf1de"
-                        : "#e3f5ec",
-                      color: claims.some((c) => c.status !== "supported") ? "#92600a" : "#0e7a50",
-                    }}
-                  >
-                    {claims.filter((c) => c.status !== "supported").length.toString().padStart(2, "0")}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted mb-3">
-                Checks the draft's factual claims against your attached references.
-              </p>
-              {claimsError && (
-                <p className="text-sm text-rose-ink mb-2">{claimsError}</p>
-              )}
-              {claims === null ? (
-                <button
-                  type="button"
-                  onClick={runClaims}
-                  disabled={claimsLoading}
-                  className="nb-btn nb-btn-sm"
-                >
-                  {claimsLoading ? "Checking…" : "Check claims"}
-                </button>
-              ) : (
-                <>
-                  {!hasRefs && (
-                    <p
-                      className="text-xs px-3 py-2 rounded-nb-sm mb-2"
-                      style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
-                    >
-                      No references attached — every claim is flagged as needing a source. Add
-                      references to verify against them.
-                    </p>
-                  )}
-                  {claims.length === 0 ? (
-                    <p className="text-sm text-muted italic font-serif">No checkable claims found.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {claims.map((c, i) => (
-                        <li
-                          key={`claim-${i}-${c.text.slice(0, 24)}`}
-                          className="nb-card p-3 text-sm"
-                          style={{ borderColor: CLAIM_BORDER[c.status] }}
+          {hiddenCount > 0 && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDismissed((v) => !v)}
+                className="text-xs font-medium text-muted hover:text-ink underline underline-offset-2"
+              >
+                {showDismissed ? "Hide" : "Show"} dismissed ({hiddenCount})
+              </button>
+              {showDismissed && (
+                <ul className="mt-2 space-y-1.5">
+                  {actionable
+                    .filter((f) => dismissed.has(f.id))
+                    .map((f) => (
+                      <li key={f.id} className="flex items-center gap-2 text-xs text-muted">
+                        <span className="truncate flex-1">{f.message}</span>
+                        <button
+                          type="button"
+                          onClick={() => onRestore(f.id)}
+                          className="text-cobalt-600 hover:text-cobalt-700 shrink-0"
                         >
-                          <span
-                            className="font-mono text-[10px] uppercase tracking-wider mr-2"
-                            style={{ color: CLAIM_COLOR[c.status] }}
-                          >
-                            [{c.status}]
-                          </span>
-                          <span className="text-ink-2">{c.text}</span>
-                          {c.note && <p className="text-xs text-muted mt-1">{c.note}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <button
-                    type="button"
-                    onClick={runClaims}
-                    disabled={claimsLoading}
-                    className="nb-btn nb-btn-ghost nb-btn-sm mt-2"
-                  >
-                    {claimsLoading ? "Checking…" : "Re-check"}
-                  </button>
-                </>
+                          restore
+                        </button>
+                      </li>
+                    ))}
+                </ul>
               )}
-            </section>
+            </div>
+          )}
+
+          {hits.length > 0 && (
+            <details className="pt-2">
+              <summary className="text-xs font-semibold uppercase tracking-wider text-green-ink cursor-pointer">
+                Positive hits ({hits.length})
+              </summary>
+              <ul className="mt-2 space-y-1.5">
+                {hits.map((h) => (
+                  <li key={h.id} className="text-xs text-ink-2">
+                    {h.section_id && (
+                      <button
+                        type="button"
+                        onClick={() => h.section_id && jumpToSection(h.section_id)}
+                        className="text-cobalt-600 hover:text-cobalt-700 mr-1"
+                      >
+                        ↪
+                      </button>
+                    )}
+                    {h.message}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+
+          <hr className="nb-rule" />
+          <FactCheck
+            claims={claims}
+            loading={claimsLoading}
+            error={claimsError}
+            hasRefs={hasRefs}
+            onRun={runClaims}
+          />
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function FindingCard({
+  finding,
+  draft,
+  onSectionSave,
+  onDismiss,
+  onApplied,
+}: {
+  finding: LintFinding;
+  draft: Draft;
+  onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
+  onDismiss: () => void;
+  onApplied: () => void;
+}): JSX.Element {
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const section = draft.sections.find((s) => s.id === finding.section_id);
+  const accent =
+    finding.kind === "violation"
+      ? { border: "#f7c3b6", tag: "#b5321b" }
+      : { border: "#f3d89b", tag: "#92600a" };
+
+  // Locate the span in the current section content; null if it drifted.
+  const locate = (): { s: number; e: number } | null => {
+    if (!section) return null;
+    const c = section.content_md;
+    if (
+      finding.start != null &&
+      finding.end != null &&
+      c.slice(finding.start, finding.end) === finding.match
+    ) {
+      return { s: finding.start, e: finding.end };
+    }
+    const idx = c.indexOf(finding.match);
+    return idx >= 0 ? { s: idx, e: idx + finding.match.length } : null;
+  };
+  const located = section ? locate() : null;
+
+  const aiFix = async (): Promise<void> => {
+    if (!section || !located) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const span = enclosingSpan(section.content_md, located.s, located.e);
+      const sentence = section.content_md.slice(span.s, span.e);
+      const { text } = await inlineEdit(draft.id, {
+        text: sentence,
+        action: "custom", // custom honors `instruction`; preset actions ignore it
+        instruction: FIX_INSTRUCTION[finding.kind] ?? FIX_INSTRUCTION.violation,
+      });
+      setSuggestion(text.trim());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const accept = async (): Promise<void> => {
+    if (!section || !located || suggestion == null) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const span = enclosingSpan(section.content_md, located.s, located.e);
+      const next =
+        section.content_md.slice(0, span.s) + suggestion + section.content_md.slice(span.e);
+      await onSectionSave(section.id, next);
+      setSuggestion(null);
+      onApplied();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="nb-card p-3 text-sm" style={{ borderLeft: `3px solid ${accent.border}` }}>
+      <p className="text-ink-2 leading-snug">{finding.message}</p>
+      {finding.match && (
+        <p className="mt-1 font-mono text-[12px] text-muted truncate" title={finding.match}>
+          “{finding.match}”
+        </p>
+      )}
+
+      {suggestion != null ? (
+        <div className="mt-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-cobalt-600 mb-1">
+            Suggested rewrite
+          </p>
+          <p className="font-serif text-[14px] text-ink bg-cobalt-50/60 rounded-nb-sm px-2.5 py-2 leading-snug">
+            {suggestion}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={accept} disabled={busy} className="nb-btn nb-btn-primary nb-btn-sm">
+              {busy ? "Applying…" : "Accept"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSuggestion(null)}
+              disabled={busy}
+              className="nb-btn nb-btn-ghost nb-btn-sm"
+            >
+              Cancel
+            </button>
           </div>
-        )}
-      </dialog>
-    </div>
+        </div>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => finding.section_id && jumpToSection(finding.section_id)}
+            disabled={!finding.section_id}
+            className="nb-btn nb-btn-ghost nb-btn-sm"
+          >
+            Jump
+          </button>
+          <button
+            type="button"
+            onClick={aiFix}
+            disabled={busy || !located}
+            className="nb-btn nb-btn-sm"
+            title={!located ? "Text changed — re-lint to refresh" : undefined}
+          >
+            {busy ? "Thinking…" : "AI fix"}
+          </button>
+          <button type="button" onClick={onDismiss} className="nb-btn nb-btn-ghost nb-btn-sm">
+            Leave it
+          </button>
+        </div>
+      )}
+      {err && <p className="mt-1.5 text-xs text-coral">{err}</p>}
+    </li>
+  );
+}
+
+function FactCheck({
+  claims,
+  loading,
+  error,
+  hasRefs,
+  onRun,
+}: {
+  claims: ClaimResult[] | null;
+  loading: boolean;
+  error: string | null;
+  hasRefs: boolean;
+  onRun: () => void;
+}): JSX.Element {
+  return (
+    <section>
+      <h3 className="font-serif text-lg font-medium text-ink tracking-tight">Fact-check</h3>
+      <p className="text-xs text-muted mb-3">Checks the draft's claims against your references.</p>
+      {error && <p className="text-sm text-coral mb-2">{error}</p>}
+      {claims === null ? (
+        <button type="button" onClick={onRun} disabled={loading} className="nb-btn nb-btn-sm">
+          {loading ? "Checking…" : "Check claims"}
+        </button>
+      ) : (
+        <>
+          {!hasRefs && (
+            <p
+              className="text-xs px-3 py-2 rounded-nb-sm mb-2"
+              style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
+            >
+              No references attached — every claim is flagged as needing a source.
+            </p>
+          )}
+          {claims.length === 0 ? (
+            <p className="text-sm text-muted italic font-serif">No checkable claims found.</p>
+          ) : (
+            <ul className="space-y-2">
+              {claims.map((c, i) => (
+                <li
+                  key={`claim-${i}-${c.text.slice(0, 24)}`}
+                  className="nb-card p-3 text-sm"
+                  style={{ borderColor: CLAIM_BORDER[c.status] }}
+                >
+                  <span
+                    className="font-mono text-[10px] uppercase tracking-wider mr-2"
+                    style={{ color: CLAIM_COLOR[c.status] }}
+                  >
+                    [{c.status}]
+                  </span>
+                  <span className="text-ink-2">{c.text}</span>
+                  {c.note && <p className="text-xs text-muted mt-1">{c.note}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" onClick={onRun} disabled={loading} className="nb-btn nb-btn-ghost nb-btn-sm mt-2">
+            {loading ? "Checking…" : "Re-check"}
+          </button>
+        </>
+      )}
+    </section>
   );
 }
 

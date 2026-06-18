@@ -17,11 +17,24 @@ from sqlalchemy import select
 from blogforge.db.engine import get_sessionmaker
 from blogforge.db.models import VoiceProfile as VoiceProfileRow
 from blogforge.db.models import VoiceSample as VoiceSampleRow
-from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample
+from blogforge.db.models import VoiceSource as VoiceSourceRow
+from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample, VoiceSource
 
 # ---------------------------------------------------------------------------
 # Row → Pydantic mappers
 # ---------------------------------------------------------------------------
+
+def _source_from_row(row: VoiceSourceRow) -> VoiceSource:
+    return VoiceSource(
+        id=str(row.id),
+        url=row.url,
+        name=row.name,
+        s3_key=row.s3_key,
+        extracted_chars=row.extracted_chars,
+        status=row.status,  # type: ignore[arg-type]
+        added_at=row.added_at,
+    )
+
 
 def _sample_from_row(row: VoiceSampleRow) -> VoiceSample:
     return VoiceSample(
@@ -232,6 +245,95 @@ class SqlVoiceStore:
             if sample_row is None:
                 return
             await session.delete(sample_row)
+            row.version += 1
+            row.updated_at = _now()
+            await session.commit()
+
+    async def add_source(
+        self,
+        user_id: UUID,
+        *,
+        url: str,
+        name: str,
+        s3_key: str,
+        extracted_chars: int = 0,
+        status: str = "ready",
+    ) -> VoiceSource:
+        """Insert a background source on the user's profile; bump profile version."""
+        async with get_sessionmaker()() as session:
+            # Ensure profile exists
+            row = (
+                await session.execute(
+                    select(VoiceProfileRow).where(VoiceProfileRow.user_id == user_id)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                row = VoiceProfileRow(user_id=user_id)
+                session.add(row)
+                await session.flush()
+
+            source_row = VoiceSourceRow(
+                profile_id=row.id,
+                url=url,
+                name=name,
+                s3_key=s3_key,
+                extracted_chars=extracted_chars,
+                status=status,
+            )
+            session.add(source_row)
+
+            row.version += 1
+            row.updated_at = _now()
+
+            await session.commit()
+            await session.refresh(source_row)
+            return _source_from_row(source_row)
+
+    async def list_sources(self, user_id: UUID) -> list[VoiceSource]:
+        """Return all sources for the user's profile, ordered by added_at."""
+        async with get_sessionmaker()() as session:
+            profile_row = (
+                await session.execute(
+                    select(VoiceProfileRow).where(VoiceProfileRow.user_id == user_id)
+                )
+            ).scalar_one_or_none()
+            if profile_row is None:
+                return []
+            rows = (
+                await session.execute(
+                    select(VoiceSourceRow)
+                    .where(VoiceSourceRow.profile_id == profile_row.id)
+                    .order_by(VoiceSourceRow.added_at)
+                )
+            ).scalars().all()
+            return [_source_from_row(r) for r in rows]
+
+    async def delete_source(self, user_id: UUID, source_id: str) -> None:
+        """Delete a source belonging to the user's profile; bump version."""
+        try:
+            source_uuid = UUID(source_id)
+        except ValueError:
+            return
+        async with get_sessionmaker()() as session:
+            # Load profile to scope by user
+            row = (
+                await session.execute(
+                    select(VoiceProfileRow).where(VoiceProfileRow.user_id == user_id)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return
+            source_row = (
+                await session.execute(
+                    select(VoiceSourceRow).where(
+                        VoiceSourceRow.id == source_uuid,
+                        VoiceSourceRow.profile_id == row.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if source_row is None:
+                return
+            await session.delete(source_row)
             row.version += 1
             row.updated_at = _now()
             await session.commit()

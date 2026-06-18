@@ -18,11 +18,11 @@ beforeEach(() => {
 });
 
 describe("WorkspaceFooter", () => {
-  it("renders Copy, Download and Lint and fires onLint", () => {
+  it("renders Copy, Download and Review and fires onLint", () => {
     render(<WorkspaceFooter {...baseProps} />);
     expect(screen.getByRole("button", { name: /copy markdown/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /download/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^lint$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^review$/i }));
     expect(baseProps.onLint).toHaveBeenCalled();
   });
 

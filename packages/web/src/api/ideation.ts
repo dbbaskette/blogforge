@@ -23,13 +23,16 @@ const base = (draftId: string): string => `/api/drafts/${encodeURIComponent(draf
 export const listIdeation = (draftId: string): Promise<IdeationMessage[]> =>
   api<IdeationMessage[]>(base(draftId));
 
+export type IdeationMode = "ideate" | "interview";
+
 export const postIdeationMessage = (
   draftId: string,
   content: string,
+  mode: IdeationMode = "ideate",
 ): Promise<{ job_id: string }> =>
   api<{ job_id: string }>(`${base(draftId)}/message`, {
     method: "POST",
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, mode }),
   });
 
 export const acceptIdeation = (draftId: string): Promise<Draft> =>

@@ -6,7 +6,11 @@ Three public coroutines cover the three ingest kinds:
     add_url_sample   — fetch + extract via trafilatura (references extractor)
     add_file_sample  — extract from raw file bytes (references extractor)
 
-Extraction failures never raise: the sample is recorded with status="failed"
+Background source ingestion:
+
+    add_url_source   — fetch + extract a URL as a context source (not a style sample)
+
+Extraction failures never raise: the sample/source is recorded with status="failed"
 and extracted_chars=0 so the UI can show the row and allow the user to retry.
 
 Reuses (never re-implements):
@@ -17,6 +21,7 @@ Reuses (never re-implements):
 
 S3 key layout:
     voice/{profile_id}/samples/{sample_id}.md
+    voice/{profile_id}/sources/{source_id}.md
 """
 from __future__ import annotations
 
@@ -28,13 +33,18 @@ from blogforge.references.extractors import (
     extract_url,
 )
 from blogforge.s3 import get_s3_client
-from blogforge.voice.models import VoiceSample
+from blogforge.voice.models import VoiceSample, VoiceSource
 from blogforge.voice.store import SqlVoiceStore
 
 
 def _s3_key(profile_id: str, sample_id: str) -> str:
     """Build the canonical S3 key for a voice writing sample."""
     return f"voice/{profile_id}/samples/{sample_id}.md"
+
+
+def _source_s3_key(profile_id: str, source_id: str) -> str:
+    """Build the canonical S3 key for a voice background source."""
+    return f"voice/{profile_id}/sources/{source_id}.md"
 
 
 async def add_text_sample(
@@ -157,5 +167,51 @@ async def add_file_sample(
         s3_key=s3_key,
         extracted_chars=extraction.extracted_chars,
         original_filename=filename,
+        status="ready",
+    )
+
+
+async def add_url_source(
+    user_id: UUID,
+    *,
+    url: str,
+) -> VoiceSource:
+    """Fetch a URL, extract its main content via trafilatura, and ingest as a
+    background/context source (distinct from style samples).
+
+    Uses ``extract_url`` from ``blogforge.references.extractors`` — the same
+    function the references and sample paths use.
+
+    On fetch / extraction failure, the source is recorded with
+    ``status="failed"`` and ``extracted_chars=0``.  The row is still created
+    so the UI can display it and offer a retry.
+
+    S3 key: ``voice/{profile_id}/sources/{source_id}.md``
+    """
+    store = SqlVoiceStore()
+    profile = await store.get_or_create(user_id)
+    source_id = uuid4().hex
+    s3_key = _source_s3_key(profile.id, source_id)
+
+    try:
+        extraction = await extract_url(url)
+    except Exception:  # any fetch/extract failure → record as failed, never raise
+        return await store.add_source(
+            user_id,
+            url=url,
+            name=url,
+            s3_key=s3_key,
+            extracted_chars=0,
+            status="failed",
+        )
+
+    await get_s3_client().put_object(s3_key, extraction.extracted.encode("utf-8"), "text/markdown")
+
+    return await store.add_source(
+        user_id,
+        url=url,
+        name=extraction.name,
+        s3_key=s3_key,
+        extracted_chars=extraction.extracted_chars,
         status="ready",
     )

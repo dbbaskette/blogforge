@@ -380,7 +380,13 @@ export function DraftWorkspace({
         />
       )}
 
-      {lintOpen && <LintPanel draftId={draft.id} onClose={() => setLintOpen(false)} />}
+      {lintOpen && (
+        <LintPanel
+          draft={draft}
+          onSectionSave={onSectionSave}
+          onClose={() => setLintOpen(false)}
+        />
+      )}
       {repurposeOpen && (
         <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
       )}

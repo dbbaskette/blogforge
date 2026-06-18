@@ -1,7 +1,13 @@
-"""POST /api/drafts/{id}/lint — wraps myvoice.lint over assembled markdown."""
+"""POST /api/drafts/{id}/lint — section-anchored myvoice.lint + repetition.
+
+Findings are linted per *section* so each carries `section_id` + section-local
+UTF-16 offsets, which the editor uses to jump to and highlight the flagged
+span. Repetition is cross-section by nature, so each repetition finding is
+anchored to the first section whose prose contains the recycled phrase.
+"""
 from __future__ import annotations
 
-import dataclasses
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -49,11 +55,74 @@ async def lint_draft(
 
     from blogforge.drafts.repetition import analyze_repetition
 
-    md = store.assemble_markdown(draft)
-    violations = lint_to_hits(result.manifest, md)
-    hits = detect_positive_hits(md)
+    violations: list[dict[str, Any]] = []
+    hits: list[dict[str, Any]] = []
+    for section in draft.sections:
+        body = section.content_md
+        if not body.strip():
+            continue
+        for h in lint_to_hits(result.manifest, body):
+            violations.append(_anchor_hit(h, "violation", section.id, body))
+        for h in detect_positive_hits(body):
+            hits.append(_anchor_hit(h, "hit", section.id, body))
+
+    repetitions = [_anchor_repetition(f, draft.sections) for f in analyze_repetition(draft)]
+    return {"violations": violations, "hits": hits, "repetitions": repetitions}
+
+
+def _utf16_offset(text: str, char_index: int) -> int:
+    """Python char index → UTF-16 code-unit offset (JS String.length semantics)."""
+    return len(text[:char_index].encode("utf-16-le")) // 2
+
+
+def _slice_utf16(text: str, start: int, end: int) -> str:
+    """Slice `text` by UTF-16 code-unit offsets (the offsets myvoice emits)."""
+    return text.encode("utf-16-le")[start * 2 : end * 2].decode("utf-16-le")
+
+
+def _anchor_hit(hit: Any, kind: str, section_id: str, body: str) -> dict[str, Any]:
+    """Shape a myvoice LintHit into a section-anchored finding dict."""
+    match = getattr(hit, "match", "") or _slice_utf16(body, hit.start, hit.end)
+    rule = getattr(hit, "rule_id", "") or getattr(hit, "rule", "")
     return {
-        "violations": [dataclasses.asdict(v) for v in violations],
-        "hits": [dataclasses.asdict(h) for h in hits],
-        "repetitions": analyze_repetition(draft),
+        "id": f"{kind}:{section_id}:{hit.start}:{rule}",
+        "kind": kind,
+        "section_id": section_id,
+        "start": hit.start,
+        "end": hit.end,
+        "match": match,
+        "rule": rule,
+        "message": hit.message,
+    }
+
+
+def _anchor_repetition(finding: dict[str, Any], sections: list[Any]) -> dict[str, Any]:
+    """Resolve a cross-section repetition finding to the first section that
+    contains its phrase, with section-local UTF-16 offsets when located."""
+    text = str(finding.get("text", ""))
+    phrase = text.rstrip("…").strip()
+    rule = str(finding.get("rule", "repetition"))
+    section_id: str | None = None
+    start: int | None = None
+    end: int | None = None
+    match = phrase
+    if phrase:
+        needle = phrase.lower()
+        for s in sections:
+            idx = s.content_md.lower().find(needle)
+            if idx >= 0:
+                section_id = s.id
+                start = _utf16_offset(s.content_md, idx)
+                end = _utf16_offset(s.content_md, idx + len(phrase))
+                match = s.content_md[idx : idx + len(phrase)]
+                break
+    return {
+        "id": f"repetition:{section_id}:{start}:{rule}:{phrase[:20]}",
+        "kind": "repetition",
+        "section_id": section_id,
+        "start": start,
+        "end": end,
+        "match": match,
+        "rule": rule,
+        "message": str(finding.get("message", "")),
     }
