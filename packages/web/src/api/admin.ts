@@ -2,7 +2,8 @@ import { api } from "./client";
 
 export interface AdminUser {
   id: string;
-  email: string;
+  email: string | null;
+  github_login: string | null;
   status: "approved" | "pending" | "rejected" | "disabled";
   role: "user" | "admin";
   created_at: string;

@@ -90,7 +90,16 @@ function TopBar(): JSX.Element {
             <Link to="/settings" className="nb-btn-ghost nb-btn nb-btn-sm">
               Settings
             </Link>
-            <span className="text-xs text-muted hidden sm:block">{user.email}</span>
+            <span className="inline-flex items-center gap-1.5 hidden sm:inline-flex">
+              {user.avatar_url && (
+                <img
+                  src={user.avatar_url}
+                  alt=""
+                  className="w-6 h-6 rounded-full"
+                />
+              )}
+              <span className="text-xs text-muted">{user.github_login ?? user.email}</span>
+            </span>
             <button type="button" onClick={onSignOut} className="nb-btn nb-btn-sm">
               Sign out
             </button>

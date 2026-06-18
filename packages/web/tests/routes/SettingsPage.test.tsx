@@ -9,6 +9,8 @@ vi.mock("../../src/hooks/useMe", () => ({
     user: {
       id: "u1",
       email: "test@x.com",
+      github_login: "testuser",
+      avatar_url: null,
       role: "admin",
       status: "approved",
       last_login_at: "2026-05-27T12:00:00Z",
@@ -20,7 +22,6 @@ vi.mock("../../src/hooks/useMe", () => ({
 }));
 
 vi.mock("../../src/api/auth", () => ({
-  changePassword: vi.fn(),
   revokeAllSessions: vi.fn(),
 }));
 
@@ -36,52 +37,15 @@ describe("SettingsPage", () => {
   it("renders the account details for the current user", async () => {
     renderPage();
     expect(screen.getByRole("heading", { name: /account/i })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("test@x.com")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("testuser")).toBeInTheDocument());
     expect(screen.getByText("admin")).toBeInTheDocument();
     expect(screen.getByText(/last sign-in/i)).toBeInTheDocument();
   });
 
-  it("calls changePassword with the right args and shows success", async () => {
-    const { changePassword } = await import("../../src/api/auth");
-    (changePassword as ReturnType<typeof vi.fn>).mockResolvedValue({ status: "ok" });
+  it("does not render a change-password form", () => {
     renderPage();
-
-    fireEvent.change(screen.getByLabelText(/current password/i), {
-      target: { value: "oldpass12" },
-    });
-    fireEvent.change(screen.getByLabelText(/^new password$/i), {
-      target: { value: "newpass12" },
-    });
-    fireEvent.change(screen.getByLabelText(/confirm new password/i), {
-      target: { value: "newpass12" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /update password/i }));
-
-    await waitFor(() => expect(changePassword).toHaveBeenCalledWith("oldpass12", "newpass12"));
-    await waitFor(() => expect(screen.getByText(/password changed/i)).toBeInTheDocument());
-  });
-
-  it("maps invalid_old_password to a friendly error", async () => {
-    const { changePassword } = await import("../../src/api/auth");
-    (changePassword as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("HTTP 400: invalid_old_password"),
-    );
-    renderPage();
-
-    fireEvent.change(screen.getByLabelText(/current password/i), {
-      target: { value: "wrongpass" },
-    });
-    fireEvent.change(screen.getByLabelText(/^new password$/i), {
-      target: { value: "newpass12" },
-    });
-    fireEvent.change(screen.getByLabelText(/confirm new password/i), {
-      target: { value: "newpass12" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /update password/i }));
-
-    await waitFor(() =>
-      expect(screen.getByText(/current password is incorrect/i)).toBeInTheDocument(),
-    );
+    expect(screen.queryByLabelText(/current password/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument();
   });
 
   it("calls revokeAllSessions when Sign out everywhere is confirmed", async () => {

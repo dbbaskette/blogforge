@@ -1,78 +1,16 @@
-import { type FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
-
-import { login, requestAccess } from "../api/auth";
-
-type Tab = "signin" | "request";
+const ERROR_MESSAGES: Record<string, string> = {
+  not_allowed: "That GitHub account isn't on the allowlist.",
+  bad_state: "Login expired — please try again.",
+  oauth_denied: "GitHub sign-in was cancelled.",
+  github_failed: "GitHub sign-in failed — please try again.",
+  github_not_configured: "GitHub login isn't configured on this server.",
+};
 
 export function LoginPage(): JSX.Element {
-  const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // When set, replaces the form with a dedicated "request received" /
-  // "awaiting approval" panel. Triggered by a successful Request access
-  // submit OR a sign-in that returns status_pending.
-  const [pending, setPending] = useState(false);
-
-  const PENDING_MESSAGE =
-    "Thanks — an admin will review your request. You'll be able to sign in once approved.";
-
-  const resetForms = (): void => {
-    setError(null);
-    setPending(false);
-  };
-
-  const onSignIn = async (e: FormEvent): Promise<void> => {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      await login(email, password);
-      navigate("/");
-    } catch (err) {
-      if (err instanceof Error && err.message.includes("status_pending")) {
-        setPending(true);
-      } else {
-        setError(_friendlyAuthError(err));
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const onRequest = async (e: FormEvent): Promise<void> => {
-    e.preventDefault();
-    setError(null);
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-    if (password !== confirm) {
-      setError("Passwords don't match.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await requestAccess(email, password);
-      setPending(true);
-      setEmail("");
-      setPassword("");
-      setConfirm("");
-    } catch (err) {
-      setError(_friendlyAuthError(err));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const backToSignIn = (): void => {
-    setTab("signin");
-    resetForms();
-  };
+  const errorCode = new URLSearchParams(window.location.search).get("error");
+  const errorMessage = errorCode
+    ? (ERROR_MESSAGES[errorCode] ?? "Sign-in error.")
+    : null;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
@@ -85,188 +23,19 @@ export function LoginPage(): JSX.Element {
           <p className="text-sm text-muted mt-1">A workshop for long-form writing.</p>
         </header>
 
-        {pending ? (
-          <div className="text-center animate-fade-up">
-            <div
-              className="w-12 h-12 mx-auto rounded-full grid place-items-center mb-4"
-              style={{ background: "#e3f5ec", color: "#0e7a50" }}
-            >
-              <span aria-hidden className="text-2xl">
-                ✓
-              </span>
-            </div>
-            <h2 className="font-serif text-xl font-medium text-ink tracking-tight mb-2">
-              Request received
-            </h2>
-            <p className="text-sm text-muted leading-relaxed mb-6">{PENDING_MESSAGE}</p>
-            <button type="button" onClick={backToSignIn} className="nb-btn nb-btn-ghost nb-btn-sm">
-              ← Back to sign in
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex border-b border-rule mb-6" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "signin"}
-                onClick={() => {
-                  setTab("signin");
-                  setError(null);
-                }}
-                className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  tab === "signin"
-                    ? "border-cobalt-500 text-cobalt-700"
-                    : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                Sign in
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "request"}
-                onClick={() => {
-                  setTab("request");
-                  setError(null);
-                }}
-                className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${
-                  tab === "request"
-                    ? "border-cobalt-500 text-cobalt-700"
-                    : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                Request access
-              </button>
-            </div>
-
-            {tab === "signin" ? (
-              <form onSubmit={onSignIn} className="space-y-4">
-                <div>
-                  <label htmlFor="login-email" className="nb-label">
-                    Email
-                  </label>
-                  <input
-                    id="login-email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="nb-input"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="login-password" className="nb-label">
-                    Password
-                  </label>
-                  <input
-                    id="login-password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="nb-input"
-                  />
-                </div>
-                {error && (
-                  <p
-                    className="text-sm px-3 py-2 rounded-nb-sm"
-                    style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-                  >
-                    {error}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="nb-btn nb-btn-primary w-full"
-                >
-                  {submitting ? "Signing in…" : "Sign in"}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={onRequest} className="space-y-4">
-                <div>
-                  <label htmlFor="req-email" className="nb-label">
-                    Email
-                  </label>
-                  <input
-                    id="req-email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="nb-input"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="req-password" className="nb-label">
-                    Password
-                  </label>
-                  <input
-                    id="req-password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="nb-input"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="req-confirm" className="nb-label">
-                    Confirm password
-                  </label>
-                  <input
-                    id="req-confirm"
-                    type="password"
-                    required
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    className="nb-input"
-                  />
-                </div>
-                {error && (
-                  <p
-                    className="text-sm px-3 py-2 rounded-nb-sm"
-                    style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-                  >
-                    {error}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="nb-btn nb-btn-primary w-full"
-                >
-                  {submitting ? "Submitting…" : "Submit request"}
-                </button>
-              </form>
-            )}
-          </>
+        {errorMessage && (
+          <p
+            className="text-sm px-3 py-2 rounded-nb-sm mb-4"
+            style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
+          >
+            {errorMessage}
+          </p>
         )}
+
+        <a href="/api/auth/github/login" className="nb-btn nb-btn-primary w-full text-center block">
+          Sign in with GitHub
+        </a>
       </div>
     </div>
   );
-}
-
-function _friendlyAuthError(e: unknown): string {
-  if (e instanceof Error) {
-    if (e.message.includes("status_pending")) {
-      return "Your account is still pending admin approval.";
-    }
-    if (e.message.includes("status_rejected")) {
-      return "Your access request was rejected.";
-    }
-    if (e.message.includes("status_disabled")) {
-      return "This account has been disabled.";
-    }
-    if (e.message.includes("invalid_credentials")) {
-      return "Email or password is incorrect.";
-    }
-    if (e.message.includes("email_already_exists")) {
-      return "An account with that email already exists.";
-    }
-    return e.message;
-  }
-  return String(e);
 }
