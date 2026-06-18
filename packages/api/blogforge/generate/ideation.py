@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from blogforge.drafts.models import Draft, OutlineProposal
+from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
 
 IDEATION_SYSTEM_BLOCK = """\
@@ -216,7 +217,7 @@ async def stream_ideation(
         sample_ids = _auto_pick_samples(manifest, n=2)
         system = compose_prompt(
             pack_root,
-            format=draft.idea.format,
+            format=resolve_format(pack_root, draft.idea.format),
             samples=sample_ids if sample_ids else None,
             draft=None,
         )
