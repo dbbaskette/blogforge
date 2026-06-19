@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getVoiceProfile, voiceExportUrl, voiceGuideUrl } from "../api/voice";
 import type { VoiceProfile } from "../api/voice";
 import { DistilledStyle } from "../components/voice/DistilledStyle";
+import { LinkedInImportCard } from "../components/voice/LinkedInImportCard";
 import { PersonaCard } from "../components/voice/PersonaCard";
 import { RulesCard } from "../components/voice/RulesCard";
 import { SamplesList } from "../components/voice/SamplesList";
@@ -106,6 +107,7 @@ export function VoicePage(): JSX.Element {
         </div>
       </header>
 
+      <LinkedInImportCard onImported={load} />
       <PersonaCard profile={profile} onChange={handleChange} />
       <RulesCard profile={profile} onChange={handleChange} />
       <SamplesList profile={profile} onChange={handleChange} onRefresh={handleRefresh} />
