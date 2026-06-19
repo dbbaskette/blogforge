@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from blogforge.auth.dependencies import get_current_user
+from blogforge.config import get_settings
 from blogforge.db.models import User
 from blogforge.keys import SUPPORTED_PROVIDERS, KeyVault
 
@@ -21,6 +22,8 @@ async def list_providers(current: User = Depends(get_current_user)) -> dict[str,
     out = {p: bool(await vault.get(p)) for p in SUPPORTED_PROVIDERS}
     # claude-cli isn't key-managed; it's available iff the binary is installed.
     out["claude-cli"] = claude_available()
+    s = get_settings()
+    out["tanzu"] = bool(s.tanzu_api_base and s.tanzu_api_key)
     return out
 
 
@@ -33,6 +36,11 @@ async def list_models(provider: str, current: User = Depends(get_current_user)) 
 
         models = await ClaudeCliProvider().list_models()
         return [m.model_dump() for m in models]
+    # tanzu is bound-service-managed — list its models without a per-user vault key.
+    if provider == "tanzu":
+        from blogforge.llm.registry import get_provider
+
+        return [m.model_dump() for m in await get_provider("tanzu", "").list_models()]
     if provider not in SUPPORTED_PROVIDERS:
         raise HTTPException(
             404,

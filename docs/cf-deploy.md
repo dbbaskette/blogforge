@@ -9,6 +9,7 @@ Pure `cf push` with the python_buildpack — no Docker, no external dependency.
    - secret: `github_client_id`, `github_client_secret`, `session_secret` (`openssl rand -hex 32`)
    `vars.yml` is gitignored — keep real secrets in it and **never commit it**.
 3. Ensure bound services exist: `cf services` should list `blogforge-postgres` and `blogforge-s3` (else `cf create-service …`).
+4. Ensure a `tanzu-all-models` GenAI service instance exists and is bound (it auto-populates `BLOGFORGE_TANZU_API_BASE/KEY`). To change the offered models: `cf set-env <app_name> BLOGFORGE_TANZU_MODELS "<comma,separated,model,ids>"`.
 
 ## Each deploy
 ```bash
