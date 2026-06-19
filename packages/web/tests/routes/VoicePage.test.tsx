@@ -50,6 +50,7 @@ vi.mock("../../src/api/voice", () => {
     setExemplar: vi.fn().mockResolvedValue(profile),
     distill: vi.fn().mockResolvedValue(profile),
     voiceExportUrl: vi.fn().mockReturnValue("/api/voice/export"),
+    voiceGuideUrl: vi.fn().mockReturnValue("/api/voice/guide.md"),
     listSources: vi.fn().mockResolvedValue([]),
     addUrlSource: vi.fn().mockResolvedValue({ id: "src1", url: "https://example.com", name: "Example", status: "ready", extracted_chars: 0, added_at: "2026-01-01T00:00:00Z" }),
     deleteSource: vi.fn().mockResolvedValue(undefined),
@@ -108,6 +109,15 @@ describe("VoicePage", () => {
     await waitFor(() =>
       expect(screen.getByRole("link", { name: /download pack/i })).toBeInTheDocument(),
     );
+  });
+
+  it("shows download voice guide link with correct href", async () => {
+    renderPage();
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: /download voice guide/i });
+      expect(link).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/api/voice/guide.md");
+    });
   });
 
   it("shows distilled style text in the textarea", async () => {

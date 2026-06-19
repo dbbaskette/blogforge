@@ -21,6 +21,7 @@ Routes:
 from __future__ import annotations
 
 import logging
+import re
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel
@@ -29,6 +30,7 @@ from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.voice.ingest import add_file_sample, add_text_sample, add_url_sample, add_url_source
 from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample, VoiceSource
+from blogforge.voice.guide import build_voice_guide
 from blogforge.voice.pack import export_zip, materialize
 from blogforge.voice.store import SqlVoiceStore
 
@@ -381,4 +383,26 @@ async def export_pack(
         content=zip_bytes,
         media_type="application/zip",
         headers={"Content-Disposition": 'attachment; filename="voice-pack.zip"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /api/voice/guide.md
+# ---------------------------------------------------------------------------
+
+
+@router.get("/guide.md")
+async def export_guide(
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Response:
+    """Download the user's voice as a portable Markdown guide."""
+    store = _store(request)
+    profile = await store.get_or_create(current.id)
+    md = build_voice_guide(profile)
+    slug = re.sub(r"[^a-z0-9]+", "-", (profile.name or "voice").lower()).strip("-") or "voice"
+    return Response(
+        content=md,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{slug}-voice-guide.md"'},
     )
