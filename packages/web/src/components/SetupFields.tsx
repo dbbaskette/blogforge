@@ -11,7 +11,15 @@ interface SetupFieldsProps {
   onChange: (next: ComposeSettings) => void;
 }
 
-type Provider = "anthropic" | "openai" | "google" | "claude-cli";
+type Provider = "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
+
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  "claude-cli": "Claude CLI",
+  tanzu: "Tanzu",
+};
 
 // Words → output tokens. English averages ~1.3-1.5 tokens/word; use 1.5 conservatively.
 const WORDS_TO_OUT_TOKENS = 1.5;
@@ -297,10 +305,12 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
             onChange={(e) => onChange({ ...value, provider: e.target.value as Provider })}
             className="nb-select"
           >
-            {(["anthropic", "openai", "google", "claude-cli"] as Provider[]).map((p) => (
+            {(["anthropic", "openai", "google", "claude-cli", "tanzu"] as Provider[]).map((p) => (
               <option key={p} value={p} disabled={!providers[p]}>
-                {p === "claude-cli" ? "claude (CLI · subscription)" : p}
-                {!providers[p] && (p === "claude-cli" ? " (not installed)" : " (no key)")}
+                {p === "claude-cli"
+                  ? "Claude CLI (subscription)"
+                  : (PROVIDER_LABELS[p] ?? p)}
+                {!providers[p] && (p === "claude-cli" ? " (not installed)" : " (no key/service)")}
               </option>
             ))}
           </select>

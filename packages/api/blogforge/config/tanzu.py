@@ -38,6 +38,7 @@ def apply_vcap_services() -> None:
 
     _apply_postgres(instances)
     _apply_s3(instances)
+    _apply_genai(instances)
 
 
 def _apply_postgres(instances: list[tuple[str, dict[str, Any]]]) -> None:
@@ -71,6 +72,21 @@ def _apply_s3(instances: list[tuple[str, dict[str, Any]]]) -> None:
             _set_if_unset("BLOGFORGE_S3_ACCESS_KEY", access)
         if secret:
             _set_if_unset("BLOGFORGE_S3_SECRET_KEY", secret)
+        return
+
+
+def _apply_genai(instances: list[tuple[str, dict[str, Any]]]) -> None:
+    for label, inst in instances:
+        if label not in ("genai", "tanzu-genai") and inst.get("name") != "tanzu-all-models":
+            continue
+        creds = inst.get("credentials", {}) or {}
+        base = creds.get("api_base") or creds.get("endpoint") or creds.get("url") or creds.get("uri")
+        key = (creds.get("api_key") or creds.get("apiKey") or creds.get("key")
+               or (creds.get("credentials") or {}).get("api_key"))
+        if base:
+            _set_if_unset("BLOGFORGE_TANZU_API_BASE", base)
+        if key:
+            _set_if_unset("BLOGFORGE_TANZU_API_KEY", key)
         return
 
 

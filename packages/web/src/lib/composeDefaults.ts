@@ -1,7 +1,7 @@
 export interface ComposeSettings {
   pack_slug: string;
   format: string | null;
-  provider: "anthropic" | "openai" | "google" | "claude-cli";
+  provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
   model: string;
   target_words: number;
   use_voice_profile: boolean;
