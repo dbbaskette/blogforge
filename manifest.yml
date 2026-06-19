@@ -5,7 +5,7 @@ applications:
     instances: 1
     buildpacks:
       - python_buildpack
-    command: blogforge serve --host 0.0.0.0 --port $PORT
+    command: python -m blogforge serve --host 0.0.0.0 --port $PORT --no-browser
     routes:
       - route: ((app_name)).((apps_domain))
     services:
@@ -25,6 +25,9 @@ applications:
       # The Tanzu config adapter maps VCAP_SERVICES -> BLOGFORGE_DATABASE_URL
       # and BLOGFORGE_S3_* at startup (postgres + s3 bindings above).
       # ----------------------------------------------------------------------
+      # Run from source (no pip install) so Alembic's source-relative migration
+      # path resolves; blogforge lives under packages/api.
+      PYTHONPATH: packages/api
       BLOGFORGE_PUBLIC_URL: https://((app_name)).((apps_domain))
       BLOGFORGE_ADMIN_EMAIL: ((admin_email))
       BLOGFORGE_GITHUB_ALLOWLIST: ((github_allowlist))
