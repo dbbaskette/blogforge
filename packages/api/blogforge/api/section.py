@@ -21,9 +21,8 @@ from blogforge.generate.references import get_reference_context
 from blogforge.generate.section import stream_section
 from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import JobRegistry
-from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
-from blogforge.llm.registry import get_provider
+from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["section"])
@@ -154,19 +153,6 @@ async def regenerate_section(
         draft, current.id, pack_store=pack_store
     )
 
-    api_key = await KeyVault().get(draft.idea.provider)
-    if not api_key:
-        raise HTTPException(
-            400,
-            detail={
-                "error": {
-                    "code": "provider_missing_key",
-                    "message": f"No API key for {draft.idea.provider}",
-                    "hint": "An admin can add one under /admin (API keys section).",
-                }
-            },
-        )
-
     job = await reg.create(JobType.REGEN_SECTION, draft_id=draft_id)
     background_tasks.add_task(
         _run_regenerate,
@@ -177,7 +163,6 @@ async def regenerate_section(
         section_id,
         pack_root,
         draft.idea.provider,
-        api_key,
         draft.idea.model,
         current.id,
         body.instruction if body else "",
@@ -234,7 +219,6 @@ async def _run_regenerate(
     section_id: str,
     pack_root: Path,
     provider_name: str,
-    api_key: str,
     model: str,
     user_id: UUID,
     instruction: str = "",
@@ -255,7 +239,7 @@ async def _run_regenerate(
         manifest = yaml.safe_load(
             (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
         ) or {}
-        provider = get_provider(provider_name, api_key)
+        provider = await build_provider_for(user_id, provider_name)
 
         # Snapshot the prior content before it's overwritten so the author
         # can compare against — or revert to — the pre-regeneration version.

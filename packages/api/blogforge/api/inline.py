@@ -16,9 +16,8 @@ from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.inline import transform_text
-from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
-from blogforge.llm.registry import get_provider
+from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["inline"])
@@ -57,23 +56,10 @@ async def inline_edit(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    api_key = await KeyVault().get(draft.idea.provider)
-    if not api_key:
-        raise HTTPException(
-            400,
-            detail={
-                "error": {
-                    "code": "provider_missing_key",
-                    "message": f"No API key for {draft.idea.provider}",
-                    "hint": "An admin can add one under /admin (API keys section).",
-                }
-            },
-        )
-
     manifest = yaml.safe_load(
         (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
     ) or {}
-    provider = get_provider(draft.idea.provider, api_key)
+    provider = await build_provider_for(current.id, draft.idea.provider)
     try:
         result = await transform_text(
             draft,

@@ -9,9 +9,8 @@ from blogforge.db.models import User
 from blogforge.drafts.models import Draft, OutlineProposal
 from blogforge.generate.outline import propose_outline
 from blogforge.generate.references import get_reference_context
-from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
-from blogforge.llm.registry import get_provider
+from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["outline"])
@@ -44,19 +43,6 @@ async def generate_outline(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    api_key = await KeyVault().get(draft.idea.provider)
-    if not api_key:
-        raise HTTPException(
-            400,
-            detail={
-                "error": {
-                    "code": "provider_missing_key",
-                    "message": f"No API key for {draft.idea.provider}",
-                    "hint": "An admin can add one under /admin (API keys section).",
-                }
-            },
-        )
-
     import yaml
 
     manifest = (
@@ -66,7 +52,7 @@ async def generate_outline(
     reference_context = await get_reference_context(draft.id, draft.references)
 
     try:
-        provider = get_provider(draft.idea.provider, api_key)
+        provider = await build_provider_for(current.id, draft.idea.provider)
         proposal: OutlineProposal = await propose_outline(
             draft.idea,
             pack_root,
@@ -75,10 +61,6 @@ async def generate_outline(
             model=draft.idea.model,
             reference_context=reference_context,
         )
-    except ProviderMissingKey as e:
-        raise HTTPException(
-            400, detail={"error": {"code": e.code, "message": e.message, "hint": e.hint}}
-        ) from e
     except ProviderError as e:
         raise HTTPException(
             502, detail={"error": {"code": e.code, "message": e.message}}

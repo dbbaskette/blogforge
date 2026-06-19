@@ -279,7 +279,7 @@ async def distill(
 ) -> VoiceProfile:
     """Run LLM-based style distillation over the user's samples and store the result."""
     from blogforge.keys import KeyVault
-    from blogforge.llm.registry import get_provider
+    from blogforge.llm.resolve import build_provider_for
     from blogforge.s3 import get_s3_client
     from blogforge.voice.distill import distill_style
 
@@ -289,33 +289,14 @@ async def distill(
     # --- resolve provider ---
     if body.provider:
         provider_name = body.provider
-        # When provider is explicitly given, fetch key but allow mock to short-circuit.
-        import os
-        if os.environ.get("BLOGFORGE_TEST_PROVIDER") == "mock":
-            api_key = "mock"
-        else:
-            api_key = await KeyVault().get(provider_name)
-            if not api_key:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": {
-                            "code": "provider_missing_key",
-                            "message": f"No API key for {provider_name}",
-                            "hint": "An admin can add one under /admin (API keys section).",
-                        }
-                    },
-                )
     else:
-        # Auto-select: first provider that has a key.
-        vault = KeyVault()
+        # Auto-select: first provider that has a key for this user.
+        vault = KeyVault(current.id)
         provider_name = None
-        api_key = ""
         for candidate in ("anthropic", "openai", "google", "claude-cli"):
             key = await vault.get(candidate)
             if key:
                 provider_name = candidate
-                api_key = key
                 break
         if provider_name is None:
             raise HTTPException(
@@ -324,13 +305,13 @@ async def distill(
                     "error": {
                         "code": "provider_missing_key",
                         "message": "No API key configured for any provider.",
-                        "hint": "An admin can add one under /admin (API keys section).",
+                        "hint": "Add your key in Settings → Provider API keys.",
                     }
                 },
             )
 
     model = body.model or _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
-    provider = get_provider(provider_name, api_key)
+    provider = await build_provider_for(current.id, provider_name)
 
     # --- load sample texts from S3 ---
     s3 = get_s3_client()
