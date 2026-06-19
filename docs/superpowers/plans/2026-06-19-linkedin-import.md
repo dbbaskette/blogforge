@@ -277,15 +277,28 @@ git commit -m "feat(api): /api/voice/import/linkedin upload + tanzu-aware provid
 
 **Files:** Modify `packages/web/src/api/voice.ts`, `packages/web/src/routes/VoicePage.tsx`; Create `packages/web/src/components/voice/LinkedInImportCard.tsx`
 
-- [ ] **Step 1: `api/voice.ts`** — add a multipart importer (mirror `uploadSampleFile`'s FormData pattern; read that fn first):
+- [ ] **Step 1: `api/voice.ts`** — add a multipart importer. **Use raw `fetch` (not the `api()` helper, which sets a JSON Content-Type that breaks multipart)** — mirror the existing `uploadSampleFile` exactly:
 ```ts
 export async function importLinkedIn(file: File): Promise<VoiceProfile> {
-  const fd = new FormData();
-  fd.append("file", file);
-  return api<VoiceProfile>("/api/voice/import/linkedin", { method: "POST", body: fd });
+  const form = new FormData();
+  form.append("file", file);
+  const BASE = import.meta.env.VITE_API_URL ?? "";
+  const res = await fetch(`${BASE}/api/voice/import/linkedin`, {
+    method: "POST",
+    body: form,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const j = await res.json();
+      detail = typeof j?.detail === "string" ? j.detail : (j?.detail?.error?.message ?? JSON.stringify(j));
+    } catch { /* ignore */ }
+    throw Object.assign(new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`), { status: res.status });
+  }
+  return (await res.json()) as VoiceProfile;
 }
 ```
-(If `api()` sets a JSON `Content-Type` that breaks FormData, mirror exactly what `uploadSampleFile` does — it already solves this for file uploads.)
 
 - [ ] **Step 2: `components/voice/LinkedInImportCard.tsx`** — a card matching the page's `nb-card` styling (read `VoicePage.tsx`/`PersonaCard` for classes):
 ```tsx
