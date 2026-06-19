@@ -4,11 +4,8 @@
 #   # edit vars.yml for your foundation, then:
 #   cf push --vars-file vars.yml
 #
-# Non-secret, per-environment values only. SECRETS (GitHub client secret,
-# session secret) are NEVER in this file — set them with `cf set-env`:
-#   cf set-env <app_name> BLOGFORGE_GITHUB_CLIENT_ID     <client-id>
-#   cf set-env <app_name> BLOGFORGE_GITHUB_CLIENT_SECRET <client-secret>
-#   cf set-env <app_name> BLOGFORGE_SESSION_SECRET       $(openssl rand -hex 32)
+# Includes SECRETS. vars.yml is gitignored, so your real values stay out of git.
+# NEVER put real secrets in THIS example file — it ships placeholders only.
 
 # Application name — also the route host (<app_name>.<apps_domain>).
 app_name: blogforge
@@ -23,3 +20,10 @@ admin_email: you@example.com
 # Comma-separated GitHub logins allowed to sign in; one is the admin.
 github_allowlist: your-gh-login
 github_admin_login: your-gh-login
+
+# --- SECRETS (real values go in vars.yml only — never commit them) ---
+# GitHub OAuth App credentials: github.com -> Settings -> Developer settings -> OAuth Apps.
+github_client_id: your-oauth-app-client-id
+github_client_secret: your-oauth-app-client-secret
+# Session-cookie signing key. Generate a strong one:  openssl rand -hex 32
+session_secret: replace-with-a-64-char-hex-string
