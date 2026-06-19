@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import re
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel
 
 from blogforge.auth.dependencies import get_current_user
@@ -271,6 +271,19 @@ _PROVIDER_DEFAULTS: dict[str, str] = {
 }
 
 
+async def _auto_select_provider(user_id) -> str | None:
+    from blogforge.config import get_settings
+    from blogforge.keys import KeyVault
+    vault = KeyVault(user_id)
+    for candidate in ("anthropic", "openai", "google", "claude-cli"):
+        if await vault.get(candidate):
+            return candidate
+    s = get_settings()
+    if s.tanzu_api_base and s.tanzu_api_key:
+        return "tanzu"
+    return None
+
+
 @router.post("/distill")
 async def distill(
     body: _DistillBody,
@@ -278,7 +291,6 @@ async def distill(
     current: User = Depends(get_current_user),
 ) -> VoiceProfile:
     """Run LLM-based style distillation over the user's samples and store the result."""
-    from blogforge.keys import KeyVault
     from blogforge.llm.resolve import build_provider_for
     from blogforge.s3 import get_s3_client
     from blogforge.voice.distill import distill_style
@@ -287,28 +299,18 @@ async def distill(
     profile = await store.get_or_create(current.id)
 
     # --- resolve provider ---
-    if body.provider:
-        provider_name = body.provider
-    else:
-        # Auto-select: first provider that has a key for this user.
-        vault = KeyVault(current.id)
-        provider_name = None
-        for candidate in ("anthropic", "openai", "google", "claude-cli"):
-            key = await vault.get(candidate)
-            if key:
-                provider_name = candidate
-                break
-        if provider_name is None:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": {
-                        "code": "provider_missing_key",
-                        "message": "No API key configured for any provider.",
-                        "hint": "Add your key in Settings → Provider API keys.",
-                    }
-                },
-            )
+    provider_name = body.provider or await _auto_select_provider(current.id)
+    if provider_name is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "code": "provider_missing_key",
+                    "message": "No API key configured for any provider.",
+                    "hint": "Add your key in Settings → Provider API keys.",
+                }
+            },
+        )
 
     model = body.model or _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
     provider = await build_provider_for(current.id, provider_name)
@@ -328,6 +330,58 @@ async def distill(
     # --- distill ---
     result = await distill_style(texts, provider, model=model)
     return await store.set_distilled(current.id, result)
+
+
+# ---------------------------------------------------------------------------
+# POST /api/voice/import/linkedin
+# ---------------------------------------------------------------------------
+
+
+@router.post("/import/linkedin")
+async def import_linkedin(
+    request: Request,
+    file: UploadFile = File(...),
+    provider: str | None = Form(None),
+    model: str | None = Form(None),
+    current: User = Depends(get_current_user),
+) -> VoiceProfile:
+    """Parse an uploaded LinkedIn data-export archive → prefill persona + seed samples."""
+    from blogforge.llm.resolve import build_provider_for
+    from blogforge.voice.ingest import add_text_sample
+    from blogforge.voice.linkedin_import import (
+        LinkedInImportError, PERSONA_SCHEMA, build_persona_prompt, parse_linkedin_archive, parse_persona,
+    )
+
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(400, detail={"error": {"code": "file_too_large", "message": "Archive exceeds 10 MB."}})
+    try:
+        parsed = parse_linkedin_archive(data)
+    except LinkedInImportError as exc:
+        raise HTTPException(400, detail={"error": {"code": "linkedin_parse_failed", "message": str(exc)}}) from exc
+
+    store = _store(request)
+    provider_name = provider or await _auto_select_provider(current.id)
+    identity, one_line, tone = "", parsed.headline, ""
+    if provider_name:
+        prov = await build_provider_for(current.id, provider_name)
+        mdl = model or _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
+        try:
+            resp = await prov.complete(
+                model=mdl, prompt=build_persona_prompt(parsed.headline, parsed.summary), json_schema=PERSONA_SCHEMA
+            )
+            identity, one_line, tone = parse_persona(resp.text)
+        except Exception:
+            identity = parsed.summary.split(". ")[0][:200]
+    elif parsed.summary:
+        identity = parsed.summary.split(". ")[0][:200]
+
+    await store.update_persona(current.id, identity=identity, one_line=one_line or parsed.headline, tone=tone)
+    if parsed.summary:
+        await add_text_sample(current.id, name="LinkedIn — About", text=parsed.summary)
+    for art in parsed.articles[:25]:
+        await add_text_sample(current.id, name=f"LinkedIn — {art.title}"[:120], text=art.text)
+    return await store.get_or_create(current.id)
 
 
 # ---------------------------------------------------------------------------
