@@ -6,3 +6,13 @@
 - **No vague attribution.** Don't cite "experts", "studies show", "industry reports", or "observers note" without a real source. Name it or cut it.
 - **Synthesize, don't summarize.** Connect ideas and show what they mean or why they matter; don't just list them one after another.
 - **Skip generic praise adjectives.** Words like "significant", "important", "effective", and "essential" say nothing on their own. Replace them with the specific reason or number that makes the point.
+- **Vary sentence length (burstiness).** Don't write three same-length sentences in a row. Mix a short, blunt sentence with a longer one that carries a couple of clauses. A uniform, metronomic rhythm reads as machine-generated.
+- **No em-dash overuse.** Don't lean on the em dash to staple clauses together — use a period, comma, colon, or parentheses. If a paragraph has more than one em dash, recast it.
+- **Don't bridge with rhetorical questions.** Avoid the self-posed-question-then-answer move: "The result? Faster builds." / "Why does this matter? Because…". State the point directly.
+- **Skip the countdown.** Don't negate options for drama: "Not a bug. Not a feature. A design flaw." Say the affirmative.
+- **No anaphora padding.** Don't open several sentences in a row with the same word ("They assume… They assume… They assume…"). Vary the openings or combine them.
+- **No false ranges.** "from X to Y to Z" only works when the items sit on a real spectrum. Don't connect unrelated things ("from databases to team culture") for sweep.
+- **Repeat the clear word; don't cycle synonyms.** Don't rotate "tool / solution / platform / offering" to dodge repetition. Reuse the precise noun.
+- **Don't disguise a list as prose.** Avoid "The first… The second… The third…" paragraphs that are a bulleted list in a trench coat. Make it a real list or connect the ideas with logic.
+- **No chatbot leftovers.** Cut conversational/reasoning leaks: "Certainly!", "Great question!", "Let's dive in", "Let me break this down", "I hope this helps", "In this article, we will".
+- **Don't end on "challenges and opportunities."** Avoid the closing cliché that lists obstacles then pivots to upbeat potential. End on a concrete point.
