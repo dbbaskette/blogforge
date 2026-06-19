@@ -184,6 +184,7 @@ def create_app() -> FastAPI:
 
     from blogforge.api.admin import router as admin_router
     from blogforge.api.auth import router as auth_router
+    from blogforge.api.keys import router as keys_router
     from blogforge.api.auth_github import router as auth_github_router
     from blogforge.api.claims import router as claims_router
     from blogforge.api.download import router as download_router
@@ -210,6 +211,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(auth_github_router)
     app.include_router(admin_router)
+    app.include_router(keys_router)
     app.include_router(drafts_router)
     app.include_router(references_router)
     app.include_router(outline_router)
