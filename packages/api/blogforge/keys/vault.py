@@ -1,53 +1,17 @@
-"""KeyVault — admin-managed provider keys, encrypted at rest.
-
-Falls back to ~/.myvoice/config.yaml when no admin-managed key is set
-for a provider. That keeps existing single-user installs working
-without forcing them through the admin UI.
-"""
+"""KeyVault — per-user provider keys, encrypted at rest."""
 from __future__ import annotations
 
-import os
-from datetime import datetime
-from pathlib import Path
-from typing import TypedDict
 from uuid import UUID
 
-import yaml
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blogforge.auth.crypto import SecretCipher
 from blogforge.config import get_settings
 from blogforge.db.engine import get_sessionmaker
-from blogforge.db.models import ProviderKey
+from blogforge.db.models import UserProviderKey
 
 SUPPORTED_PROVIDERS: tuple[str, ...] = ("anthropic", "openai", "google")
-
-
-class ProviderKeyStatus(TypedDict):
-    provider: str
-    configured: bool
-    source: str  # "stored" | "myvoice" | "none"
-    updated_at: datetime | None
-    updated_by: UUID | None
-
-
-def _myvoice_config_path() -> Path:
-    env = os.environ.get("MYVOICE_CONFIG_PATH")
-    return Path(env) if env else Path.home() / ".myvoice" / "config.yaml"
-
-
-def _read_myvoice_key(provider: str) -> str:
-    """Best-effort read from ~/.myvoice/config.yaml. Empty string on any error."""
-    path = _myvoice_config_path()
-    if not path.is_file():
-        return ""
-    try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except (yaml.YAMLError, OSError):
-        return ""
-    providers = data.get("providers") or {}
-    return str((providers.get(provider) or {}).get("api_key") or "")
 
 
 def _cipher() -> SecretCipher:
@@ -59,16 +23,17 @@ def _cipher() -> SecretCipher:
 
 
 class KeyVault:
-    """Service object for admin-managed provider keys.
+    """Service object for per-user provider keys.
 
-    Methods are async because they hit the DB; tests can stub by passing
-    in a custom session via the optional `_session` arg (mostly for
-    transaction reuse from the admin routes).
+    Methods are async because they hit the DB.
     """
 
+    def __init__(self, user_id: UUID) -> None:
+        self._user_id = user_id
+
     async def get(self, provider: str) -> str:
-        """Decrypted key for `provider`, or "" if neither stored nor in
-        the myvoice config. Raises ValueError for unknown providers.
+        """Decrypted key for `provider`, or "" if not stored.
+        Raises ValueError for unknown providers.
 
         `claude-cli` carries no key — it authenticates through the local
         Claude Code CLI — so we return a non-empty sentinel when the binary is
@@ -84,9 +49,9 @@ class KeyVault:
             row = await self._load(session, provider)
             if row is not None:
                 return _cipher().decrypt(row.encrypted_key)
-        return _read_myvoice_key(provider)
+        return ""
 
-    async def set(self, provider: str, api_key: str, *, updated_by: UUID) -> None:
+    async def set(self, provider: str, api_key: str) -> None:
         """Store an encrypted key, replacing any existing row."""
         self._check_provider(provider)
         if not api_key:
@@ -96,15 +61,14 @@ class KeyVault:
             existing = await self._load(session, provider)
             if existing is None:
                 session.add(
-                    ProviderKey(
+                    UserProviderKey(
+                        user_id=self._user_id,
                         provider=provider,
                         encrypted_key=ciphertext,
-                        updated_by=updated_by,
                     )
                 )
             else:
                 existing.encrypted_key = ciphertext
-                existing.updated_by = updated_by
             await session.commit()
 
     async def delete(self, provider: str) -> None:
@@ -112,56 +76,16 @@ class KeyVault:
         self._check_provider(provider)
         async with get_sessionmaker()() as session:
             await session.execute(
-                delete(ProviderKey).where(ProviderKey.provider == provider)
+                delete(UserProviderKey).where(
+                    UserProviderKey.user_id == self._user_id,
+                    UserProviderKey.provider == provider,
+                )
             )
             await session.commit()
 
-    async def list_status(self) -> list[ProviderKeyStatus]:
-        """One status row per supported provider, ordered consistently.
-
-        `source` records where the key came from for /admin/keys UI:
-        - "stored" — admin-managed row exists.
-        - "myvoice" — falling back to ~/.myvoice/config.yaml.
-        - "none" — no key anywhere.
-        Never returns the key itself.
-        """
-        async with get_sessionmaker()() as session:
-            rows = (await session.execute(select(ProviderKey))).scalars().all()
-        by_provider = {r.provider: r for r in rows}
-        out: list[ProviderKeyStatus] = []
-        for provider in SUPPORTED_PROVIDERS:
-            stored = by_provider.get(provider)
-            if stored is not None:
-                out.append(
-                    ProviderKeyStatus(
-                        provider=provider,
-                        configured=True,
-                        source="stored",
-                        updated_at=stored.updated_at,
-                        updated_by=stored.updated_by,
-                    )
-                )
-            elif _read_myvoice_key(provider):
-                out.append(
-                    ProviderKeyStatus(
-                        provider=provider,
-                        configured=True,
-                        source="myvoice",
-                        updated_at=None,
-                        updated_by=None,
-                    )
-                )
-            else:
-                out.append(
-                    ProviderKeyStatus(
-                        provider=provider,
-                        configured=False,
-                        source="none",
-                        updated_at=None,
-                        updated_by=None,
-                    )
-                )
-        return out
+    async def list_status(self) -> dict[str, bool]:
+        """Return {provider: bool} for each supported provider."""
+        return {p: bool(await self.get(p)) for p in SUPPORTED_PROVIDERS}
 
     @staticmethod
     def _check_provider(provider: str) -> None:
@@ -170,10 +94,11 @@ class KeyVault:
                 f"unknown provider {provider!r}; expected one of {SUPPORTED_PROVIDERS}"
             )
 
-    @staticmethod
-    async def _load(session: AsyncSession, provider: str) -> ProviderKey | None:
+    async def _load(self, session: AsyncSession, provider: str) -> UserProviderKey | None:
         result = await session.execute(
-            select(ProviderKey).where(ProviderKey.provider == provider)
+            select(UserProviderKey).where(
+                UserProviderKey.user_id == self._user_id,
+                UserProviderKey.provider == provider,
+            )
         )
-        row: ProviderKey | None = result.scalar_one_or_none()
-        return row
+        return result.scalar_one_or_none()
