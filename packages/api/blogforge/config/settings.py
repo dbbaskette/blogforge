@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     public_url: str = ""
     github_allowlist: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
+    tanzu_api_base: str = ""
+    tanzu_api_key: str = ""
+    tanzu_models: Annotated[list[str], NoDecode] = Field(default_factory=lambda: [
+        "openai/gpt-oss-120b", "Qwen/Qwen3.5-27B-GPTQ-Int4", "google/gemma-4-31B-it",
+    ])
+
     s3_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "blogforge"
     s3_secret_key: str = "blogforge-minio-secret"
@@ -68,6 +74,13 @@ class Settings(BaseSettings):
     def split_allowlist(cls, v: object) -> object:
         if isinstance(v, str):
             return [s.strip().lower() for s in v.split(",") if s.strip()]
+        return v
+
+    @field_validator("tanzu_models", mode="before")
+    @classmethod
+    def _split_tanzu_models(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [s.strip() for s in v.split(",") if s.strip()]
         return v
 
 
