@@ -77,7 +77,7 @@ def _apply_s3(instances: list[tuple[str, dict[str, Any]]]) -> None:
 
 def _apply_genai(instances: list[tuple[str, dict[str, Any]]]) -> None:
     for label, inst in instances:
-        if label not in ("genai", "tanzu-genai") and inst.get("name") != "tanzu-all-models":
+        if label not in ("genai", "tanzu-genai", "ai-models") and inst.get("name") != "blogforge-ai":
             continue
         creds = inst.get("credentials", {}) or {}
         base = creds.get("api_base") or creds.get("endpoint") or creds.get("url") or creds.get("uri")
