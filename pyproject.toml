@@ -47,7 +47,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-artifacts = ["packages/api/blogforge/static/**/*"]
+artifacts = [
+    "packages/api/blogforge/static/**/*",
+    "packages/api/blogforge/voice/assets/**/*",
+    "packages/api/blogforge/voice/bundled_packs/**/*",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["packages/api/blogforge"]

@@ -23,17 +23,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # Install uv (pinned via pip; smaller than the standalone installer).
 RUN pip install --no-cache-dir uv==0.5.0
 
-# BlogForge's pyproject.toml has `[tool.uv.sources]` pointing myvoice at
-# ../myvoice (a sibling-repo editable install for local dev). Resolved
-# relative to /app, that's /myvoice — fetch it from GitHub so the source
-# override finds something at the expected path.
-#
-# Override the ref at build time with `--build-arg MYVOICE_REF=<sha-or-tag>`
-# for reproducible images.
-ARG MYVOICE_REF=main
-RUN git clone --depth=1 --branch "${MYVOICE_REF}" \
-        https://github.com/dbbaskette/myvoice /myvoice
-
 # Copy project metadata + the pinned dependency lock. README is required
 # because pyproject.toml declares `readme = "README.md"` and hatchling
 # validates the file at wheel-build time.
@@ -48,8 +37,7 @@ COPY pyproject.toml uv.lock README.md requirements.lock /app/
 #      BuildKit uv cache stays valid build-to-build.
 #   2. Layer caching — keyed only on the lockfiles, so editing application code
 #      never re-runs this step. Code-only rebuilds are fully offline.
-# `-e ../myvoice` in requirements.lock resolves to /myvoice (cloned above) from
-# WORKDIR /app. Regenerate the lock after changing deps with:
+# Regenerate the lock after changing deps with:
 #   uv export --frozen --no-emit-project --no-dev --no-hashes -o requirements.lock
 ENV UV_CACHE_DIR=/root/.cache/uv
 RUN --mount=type=cache,target=/root/.cache/uv \
