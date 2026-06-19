@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     s3_secret_key: str = "blogforge-minio-secret"
     s3_bucket: str = "blogforge"
     s3_region: str = "us-east-1"
+    # Verify the S3 endpoint's TLS certificate. Default True (secure). The
+    # Tanzu/CF SeaweedFS gateway presents a self-signed cert from the
+    # foundation's internal CA (not in the container trust store), so
+    # config/tanzu._apply_s3 flips this to False for the bound instance.
+    s3_verify_ssl: bool = True
 
     run_migrations_on_boot: bool = True
     # Set to False in tests to skip the S3 bucket bootstrap (tests use moto
