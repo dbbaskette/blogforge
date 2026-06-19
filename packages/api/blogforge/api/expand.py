@@ -8,7 +8,7 @@ from uuid import UUID
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from myvoice.compose import ComposeError
+from blogforge.voice.compose import ComposeError
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User

@@ -64,7 +64,7 @@ async def propose_outline(
     non-empty it gets prepended to the user prompt with a `---`
     separator — the LLM sees the materials before the idea brief.
     """
-    from myvoice import compose_prompt
+    from blogforge.voice import compose_prompt
 
     sample_ids = _auto_pick_samples(manifest, n=2)
     system = compose_prompt(

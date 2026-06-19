@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from myvoice import PackStore
+from blogforge.voice import PackStore
 
 from blogforge import __version__
 from blogforge.api.events import EventBus

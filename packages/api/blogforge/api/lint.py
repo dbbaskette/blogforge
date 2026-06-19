@@ -40,8 +40,8 @@ async def lint_draft(
                 detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}},
             )
 
-    from myvoice import validate_pack
-    from myvoice.lint import detect_positive_hits, lint_to_hits
+    from blogforge.voice import validate_pack
+    from blogforge.voice.lint import detect_positive_hits, lint_to_hits
 
     from blogforge.voice.resolve import resolve_voice
 
