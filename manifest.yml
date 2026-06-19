@@ -5,7 +5,11 @@ applications:
     instances: 1
     buildpacks:
       - python_buildpack
-    command: python -m blogforge serve --host 0.0.0.0 --port $PORT --no-browser
+    # The buildpack (uv) installs deps into a non-relocatable uv venv and ships
+    # only Python 3.14. Run the buildpack's python with the venv's real runtime
+    # site-packages on PYTHONPATH (packages/api FIRST so the source `blogforge`
+    # wins; alembic resolves via its source-relative __file__).
+    command: PYTHONPATH="/home/vcap/app/packages/api:$(echo /home/vcap/deps/0/uv_venv/lib/python*/site-packages)" python -m blogforge serve --host 0.0.0.0 --port $PORT --no-browser
     routes:
       - route: ((app_name)).((apps_domain))
     services:
@@ -24,9 +28,6 @@ applications:
       # The Tanzu config adapter maps VCAP_SERVICES -> BLOGFORGE_DATABASE_URL
       # and BLOGFORGE_S3_* at startup (postgres + s3 bindings above).
       # ----------------------------------------------------------------------
-      # Run from source (no pip install) so Alembic's source-relative migration
-      # path resolves; blogforge lives under packages/api.
-      PYTHONPATH: packages/api
       BLOGFORGE_PUBLIC_URL: https://((app_name)).((apps_domain))
       BLOGFORGE_ADMIN_EMAIL: ((admin_email))
       BLOGFORGE_GITHUB_ALLOWLIST: ((github_allowlist))
@@ -37,8 +38,10 @@ applications:
       BLOGFORGE_SESSION_SECRET: ((session_secret))
       # Production serves over TLS — sign session cookies as Secure.
       BLOGFORGE_COOKIE_SECURE: "true"
-      BLOGFORGE_S3_BUCKET: blogforge
-      BLOGFORGE_S3_REGION: us-east-1
+      # S3 endpoint/bucket/region/keys come from the seaweedfs binding
+      # (config/tanzu.py _apply_s3). Skip boot-time bucket creation — the bound
+      # instance already provisions a bucket, and the create call can hang.
+      BLOGFORGE_S3_BOOTSTRAP_ON_BOOT: "false"
       BLOGFORGE_RUN_MIGRATIONS_ON_BOOT: "true"
       # Empty — api and web share an origin, so CORS is unnecessary.
       BLOGFORGE_CORS_ORIGINS: ""

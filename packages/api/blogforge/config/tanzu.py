@@ -63,15 +63,23 @@ def _apply_s3(instances: list[tuple[str, dict[str, Any]]]) -> None:
         if label not in ("seaweedfs", "s3") and inst.get("name") != "blogforge-s3":
             continue
         creds = inst.get("credentials", {})
-        endpoint = creds.get("endpoint") or creds.get("endpoint_url")
+        # Prefer endpoint_url (carries the https:// scheme the S3 client needs);
+        # `endpoint` is scheme-less and makes the client hang on connect.
+        endpoint = creds.get("endpoint_url") or creds.get("endpoint")
         access = creds.get("access_key") or creds.get("accessKey")
         secret = creds.get("secret_key") or creds.get("secretKey")
+        bucket = creds.get("bucket")
+        region = creds.get("region")
         if endpoint:
             _set_if_unset("BLOGFORGE_S3_ENDPOINT_URL", endpoint)
         if access:
             _set_if_unset("BLOGFORGE_S3_ACCESS_KEY", access)
         if secret:
             _set_if_unset("BLOGFORGE_S3_SECRET_KEY", secret)
+        if bucket:
+            _set_if_unset("BLOGFORGE_S3_BUCKET", bucket)
+        if region:
+            _set_if_unset("BLOGFORGE_S3_REGION", region)
         return
 
 
@@ -80,9 +88,12 @@ def _apply_genai(instances: list[tuple[str, dict[str, Any]]]) -> None:
         if label not in ("genai", "tanzu-genai", "ai-models") and inst.get("name") != "blogforge-ai":
             continue
         creds = inst.get("credentials", {}) or {}
-        base = creds.get("api_base") or creds.get("endpoint") or creds.get("url") or creds.get("uri")
-        key = (creds.get("api_key") or creds.get("apiKey") or creds.get("key")
-               or (creds.get("credentials") or {}).get("api_key"))
+        # The Tanzu GenAI tile nests the real values under "endpoint"
+        # ({"endpoint": {"openai_api_base", "api_base", "api_key", ...}}); tolerate
+        # a flat shape too. Prefer the OpenAI-compatible base for our provider.
+        ep = creds.get("endpoint") if isinstance(creds.get("endpoint"), dict) else creds
+        base = ep.get("openai_api_base") or ep.get("api_base") or ep.get("url") or ep.get("uri")
+        key = ep.get("api_key") or ep.get("apiKey") or ep.get("key")
         if base:
             _set_if_unset("BLOGFORGE_TANZU_API_BASE", base)
         if key:
