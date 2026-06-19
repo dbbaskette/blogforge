@@ -1,0 +1,25 @@
+# Template for the CF manifest vars file.
+#
+#   cp vars.example.yml vars.yml      # vars.yml is gitignored
+#   # edit vars.yml for your foundation, then:
+#   cf push --vars-file vars.yml
+#
+# Non-secret, per-environment values only. SECRETS (GitHub client secret,
+# session secret) are NEVER in this file — set them with `cf set-env`:
+#   cf set-env <app_name> BLOGFORGE_GITHUB_CLIENT_ID     <client-id>
+#   cf set-env <app_name> BLOGFORGE_GITHUB_CLIENT_SECRET <client-secret>
+#   cf set-env <app_name> BLOGFORGE_SESSION_SECRET       $(openssl rand -hex 32)
+
+# Application name — also the route host (<app_name>.<apps_domain>).
+app_name: blogforge
+
+# Your foundation's shared apps domain (cf domains). The OAuth callback to
+# register in GitHub is:  https://<app_name>.<apps_domain>/api/auth/github/callback
+apps_domain: apps.example.com
+
+# Seeded admin identity; the GitHub admin login adopts this row on first sign-in.
+admin_email: you@example.com
+
+# Comma-separated GitHub logins allowed to sign in; one is the admin.
+github_allowlist: your-gh-login
+github_admin_login: your-gh-login
