@@ -45,6 +45,7 @@ class S3Client:
         self._access_key = settings.s3_access_key
         self._secret_key = settings.s3_secret_key
         self._region = settings.s3_region
+        self._verify_ssl = settings.s3_verify_ssl
         self._session = aiobotocore.session.get_session()
 
     @property
@@ -58,6 +59,7 @@ class S3Client:
             aws_access_key_id=self._access_key,
             aws_secret_access_key=self._secret_key,
             region_name=self._region,
+            verify=self._verify_ssl,
         )
 
     async def put_object(

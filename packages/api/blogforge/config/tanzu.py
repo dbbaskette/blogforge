@@ -80,6 +80,12 @@ def _apply_s3(instances: list[tuple[str, dict[str, Any]]]) -> None:
             _set_if_unset("BLOGFORGE_S3_BUCKET", bucket)
         if region:
             _set_if_unset("BLOGFORGE_S3_REGION", region)
+        # The foundation's SeaweedFS S3 gateway serves a self-signed cert from an
+        # internal CA that isn't in the container trust store, and the binding
+        # ships no CA bundle — so botocore's default verification fails on every
+        # request. Disable it for the bound instance (traffic stays on the
+        # foundation's private network). Overridable: `cf set-env … true`.
+        _set_if_unset("BLOGFORGE_S3_VERIFY_SSL", "false")
         return
 
 
