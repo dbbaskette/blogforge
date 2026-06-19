@@ -25,6 +25,12 @@ vi.mock("../../src/api/auth", () => ({
   revokeAllSessions: vi.fn(),
 }));
 
+vi.mock("../../src/api/keys", () => ({
+  getKeyStatus: vi.fn().mockResolvedValue({ anthropic: false, openai: false, google: false }),
+  setKey: vi.fn(),
+  deleteKey: vi.fn(),
+}));
+
 function renderPage(): void {
   render(
     <MemoryRouter>
