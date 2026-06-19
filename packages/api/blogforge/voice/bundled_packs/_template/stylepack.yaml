@@ -1,0 +1,62 @@
+# TEMPLATE STYLE PACK
+# Copy this directory to packs/<your-slug>/, then fill in every TODO.
+spec_version: "1.0"
+
+pack:
+  slug: _template   # MUST match the directory name. Change after copy.
+  name: "TODO: Your Pack Name"
+  version: "0.1.0"
+  author: "TODO: Your Name"
+  description: "TODO: One sentence describing your voice."
+
+persona:
+  identity: "TODO: A short tagline for who this voice is (e.g., 'The Builder Who Gets It')."
+  one_line: "TODO: One sentence of the persona's stance and what they advocate for."
+
+# Words this voice avoids. Linters flag any occurrence (case-insensitive).
+banished:
+  words: []
+  phrases: []
+  # Words from `words` that this voice actually uses in specific contexts.
+  # Each exception needs a reason.
+  permitted_exceptions: []
+
+# Enforceable rules. Most packs accept the defaults.
+rules:
+  no_em_dashes: true
+  no_ascii_double_hyphen_between_letters: true
+  no_sentence_starters: []
+
+# Pop-culture franchises this voice does or doesn't reference.
+pop_culture:
+  allowed: []
+  banned: []
+
+# Format add-ons (instructions for rewriting drafts in a specific shape).
+# Add entries here as you create files under formats/.
+formats: []
+
+# Voice exemplars (real passages this voice has written; the LLM uses them
+# for tone-matching). Add entries here as you create files under samples/.
+samples: []
+
+# Standing bios. The four below are recommended starting points; delete
+# any you don't need.
+bios:
+  - name: twitter
+    file: bios/twitter.md
+    max_chars: 160
+    description: "Twitter/X profile bio"
+  - name: conference-speaker
+    file: bios/conference-speaker.md
+    target_words: 75
+    description: "CFP submissions and event programs"
+  - name: linkedin-about
+    file: bios/linkedin-about.md
+    max_chars: 1700
+    description: "LinkedIn About section"
+  - name: book-jacket
+    file: bios/book-jacket.md
+    target_words: 150
+    third_person: true
+    description: "Book endorsements and foreword credits"

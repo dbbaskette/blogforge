@@ -1,0 +1,9 @@
+- **Concrete over abstract.** Name the thing. Show the example. Replace "improves performance" with the actual number.
+- **Earn every sentence.** If a sentence does not carry weight, cut it. Shorter is usually stronger.
+- **Vary sentence length.** Mix short and long for rhythm. Uniform cadence reads like a machine.
+- **Strong verbs.** Prefer one precise verb over an adjective-adverb stack. "Slashed" beats "significantly reduced."
+- **Specifics over claims.** Numbers, names, and examples beat vague praise.
+- **One idea per sentence.** Split any sentence trying to do two jobs.
+- **Active voice by default.** Name who does what. Use passive voice only when the actor genuinely does not matter.
+- **Cut hedging and filler.** Drop "very," "really," "quite," "in order to," and throat-clearing intros.
+- **Read it aloud.** If a person would not say it that way, rewrite it. Never robotic.
