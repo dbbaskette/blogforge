@@ -11,7 +11,7 @@ applications:
     services:
       - blogforge-postgres
       - blogforge-s3
-      - tanzu-all-models
+      - blogforge-ai
     env:
       # ----------------------------------------------------------------------
       # Non-secret, per-environment values come from the vars file:
