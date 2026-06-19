@@ -16,11 +16,9 @@ applications:
       # Non-secret, per-environment values come from the vars file:
       #   cf push --vars-file vars.yml
       #
-      # SECRETS ARE NOT IN THIS FILE OR THE VARS FILE. Set them once via
-      # cf set-env (they persist across pushes); then `cf restage`:
-      #   cf set-env ((app_name)) BLOGFORGE_GITHUB_CLIENT_ID     <client-id>
-      #   cf set-env ((app_name)) BLOGFORGE_GITHUB_CLIENT_SECRET <client-secret>
-      #   cf set-env ((app_name)) BLOGFORGE_SESSION_SECRET       <64-char-hex>
+      # Secrets ALSO come from the vars file. vars.yml is gitignored — NEVER
+      # commit real values; vars.example.yml ships placeholders only. The keys:
+      #   github_client_id, github_client_secret, session_secret
       #
       # The Tanzu config adapter maps VCAP_SERVICES -> BLOGFORGE_DATABASE_URL
       # and BLOGFORGE_S3_* at startup (postgres + s3 bindings above).
@@ -32,6 +30,10 @@ applications:
       BLOGFORGE_ADMIN_EMAIL: ((admin_email))
       BLOGFORGE_GITHUB_ALLOWLIST: ((github_allowlist))
       BLOGFORGE_GITHUB_ADMIN_LOGIN: ((github_admin_login))
+      # Secrets, interpolated from vars.yml (gitignored) — see vars.example.yml.
+      BLOGFORGE_GITHUB_CLIENT_ID: ((github_client_id))
+      BLOGFORGE_GITHUB_CLIENT_SECRET: ((github_client_secret))
+      BLOGFORGE_SESSION_SECRET: ((session_secret))
       # Production serves over TLS — sign session cookies as Secure.
       BLOGFORGE_COOKIE_SECURE: "true"
       BLOGFORGE_S3_BUCKET: blogforge
