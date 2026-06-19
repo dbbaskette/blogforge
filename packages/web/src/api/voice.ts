@@ -176,6 +176,35 @@ export function distill(body?: { provider?: string; model?: string }): Promise<V
 }
 
 // ---------------------------------------------------------------------------
+// LinkedIn import
+// ---------------------------------------------------------------------------
+
+/**
+ * Multipart LinkedIn data-export upload — must let the browser set
+ * Content-Type so the boundary is generated automatically. Bypasses the
+ * api() wrapper and calls fetch directly (mirrors uploadSampleFile).
+ */
+export async function importLinkedIn(file: File): Promise<VoiceProfile> {
+  const form = new FormData();
+  form.append("file", file);
+  const BASE = import.meta.env.VITE_API_URL ?? "";
+  const res = await fetch(`${BASE}/api/voice/import/linkedin`, {
+    method: "POST",
+    body: form,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {
+      const j = await res.json();
+      detail = typeof j?.detail === "string" ? j.detail : (j?.detail?.error?.message ?? JSON.stringify(j));
+    } catch { /* ignore */ }
+    throw Object.assign(new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`), { status: res.status });
+  }
+  return (await res.json()) as VoiceProfile;
+}
+
+// ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
 

@@ -54,6 +54,7 @@ vi.mock("../../src/api/voice", () => {
     listSources: vi.fn().mockResolvedValue([]),
     addUrlSource: vi.fn().mockResolvedValue({ id: "src1", url: "https://example.com", name: "Example", status: "ready", extracted_chars: 0, added_at: "2026-01-01T00:00:00Z" }),
     deleteSource: vi.fn().mockResolvedValue(undefined),
+    importLinkedIn: vi.fn().mockResolvedValue(profile),
   };
 });
 
