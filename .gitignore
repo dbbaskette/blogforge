@@ -48,3 +48,9 @@ myvoice-centered-check.png
 
 # run-local.sh standalone SQLite data
 local-data/
+
+# CF deploy vars — per-environment, may hold non-public values.
+# Commit vars.example.yml only; copy it to vars.yml (gitignored) per foundation.
+vars.yml
+vars-*.yml
+!vars.example.yml

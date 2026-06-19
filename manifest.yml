@@ -1,29 +1,38 @@
 ---
 applications:
-  - name: blogforge
+  - name: ((app_name))
     memory: 512M
     instances: 1
     buildpacks:
       - python_buildpack
     command: blogforge serve --host 0.0.0.0 --port $PORT
+    routes:
+      - route: ((app_name)).((apps_domain))
     services:
       - blogforge-postgres
       - blogforge-s3
     env:
-      # Required at deploy time:
-      #   cf set-env blogforge BLOGFORGE_ADMIN_PASSWORD <strong-secret>
-      #   cf set-env blogforge BLOGFORGE_SESSION_SECRET <64-char-hex>
-      # The Tanzu config adapter translates VCAP_SERVICES into
-      # BLOGFORGE_DATABASE_URL and BLOGFORGE_S3_* at startup.
-      BLOGFORGE_ADMIN_EMAIL: dbbaskette@gmail.com
+      # ----------------------------------------------------------------------
+      # Non-secret, per-environment values come from the vars file:
+      #   cf push --vars-file vars.yml
+      #
+      # SECRETS ARE NOT IN THIS FILE OR THE VARS FILE. Set them once via
+      # cf set-env (they persist across pushes); then `cf restage`:
+      #   cf set-env ((app_name)) BLOGFORGE_GITHUB_CLIENT_ID     <client-id>
+      #   cf set-env ((app_name)) BLOGFORGE_GITHUB_CLIENT_SECRET <client-secret>
+      #   cf set-env ((app_name)) BLOGFORGE_SESSION_SECRET       <64-char-hex>
+      #
+      # The Tanzu config adapter maps VCAP_SERVICES -> BLOGFORGE_DATABASE_URL
+      # and BLOGFORGE_S3_* at startup (postgres + s3 bindings above).
+      # ----------------------------------------------------------------------
+      BLOGFORGE_PUBLIC_URL: https://((app_name)).((apps_domain))
+      BLOGFORGE_ADMIN_EMAIL: ((admin_email))
+      BLOGFORGE_GITHUB_ALLOWLIST: ((github_allowlist))
+      BLOGFORGE_GITHUB_ADMIN_LOGIN: ((github_admin_login))
+      # Production serves over TLS — sign session cookies as Secure.
+      BLOGFORGE_COOKIE_SECURE: "true"
       BLOGFORGE_S3_BUCKET: blogforge
       BLOGFORGE_S3_REGION: us-east-1
       BLOGFORGE_RUN_MIGRATIONS_ON_BOOT: "true"
-      # Empty by default — when api and web share an origin, CORS is unnecessary.
+      # Empty — api and web share an origin, so CORS is unnecessary.
       BLOGFORGE_CORS_ORIGINS: ""
-      BLOGFORGE_GITHUB_ALLOWLIST: dbbaskette
-      BLOGFORGE_GITHUB_ADMIN_LOGIN: dbbaskette
-      # GitHub OAuth secrets + public URL — set at deploy time, do not commit:
-      #   cf set-env blogforge BLOGFORGE_GITHUB_CLIENT_ID <client-id>
-      #   cf set-env blogforge BLOGFORGE_GITHUB_CLIENT_SECRET <client-secret>
-      #   cf set-env blogforge BLOGFORGE_PUBLIC_URL https://<app-route>
