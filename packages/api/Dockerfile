@@ -26,22 +26,22 @@ RUN pip install --no-cache-dir uv==0.5.0
 # Copy project metadata + the pinned dependency lock. README is required
 # because pyproject.toml declares `readme = "README.md"` and hatchling
 # validates the file at wheel-build time.
-COPY pyproject.toml uv.lock README.md requirements.lock /app/
+COPY pyproject.toml uv.lock README.md requirements.txt /app/
 
 # Install PINNED dependencies BEFORE copying app source. Two reasons this
 # matters:
 #   1. Determinism — `uv pip install -e .` re-resolves to the latest matching
 #      releases on every build (e.g. idna 3.16 → 3.18), so a freshly-published
 #      transitive dep is a cache miss → fresh download → build breaks the moment
-#      the network hiccups. requirements.lock pins exact versions, so the
+#      the network hiccups. requirements.txt pins exact versions, so the
 #      BuildKit uv cache stays valid build-to-build.
 #   2. Layer caching — keyed only on the lockfiles, so editing application code
 #      never re-runs this step. Code-only rebuilds are fully offline.
 # Regenerate the lock after changing deps with:
-#   uv export --frozen --no-emit-project --no-dev --no-hashes -o requirements.lock
+#   uv export --frozen --no-emit-project --no-dev --no-hashes -o requirements.txt
 ENV UV_CACHE_DIR=/root/.cache/uv
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system -r requirements.lock
+    uv pip install --system -r requirements.txt
 
 COPY packages/api /app/packages/api
 
@@ -52,7 +52,7 @@ COPY --from=web /work/packages/web/dist /app/packages/api/blogforge/static
 # source tree's well-known paths (parents[1] of blogforge/server.py) stay
 # reachable at runtime (a non-editable wheel puts __file__ in site-packages/
 # and the migrations lookup resolves into alembic's own dir, crashing on boot).
-# --no-deps: dependencies are already installed from requirements.lock above.
+# --no-deps: dependencies are already installed from requirements.txt above.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system --no-deps -e .
 
