@@ -1,0 +1,16 @@
+.git
+.venv
+local-venv
+node_modules
+**/node_modules
+packages/web
+local-data
+docs
+**/__pycache__
+.pytest_cache
+.ruff_cache
+**/tests
+*.db
+vars.yml
+vars-*.yml
+.cf-smoke.db
