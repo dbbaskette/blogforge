@@ -1,0 +1,6 @@
+# Forbidden sentence openers (classic AI connectors).
+Absolutely
+Certainly
+Moreover
+Furthermore
+Additionally

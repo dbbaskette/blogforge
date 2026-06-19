@@ -95,7 +95,7 @@ async def generate_document(
 ) -> str:
     """Compose the entire post in one call. Returns the full markdown body
     (``## `` headings + prose), to be split via :func:`split_document`."""
-    from myvoice import compose_prompt
+    from blogforge.voice import compose_prompt
 
     sample_ids = _auto_pick_samples(manifest, n=3)
     system = compose_prompt(

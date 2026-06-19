@@ -104,7 +104,7 @@ async def transform_text(
 ) -> str:
     """Return ``text`` rewritten per ``action`` (or ``instruction`` when
     ``action == "custom"``), in the draft's voice."""
-    from myvoice import compose_prompt
+    from blogforge.voice import compose_prompt
 
     sample_ids = _auto_pick_samples(manifest, n=3)
     system = compose_prompt(

@@ -1,0 +1,8 @@
+- **Negation / antithesis.** Do not set up a contrast just to knock it down. Avoid "It's not just X, it's Y", "not only A but also B", "X isn't just about Y", "X is more than just Y". State the affirmative directly. Before: "This isn't a tool, it's a movement." After: "This tool cuts deploy time from an hour to a minute."
+- **Don't dodge plain verbs.** Use "is" and "has". Avoid inflating them into "serves as", "stands as", "boasts", "represents a", "plays a vital role", "leaves an indelible mark". Before: "The API serves as a gateway that boasts low latency." After: "The API is the gateway. It adds 5ms."
+- **Don't force the rule of three.** AI pads with triplets ("fast, simple, and reliable"). Use a triplet only when all three earn their place; otherwise one strong term wins.
+- **No participle tack-ons.** Don't append fake significance with "-ing" clauses: "..., highlighting its importance", "..., creating a seamless experience", "..., reflecting a broader trend." End the sentence.
+- **No puffery.** Drop travel-brochure and press-release adjectives: "nestled in the heart of", "rich tapestry", "vibrant community", "breathtaking". Name the specific thing instead.
+- **No vague attribution.** Don't cite "experts", "studies show", "industry reports", or "observers note" without a real source. Name it or cut it.
+- **Synthesize, don't summarize.** Connect ideas and show what they mean or why they matter; don't just list them one after another.
+- **Skip generic praise adjectives.** Words like "significant", "important", "effective", and "essential" say nothing on their own. Replace them with the specific reason or number that makes the point.

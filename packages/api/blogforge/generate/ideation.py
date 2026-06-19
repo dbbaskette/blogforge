@@ -212,7 +212,7 @@ async def stream_ideation(
     (which may be None if the model didn't emit a JSON block).
     """
     if pack_root is not None:
-        from myvoice import compose_prompt
+        from blogforge.voice import compose_prompt
 
         sample_ids = _auto_pick_samples(manifest, n=2)
         system = compose_prompt(

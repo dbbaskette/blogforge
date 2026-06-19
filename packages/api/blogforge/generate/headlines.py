@@ -83,7 +83,7 @@ async def generate_headlines(
     n: int = 5,
 ) -> list[str]:
     """Return up to ``n`` title or hook options for the draft, in voice."""
-    from myvoice import compose_prompt
+    from blogforge.voice import compose_prompt
 
     sample_ids = _auto_pick_samples(manifest, n=3)
     system = compose_prompt(

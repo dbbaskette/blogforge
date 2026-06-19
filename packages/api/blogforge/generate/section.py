@@ -112,7 +112,7 @@ async def stream_section(
     `instruction` is an optional author note steering this regeneration
     ("tighten this", "add a concrete example", "less formal"); when set
     it's appended to the user prompt as an explicit revision directive."""
-    from myvoice import compose_prompt
+    from blogforge.voice import compose_prompt
 
     sample_ids = _auto_pick_samples(manifest, n=3)
     system = compose_prompt(

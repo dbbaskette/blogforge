@@ -22,7 +22,6 @@ dependencies = [
     "httpx>=0.27",
     "itsdangerous>=2.2",
     "jinja2>=3.1",
-    "myvoice>=0.1.0",
     "openai>=1.50",
     # asyncpg is the async runtime driver; psycopg2-binary covers alembic
     # migrations (env.py strips +asyncpg from the URL, so sqlalchemy
@@ -48,7 +47,11 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build]
-artifacts = ["packages/api/blogforge/static/**/*"]
+artifacts = [
+    "packages/api/blogforge/static/**/*",
+    "packages/api/blogforge/voice/assets/**/*",
+    "packages/api/blogforge/voice/bundled_packs/**/*",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["packages/api/blogforge"]
@@ -88,10 +91,6 @@ python_version = "3.11"
 mypy_path = "packages/api"
 explicit_package_bases = true
 
-[[tool.mypy.overrides]]
-module = "myvoice.*"
-ignore_missing_imports = true
-
 # aiobotocore + botocore don't ship type stubs and aren't worth typing.
 [[tool.mypy.overrides]]
 module = ["aiobotocore.*", "botocore.*", "moto.*"]
@@ -111,5 +110,3 @@ disable_error_code = ["untyped-decorator", "no-any-return", "call-arg"]
 testpaths = ["packages/api/tests"]
 asyncio_mode = "auto"
 
-[tool.uv.sources]
-myvoice = { path = "../myvoice", editable = true }
