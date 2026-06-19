@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getVoiceProfile, voiceExportUrl } from "../api/voice";
+import { getVoiceProfile, voiceExportUrl, voiceGuideUrl } from "../api/voice";
 import type { VoiceProfile } from "../api/voice";
 import { DistilledStyle } from "../components/voice/DistilledStyle";
 import { PersonaCard } from "../components/voice/PersonaCard";
@@ -96,13 +96,14 @@ export function VoicePage(): JSX.Element {
           </h1>
           <p className="text-sm text-muted mt-2">{statusLine}</p>
         </div>
-        <a
-          href={voiceExportUrl()}
-          download
-          className="nb-btn nb-btn-sm nb-btn-ghost shrink-0 mt-2"
-        >
-          Download pack
-        </a>
+        <div className="flex gap-2 shrink-0 mt-2">
+          <a href={voiceExportUrl()} download className="nb-btn nb-btn-sm nb-btn-ghost">
+            Download pack
+          </a>
+          <a href={voiceGuideUrl()} download className="nb-btn nb-btn-sm nb-btn-ghost">
+            Download voice guide
+          </a>
+        </div>
       </header>
 
       <PersonaCard profile={profile} onChange={handleChange} />

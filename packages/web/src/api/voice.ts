@@ -187,3 +187,8 @@ export function distill(body?: { provider?: string; model?: string }): Promise<V
 export function voiceExportUrl(): string {
   return `/api/voice/export`;
 }
+
+/** URL for downloading the portable Markdown voice guide. */
+export function voiceGuideUrl(): string {
+  return `/api/voice/guide.md`;
+}
