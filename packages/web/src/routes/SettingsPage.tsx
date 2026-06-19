@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { revokeAllSessions } from "../api/auth";
+import { ProviderKeysCard } from "../components/settings/ProviderKeysCard";
 import { useMe } from "../hooks/useMe";
 
 export function SettingsPage(): JSX.Element {
@@ -43,6 +44,7 @@ export function SettingsPage(): JSX.Element {
         </div>
       </section>
 
+      <ProviderKeysCard />
       <SessionsCard />
     </div>
   );

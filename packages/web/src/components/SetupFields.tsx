@@ -163,7 +163,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
         const msg = e.message ?? String(e);
         if (msg.includes("provider_missing_key") || msg.includes("HTTP 400")) {
           setModelsError(
-            `${value.provider} rejected the configured key. An admin can replace it under /admin (API keys section).`,
+            `${value.provider} rejected the configured key. Add your key in Settings → Provider API keys.`,
           );
         } else {
           setModelsError(`Failed to load ${value.provider} models: ${msg}`);
@@ -339,7 +339,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
           className="text-xs px-3 py-2 rounded-nb-sm"
           style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
         >
-          No API key for {value.provider}. An admin can add one under /admin (API keys section).
+          No API key for {value.provider}. Add your key in Settings → Provider API keys.
         </p>
       )}
 

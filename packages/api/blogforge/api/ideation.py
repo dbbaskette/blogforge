@@ -26,9 +26,8 @@ from blogforge.generate.ideation import stream_ideation
 from blogforge.generate.references import get_reference_context
 from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import JobRegistry
-from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
-from blogforge.llm.registry import get_provider
+from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["ideation"])
@@ -113,19 +112,6 @@ async def post_ideation_message(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    api_key = await KeyVault().get(draft.idea.provider)
-    if not api_key:
-        raise HTTPException(
-            400,
-            detail={
-                "error": {
-                    "code": "provider_missing_key",
-                    "message": f"No API key for {draft.idea.provider}",
-                    "hint": "An admin can add one under /admin (API keys section).",
-                }
-            },
-        )
-
     if not await _try_claim(draft_id):
         raise HTTPException(
             409,
@@ -163,7 +149,6 @@ async def post_ideation_message(
         body.content,
         pack_root,
         draft.idea.provider,
-        api_key,
         draft.idea.model,
         current.id,
         next_pos + 1,  # assistant message position
@@ -180,7 +165,6 @@ async def _run_ideation(
     new_user_content: str,
     pack_root: Path,
     provider_name: str,
-    api_key: str,
     model: str,
     user_id: UUID,
     assistant_position: int,
@@ -205,7 +189,7 @@ async def _run_ideation(
         if bg:
             reference_context = f"{bg}\n\n{reference_context}" if reference_context else bg
 
-        provider = get_provider(provider_name, api_key)
+        provider = await build_provider_for(user_id, provider_name)
 
         await reg.set_stage(job_id, "ideation:start")
 

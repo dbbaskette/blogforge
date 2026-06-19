@@ -160,6 +160,18 @@ def create_app() -> FastAPI:
 
     install_exception_handler(app)
 
+    from blogforge.llm.exceptions import ProviderMissingKey
+    from fastapi.responses import JSONResponse
+
+    @app.exception_handler(ProviderMissingKey)
+    async def _missing_provider_key(_request, exc: ProviderMissingKey) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={"error": {"code": "provider_missing_key",
+                               "message": str(exc) or "No API key configured for this provider.",
+                               "hint": "Add your key in Settings → Provider API keys."}},
+        )
+
     if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -171,8 +183,8 @@ def create_app() -> FastAPI:
         )
 
     from blogforge.api.admin import router as admin_router
-    from blogforge.api.admin_keys import router as admin_keys_router
     from blogforge.api.auth import router as auth_router
+    from blogforge.api.keys import router as keys_router
     from blogforge.api.auth_github import router as auth_github_router
     from blogforge.api.claims import router as claims_router
     from blogforge.api.download import router as download_router
@@ -199,7 +211,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(auth_github_router)
     app.include_router(admin_router)
-    app.include_router(admin_keys_router)
+    app.include_router(keys_router)
     app.include_router(drafts_router)
     app.include_router(references_router)
     app.include_router(outline_router)

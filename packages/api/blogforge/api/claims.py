@@ -8,9 +8,8 @@ from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.claims import check_claims
 from blogforge.generate.references import get_reference_context
-from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
-from blogforge.llm.registry import get_provider
+from blogforge.llm.resolve import build_provider_for
 
 router = APIRouter(tags=["claims"])
 
@@ -34,21 +33,8 @@ async def claims(
             detail={"error": {"code": "empty_draft", "message": "Write some sections first."}},
         )
 
-    api_key = await KeyVault().get(draft.idea.provider)
-    if not api_key:
-        raise HTTPException(
-            400,
-            detail={
-                "error": {
-                    "code": "provider_missing_key",
-                    "message": f"No API key for {draft.idea.provider}",
-                    "hint": "An admin can add one under /admin (API keys section).",
-                }
-            },
-        )
-
     reference_context = await get_reference_context(draft.id, draft.references)
-    provider = get_provider(draft.idea.provider, api_key)
+    provider = await build_provider_for(current.id, draft.idea.provider)
     try:
         results = await check_claims(
             md, reference_context, provider, model=draft.idea.model

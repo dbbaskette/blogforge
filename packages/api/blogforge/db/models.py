@@ -199,24 +199,18 @@ class IdeationMessage(Base):
     draft: Mapped[Draft] = relationship(back_populates="ideation_messages")
 
 
-class ProviderKey(Base):
-    """Admin-managed LLM provider API key.
+class UserProviderKey(Base):
+    """Per-user, encrypted LLM provider API key."""
+    __tablename__ = "user_provider_keys"
 
-    One row per provider (anthropic, openai, google). `encrypted_key`
-    holds the SecretCipher ciphertext, never the raw key. `updated_by`
-    is the admin who last touched the row (for audit).
-    """
-
-    __tablename__ = "provider_keys"
-
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
     provider: Mapped[str] = mapped_column(String(32), primary_key=True)
     encrypted_key: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now
-    )
-    updated_by: Mapped[UUID | None] = mapped_column(
-        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
 

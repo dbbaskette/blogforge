@@ -1,22 +1,23 @@
-"""GET /api/providers — availability via KeyVault (admin-managed keys with
-myvoice fallback)."""
+"""GET /api/providers — availability via KeyVault (per-user keys)."""
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from blogforge.auth.dependencies import get_current_user
+from blogforge.db.models import User
 from blogforge.keys import SUPPORTED_PROVIDERS, KeyVault
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 
 
 @router.get("")
-async def list_providers() -> dict[str, bool]:
+async def list_providers(current: User = Depends(get_current_user)) -> dict[str, bool]:
     """Return availability map; never includes the keys themselves."""
     from blogforge.llm.claude_cli import claude_available
 
-    vault = KeyVault()
+    vault = KeyVault(current.id)
     out = {p: bool(await vault.get(p)) for p in SUPPORTED_PROVIDERS}
     # claude-cli isn't key-managed; it's available iff the binary is installed.
     out["claude-cli"] = claude_available()
@@ -24,9 +25,8 @@ async def list_providers() -> dict[str, bool]:
 
 
 @router.get("/{provider}/models")
-async def list_models(provider: str) -> list[dict[str, Any]]:
-    """Proxy to the provider's list_models, using the admin-managed key
-    (or the myvoice fallback if nothing's stored)."""
+async def list_models(provider: str, current: User = Depends(get_current_user)) -> list[dict[str, Any]]:
+    """Proxy to the provider's list_models, using the per-user key."""
     # claude-cli is keyless (CLI auth) — list its models without a vault key.
     if provider == "claude-cli":
         from blogforge.llm.claude_cli import ClaudeCliProvider
@@ -43,7 +43,7 @@ async def list_models(provider: str) -> list[dict[str, Any]]:
                 }
             },
         )
-    api_key = await KeyVault().get(provider)
+    api_key = await KeyVault(current.id).get(provider)
     if not api_key:
         raise HTTPException(
             400,
@@ -51,7 +51,7 @@ async def list_models(provider: str) -> list[dict[str, Any]]:
                 "error": {
                     "code": "provider_missing_key",
                     "message": f"No API key configured for {provider}.",
-                    "hint": "An admin can add one under /admin (API keys section).",
+                    "hint": "Add your key in Settings → Provider API keys.",
                 }
             },
         )

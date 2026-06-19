@@ -46,18 +46,9 @@ async def generate_hero(
     if draft is None:
         raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
 
-    api_key = await KeyVault().get("google")
+    api_key = await KeyVault(current.id).get("google")
     if not api_key:
-        raise HTTPException(
-            400,
-            detail={
-                "error": {
-                    "code": "provider_missing_key",
-                    "message": "Hero images need a Google API key.",
-                    "hint": "An admin can add the Google key under /admin (API keys section).",
-                }
-            },
-        )
+        raise ProviderMissingKey("google")
 
     prompt = body.prompt.strip() or build_hero_prompt(draft)
     try:

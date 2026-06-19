@@ -17,9 +17,8 @@ from blogforge.generate.document import generate_document, split_document
 from blogforge.generate.references import get_reference_context
 from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import JobRegistry
-from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
-from blogforge.llm.registry import get_provider
+from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["expand"])
@@ -76,19 +75,6 @@ async def expand_draft(
         draft, current.id, pack_store=pack_store
     )
 
-    api_key = await KeyVault().get(draft.idea.provider)
-    if not api_key:
-        raise HTTPException(
-            400,
-            detail={
-                "error": {
-                    "code": "provider_missing_key",
-                    "message": f"No API key for {draft.idea.provider}",
-                    "hint": "An admin can add one under /admin (API keys section).",
-                }
-            },
-        )
-
     job = await reg.create(JobType.EXPAND, draft_id=draft_id)
     background_tasks.add_task(
         _run_expand,
@@ -98,7 +84,6 @@ async def expand_draft(
         draft_id,
         pack_root,
         draft.idea.provider,
-        api_key,
         draft.idea.model,
         current.id,
         limit,
@@ -113,7 +98,6 @@ async def _run_expand(
     draft_id: str,
     pack_root: Path,
     provider_name: str,
-    api_key: str,
     model: str,
     user_id: UUID,
     limit: int | None = None,
@@ -130,7 +114,7 @@ async def _run_expand(
         manifest = yaml.safe_load(
             (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
         ) or {}
-        provider = get_provider(provider_name, api_key)
+        provider = await build_provider_for(user_id, provider_name)
         # Build reference context once per expand job (every section in this
         # draft sees the same materials), not per-section.
         reference_context = await get_reference_context(draft.id, draft.references)

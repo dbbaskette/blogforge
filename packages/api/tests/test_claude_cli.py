@@ -47,12 +47,14 @@ async def test_list_models_returns_cli_aliases() -> None:
 
 @pytest.mark.asyncio
 async def test_keyvault_claude_cli_sentinel_tracks_binary(monkeypatch: pytest.MonkeyPatch) -> None:
+    import uuid
     from blogforge.keys import KeyVault
 
+    dummy_user_id = uuid.uuid4()
     monkeypatch.setattr("blogforge.llm.claude_cli.shutil.which", lambda _: "/usr/bin/claude")
-    assert await KeyVault().get("claude-cli") == "cli"
+    assert await KeyVault(dummy_user_id).get("claude-cli") == "cli"
     monkeypatch.setattr("blogforge.llm.claude_cli.shutil.which", lambda _: None)
-    assert await KeyVault().get("claude-cli") == ""
+    assert await KeyVault(dummy_user_id).get("claude-cli") == ""
 
 
 def test_claude_available_reflects_path(monkeypatch: pytest.MonkeyPatch) -> None:
