@@ -83,6 +83,13 @@ _AI_INFLATION = re.compile(
     r"|plays? a (?:vital|crucial|pivotal|key|central) role)\b",
     re.IGNORECASE,
 )
+_AI_VAGUE_ATTRIBUTION = re.compile(
+    r"\b(?:experts?|researchers?|scientists?|analysts?|observers?|critics?|"
+    r"studies|research|industry\s+reports?|sources)\s+"
+    r"(?:say|says|said|believe[sd]?|note[sd]?|suggest[s]?|show[s]?|report[s]?|"
+    r"claim[s]?|argue[s]?|agree[s]?|point\s+out|have\s+(?:shown|noted|argued|found))\b",
+    re.IGNORECASE,
+)
 
 
 def detect_positive_hits(text: str) -> list[LintHit]:
@@ -131,6 +138,8 @@ def detect_ai_patterns(text: str) -> list[LintHit]:
         (_AI_NEGATION, "ai_pattern:negation", "AI negation/antithesis pattern."),
         (_AI_NOT_ONLY, "ai_pattern:negation", "AI 'not only... but' pattern."),
         (_AI_INFLATION, "ai_pattern:inflation", "AI significance-inflation phrasing."),
+        (_AI_VAGUE_ATTRIBUTION, "ai_pattern:vague_attribution",
+         "Vague attribution — name the source or cut it."),
     )
     for pattern, rule_id, message in specs:
         for m in pattern.finditer(text):
