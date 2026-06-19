@@ -17,10 +17,11 @@ _BASE_URL = "https://api.openai.com/v1"
 class OpenAIProvider:
     name = "openai"
 
-    def __init__(self, api_key: str) -> None:
+    def __init__(self, api_key: str, base_url: str | None = None) -> None:
         if not api_key:
             raise ProviderMissingKey("openai")
         self._api_key = api_key
+        self._base_url = (base_url or _BASE_URL).rstrip("/")
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -28,7 +29,7 @@ class OpenAIProvider:
 
     async def list_models(self) -> list[ModelInfo]:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.get(f"{_BASE_URL}/models", headers=self._headers)
+            r = await client.get(f"{self._base_url}/models", headers=self._headers)
         if r.status_code == 401:
             raise ProviderMissingKey("openai")
         if r.status_code >= 400:
@@ -74,7 +75,7 @@ class OpenAIProvider:
             }
         async with httpx.AsyncClient(timeout=120.0) as client:
             r = await client.post(
-                f"{_BASE_URL}/chat/completions", headers=self._headers, json=body
+                f"{self._base_url}/chat/completions", headers=self._headers, json=body
             )
         self._raise_for_status(r)
         data = r.json()
@@ -114,7 +115,7 @@ class OpenAIProvider:
         }
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(
-                "POST", f"{_BASE_URL}/chat/completions", headers=self._headers, json=body
+                "POST", f"{self._base_url}/chat/completions", headers=self._headers, json=body
             ) as r:
                 if r.status_code >= 400:
                     body_text = await r.aread()
