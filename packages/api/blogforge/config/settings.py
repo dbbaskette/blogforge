@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     tanzu_models: Annotated[list[str], NoDecode] = Field(default_factory=lambda: [
         "openai/gpt-oss-120b", "Qwen/Qwen3.5-27B-GPTQ-Int4", "google/gemma-4-31B-it",
     ])
+    # Like s3_verify_ssl: the bound GenAI proxy presents a self-signed cert from
+    # the foundation's internal CA, so config/tanzu._apply_genai flips this to
+    # False for the bound gateway. Default True keeps real OpenAI strict.
+    tanzu_verify_ssl: bool = True
 
     s3_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "blogforge"
