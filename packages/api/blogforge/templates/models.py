@@ -16,8 +16,9 @@ class TemplateInput(BaseModel):
 
     name: str = Field(min_length=1, max_length=200)
     topic: str = ""
-    pack_slug: str = Field(min_length=1)
-    provider: Literal["anthropic", "openai", "google"]
+    # Empty in voice-profile mode (mirrors IdeaInput.pack_slug).
+    pack_slug: str = ""
+    provider: Literal["anthropic", "openai", "google", "claude-cli", "tanzu"]
     model: str = Field(min_length=1)
     target_words: int = Field(default=1500, ge=300, le=10000)
     format: str | None = None

@@ -118,6 +118,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
 
   const valueRef = useRef(value);
   valueRef.current = value;
+  const providerAutoPicked = useRef(false);
 
   // Load packs and providers on mount
   useEffect(() => {
@@ -128,6 +129,20 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
       .then(setProviders)
       .catch(() => {});
   }, []);
+
+  // Once, after availability loads: if the saved/default provider has no
+  // key/service (e.g. the "anthropic" default on a Tanzu-only deploy), switch
+  // to the first available one. Guarded so it never fights a later manual pick.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot on providers load; reads valueRef + stable onChange
+  useEffect(() => {
+    if (providerAutoPicked.current || Object.keys(providers).length === 0) return;
+    providerAutoPicked.current = true;
+    if (!providers[valueRef.current.provider]) {
+      const order: Provider[] = ["anthropic", "openai", "google", "claude-cli", "tanzu"];
+      const next = order.find((p) => providers[p]);
+      if (next) onChange({ ...valueRef.current, provider: next });
+    }
+  }, [providers, onChange]);
 
   // Load formats when pack_slug changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when pack_slug changes; reading value.format inside is intentional

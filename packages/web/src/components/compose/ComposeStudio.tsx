@@ -244,11 +244,12 @@ export function ComposeStudio(): JSX.Element {
         >
           {advancedOpen ? "▲ Hide advanced" : "▼ Advanced"}
         </button>
-        {advancedOpen && (
-          <div className="glass-card p-4 mt-3">
-            <SetupFields value={settings} onChange={setSettings} />
-          </div>
-        )}
+        {/* Always mounted so its load + auto-select effects populate pack/
+            provider/model even when collapsed (the quick flows submit these);
+            just visually hidden until the user opens Advanced. */}
+        <div className={advancedOpen ? "glass-card p-4 mt-3" : "hidden"}>
+          <SetupFields value={settings} onChange={setSettings} />
+        </div>
       </div>
     </div>
   );
