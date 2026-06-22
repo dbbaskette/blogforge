@@ -271,6 +271,19 @@ _PROVIDER_DEFAULTS: dict[str, str] = {
 }
 
 
+def _default_model(provider_name: str) -> str:
+    """Default chat model for a provider when the caller didn't pick one.
+
+    `tanzu` has no static default — the served models come from the binding —
+    so fall back to the first configured Tanzu model (NOT the anthropic
+    default, which the GenAI gateway doesn't serve and would 404 on)."""
+    if provider_name == "tanzu":
+        from blogforge.config import get_settings
+        models = get_settings().tanzu_models
+        return models[0] if models else "openai/gpt-oss-120b"
+    return _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
+
+
 async def _auto_select_provider(user_id) -> str | None:
     from blogforge.config import get_settings
     from blogforge.keys import KeyVault
@@ -312,7 +325,7 @@ async def distill(
             },
         )
 
-    model = body.model or _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
+    model = body.model or _default_model(provider_name)
     provider = await build_provider_for(current.id, provider_name)
 
     # --- load sample texts from S3 ---
@@ -365,7 +378,7 @@ async def import_linkedin(
     identity, one_line, tone = "", parsed.headline, ""
     if provider_name:
         prov = await build_provider_for(current.id, provider_name)
-        mdl = model or _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
+        mdl = model or _default_model(provider_name)
         try:
             resp = await prov.complete(
                 model=mdl, prompt=build_persona_prompt(parsed.headline, parsed.summary), json_schema=PERSONA_SCHEMA

@@ -104,6 +104,11 @@ def _apply_genai(instances: list[tuple[str, dict[str, Any]]]) -> None:
             _set_if_unset("BLOGFORGE_TANZU_API_BASE", base)
         if key:
             _set_if_unset("BLOGFORGE_TANZU_API_KEY", key)
+        # Same self-signed-cert story as SeaweedFS: the GenAI proxy serves a
+        # foundation-internal cert the container doesn't trust, so every LLM
+        # call would fail TLS verification. Disable it for the bound gateway
+        # (overridable via `cf set-env BLOGFORGE_TANZU_VERIFY_SSL true`).
+        _set_if_unset("BLOGFORGE_TANZU_VERIFY_SSL", "false")
         return
 
 

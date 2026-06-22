@@ -17,18 +17,21 @@ _BASE_URL = "https://api.openai.com/v1"
 class OpenAIProvider:
     name = "openai"
 
-    def __init__(self, api_key: str, base_url: str | None = None) -> None:
+    def __init__(self, api_key: str, base_url: str | None = None, verify_ssl: bool = True) -> None:
         if not api_key:
             raise ProviderMissingKey("openai")
         self._api_key = api_key
         self._base_url = (base_url or _BASE_URL).rstrip("/")
+        # Verify the endpoint's TLS cert. True for real OpenAI; subclasses
+        # talking to a self-signed gateway (Tanzu) pass False.
+        self._verify_ssl = verify_ssl
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
 
     async def list_models(self) -> list[ModelInfo]:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, verify=self._verify_ssl) as client:
             r = await client.get(f"{self._base_url}/models", headers=self._headers)
         if r.status_code == 401:
             raise ProviderMissingKey("openai")
@@ -73,7 +76,7 @@ class OpenAIProvider:
                 "type": "json_schema",
                 "json_schema": {"name": "result", "schema": json_schema, "strict": True},
             }
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=120.0, verify=self._verify_ssl) as client:
             r = await client.post(
                 f"{self._base_url}/chat/completions", headers=self._headers, json=body
             )
@@ -113,7 +116,7 @@ class OpenAIProvider:
             "stream_options": {"include_usage": True},
             "messages": [{"role": "user", "content": prompt}],
         }
-        async with httpx.AsyncClient(timeout=None) as client:
+        async with httpx.AsyncClient(timeout=None, verify=self._verify_ssl) as client:
             async with client.stream(
                 "POST", f"{self._base_url}/chat/completions", headers=self._headers, json=body
             ) as r:
