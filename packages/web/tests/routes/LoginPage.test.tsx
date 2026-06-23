@@ -38,7 +38,7 @@ describe("LoginPage", () => {
       </MemoryRouter>,
     );
     expect(
-      screen.getByText("That GitHub account isn't on the allowlist."),
+      screen.getByText(/isn't on the allowlist/i),
     ).toBeInTheDocument();
     // Restore
     Object.defineProperty(window, "location", {

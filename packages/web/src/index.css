@@ -246,6 +246,11 @@ body {
   color: #1f2328;
   border-color: transparent;
 }
+/* Active route in the top nav (NavLink sets aria-current="page"). */
+.nb-btn-ghost[aria-current="page"] {
+  background: rgba(47, 107, 255, 0.1);
+  color: #1741b8;
+}
 
 .nb-btn-sm {
   padding: 5px 10px;
@@ -336,4 +341,17 @@ input[type="range"] {
 .lint-flash {
   animation: lint-flash 1.4s ease-out;
   border-radius: 12px;
+}
+
+/* Respect the OS "reduce motion" preference: neutralize the fade/slide/expand
+   animations applied across routes and panels. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { logout } from "../api/auth";
 import { useMe } from "../hooks/useMe";
@@ -78,19 +78,25 @@ function TopBar(): JSX.Element {
           </span>
         </Link>
         {user && (
-          <nav className="flex items-center gap-2">
-            {user.role === "admin" && (
-              <Link to="/admin" className="nb-btn-ghost nb-btn nb-btn-sm">
-                Admin
-              </Link>
-            )}
-            <Link to="/voice" className="nb-btn-ghost nb-btn nb-btn-sm">
+          <nav className="flex items-center gap-1 sm:gap-2">
+            <NavLink to="/" end className="nb-btn-ghost nb-btn nb-btn-sm">
+              Drafts
+            </NavLink>
+            <NavLink to="/voice" className="nb-btn-ghost nb-btn nb-btn-sm">
               Your Voice
-            </Link>
-            <Link to="/settings" className="nb-btn-ghost nb-btn nb-btn-sm">
+            </NavLink>
+            <NavLink to="/settings" className="nb-btn-ghost nb-btn nb-btn-sm">
               Settings
-            </Link>
-            <span className="inline-flex items-center gap-1.5 hidden sm:inline-flex">
+            </NavLink>
+            {user.role === "admin" && (
+              <NavLink to="/admin" className="nb-btn-ghost nb-btn nb-btn-sm">
+                Admin
+              </NavLink>
+            )}
+            <NavLink to="/compose" className="nb-btn nb-btn-sm nb-btn-primary ml-1">
+              ✍ Compose
+            </NavLink>
+            <span className="inline-flex items-center gap-1.5 hidden sm:inline-flex ml-1">
               {user.avatar_url && (
                 <img
                   src={user.avatar_url}
