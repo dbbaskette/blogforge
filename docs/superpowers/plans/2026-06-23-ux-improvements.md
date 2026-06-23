@@ -9,9 +9,10 @@ Source: the 18-item UX review (compose, draft editor, voice/onboarding/settings,
 - [x] #14 Global `prefers-reduced-motion` opt-out
 
 ## Batch 2 — Shared primitives (foundation for later batches)
-- [ ] #15 `ConfirmDialog` (wire the orphaned `DeleteDraftDialog`), `.nb-btn-danger`, shared `ErrorBanner`; replace native `confirm()` (Drafts/Trash/Settings/Voice)
-- [ ] #7 toast/notification context + `ErrorBoundary` + global 401 handling in `api/client.ts`
-- [ ] #13 modal primitive (focus trap, `aria-modal`, Escape, restore focus) applied to dialogs + side panels; mode picker as radiogroup
+- [x] #15 `ConfirmDialog` + `useConfirm` (promise-based, focus-trapped); `.nb-btn-danger`; replaced native `confirm()` (Drafts/Trash/Settings/SamplesList/SourcesCard); retired orphaned `DeleteDraftDialog`. (2a)
+- [x] #7 `ErrorBoundary` at root + global 401 handling in `api/client.ts`. (2a) — *toast/notification context deferred to a later batch where success feedback is wired (5/6).*
+- [x] #13 `useDialogA11y` (focus trap + Escape + restore focus) applied to RepurposePanel/HeadlineLab/LintPanel; ModePicker → radiogroup. (2b)
+- [ ] *Deferred:* shared `ErrorBanner` + dedup of the per-screen red banners → folded into Batch 6 polish.
 
 ## Batch 3 — Data-loss & save model (critical)
 - [ ] #1 section editor dirty-tracking + autosave + `beforeunload` guard; honest global "saved" indicator (`MarkdownEditor`, `DraftWorkspace`)

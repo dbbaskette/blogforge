@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { generateHeadlines } from "../../api/drafts";
 import { Icon } from "../ui/Icon";
+import { useDialogA11y } from "../ui/useDialogA11y";
 
 type Kind = "title" | "hook";
 
@@ -40,21 +41,20 @@ export function HeadlineLab({
   };
 
   const current = options[kind];
+  const panelRef = useDialogA11y(true, onClose);
 
   return (
     <div
       className="fixed inset-0 z-40 flex justify-end bg-ink/30 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
-      }}
       role="presentation"
     >
-      <dialog
-        open
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
         className="w-[460px] max-w-full bg-canvas border-l border-rule-2 h-full overflow-y-auto shadow-nb-pop m-0 p-0 text-ink animate-slide-in-right"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
         aria-label="Headline and hook lab"
       >
         <header className="px-6 pt-6 pb-4 border-b border-rule bg-white sticky top-0 z-10">
@@ -148,7 +148,7 @@ export function HeadlineLab({
             ))}
           </ul>
         </div>
-      </dialog>
+      </div>
     </div>
   );
 }

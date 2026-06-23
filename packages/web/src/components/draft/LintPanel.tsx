@@ -10,6 +10,7 @@ import {
 } from "../../api/drafts";
 import { dismiss as dismissFinding, loadDismissed, restore } from "../../lib/lintDismissals";
 import { Icon } from "../ui/Icon";
+import { useDialogA11y } from "../ui/useDialogA11y";
 
 interface LintPanelProps {
   draft: Draft;
@@ -103,8 +104,13 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
     }
   };
 
+  const panelRef = useDialogA11y(true, onClose);
+
   return (
-    <aside
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
       className="fixed right-0 top-0 z-30 h-full w-[420px] max-w-full overflow-y-auto glass-card border-l border-rule shadow-glass-lg animate-slide-in-right"
       aria-label="Proofreader"
     >
@@ -224,7 +230,7 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
           />
         </div>
       )}
-    </aside>
+    </div>
   );
 }
 
