@@ -24,6 +24,9 @@ interface SectionsPanelProps {
   onReorder: (section_ids: string[]) => Promise<void>;
   /** Compose the whole post in a single pass from the outline. */
   onExpandUnfilled: () => Promise<void>;
+  /** Fill only the still-unwritten sections — used to recover from a partial
+   * compose failure without re-composing (and re-paying for) the whole draft. */
+  onComposeRemaining: () => Promise<void>;
   /** Holistic, whole-draft revision against a single author instruction. */
   onReviseDraft: (instruction: string) => Promise<void>;
   /** Optional right-rail block, typically a collapsible ReferencesList. */
@@ -45,6 +48,7 @@ export function SectionsPanel({
   onRevertSection,
   onReorder,
   onExpandUnfilled,
+  onComposeRemaining,
   onReviseDraft,
   references,
 }: SectionsPanelProps): JSX.Element {
@@ -234,15 +238,30 @@ export function SectionsPanel({
           style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
         >
           <p className="text-[11px] font-semibold uppercase tracking-wider">Generation failed</p>
-          <p className="text-sm mt-1">{jobError.message}</p>
+          <p className="text-sm mt-1">
+            {writtenCount > 0
+              ? `Composed ${writtenCount} of ${total} section${total === 1 ? "" : "s"}, then failed: ${jobError.message}`
+              : jobError.message}
+          </p>
           {jobError.hint && <p className="text-xs mt-1 opacity-80">{jobError.hint}</p>}
-          <button
-            type="button"
-            onClick={onDismissJobError}
-            className="mt-2 text-xs font-medium underline underline-offset-2 hover:no-underline"
-          >
-            dismiss
-          </button>
+          <div className="mt-2 flex items-center gap-3">
+            {unfilledCount > 0 && !jobRunning && (
+              <button
+                type="button"
+                onClick={() => onComposeRemaining()}
+                className="nb-btn nb-btn-primary nb-btn-sm"
+              >
+                Compose remaining →
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onDismissJobError}
+              className="text-xs font-medium underline underline-offset-2 hover:no-underline"
+            >
+              dismiss
+            </button>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { type RepurposeFormat, listRepurposeFormats, repurposeDraft } from "../../api/drafts";
+import { useElapsed } from "../../hooks/useElapsed";
 import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
@@ -16,6 +17,7 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const secs = useElapsed(loading);
 
   useEffect(() => {
     listRepurposeFormats()
@@ -109,7 +111,7 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
                 aria-hidden
                 className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"
               />
-              <span className="text-sm font-medium">Repurposing…</span>
+              <span className="text-sm font-medium">Repurposing… {secs}s</span>
             </div>
           )}
 

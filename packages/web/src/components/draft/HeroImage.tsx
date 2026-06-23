@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { deleteHeroImage, generateHeroImage, heroImageUrl } from "../../api/drafts";
+import { useElapsed } from "../../hooks/useElapsed";
 
 interface HeroImageProps {
   draftId: string;
@@ -17,6 +18,7 @@ export function HeroImage({ draftId, heroKey, onChanged }: HeroImageProps): JSX.
   const [error, setError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [showPrompt, setShowPrompt] = useState(false);
+  const secs = useElapsed(busy);
 
   const generate = async (): Promise<void> => {
     setBusy(true);
@@ -58,7 +60,7 @@ export function HeroImage({ draftId, heroKey, onChanged }: HeroImageProps): JSX.
           <div className="flex items-center gap-2">
             {error && <span className="text-xs text-rose-ink">{error}</span>}
             <button type="button" onClick={generate} disabled={busy} className="nb-btn nb-btn-sm">
-              {busy ? "Working…" : "Regenerate"}
+              {busy ? `Working… ${secs}s` : "Regenerate"}
             </button>
             <button
               type="button"
@@ -97,10 +99,11 @@ export function HeroImage({ draftId, heroKey, onChanged }: HeroImageProps): JSX.
             disabled={busy}
             className="nb-btn nb-btn-primary nb-btn-sm"
           >
-            {busy ? "Generating…" : "Generate hero image"}
+            {busy ? `Generating… ${secs}s` : "Generate hero image"}
           </button>
         </div>
       </div>
+      {busy && <p className="text-xs text-muted mt-2">This can take 20–30s.</p>}
       {showPrompt && (
         <textarea
           value={prompt}

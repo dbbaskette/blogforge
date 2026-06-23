@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { distill, updateDistilled } from "../../api/voice";
 import type { VoiceProfile } from "../../api/voice";
+import { useElapsed } from "../../hooks/useElapsed";
 import { useConfirm } from "../ui/ConfirmDialog";
 
 interface DistilledStyleProps {
@@ -17,6 +18,7 @@ export function DistilledStyle({ profile, onChange }: DistilledStyleProps): JSX.
   const [distilling, setDistilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const secs = useElapsed(distilling);
 
   const save = async (): Promise<void> => {
     if (text === profile.distilled_style_md) return;
@@ -125,7 +127,7 @@ export function DistilledStyle({ profile, onChange }: DistilledStyleProps): JSX.
                   aria-hidden
                   className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
                 />
-                Reading your samples…
+                Reading your samples… {secs}s
               </>
             ) : (
               "Re-distill from samples"

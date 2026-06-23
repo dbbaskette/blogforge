@@ -43,10 +43,14 @@ describe("ComposeStudio", () => {
     expect(screen.getByText(/Blank page/)).toBeInTheDocument();
   });
 
+  // The pre-flight guard disables the run buttons until an available provider +
+  // model resolve (async). Wait for the button to enable before clicking.
   it("Blank mode creates a draft and navigates to the editor", async () => {
     renderStudio();
     fireEvent.click(screen.getByText(/Blank page/));
-    fireEvent.click(screen.getByRole("button", { name: /open editor/i }));
+    const btn = screen.getByRole("button", { name: /open editor/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
     await waitFor(() => expect(createDraft).toHaveBeenCalled());
     expect(navigate).toHaveBeenCalledWith("/drafts/d1");
   });
@@ -55,7 +59,9 @@ describe("ComposeStudio", () => {
     renderStudio();
     fireEvent.click(screen.getByText(/I have an outline/));
     fireEvent.change(screen.getByLabelText(/your outline/i), { target: { value: "# T\n## One\n## Two" } });
-    fireEvent.click(screen.getByRole("button", { name: /write draft/i }));
+    const btn = screen.getByRole("button", { name: /write draft/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
     await waitFor(() => expect(expandSections).toHaveBeenCalledWith("d1"));
     expect(createDraft).toHaveBeenCalled();
     expect(updateDraft).toHaveBeenCalledWith("d1", expect.objectContaining({
@@ -68,7 +74,9 @@ describe("ComposeStudio", () => {
     renderStudio();
     fireEvent.click(screen.getByText(/Just write it/));
     fireEvent.change(screen.getByLabelText(/topic/i), { target: { value: "My topic" } });
-    fireEvent.click(screen.getByRole("button", { name: /outline & write/i }));
+    const btn = screen.getByRole("button", { name: /outline & write/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
     await waitFor(() => expect(expandSections).toHaveBeenCalledWith("d1"));
     expect(generateOutline).toHaveBeenCalledWith("d1");
     expect(navigate).toHaveBeenCalledWith("/drafts/d1");
@@ -78,7 +86,10 @@ describe("ComposeStudio", () => {
     renderStudio();
     fireEvent.click(screen.getByText(/Help me shape it/));
     fireEvent.change(screen.getByLabelText(/topic/i), { target: { value: "My topic" } });
-    fireEvent.click(screen.getByRole("button", { name: /start →/i }));
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/drafts/d1"));
+    const btn = screen.getByRole("button", { name: /start →/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+    await waitFor(() => expect(generateOutline).toHaveBeenCalledWith("d1"));
+    expect(navigate).toHaveBeenCalledWith("/drafts/d1");
   });
 });

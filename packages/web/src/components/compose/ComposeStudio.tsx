@@ -163,12 +163,16 @@ export function ComposeStudio(): JSX.Element {
   }
 
   // PROPOSE
+  // Generate an outline so the user lands on the Outline stage to tweak, then
+  // AI writes it — generateOutline returns the updated draft and (server-side)
+  // advances stage to "outline", so no separate setDraftStage call is needed.
   async function runPropose(): Promise<void> {
     setBusy(true);
     setError(null);
     try {
       const idea = ideaFrom(settings, topic.trim(), bullets, notes);
       const draft = await createDraft(idea);
+      await generateOutline(draft.id);
       saveDefaults(settings);
       navigate(`/drafts/${draft.id}`);
     } catch (e) {

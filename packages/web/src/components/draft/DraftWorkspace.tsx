@@ -364,6 +364,7 @@ export function DraftWorkspace({
             onReviseDraft={handleReviseDraft}
             onReorder={onReorder}
             onExpandUnfilled={handleExpandUnfilled}
+            onComposeRemaining={handleExpandUnfilled}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
         )}
