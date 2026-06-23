@@ -35,9 +35,14 @@ Source: the 18-item UX review (compose, draft editor, voice/onboarding/settings,
 - [x] **Toast system** (deferred #7): `ToastProvider` + `useToast` (graceful no-op without provider), wired success toasts on key save/remove, sign-out-everywhere, and admin approve/role actions.
 - [ ] *Deferred:* loading skeletons + compose cost/length summary + ErrorBanner dedup → Batch 7 / future polish.
 
-## Batch 7 — Docs & smaller wins
-- [ ] #18 README rewrite (GitHub OAuth + per-user keys; drop email/password + `/admin` keys)
-- [ ] `Template.provider` type widened to include `tanzu`/`claude-cli`; topic/title label consistency; section-reorder optimistic UI + surfaced errors
+## Batch 7 — Docs & smaller wins ✅
+- [x] #18 README rewritten for GitHub-OAuth login + per-user keys in Settings + Tanzu deploy (dropped email/password seed + `/admin` keys + stale env).
+- [x] web `Template.provider` widened to include `claude-cli`/`tanzu`.
+- [x] section-reorder optimistic UI + rollback + surfaced "Reorder failed" (was a swallowed error).
+- [x] topic/title placeholder clarity across Blank/Express/Propose.
+
+---
+**All 7 batches shipped + deployed.** Deferred-by-design (need backend work or are pure polish): per-draft voice pill (DraftSummary field), request-cancel on slow ops (AbortSignal through `api()`), loading skeletons, compose cost/length summary surfaced, ErrorBanner dedup. The built-in **Blog format** (pre-approved) remains queued separately.
 
 ## Queued (separate, pre-approved)
 - [ ] Built-in **Blog post** format, default in voice-profile mode (`voice/pack.py` materialize + compose defaults)

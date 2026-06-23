@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import type { Draft } from "../../api/drafts";
+import type { Draft, Section } from "../../api/drafts";
 import { DraftReadView } from "./DraftReadView";
 import { SectionCard } from "./SectionCard";
 
@@ -57,17 +57,44 @@ export function SectionsPanel({
   const [reviseNote, setReviseNote] = useState("");
   const [revising, setRevising] = useState(false);
   const [reviseError, setReviseError] = useState<string | null>(null);
+  // Optimistic section order, applied immediately on reorder and reconciled
+  // when the server-backed `draft` prop updates. `null` = use the server order.
+  const [optimisticSections, setOptimisticSections] = useState<Section[] | null>(null);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+  // Reset the optimistic override whenever the server order changes so we never
+  // show stale local state once the parent re-renders with fresh sections.
+  const serverOrderKey = draft.sections.map((s) => s.id).join(",");
+  const lastServerOrderKey = useRef(serverOrderKey);
+  useEffect(() => {
+    if (lastServerOrderKey.current !== serverOrderKey) {
+      lastServerOrderKey.current = serverOrderKey;
+      setOptimisticSections(null);
+    }
+  }, [serverOrderKey]);
+
+  const sections = optimisticSections ?? draft.sections;
 
   const moveSection = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const ids = draft.sections.map((s) => s.id);
     const swap = idx + dir;
-    if (swap < 0 || swap >= ids.length) return;
-    [ids[idx], ids[swap]] = [ids[swap], ids[idx]];
-    await onReorder(ids).catch(() => {});
+    if (swap < 0 || swap >= sections.length) return;
+    const next = [...sections];
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    // Optimistic: reorder locally now so the list responds instantly.
+    setOptimisticSections(next);
+    setReorderError(null);
+    try {
+      await onReorder(next.map((s) => s.id));
+      // Success: drop the override; the parent prop carries the server truth.
+      setOptimisticSections(null);
+    } catch (e) {
+      // Reject: roll back to the server order and surface the failure.
+      setOptimisticSections(null);
+      setReorderError(e instanceof Error ? e.message : String(e));
+    }
   };
 
-  const total = draft.sections.length;
-  const doneCount = draft.sections.filter(
+  const total = sections.length;
+  const doneCount = sections.filter(
     (s) => s.status === "ready" || s.status === "edited",
   ).length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
@@ -265,17 +292,34 @@ export function SectionsPanel({
         </div>
       )}
 
-      {draft.sections.length === 0 && !composingWholeDraft && (
+      {reorderError && (
+        <div
+          className="px-4 py-3 rounded-nb"
+          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-wider">Reorder failed</p>
+          <p className="text-sm mt-1">{reorderError}</p>
+          <button
+            type="button"
+            onClick={() => setReorderError(null)}
+            className="mt-2 text-xs font-medium underline underline-offset-2 hover:no-underline"
+          >
+            dismiss
+          </button>
+        </div>
+      )}
+
+      {sections.length === 0 && !composingWholeDraft && (
         <p className="nb-card p-8 text-center italic text-muted">No sections yet.</p>
       )}
 
       {composingWholeDraft ? (
-        <ComposingDraftPanel titles={draft.sections.map((s) => s.title)} />
+        <ComposingDraftPanel titles={sections.map((s) => s.title)} />
       ) : view === "read" ? (
         <DraftReadView draft={draft} />
       ) : (
         <div className="space-y-3">
-          {draft.sections.map((section, i) => (
+          {sections.map((section, i) => (
             <SectionCard
               key={section.id}
               section={section}
@@ -289,7 +333,7 @@ export function SectionsPanel({
               onMoveUp={() => moveSection(i, -1)}
               onMoveDown={() => moveSection(i, 1)}
               canMoveUp={i > 0}
-              canMoveDown={i < draft.sections.length - 1}
+              canMoveDown={i < sections.length - 1}
             />
           ))}
         </div>

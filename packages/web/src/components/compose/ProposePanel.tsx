@@ -22,7 +22,7 @@ export function ProposePanel({
           type="text"
           aria-label="Topic"
           className="nb-input w-full"
-          placeholder="What is this post about?"
+          placeholder="What's this post about?"
           value={topic}
           onChange={(e) => onTopic(e.target.value)}
         />
