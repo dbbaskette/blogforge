@@ -11,7 +11,6 @@ import {
 import { listProviderAvailability } from "../api/providers";
 import { Icon } from "../components/ui/Icon";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
-import { useMe } from "../hooks/useMe";
 
 const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: string }> = {
   research: { label: "Researching", pillClass: "nb-pill nb-pill-empty" },
@@ -27,7 +26,6 @@ const STAGE_FILTERS: { value: DraftStage | "all"; label: string }[] = [
 ];
 
 export function DraftsPage(): JSX.Element {
-  const { user } = useMe();
   const navigate = useNavigate();
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +96,7 @@ export function DraftsPage(): JSX.Element {
     <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10 animate-fade-up">
       <Hero onNew={() => navigate("/compose")} />
 
-      {noKeys && <KeysBanner isAdmin={user?.role === "admin"} />}
+      {noKeys && <KeysBanner />}
       {error && <ErrorBanner message={error} />}
 
       <section className="mt-10">
@@ -405,7 +403,7 @@ function EmptyState({ onNew }: { onNew: () => void }): JSX.Element {
 // ────────────────────────────────────────────────────────────────
 // Banners
 
-function KeysBanner({ isAdmin }: { isAdmin: boolean }): JSX.Element {
+function KeysBanner(): JSX.Element {
   return (
     <div
       className="mt-6 rounded-nb p-4 flex items-start gap-3"
@@ -413,21 +411,14 @@ function KeysBanner({ isAdmin }: { isAdmin: boolean }): JSX.Element {
     >
       <span className="nb-pill nb-pill-gen">Heads up</span>
       <p className="text-sm text-ink-2 leading-relaxed">
-        No API keys configured.{" "}
-        {isAdmin ? (
-          <>
-            Add one in{" "}
-            <Link
-              to="/admin"
-              className="text-cobalt-600 font-medium underline underline-offset-2 hover:text-cobalt-700"
-            >
-              /admin
-            </Link>{" "}
-            (API keys section) before drafting.
-          </>
-        ) : (
-          <>Ask an admin to add one before drafting.</>
-        )}
+        No writing model is available yet. Add your own provider API key in{" "}
+        <Link
+          to="/settings"
+          className="text-cobalt-600 font-medium underline underline-offset-2 hover:text-cobalt-700"
+        >
+          Settings → Provider API keys
+        </Link>{" "}
+        to start drafting.
       </p>
     </div>
   );
