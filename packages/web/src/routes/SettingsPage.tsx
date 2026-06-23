@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { revokeAllSessions } from "../api/auth";
 import { ProviderKeysCard } from "../components/settings/ProviderKeysCard";
 import { useConfirm } from "../components/ui/ConfirmDialog";
+import { useToast } from "../components/ui/Toast";
 import { useMe } from "../hooks/useMe";
 
 export function SettingsPage(): JSX.Element {
@@ -57,6 +58,7 @@ export function SettingsPage(): JSX.Element {
 function SessionsCard(): JSX.Element {
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +68,7 @@ function SessionsCard(): JSX.Element {
     setError(null);
     try {
       await revokeAllSessions();
+      toast("Signed out of all sessions", "success");
       navigate("/login");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

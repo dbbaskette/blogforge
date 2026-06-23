@@ -10,6 +10,7 @@ const baseProps = {
   sectionCount: 2,
   onLint: vi.fn(),
   onRepurpose: vi.fn(),
+  onHeadlines: vi.fn(),
 };
 
 beforeEach(() => {

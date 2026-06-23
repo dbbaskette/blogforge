@@ -30,6 +30,14 @@ const STAGE_FILTERS: { value: DraftStage | "all"; label: string }[] = [
   { value: "sections", label: "Drafting" },
 ];
 
+type SortKey = "updated" | "title" | "words";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "updated", label: "Recently updated" },
+  { value: "title", label: "Title (A–Z)" },
+  { value: "words", label: "Most words" },
+];
+
 export function DraftsPage(): JSX.Element {
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -48,6 +56,7 @@ export function DraftsPage(): JSX.Element {
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<DraftStage | "all">("all");
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>("updated");
 
   const reload = useCallback(() => {
     listDrafts()
@@ -104,6 +113,22 @@ export function DraftsPage(): JSX.Element {
       return true;
     });
   }, [drafts, query, stageFilter, activeTags]);
+
+  const sorted = useMemo(() => {
+    const copy = [...filtered];
+    switch (sortKey) {
+      case "title":
+        copy.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case "words":
+        copy.sort((a, b) => b.word_count - a.word_count);
+        break;
+      default:
+        copy.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+        break;
+    }
+    return copy;
+  }, [filtered, sortKey]);
 
   const toggleTag = (tag: string): void =>
     setActiveTags((cur) => {
@@ -189,6 +214,18 @@ export function DraftsPage(): JSX.Element {
                   </button>
                 ))}
               </div>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                aria-label="Sort drafts"
+                className="nb-select self-start"
+              >
+                {SORT_OPTIONS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
             </div>
             {allTags.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -232,9 +269,9 @@ export function DraftsPage(): JSX.Element {
           <p className="nb-card p-8 text-center italic text-muted">No drafts match your filters.</p>
         )}
 
-        {drafts && filtered.length > 0 && (
+        {drafts && sorted.length > 0 && (
           <div className="space-y-3">
-            {filtered.map((d) => (
+            {sorted.map((d) => (
               <DraftRow
                 key={d.id}
                 draft={d}

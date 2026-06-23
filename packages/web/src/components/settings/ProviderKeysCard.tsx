@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { deleteKey, getKeyStatus, type KeyStatus, setKey } from "../../api/keys";
 import { listModels } from "../../api/providers";
+import { useToast } from "../ui/Toast";
 
 type ProviderId = "anthropic" | "openai" | "google";
 
@@ -70,6 +71,7 @@ interface ProviderRowProps {
 type Validity = "unknown" | "checking" | "valid" | "rejected";
 
 function ProviderRow({ id, label, note, isSet, onChanged }: ProviderRowProps): JSX.Element {
+  const { toast } = useToast();
   const [inputValue, setInputValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
@@ -82,6 +84,7 @@ function ProviderRow({ id, label, note, isSet, onChanged }: ProviderRowProps): J
     try {
       await setKey(id, inputValue.trim());
       setInputValue("");
+      toast("Key saved", "success");
       onChanged();
       // Validate the saved key by listing models; surface failures now
       // rather than later when drafting.
@@ -106,6 +109,7 @@ function ProviderRow({ id, label, note, isSet, onChanged }: ProviderRowProps): J
     try {
       await deleteKey(id);
       setValidity("unknown");
+      toast("Key removed", "success");
       onChanged();
     } catch (err) {
       setRowError(err instanceof Error ? err.message : String(err));

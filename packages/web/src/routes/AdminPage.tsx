@@ -8,8 +8,10 @@ import {
   promoteUser,
   rejectUser,
 } from "../api/admin";
+import { useToast } from "../components/ui/Toast";
 
 export function AdminPage(): JSX.Element {
+  const { toast } = useToast();
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,10 +24,11 @@ export function AdminPage(): JSX.Element {
     reload();
   }, [reload]);
 
-  const handle = async (action: () => Promise<unknown>): Promise<void> => {
+  const handle = async (action: () => Promise<unknown>, successMessage?: string): Promise<void> => {
     setError(null);
     try {
       await action();
+      if (successMessage) toast(successMessage, "success");
       reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -76,14 +79,14 @@ export function AdminPage(): JSX.Element {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => handle(() => approveUser(u.id))}
+                    onClick={() => handle(() => approveUser(u.id), "User approved")}
                     className="nb-btn nb-btn-primary nb-btn-sm"
                   >
                     Approve
                   </button>
                   <button
                     type="button"
-                    onClick={() => handle(() => rejectUser(u.id))}
+                    onClick={() => handle(() => rejectUser(u.id), "Request rejected")}
                     className="nb-btn nb-btn-sm"
                   >
                     Reject
@@ -129,7 +132,7 @@ export function AdminPage(): JSX.Element {
                 {u.status === "approved" && u.role !== "admin" && (
                   <button
                     type="button"
-                    onClick={() => handle(() => promoteUser(u.id))}
+                    onClick={() => handle(() => promoteUser(u.id), "Promoted to admin")}
                     className="nb-btn nb-btn-sm"
                   >
                     Promote
@@ -138,7 +141,7 @@ export function AdminPage(): JSX.Element {
                 {u.status === "approved" && (
                   <button
                     type="button"
-                    onClick={() => handle(() => disableUser(u.id))}
+                    onClick={() => handle(() => disableUser(u.id), "User disabled")}
                     className="nb-btn nb-btn-sm"
                   >
                     Disable
