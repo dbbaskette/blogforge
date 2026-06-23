@@ -18,11 +18,11 @@ Source: the 18-item UX review (compose, draft editor, voice/onboarding/settings,
 - [x] #1 `MarkdownEditor` rewritten: debounced **autosave** + **guard** (never clobbers unsaved edits; ignores the save echo) + per-section save status + `beforeunload`; Save button retired. Inline-AI edits now persist (they autosave). Backend `save_section` gains `create_version` (autosave passes false after the first session save → no version-history spam). Tests: web autosave/guard + backend create_version.
 - [x] **3b restore prior version** — *already built* (`SectionVersionHistory` + `onRevert` + `revert_section_version`, behind the per-section **History** link). Surfacing it better folds into Batch 6 discoverability.
 
-## Batch 4 — Onboarding & first-run
-- [ ] #2 first-run setup checklist on Drafts (key/Tanzu → voice → first piece)
-- [ ] #4 pre-flight provider/model guard in compose (disable run + inline hint)
-- [ ] #12 Distill clarity + confirm-before-overwrite of hand edits
-- [ ] #17 voice concepts: explain "exemplar", single persona save model, key validation feedback
+## Batch 4 — Onboarding & first-run ✅
+- [x] #2 dismissible first-run checklist on Drafts (provider/Tanzu → voice → first piece), driven by provider availability + voice-profile state
+- [x] #4 pre-flight provider/model guard in compose (run buttons disabled + inline "add a key / pick under Advanced" notice; chosen provider·model shown even when Advanced collapsed)
+- [x] #12 Distill: clearer explainer, confirm-before-overwrite (useConfirm), "Reading your samples…" busy state, no-key hint → Settings
+- [x] #17 voice concepts: exemplar helper line; single persona save model (blur-save + persistent dirty/saved status, redundant button removed); provider-key validation (Valid ✓ / Key rejected) + per-provider "what it powers" note feedback
 
 ## Batch 5 — Generation feedback & recovery
 - [ ] #6 long-op feedback (elapsed/cancel) for hero/repurpose/fact-check/distill; honest express busy labels
