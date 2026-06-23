@@ -5,11 +5,13 @@ export function OutlineInPanel({
   onOutlineText,
   onRun,
   busy,
+  disabled = false,
 }: {
   outlineText: string;
   onOutlineText: (v: string) => void;
   onRun: () => void;
   busy: boolean;
+  disabled?: boolean;
 }): JSX.Element {
   const parsed = parseOutline(outlineText);
   const sectionCount = parsed.sections.length;
@@ -51,7 +53,7 @@ export function OutlineInPanel({
         type="button"
         className="nb-btn nb-btn-primary"
         onClick={onRun}
-        disabled={busy || sectionCount === 0}
+        disabled={busy || disabled || sectionCount === 0}
       >
         {busy ? "Writing draft…" : "Write draft →"}
       </button>

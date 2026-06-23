@@ -42,6 +42,11 @@ export function SamplesList({ profile, onChange, onRefresh }: SamplesListProps):
     <section className="mt-8">
       <h2 className="font-serif text-xl font-medium text-ink mb-3">Writing samples</h2>
       <div className="nb-card p-6 space-y-4">
+        <p className="text-xs text-muted">
+          Star ★ your strongest samples — exemplars are weighted most heavily when distilling your
+          voice.
+        </p>
+
         {anyNeedsRedistill && (
           <div
             className="text-xs px-3 py-2 rounded-nb-sm"

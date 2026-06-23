@@ -14,7 +14,7 @@ export function PersonaCard({ profile, onChange }: PersonaCardProps): JSX.Elemen
   const [tone, setTone] = useState(profile.persona_tone);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedFlash, setSavedFlash] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const save = async (): Promise<void> => {
     setSaving(true);
@@ -22,8 +22,7 @@ export function PersonaCard({ profile, onChange }: PersonaCardProps): JSX.Elemen
     try {
       const updated = await updatePersona({ identity, one_line: oneLine, tone });
       onChange(updated);
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 1500);
+      setDirty(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -54,7 +53,10 @@ export function PersonaCard({ profile, onChange }: PersonaCardProps): JSX.Elemen
             id="persona-identity"
             rows={3}
             value={identity}
-            onChange={(e) => setIdentity(e.target.value)}
+            onChange={(e) => {
+              setIdentity(e.target.value);
+              setDirty(true);
+            }}
             onBlur={handleBlur}
             placeholder="Describe your professional identity and writing persona…"
             className="nb-textarea"
@@ -68,7 +70,10 @@ export function PersonaCard({ profile, onChange }: PersonaCardProps): JSX.Elemen
             id="persona-one-line"
             type="text"
             value={oneLine}
-            onChange={(e) => setOneLine(e.target.value)}
+            onChange={(e) => {
+              setOneLine(e.target.value);
+              setDirty(true);
+            }}
             onBlur={handleBlur}
             placeholder="A single sentence that captures your voice"
             className="nb-input"
@@ -82,7 +87,10 @@ export function PersonaCard({ profile, onChange }: PersonaCardProps): JSX.Elemen
             id="persona-tone"
             type="text"
             value={tone}
-            onChange={(e) => setTone(e.target.value)}
+            onChange={(e) => {
+              setTone(e.target.value);
+              setDirty(true);
+            }}
             onBlur={handleBlur}
             placeholder="e.g. warm, direct, analytical, conversational"
             className="nb-input"
@@ -99,20 +107,13 @@ export function PersonaCard({ profile, onChange }: PersonaCardProps): JSX.Elemen
         )}
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving}
-            className="nb-btn nb-btn-primary nb-btn-sm"
-          >
-            {saving ? "Saving…" : "Save identity"}
-          </button>
-          {savedFlash && (
-            <span
-              className="text-xs font-medium"
-              style={{ color: "#0e7a50" }}
-            >
-              Saved
+          {saving ? (
+            <span className="text-xs text-muted">Saving…</span>
+          ) : dirty ? (
+            <span className="text-xs text-muted">Unsaved changes…</span>
+          ) : (
+            <span className="text-xs font-medium" style={{ color: "#0e7a50" }}>
+              ✓ Saved
             </span>
           )}
         </div>

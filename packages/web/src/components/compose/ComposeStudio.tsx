@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   type IdeaInput,
@@ -9,6 +9,7 @@ import {
   generateOutline,
   updateDraft,
 } from "../../api/drafts";
+import { listProviderAvailability } from "../../api/providers";
 import { type Template, deleteTemplate, listTemplates } from "../../api/templates";
 import { loadDefaults, saveDefaults } from "../../lib/composeDefaults";
 import { parseOutline } from "../../lib/parseOutline";
@@ -19,6 +20,14 @@ import { type ComposeMode, ModePicker } from "./ModePicker";
 import { OutlineInPanel } from "./OutlineInPanel";
 import { ProposePanel } from "./ProposePanel";
 import { VoiceIndicator } from "./VoiceIndicator";
+
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  "claude-cli": "Claude CLI",
+  tanzu: "Tanzu",
+};
 
 function ideaFrom(settings: ComposeSettings, topic: string, bullets: string[] = [], notes = ""): IdeaInput {
   return { topic, bullets, notes, ...settings };
@@ -36,12 +45,22 @@ export function ComposeStudio(): JSX.Element {
   const [bullets, setBullets] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [providers, setProviders] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     listTemplates()
       .then(setTemplates)
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    listProviderAvailability()
+      .then(setProviders)
+      .catch(() => {});
+  }, []);
+
+  const canRun = !!settings.model && providers[settings.provider] === true;
+  const providerLabel = PROVIDER_LABELS[settings.provider] ?? settings.provider;
 
   function applyTemplate(t: Template): void {
     setTopic(t.topic);
@@ -201,17 +220,38 @@ export function ComposeStudio(): JSX.Element {
       {/* Mode picker */}
       <ModePicker active={mode} onPick={setMode} />
 
+      {/* Chosen provider/model — visible even when Advanced is collapsed */}
+      {canRun && (
+        <p className="text-sm text-muted">
+          Writing with {providerLabel} · {settings.model}
+        </p>
+      )}
+
+      {/* Pre-flight guard: no usable provider/model resolved */}
+      {!canRun && (
+        <p
+          className="px-4 py-3 rounded text-sm"
+          style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
+        >
+          No writing model is ready yet — add a key in{" "}
+          <Link to="/settings" className="underline">
+            Settings
+          </Link>{" "}
+          → Provider API keys, or choose one under Advanced.
+        </p>
+      )}
+
       {/* Active-mode panel */}
       {mode !== null && (
         <div className="glass-card p-4 space-y-3">
           {mode === "blank" && (
-            <BlankPanel topic={topic} onTopic={setTopic} onRun={runBlank} busy={busy} />
+            <BlankPanel topic={topic} onTopic={setTopic} onRun={runBlank} busy={busy} disabled={!canRun} />
           )}
           {mode === "express" && (
-            <ExpressPanel topic={topic} onTopic={setTopic} onRun={runExpress} busy={busy} />
+            <ExpressPanel topic={topic} onTopic={setTopic} onRun={runExpress} busy={busy} disabled={!canRun} />
           )}
           {mode === "propose" && (
-            <ProposePanel topic={topic} onTopic={setTopic} onRun={runPropose} busy={busy} />
+            <ProposePanel topic={topic} onTopic={setTopic} onRun={runPropose} busy={busy} disabled={!canRun} />
           )}
           {mode === "outline" && (
             <OutlineInPanel
@@ -219,6 +259,7 @@ export function ComposeStudio(): JSX.Element {
               onOutlineText={setOutlineText}
               onRun={runOutline}
               busy={busy}
+              disabled={!canRun}
             />
           )}
         </div>

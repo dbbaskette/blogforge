@@ -9,9 +9,13 @@ import {
   setDraftTags,
 } from "../api/drafts";
 import { listProviderAvailability } from "../api/providers";
+import { getVoiceProfile } from "../api/voice";
+import { OnboardingChecklist, type OnboardingStep } from "../components/OnboardingChecklist";
 import { Icon } from "../components/ui/Icon";
 import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
+
+const ONBOARDING_DISMISSED_KEY = "bf.onboarding.dismissed";
 
 const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: string }> = {
   research: { label: "Researching", pillClass: "nb-pill nb-pill-empty" },
@@ -33,6 +37,13 @@ export function DraftsPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [noKeys, setNoKeys] = useState(false);
 
+  // Onboarding checklist state.
+  const [hasProvider, setHasProvider] = useState(false);
+  const [hasVoice, setHasVoice] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1",
+  );
+
   // Filters (client-side over the loaded list).
   const [query, setQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<DraftStage | "all">("all");
@@ -48,8 +59,18 @@ export function DraftsPage(): JSX.Element {
 
   useEffect(() => {
     listProviderAvailability()
-      .then((map) => setNoKeys(!Object.values(map).some(Boolean)))
+      .then((map) => {
+        const available = Object.values(map).some(Boolean);
+        setNoKeys(!available);
+        setHasProvider(available);
+      })
       .catch(() => setNoKeys(true));
+  }, []);
+
+  useEffect(() => {
+    getVoiceProfile()
+      .then((p) => setHasVoice(p.distilled_style_md.trim().length > 0 || p.samples.length > 0))
+      .catch(() => setHasVoice(false));
   }, []);
 
   const onEvent = useCallback(() => reload(), [reload]);
@@ -94,10 +115,30 @@ export function DraftsPage(): JSX.Element {
 
   const hasFilters = query.trim() !== "" || stageFilter !== "all" || activeTags.size > 0;
 
+  const onboardingSteps = useMemo<OnboardingStep[]>(
+    () => [
+      { key: "provider", label: "Add a provider key or use Tanzu", to: "/settings", done: hasProvider },
+      { key: "voice", label: "Set up Your Voice", to: "/voice", done: hasVoice },
+      { key: "draft", label: "Write your first piece", to: "/compose", done: (drafts?.length ?? 0) > 0 },
+    ],
+    [hasProvider, hasVoice, drafts],
+  );
+
+  const showOnboarding =
+    !onboardingDismissed && onboardingSteps.some((s) => !s.done);
+
+  const dismissOnboarding = useCallback(() => {
+    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+    setOnboardingDismissed(true);
+  }, []);
+
   return (
     <div className="max-w-5xl mx-auto px-6 lg:px-10 py-10 animate-fade-up">
       <Hero onNew={() => navigate("/compose")} />
 
+      {showOnboarding && (
+        <OnboardingChecklist steps={onboardingSteps} onDismiss={dismissOnboarding} />
+      )}
       {noKeys && <KeysBanner />}
       {error && <ErrorBanner message={error} />}
 

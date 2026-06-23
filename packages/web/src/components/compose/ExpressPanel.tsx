@@ -3,11 +3,13 @@ export function ExpressPanel({
   onTopic,
   onRun,
   busy,
+  disabled = false,
 }: {
   topic: string;
   onTopic: (v: string) => void;
   onRun: () => void;
   busy: boolean;
+  disabled?: boolean;
 }): JSX.Element {
   return (
     <>
@@ -29,7 +31,7 @@ export function ExpressPanel({
         type="button"
         className="nb-btn nb-btn-primary"
         onClick={onRun}
-        disabled={busy || !topic.trim()}
+        disabled={busy || disabled || !topic.trim()}
       >
         {busy ? "Outlining → writing…" : "Outline & write →"}
       </button>

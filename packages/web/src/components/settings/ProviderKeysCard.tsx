@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { deleteKey, getKeyStatus, type KeyStatus, setKey } from "../../api/keys";
+import { listModels } from "../../api/providers";
 
-const PROVIDERS: Array<{ id: string; label: string }> = [
-  { id: "anthropic", label: "Anthropic" },
-  { id: "openai", label: "OpenAI" },
-  { id: "google", label: "Google (Gemini)" },
+type ProviderId = "anthropic" | "openai" | "google";
+
+const PROVIDERS: Array<{ id: ProviderId; label: string; note: string }> = [
+  { id: "anthropic", label: "Anthropic", note: "Powers drafting." },
+  { id: "openai", label: "OpenAI", note: "Powers drafting." },
+  { id: "google", label: "Google (Gemini)", note: "Required for hero images." },
 ];
 
 export function ProviderKeysCard(): JSX.Element {
@@ -39,14 +42,14 @@ export function ProviderKeysCard(): JSX.Element {
         )}
         {status !== null && (
           <ul className="space-y-4">
-            {PROVIDERS.map((p, i) => (
+            {PROVIDERS.map((p) => (
               <ProviderRow
                 key={p.id}
                 id={p.id}
                 label={p.label}
+                note={p.note}
                 isSet={status[p.id] ?? false}
                 onChanged={reload}
-                showGoogleNote={i === PROVIDERS.length - 1}
               />
             ))}
           </ul>
@@ -57,17 +60,20 @@ export function ProviderKeysCard(): JSX.Element {
 }
 
 interface ProviderRowProps {
-  id: string;
+  id: ProviderId;
   label: string;
+  note: string;
   isSet: boolean;
   onChanged: () => void;
-  showGoogleNote: boolean;
 }
 
-function ProviderRow({ id, label, isSet, onChanged, showGoogleNote }: ProviderRowProps): JSX.Element {
+type Validity = "unknown" | "checking" | "valid" | "rejected";
+
+function ProviderRow({ id, label, note, isSet, onChanged }: ProviderRowProps): JSX.Element {
   const [inputValue, setInputValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [rowError, setRowError] = useState<string | null>(null);
+  const [validity, setValidity] = useState<Validity>("unknown");
 
   const onSave = async (): Promise<void> => {
     if (!inputValue.trim()) return;
@@ -77,6 +83,16 @@ function ProviderRow({ id, label, isSet, onChanged, showGoogleNote }: ProviderRo
       await setKey(id, inputValue.trim());
       setInputValue("");
       onChanged();
+      // Validate the saved key by listing models; surface failures now
+      // rather than later when drafting.
+      setValidity("checking");
+      try {
+        await listModels(id);
+        setValidity("valid");
+      } catch {
+        setValidity("rejected");
+        setRowError("Key rejected — check the value");
+      }
     } catch (err) {
       setRowError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -89,6 +105,7 @@ function ProviderRow({ id, label, isSet, onChanged, showGoogleNote }: ProviderRo
     setRowError(null);
     try {
       await deleteKey(id);
+      setValidity("unknown");
       onChanged();
     } catch (err) {
       setRowError(err instanceof Error ? err.message : String(err));
@@ -103,7 +120,13 @@ function ProviderRow({ id, label, isSet, onChanged, showGoogleNote }: ProviderRo
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-sm font-medium text-ink w-36 shrink-0">{label}</span>
           <span className="text-sm text-muted">
-            {isSet ? (
+            {validity === "checking" ? (
+              <span className="text-muted">Validating…</span>
+            ) : validity === "valid" ? (
+              <span className="text-green-700 font-medium">Valid ✓</span>
+            ) : validity === "rejected" ? (
+              <span className="text-rose font-medium">Key rejected</span>
+            ) : isSet ? (
               <span className="text-green-700 font-medium">Set ✓</span>
             ) : (
               <span className="text-muted">Not set</span>
@@ -149,9 +172,7 @@ function ProviderRow({ id, label, isSet, onChanged, showGoogleNote }: ProviderRo
           {rowError}
         </p>
       )}
-      {showGoogleNote && (
-        <p className="text-xs text-muted">Required for hero images.</p>
-      )}
+      <p className="text-xs text-muted">{note}</p>
     </li>
   );
 }

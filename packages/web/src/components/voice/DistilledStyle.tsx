@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { distill, updateDistilled } from "../../api/voice";
 import type { VoiceProfile } from "../../api/voice";
+import { useConfirm } from "../ui/ConfirmDialog";
 
 interface DistilledStyleProps {
   profile: VoiceProfile;
@@ -9,6 +11,7 @@ interface DistilledStyleProps {
 }
 
 export function DistilledStyle({ profile, onChange }: DistilledStyleProps): JSX.Element {
+  const confirm = useConfirm();
   const [text, setText] = useState(profile.distilled_style_md);
   const [saving, setSaving] = useState(false);
   const [distilling, setDistilling] = useState(false);
@@ -32,6 +35,18 @@ export function DistilledStyle({ profile, onChange }: DistilledStyleProps): JSX.
   };
 
   const handleRedistill = async (): Promise<void> => {
+    if (
+      text.trim() !== "" &&
+      !(await confirm({
+        title: "Replace your style guide?",
+        message:
+          "Distilling reads your samples and overwrites the current text. Your edits will be replaced.",
+        confirmLabel: "Distill",
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setDistilling(true);
     setError(null);
     try {
@@ -50,8 +65,9 @@ export function DistilledStyle({ profile, onChange }: DistilledStyleProps): JSX.
       <h2 className="font-serif text-xl font-medium text-ink mb-3">Distilled style</h2>
       <div className="nb-card p-6 space-y-4">
         <p className="text-xs text-muted leading-relaxed">
-          A distilled summary of your writing style derived from your samples. You can edit it
-          manually or re-distill from your samples using AI.
+          A summary of how you write. Distilling is an AI pass that reads your writing samples —
+          especially the ones you mark as exemplars — and rewrites this guide from them, so add a
+          few samples first. You can also edit the text by hand at any time.
         </p>
 
         <div>
@@ -74,7 +90,17 @@ export function DistilledStyle({ profile, onChange }: DistilledStyleProps): JSX.
             className="text-sm px-3 py-2 rounded-nb-sm"
             style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
           >
-            {error}
+            {error.includes("provider_missing_key") || error.includes("HTTP 400") ? (
+              <>
+                Distilling needs a writing model. Add a provider key in{" "}
+                <Link to="/settings" className="underline">
+                  Settings
+                </Link>{" "}
+                → Provider API keys, or use the Tanzu model.
+              </>
+            ) : (
+              error
+            )}
           </p>
         )}
 
@@ -99,7 +125,7 @@ export function DistilledStyle({ profile, onChange }: DistilledStyleProps): JSX.
                   aria-hidden
                   className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"
                 />
-                Distilling…
+                Reading your samples…
               </>
             ) : (
               "Re-distill from samples"
