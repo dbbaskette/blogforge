@@ -26,7 +26,7 @@ export interface DraftWorkspaceProps {
   onGenerateOutline: () => Promise<void>;
   onExpandAll: () => Promise<void>;
   onExpandUnfilled: () => Promise<void>;
-  onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
+  onSectionSave: (sectionId: string, content_md: string, createVersion?: boolean) => Promise<void>;
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReviseDraft: (instruction: string) => Promise<void>;

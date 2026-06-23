@@ -49,6 +49,28 @@ async def test_save_section_sets_edited(authed_client) -> None:
     assert s1["word_count"] == 4
 
 
+async def test_save_section_create_version_flag(authed_client) -> None:
+    client, _ = authed_client
+    did = _seed(client)
+    # First save (default create_version=true) snapshots the prior baseline.
+    client.post(f"/api/drafts/{did}/sections/s1/save", json={"content_md": "v1"})
+    base = len(client.get(f"/api/drafts/{did}/sections/s1/versions").json())
+
+    # Autosave (create_version=false): content updates, but NO new version.
+    r = client.post(
+        f"/api/drafts/{did}/sections/s1/save",
+        json={"content_md": "v2 autosaved", "create_version": False},
+    )
+    assert r.status_code == 200
+    s1 = next(s for s in r.json()["sections"] if s["id"] == "s1")
+    assert s1["content_md"] == "v2 autosaved"
+    assert len(client.get(f"/api/drafts/{did}/sections/s1/versions").json()) == base
+
+    # An explicit save (default true) does add a version.
+    client.post(f"/api/drafts/{did}/sections/s1/save", json={"content_md": "v3"})
+    assert len(client.get(f"/api/drafts/{did}/sections/s1/versions").json()) == base + 1
+
+
 async def test_reorder_sections(authed_client) -> None:
     client, _ = authed_client
     did = _seed(client)

@@ -163,12 +163,13 @@ export async function saveSection(
   id: string,
   sectionId: string,
   content_md: string,
+  createVersion = true,
 ): Promise<Draft> {
   return api(
     `/api/drafts/${encodeURIComponent(id)}/sections/${encodeURIComponent(sectionId)}/save`,
     {
       method: "POST",
-      body: JSON.stringify({ content_md }),
+      body: JSON.stringify({ content_md, create_version: createVersion }),
     },
   );
 }
