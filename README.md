@@ -31,21 +31,36 @@ Drafts (with their references and chat history) persist to Postgres + S3, multi-
 
 Pick a provider per draft:
 
-- **Anthropic / OpenAI / Google** — API-key providers. An admin adds keys under `/admin` (encrypted at rest; myvoice config is used as a fallback). Per-draft cost estimates are shown from a static rate card.
+- **Anthropic / OpenAI / Google** — API-key providers. Each user adds their own keys in **Settings → Provider API keys** (encrypted at rest; myvoice config is used as a fallback). Per-draft cost estimates are shown from a static rate card.
+- **Tanzu** — on a Tanzu Platform deploy, a bound GenAI model is offered as the **Tanzu** provider with **no key required** (the model binding supplies the base URL + credentials). See **Tanzu Platform deployment** below.
 - **Claude CLI (subscription)** — generate through your locally logged-in [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI (`claude -p`) instead of an API key, with web search on so Claude can research while it writes. Requires running the API on the host where `claude` is installed and authenticated — see **Using the Claude CLI** below.
 
 ## Quickstart (Docker)
 
-```bash
-docker compose up --build
-```
+Sign-in is **GitHub OAuth only** — there's no email/password. Before first start, register a GitHub OAuth App and set five env vars so the login button works.
 
-Then open http://localhost:7880. On first start the API container will:
+1. Register a GitHub OAuth App (callback `http://localhost:7880/api/auth/github/callback`) and copy the Client ID + secret — full steps in [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md).
+2. Put the config in a `.env` file Docker Compose will load:
 
-1. Run database migrations (`alembic upgrade head`).
-2. Seed an admin user — `dbbaskette@gmail.com` / `VMware0!`.
+   ```bash
+   BLOGFORGE_GITHUB_CLIENT_ID=<client-id>
+   BLOGFORGE_GITHUB_CLIENT_SECRET=<client-secret>
+   BLOGFORGE_GITHUB_ALLOWLIST=your-github-login   # comma-separated logins allowed to sign in
+   BLOGFORGE_GITHUB_ADMIN_LOGIN=your-github-login  # which login becomes the admin
+   BLOGFORGE_PUBLIC_URL=http://localhost:7880      # base URL used to build the OAuth callback
+   ```
 
-Sign in with that account. To add more users, share the URL — anyone can hit `/login`, click **Request access**, and submit. Approve them under `/admin`. Add your LLM provider API keys under `/admin` too.
+3. Start it:
+
+   ```bash
+   docker compose up --build
+   ```
+
+Then open http://localhost:7880. On first start the API container runs database migrations (`alembic upgrade head`), then click **Sign in with GitHub**.
+
+- Only logins in `BLOGFORGE_GITHUB_ALLOWLIST` may sign in; anyone else is rejected. The login in `BLOGFORGE_GITHUB_ADMIN_LOGIN` becomes the admin on first sign-in.
+- To add more users, add their GitHub login to the allowlist (or let them hit `/login`, which creates a pending request), then approve and manage roles under `/admin`.
+- Each user adds their own LLM provider keys in **Settings → Provider API keys** (Anthropic / OpenAI / Google).
 
 ## Using the Claude CLI (subscription, no API key)
 
@@ -68,11 +83,16 @@ BLOGFORGE_S3_ENDPOINT_URL="http://localhost:9000" \
 BLOGFORGE_S3_ACCESS_KEY=blogforge \
 BLOGFORGE_S3_SECRET_KEY=blogforge-minio-secret \
 BLOGFORGE_S3_BUCKET=blogforge \
-BLOGFORGE_ADMIN_EMAIL=dbbaskette@gmail.com \
-BLOGFORGE_ADMIN_PASSWORD=VMware0! \
+BLOGFORGE_GITHUB_CLIENT_ID=<client-id> \
+BLOGFORGE_GITHUB_CLIENT_SECRET=<client-secret> \
+BLOGFORGE_GITHUB_ALLOWLIST=your-github-login \
+BLOGFORGE_GITHUB_ADMIN_LOGIN=your-github-login \
+BLOGFORGE_PUBLIC_URL=http://localhost:7880 \
 BLOGFORGE_CORS_ORIGINS=http://localhost:7881 \
   uv run blogforge serve --port 7880
 ```
+
+(The GitHub OAuth vars are the same five from the Quickstart — see [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md). `./scripts/serve-host.sh` and `./scripts/run-local.sh` default the allowlist/admin/public-URL for you.)
 
 In another terminal, the web dev server:
 
@@ -83,21 +103,32 @@ cd packages/web && pnpm dev
 
 ## Tanzu Platform deployment
 
+Pure `cf push` with the `python_buildpack` — no Docker. Full guide in [`docs/cf-deploy.md`](docs/cf-deploy.md).
+
 ```bash
+# 1. Bind the three services the manifest expects:
 cf create-service postgres on-demand-postgres-small blogforge-postgres
 cf create-service seaweedfs default blogforge-s3
-cf push -f manifest.yml
-cf set-env blogforge BLOGFORGE_ADMIN_PASSWORD '<your-strong-secret>'
-cf set-env blogforge BLOGFORGE_SESSION_SECRET "$(openssl rand -hex 32)"
-cf restage blogforge
+cf create-service ai-models tanzu-all-models blogforge-ai   # bound GenAI model -> keyless "Tanzu" provider
+
+# 2. Register a GitHub OAuth App (callback https://<route>/api/auth/github/callback),
+#    then copy the secrets template and fill it in:
+cp vars.example.yml vars.yml          # gitignored — holds non-secret config AND secrets, NEVER commit
+#   non-secret: app_name, apps_domain, admin_email, github_allowlist, github_admin_login
+#   secret:     github_client_id, github_client_secret, session_secret (openssl rand -hex 32)
+
+# 3. Build the web bundle and push (vars.yml is interpolated into manifest.yml):
+./scripts/cf-prepare.sh
+cf push --vars-file vars.yml
 ```
 
-The `blogforge.config.tanzu` adapter translates `VCAP_SERVICES` into the env vars the app reads, so no manual database / S3 wiring is needed. (The Claude CLI provider isn't available in a containerized/cloud deploy — use the API-key providers there.)
+The `blogforge.config.tanzu` adapter translates `VCAP_SERVICES` into the env vars the app reads, so no manual database / S3 / model wiring is needed: the `blogforge-postgres` binding sets `BLOGFORGE_DATABASE_URL`, `blogforge-s3` sets `BLOGFORGE_S3_*`, and `blogforge-ai` sets `BLOGFORGE_TANZU_API_BASE` / `BLOGFORGE_TANZU_API_KEY` (surfaced as the keyless **Tanzu** provider). Migrations run on first boot (`BLOGFORGE_RUN_MIGRATIONS_ON_BOOT=true`). Sign in with GitHub; the `github_admin_login` lands as admin. (The Claude CLI provider isn't available in a cloud deploy — use the Tanzu model or the API-key providers there.)
 
 ## Requires
 
 - [myvoice](https://github.com/dbbaskette/myvoice) (BlogForge imports it as a library for pack loading + lint + prompt composition).
-- At least one of: an **API key** for Anthropic / OpenAI / Google (added under `/admin`), **or** the **Claude Code CLI** installed and logged in (for the Claude CLI provider).
+- At least one of: an **API key** for Anthropic / OpenAI / Google (added in **Settings → Provider API keys**), a bound **Tanzu** model (on a Tanzu Platform deploy, no key needed), **or** the **Claude Code CLI** installed and logged in (for the Claude CLI provider).
+- A **GitHub OAuth App** for sign-in (GitHub is the only login method) — see [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md).
 
 ## Design
 

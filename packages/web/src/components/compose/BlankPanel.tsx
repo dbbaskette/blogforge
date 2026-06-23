@@ -21,7 +21,7 @@ export function BlankPanel({
           id="compose-title"
           type="text"
           className="nb-input w-full"
-          placeholder="What are you writing about?"
+          placeholder="Name your post (you can rename later)"
           value={topic}
           onChange={(e) => onTopic(e.target.value)}
         />

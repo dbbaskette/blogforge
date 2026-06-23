@@ -5,7 +5,7 @@ export interface Template {
   name: string;
   topic: string;
   pack_slug: string;
-  provider: "anthropic" | "openai" | "google";
+  provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
   model: string;
   target_words: number;
   format: string | null;
