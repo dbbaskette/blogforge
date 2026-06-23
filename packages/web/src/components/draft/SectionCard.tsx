@@ -14,7 +14,7 @@ interface SectionCardProps {
   defaultOpen?: boolean;
   /** Draft id — needed to load this section's version history. */
   draftId: string;
-  onSave: (content_md: string) => Promise<void>;
+  onSave: (content_md: string, createVersion?: boolean) => Promise<void>;
   /** `instruction` steers a guided regeneration ("tighten", "add an example"). */
   onRegenerate: (instruction?: string) => Promise<void>;
   onRevert: (versionId: string) => Promise<void>;

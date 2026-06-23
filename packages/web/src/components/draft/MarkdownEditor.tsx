@@ -2,31 +2,32 @@ import Link from "@tiptap/extension-link";
 import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { marked } from "marked";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TurndownService from "turndown";
 
 import { type InlineAction, inlineEdit } from "../../api/drafts";
 
 export interface MarkdownEditorProps {
   initialMarkdown: string;
-  onSave: (md: string) => Promise<void>;
-  onChange?: (md: string) => void;
-  /** When set, the rich editor shows a floating AI toolbar on text selection. */
+  /**
+   * Persist the section. `createVersion` is true only for the first save of an
+   * editing session (snapshots the pre-edit baseline); subsequent autosaves
+   * pass false so debounced saves don't spam the version history.
+   */
+  onSave: (md: string, createVersion: boolean) => Promise<void>;
+  /** Draft id — when set, the rich editor shows a floating AI toolbar on selection. */
   draftId?: string;
 }
 
 type Mode = "rich" | "raw";
+type SaveStatus = "saved" | "dirty" | "saving" | "error";
 
-export function MarkdownEditor({
-  initialMarkdown,
-  onSave,
-  onChange,
-  draftId,
-}: MarkdownEditorProps): JSX.Element {
+const AUTOSAVE_MS = 1000;
+
+export function MarkdownEditor({ initialMarkdown, onSave, draftId }: MarkdownEditorProps): JSX.Element {
   const [raw, setRaw] = useState<string>(initialMarkdown);
   const [mode, setMode] = useState<Mode>("rich");
-  const [saving, setSaving] = useState(false);
-  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [status, setStatus] = useState<SaveStatus>("saved");
   const [error, setError] = useState<string | null>(null);
   // Anchor for the floating AI toolbar; null when nothing is selected.
   const [aiAnchor, setAiAnchor] = useState<{ top: number; left: number } | null>(null);
@@ -42,6 +43,47 @@ export function MarkdownEditor({
     [],
   );
 
+  // Autosave bookkeeping. Refs (not state) because the editor's onUpdate is
+  // bound once at creation and must read the freshest values at call time.
+  const lastSavedRef = useRef(initialMarkdown); // last content we persisted or loaded
+  const latestMdRef = useRef(initialMarkdown); // current editor content (rich or raw)
+  const dirtyRef = useRef(false);
+  const versionedRef = useRef(false); // did we snapshot this edit session's baseline yet?
+  const applyingExternalRef = useRef(false); // suppress autosave during programmatic setContent
+  const loadedRef = useRef(false); // has the initial content been loaded into the editor?
+  const saveTimerRef = useRef<number | null>(null);
+  const scheduleSaveRef = useRef<() => void>(() => {});
+
+  const doSave = useCallback(async (): Promise<void> => {
+    const content = latestMdRef.current;
+    if (content === lastSavedRef.current) {
+      dirtyRef.current = false;
+      setStatus("saved");
+      return;
+    }
+    setStatus("saving");
+    setError(null);
+    const createVersion = !versionedRef.current;
+    try {
+      await onSave(content, createVersion);
+      lastSavedRef.current = content;
+      versionedRef.current = true;
+      dirtyRef.current = false;
+      setStatus("saved");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStatus("error"); // stays dirty so a retry can re-save
+    }
+  }, [onSave]);
+
+  const scheduleSave = useCallback((): void => {
+    dirtyRef.current = true;
+    setStatus("dirty");
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => void doSave(), AUTOSAVE_MS);
+  }, [doSave]);
+  scheduleSaveRef.current = scheduleSave;
+
   const editor = useEditor({
     extensions: [StarterKit, Link.configure({ openOnClick: false })],
     content: "",
@@ -51,10 +93,9 @@ export function MarkdownEditor({
       },
     },
     onUpdate: ({ editor: e }) => {
-      if (onChange) {
-        const md = turndown.turndown(e.getHTML());
-        onChange(md);
-      }
+      if (applyingExternalRef.current) return; // programmatic setContent, not a user edit
+      latestMdRef.current = turndown.turndown(e.getHTML());
+      scheduleSaveRef.current();
     },
     onSelectionUpdate: ({ editor: e }) => {
       // Surface the AI toolbar only for a real, non-empty selection.
@@ -72,35 +113,65 @@ export function MarkdownEditor({
     },
   });
 
+  // Load the initial content once the editor is ready, then ONLY accept genuine
+  // external changes (regenerate/revise/refetch): never clobber unsaved local
+  // edits, and ignore the echo of our own just-saved content (which would reset
+  // the cursor mid-typing because section saves replace the whole draft state).
   useEffect(() => {
     if (!editor) return;
-    const html = marked.parse(initialMarkdown) as string;
-    editor.commands.setContent(html);
-    setRaw(initialMarkdown);
+    const applyExternal = (md: string): void => {
+      applyingExternalRef.current = true;
+      editor.commands.setContent(marked.parse(md) as string);
+      applyingExternalRef.current = false;
+      setRaw(md);
+      latestMdRef.current = md;
+      lastSavedRef.current = md;
+    };
+    if (!loadedRef.current) {
+      loadedRef.current = true;
+      applyExternal(initialMarkdown);
+      return;
+    }
+    if (initialMarkdown === lastSavedRef.current) return; // our own save echoed back
+    if (dirtyRef.current) return; // protect unsaved local edits
+    applyExternal(initialMarkdown);
+    versionedRef.current = false; // a fresh baseline → next edit snapshots it
+    setStatus("saved");
   }, [initialMarkdown, editor]);
 
-  const handleSave = useCallback(async () => {
-    if (!editor) return;
-    setSaving(true);
-    setError(null);
-    const content = mode === "rich" ? turndown.turndown(editor.getHTML()) : raw;
-    try {
-      await onSave(content);
-      setSavedMessage("Saved");
-      setTimeout(() => setSavedMessage(null), 2000);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }, [editor, mode, raw, turndown, onSave]);
+  // Warn before leaving the page with an unsaved or in-flight edit.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent): void => {
+      if (dirtyRef.current || status === "saving") {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [status]);
+
+  // Flush a pending autosave on unmount (best-effort; no setState after unmount).
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      if (dirtyRef.current && latestMdRef.current !== lastSavedRef.current) {
+        void onSave(latestMdRef.current, !versionedRef.current).catch(() => {});
+      }
+    };
+  }, [onSave]);
 
   const handleSwitchMode = (next: Mode): void => {
     if (next === mode || !editor) return;
     if (next === "raw") {
-      setRaw(turndown.turndown(editor.getHTML()));
+      const md = turndown.turndown(editor.getHTML());
+      setRaw(md);
+      latestMdRef.current = md;
     } else {
+      applyingExternalRef.current = true;
       editor.commands.setContent(marked.parse(raw) as string);
+      applyingExternalRef.current = false;
+      latestMdRef.current = raw;
     }
     setAiAnchor(null);
     setMode(next);
@@ -123,6 +194,7 @@ export function MarkdownEditor({
       try {
         const { text: rewritten } = await inlineEdit(draftId, { text, action, instruction });
         const html = marked.parse(rewritten) as string;
+        // insertContentAt fires onUpdate → the edit is marked dirty and autosaved.
         editor.chain().focus().insertContentAt({ from, to }, html).run();
         setAiAnchor(null);
       } catch (e) {
@@ -136,7 +208,8 @@ export function MarkdownEditor({
 
   const handleRawChange = (val: string): void => {
     setRaw(val);
-    if (onChange) onChange(val);
+    latestMdRef.current = val;
+    scheduleSave();
   };
 
   return (
@@ -171,13 +244,25 @@ export function MarkdownEditor({
           </button>
         </div>
         <div className="flex-1" />
-        {error && <span className="text-xs text-rose-ink">{error}</span>}
-        {savedMessage && (
-          <span className="text-xs text-leaf font-medium animate-fade-in">✓ {savedMessage}</span>
+        {error ? (
+          <span
+            className="text-xs text-rose-ink flex items-center gap-1.5 max-w-[260px]"
+            title={error}
+          >
+            <span className="truncate">{error}</span>
+            {status === "error" && (
+              <button
+                type="button"
+                onClick={() => void doSave()}
+                className="shrink-0 underline underline-offset-2 hover:no-underline"
+              >
+                Retry
+              </button>
+            )}
+          </span>
+        ) : (
+          <SaveStatusLabel status={status} />
         )}
-        <button type="button" onClick={handleSave} disabled={saving} className="nb-btn nb-btn-sm">
-          {saving ? "Saving…" : "Save"}
-        </button>
       </header>
 
       {mode === "rich" && editor && (
@@ -200,6 +285,14 @@ export function MarkdownEditor({
       )}
     </div>
   );
+}
+
+function SaveStatusLabel({ status }: { status: SaveStatus }): JSX.Element | null {
+  if (status === "saving") return <span className="text-xs text-muted">Saving…</span>;
+  if (status === "dirty") return <span className="text-xs text-muted">Unsaved changes…</span>;
+  if (status === "saved")
+    return <span className="text-xs text-leaf font-medium animate-fade-in">✓ Saved</span>;
+  return null;
 }
 
 interface AiSelectionToolbarProps {

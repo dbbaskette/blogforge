@@ -18,7 +18,7 @@ interface SectionsPanelProps {
   liveSectionId?: string | null;
   /** Accumulated live token text for liveSectionId. */
   liveText?: string;
-  onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
+  onSectionSave: (sectionId: string, content_md: string, createVersion?: boolean) => Promise<void>;
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
@@ -264,7 +264,7 @@ export function SectionsPanel({
               isGenerating={generatingIds.has(section.id)}
               liveText={liveSectionId === section.id ? liveText : undefined}
               draftId={draft.id}
-              onSave={(md) => onSectionSave(section.id, md)}
+              onSave={(md, createVersion) => onSectionSave(section.id, md, createVersion)}
               onRegenerate={(instruction) => onRegenerateSection(section.id, instruction)}
               onRevert={(versionId) => onRevertSection(section.id, versionId)}
               onMoveUp={() => moveSection(i, -1)}

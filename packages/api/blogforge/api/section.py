@@ -30,6 +30,10 @@ router = APIRouter(tags=["section"])
 
 class _SaveBody(BaseModel):
     content_md: str
+    # Autosave passes False after the first save of an editing session so
+    # debounced keystroke saves don't spam the version history; the first save
+    # (and explicit saves) snapshot the pre-edit baseline.
+    create_version: bool = True
 
 
 class _ReorderBody(BaseModel):
@@ -73,16 +77,17 @@ async def save_section(
     if section is None:
         raise _section_not_found(section_id)
     # Snapshot the prior content so a manual edit can be undone.
-    await store.add_section_version(
-        draft.id,
-        section_id,
-        user_id=current.id,
-        title=section.title,
-        content_md=section.content_md,
-        word_count=section.word_count,
-        status=section.status,
-        source="save",
-    )
+    if body.create_version:
+        await store.add_section_version(
+            draft.id,
+            section_id,
+            user_id=current.id,
+            title=section.title,
+            content_md=section.content_md,
+            word_count=section.word_count,
+            status=section.status,
+            source="save",
+        )
     section.content_md = body.content_md
     section.status = "edited"
     section.last_error = None

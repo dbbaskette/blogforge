@@ -84,9 +84,9 @@ export function DraftPage(): JSX.Element {
   }, [id]);
 
   const onSectionSave = useCallback(
-    async (sectionId: string, content_md: string) => {
+    async (sectionId: string, content_md: string, createVersion = true) => {
       if (!id) return;
-      setDraft(await saveSection(id, sectionId, content_md));
+      setDraft(await saveSection(id, sectionId, content_md, createVersion));
     },
     [id],
   );

@@ -14,8 +14,9 @@ Source: the 18-item UX review (compose, draft editor, voice/onboarding/settings,
 - [x] #13 `useDialogA11y` (focus trap + Escape + restore focus) applied to RepurposePanel/HeadlineLab/LintPanel; ModePicker → radiogroup. (2b)
 - [ ] *Deferred:* shared `ErrorBanner` + dedup of the per-screen red banners → folded into Batch 6 polish.
 
-## Batch 3 — Data-loss & save model (critical)
-- [ ] #1 section editor dirty-tracking + autosave + `beforeunload` guard; honest global "saved" indicator (`MarkdownEditor`, `DraftWorkspace`)
+## Batch 3 — Data-loss & save model (critical) ✅
+- [x] #1 `MarkdownEditor` rewritten: debounced **autosave** + **guard** (never clobbers unsaved edits; ignores the save echo) + per-section save status + `beforeunload`; Save button retired. Inline-AI edits now persist (they autosave). Backend `save_section` gains `create_version` (autosave passes false after the first session save → no version-history spam). Tests: web autosave/guard + backend create_version.
+- [x] **3b restore prior version** — *already built* (`SectionVersionHistory` + `onRevert` + `revert_section_version`, behind the per-section **History** link). Surfacing it better folds into Batch 6 discoverability.
 
 ## Batch 4 — Onboarding & first-run
 - [ ] #2 first-run setup checklist on Drafts (key/Tanzu → voice → first piece)
