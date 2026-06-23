@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { revokeAllSessions } from "../api/auth";
 import { ProviderKeysCard } from "../components/settings/ProviderKeysCard";
+import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useMe } from "../hooks/useMe";
 
 export function SettingsPage(): JSX.Element {
@@ -55,11 +56,12 @@ export function SettingsPage(): JSX.Element {
 
 function SessionsCard(): JSX.Element {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const onRevokeAll = async (): Promise<void> => {
-    if (!confirm("Sign out of all sessions, including this one?")) return;
+    if (!(await confirm({ title: "Sign out of all sessions?", message: "This signs you out everywhere, including this device.", confirmLabel: "Sign out everywhere", danger: true }))) return;
     setSubmitting(true);
     setError(null);
     try {

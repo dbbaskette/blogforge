@@ -10,6 +10,7 @@ import {
 } from "../api/drafts";
 import { listProviderAvailability } from "../api/providers";
 import { Icon } from "../components/ui/Icon";
+import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
 
 const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: string }> = {
@@ -27,6 +28,7 @@ const STAGE_FILTERS: { value: DraftStage | "all"; label: string }[] = [
 
 export function DraftsPage(): JSX.Element {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noKeys, setNoKeys] = useState(false);
@@ -54,7 +56,7 @@ export function DraftsPage(): JSX.Element {
   useGlobalEvents(onEvent);
 
   const onDelete = async (id: string): Promise<void> => {
-    if (!confirm("Move this draft to the trash?")) return;
+    if (!(await confirm({ title: "Move this draft to the trash?", message: "You can restore it any time from Trash.", confirmLabel: "Move to trash", danger: true }))) return;
     await deleteDraft(id);
     reload();
   };

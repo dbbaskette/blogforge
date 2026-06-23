@@ -235,6 +235,16 @@ body {
   box-shadow: none;
 }
 
+.nb-btn-danger {
+  background: #e6492d;
+  border-color: #e6492d;
+  color: #ffffff;
+}
+.nb-btn-danger:hover:not(:disabled) {
+  background: #c63a21;
+  border-color: #c63a21;
+}
+
 .nb-btn-ghost {
   background: transparent;
   border-color: transparent;

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { type DraftSummary, hardDeleteDraft, listTrashedDrafts, restoreDraft } from "../api/drafts";
+import { useConfirm } from "../components/ui/ConfirmDialog";
 import { Icon } from "../components/ui/Icon";
 
 export function TrashPage(): JSX.Element {
+  const confirm = useConfirm();
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function TrashPage(): JSX.Element {
   };
 
   const onHardDelete = async (id: string): Promise<void> => {
-    if (!confirm("Delete this draft forever? This cannot be undone.")) return;
+    if (!(await confirm({ title: "Delete this draft forever?", message: "This cannot be undone.", confirmLabel: "Delete forever", danger: true }))) return;
     setBusyId(id);
     setError(null);
     try {

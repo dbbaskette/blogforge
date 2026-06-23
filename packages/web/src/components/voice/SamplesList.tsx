@@ -8,6 +8,7 @@ import {
   uploadSampleFile,
 } from "../../api/voice";
 import type { VoiceProfile, VoiceSample } from "../../api/voice";
+import { useConfirm } from "../ui/ConfirmDialog";
 import { Icon } from "../ui/Icon";
 
 interface SamplesListProps {
@@ -93,6 +94,7 @@ function SampleRow({
   onToggleExemplar,
   onDelete,
 }: SampleRowProps): JSX.Element {
+  const confirm = useConfirm();
   const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const isNew = needsRedistill(sample, distilledAt);
@@ -107,7 +109,7 @@ function SampleRow({
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!confirm(`Delete sample "${sample.name}"?`)) return;
+    if (!(await confirm({ title: `Delete sample "${sample.name}"?`, confirmLabel: "Delete", danger: true }))) return;
     setDeleting(true);
     try {
       await onDelete();
