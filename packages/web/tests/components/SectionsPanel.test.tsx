@@ -43,6 +43,7 @@ const baseProps = {
   onRevertSection: noop,
   onReorder: noop,
   onExpandUnfilled: noop,
+  onComposeRemaining: noop,
   onReviseDraft: noop,
 };
 

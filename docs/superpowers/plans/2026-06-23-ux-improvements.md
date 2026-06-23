@@ -24,10 +24,10 @@ Source: the 18-item UX review (compose, draft editor, voice/onboarding/settings,
 - [x] #12 Distill: clearer explainer, confirm-before-overwrite (useConfirm), "Reading your samples…" busy state, no-key hint → Settings
 - [x] #17 voice concepts: exemplar helper line; single persona save model (blur-save + persistent dirty/saved status, redundant button removed); provider-key validation (Valid ✓ / Key rejected) + per-provider "what it powers" note feedback
 
-## Batch 5 — Generation feedback & recovery
-- [ ] #6 long-op feedback (elapsed/cancel) for hero/repurpose/fact-check/distill; honest express busy labels
-- [ ] #8 bulk-compose partial-failure recovery ("compose remaining")
-- [ ] #11 `propose` mode actually generates an outline (or merge with blank)
+## Batch 5 — Generation feedback & recovery ✅
+- [x] #6 elapsed-time counter on the slow ops (hero/repurpose/fact-check/distill) via `useElapsed`, + "~20–30s" hint on hero. (Request *cancel* deferred — needs AbortSignal plumbing through `api()`.)
+- [x] #8 bulk-compose partial-failure recovery: failure banner now summarizes "Composed N of M, then failed" + a "Compose remaining →" button (reuses the existing only-unfilled `expandSections` path).
+- [x] #11 `propose` mode now generates the outline (`generateOutline` already advances stage→outline) so it lands on the Outline stage to tweak — fulfilling its promise instead of duplicating Blank.
 
 ## Batch 6 — Lists, discoverability & polish
 - [ ] #16 Drafts list: sort control + per-draft voice pill + SSE auto-reconnect

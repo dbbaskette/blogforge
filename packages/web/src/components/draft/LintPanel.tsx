@@ -8,6 +8,7 @@ import {
   inlineEdit,
   lintDraft,
 } from "../../api/drafts";
+import { useElapsed } from "../../hooks/useElapsed";
 import { dismiss as dismissFinding, loadDismissed, restore } from "../../lib/lintDismissals";
 import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
@@ -387,6 +388,7 @@ function FactCheck({
   hasRefs: boolean;
   onRun: () => void;
 }): JSX.Element {
+  const secs = useElapsed(loading);
   return (
     <section>
       <h3 className="font-serif text-lg font-medium text-ink tracking-tight">Fact-check</h3>
@@ -394,7 +396,7 @@ function FactCheck({
       {error && <p className="text-sm text-coral mb-2">{error}</p>}
       {claims === null ? (
         <button type="button" onClick={onRun} disabled={loading} className="nb-btn nb-btn-sm">
-          {loading ? "Checking…" : "Check claims"}
+          {loading ? `Checking… ${secs}s` : "Check claims"}
         </button>
       ) : (
         <>
@@ -429,7 +431,7 @@ function FactCheck({
             </ul>
           )}
           <button type="button" onClick={onRun} disabled={loading} className="nb-btn nb-btn-ghost nb-btn-sm mt-2">
-            {loading ? "Checking…" : "Re-check"}
+            {loading ? `Checking… ${secs}s` : "Re-check"}
           </button>
         </>
       )}
