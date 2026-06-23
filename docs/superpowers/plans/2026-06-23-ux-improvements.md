@@ -29,10 +29,11 @@ Source: the 18-item UX review (compose, draft editor, voice/onboarding/settings,
 - [x] #8 bulk-compose partial-failure recovery: failure banner now summarizes "Composed N of M, then failed" + a "Compose remaining →" button (reuses the existing only-unfilled `expandSections` path).
 - [x] #11 `propose` mode now generates the outline (`generateOutline` already advances stage→outline) so it lands on the Outline stage to tweak — fulfilling its promise instead of duplicating Blank.
 
-## Batch 6 — Lists, discoverability & polish
-- [ ] #16 Drafts list: sort control + per-draft voice pill + SSE auto-reconnect
-- [ ] #10 persistent tools affordance (inline AI / repurpose / headline lab discoverability)
-- [ ] loading skeletons on list/settings/admin routes; compose cost/length summary surfaced
+## Batch 6 — Lists, discoverability & polish ✅
+- [x] #16 Drafts list **sort** (Recently updated / Title A–Z / Most words); **SSE auto-reconnect** (backoff + refresh on tab refocus) instead of dying on the first blip. (Per-draft voice pill deferred — needs a backend `DraftSummary` field.)
+- [x] #10 tools discoverability: labeled **Draft tools** bar (Headlines/Repurpose/Copy/Review/Download) with the Headline lab now reachable from the sections workspace; one-time dismissible inline-AI hint.
+- [x] **Toast system** (deferred #7): `ToastProvider` + `useToast` (graceful no-op without provider), wired success toasts on key save/remove, sign-out-everywhere, and admin approve/role actions.
+- [ ] *Deferred:* loading skeletons + compose cost/length summary + ErrorBanner dedup → Batch 7 / future polish.
 
 ## Batch 7 — Docs & smaller wins
 - [ ] #18 README rewrite (GitHub OAuth + per-user keys; drop email/password + `/admin` keys)

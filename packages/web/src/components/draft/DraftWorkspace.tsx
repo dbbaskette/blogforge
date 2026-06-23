@@ -5,6 +5,7 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
 import { LintPanel } from "./LintPanel";
 import { RepurposePanel } from "./RepurposePanel";
@@ -16,6 +17,8 @@ import { SectionsPanel } from "./SectionsPanel";
 import { StageNav } from "./StageNav";
 import { SetupDisclosure } from "./SetupDisclosure";
 import { WorkspaceFooter } from "./WorkspaceFooter";
+
+const INLINE_AI_HINT_KEY = "bf.inlineai.hint.dismissed";
 
 export interface DraftWorkspaceProps {
   draft: Draft;
@@ -54,6 +57,15 @@ export function DraftWorkspace({
 }: DraftWorkspaceProps): JSX.Element {
   const [lintOpen, setLintOpen] = useState(false);
   const [repurposeOpen, setRepurposeOpen] = useState(false);
+  const [headlinesOpen, setHeadlinesOpen] = useState(false);
+  // One-time hint pointing authors at select-text inline AI. Persisted dismissed.
+  const [inlineHintDismissed, setInlineHintDismissed] = useState(
+    () => localStorage.getItem(INLINE_AI_HINT_KEY) === "1",
+  );
+  const dismissInlineHint = useCallback(() => {
+    localStorage.setItem(INLINE_AI_HINT_KEY, "1");
+    setInlineHintDismissed(true);
+  }, []);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
@@ -347,6 +359,21 @@ export function DraftWorkspace({
           </div>
         )}
 
+        {draft.stage === "sections" && draft.sections.length > 0 && !inlineHintDismissed && (
+          <div className="mb-4 flex items-start gap-2 text-xs text-muted">
+            <p className="leading-relaxed">
+              Tip: select any text in a section to rephrase, shorten, expand, or fix it with AI.
+            </p>
+            <button
+              type="button"
+              onClick={dismissInlineHint}
+              className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
+            >
+              Got it
+            </button>
+          </div>
+        )}
+
         {draft.stage === "sections" && (
           <SectionsPanel
             draft={draft}
@@ -378,6 +405,7 @@ export function DraftWorkspace({
           sectionCount={draft.sections.length}
           onLint={() => setLintOpen(true)}
           onRepurpose={() => setRepurposeOpen(true)}
+          onHeadlines={() => setHeadlinesOpen(true)}
         />
       )}
 
@@ -390,6 +418,20 @@ export function DraftWorkspace({
       )}
       {repurposeOpen && (
         <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
+      )}
+      {headlinesOpen && (
+        <HeadlineLab
+          draftId={draft.id}
+          onApplyTitle={(title) => onChange({ ...draft, title })}
+          onApplyHook={(hook) =>
+            onChange(
+              draft.outline
+                ? { ...draft, outline: { ...draft.outline, opening_hook: hook } }
+                : draft,
+            )
+          }
+          onClose={() => setHeadlinesOpen(false)}
+        />
       )}
     </div>
   );

@@ -9,6 +9,7 @@ interface WorkspaceFooterProps {
   sectionCount: number;
   onLint: () => void;
   onRepurpose: () => void;
+  onHeadlines: () => void;
 }
 
 export function WorkspaceFooter({
@@ -18,6 +19,7 @@ export function WorkspaceFooter({
   sectionCount,
   onLint,
   onRepurpose,
+  onHeadlines,
 }: WorkspaceFooterProps): JSX.Element {
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
@@ -36,7 +38,10 @@ export function WorkspaceFooter({
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none w-full max-w-3xl px-4">
-      <footer className="nb-card shadow-nb-pop px-4 py-2.5 flex items-center gap-4 pointer-events-auto">
+      <footer
+        className="nb-card shadow-nb-pop px-4 py-2.5 flex items-center gap-4 flex-wrap pointer-events-auto"
+        aria-label="Draft tools"
+      >
         <div className="flex items-center gap-3 text-xs text-muted">
           <span className="font-mono text-ink font-medium text-[13px]">
             {totalWords.toLocaleString()}
@@ -52,14 +57,40 @@ export function WorkspaceFooter({
         </div>
         <div className="flex-1" />
 
-        <button type="button" onClick={handleCopy} className="nb-btn nb-btn-sm">
+        <span className="hidden sm:inline text-[11px] font-semibold uppercase tracking-wider text-muted-2 mr-1">
+          Tools
+        </span>
+        <button
+          type="button"
+          onClick={onHeadlines}
+          className="nb-btn nb-btn-sm"
+          title="Generate alternative titles and opening hooks"
+        >
+          Headlines
+        </button>
+        <button
+          type="button"
+          onClick={onRepurpose}
+          className="nb-btn nb-btn-sm"
+          title="Turn this draft into social posts, a newsletter, and more"
+        >
+          Repurpose
+        </button>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="nb-btn nb-btn-sm"
+          title="Copy the whole draft as Markdown"
+        >
           {copyMessage ?? "Copy markdown"}
         </button>
         <DownloadMenu draftId={draftId} />
-        <button type="button" onClick={onRepurpose} className="nb-btn nb-btn-sm">
-          Repurpose
-        </button>
-        <button type="button" onClick={onLint} className="nb-btn nb-btn-primary nb-btn-sm">
+        <button
+          type="button"
+          onClick={onLint}
+          className="nb-btn nb-btn-primary nb-btn-sm"
+          title="Proofread and fact-check the draft"
+        >
           Review
         </button>
       </footer>

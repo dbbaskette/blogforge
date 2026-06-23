@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ConfirmProvider } from "./components/ui/ConfirmDialog";
+import { ToastProvider } from "./components/ui/Toast";
 import "./index.css";
 
 const root = document.getElementById("root");
@@ -15,7 +16,9 @@ ReactDOM.createRoot(root).render(
     <ErrorBoundary>
       <BrowserRouter>
         <ConfirmProvider>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </ConfirmProvider>
       </BrowserRouter>
     </ErrorBoundary>
