@@ -22,6 +22,19 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     credentials: "include",
   });
   if (!res.ok) {
+    if (
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      window.location?.pathname !== "/login"
+    ) {
+      // Session expired or never signed in — bounce to the login screen
+      // instead of letting callers render a raw "HTTP 401" banner mid-page.
+      try {
+        window.location.assign("/login");
+      } catch {
+        /* jsdom (tests) has no navigation — ignore */
+      }
+    }
     let detail: string | undefined;
     try {
       const j = await res.json();

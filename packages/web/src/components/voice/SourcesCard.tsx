@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { addUrlSource, deleteSource, listSources } from "../../api/voice";
 import type { VoiceSource } from "../../api/voice";
+import { useConfirm } from "../ui/ConfirmDialog";
 import { Icon } from "../ui/Icon";
 
 export function SourcesCard(): JSX.Element {
@@ -68,10 +69,11 @@ interface SourceRowProps {
 }
 
 function SourceRow({ source, onRefresh }: SourceRowProps): JSX.Element {
+  const confirm = useConfirm();
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async (): Promise<void> => {
-    if (!confirm(`Delete source "${source.name || source.url}"?`)) return;
+    if (!(await confirm({ title: `Delete source "${source.name || source.url}"?`, confirmLabel: "Delete", danger: true }))) return;
     setDeleting(true);
     try {
       await deleteSource(source.id);
