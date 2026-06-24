@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from blogforge.voice.compose import ComposeError
 
 from blogforge.auth.dependencies import get_current_user
+from blogforge.config import get_settings
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.document import generate_document, split_document
@@ -19,6 +20,8 @@ from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import JobRegistry
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
+from blogforge.voice.enforce import enforce_voice_rules
+from blogforge.voice.packs.manifest import Manifest
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["expand"])
@@ -187,9 +190,15 @@ async def _run_expand(
         # Split the one document back onto the section model by H2 heading.
         by_id = split_document(document, draft.sections)
         now = datetime.now(UTC)
+        # Enforce the mechanical voice rules the model may have ignored (em/en
+        # dashes, ASCII `--`, banished words): detect → model repair → backstop.
+        enforce_on = get_settings().enforce_voice_rules
+        mf = Manifest.model_validate(manifest) if enforce_on else None
         for section in draft.sections:
             body = (by_id.get(section.id) or "").strip()
             if body:
+                if mf is not None:
+                    body = (await enforce_voice_rules(body, mf, provider, model)).strip()
                 section.content_md = body + "\n"
                 section.word_count = len(body.split())
                 section.status = "ready"
