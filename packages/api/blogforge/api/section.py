@@ -11,9 +11,11 @@ from uuid import UUID
 import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from blogforge.voice.compose import ComposeError
+from blogforge.voice.enforce import enforce_voice_rules
 from pydantic import BaseModel
 
 from blogforge.auth.dependencies import get_current_user
+from blogforge.config import get_settings
 from blogforge.db.models import User
 from blogforge.drafts.models import Draft, SectionVersion
 from blogforge.drafts.sql_store import SqlDraftStore
@@ -306,8 +308,13 @@ async def _run_regenerate(
                 "Check the draft's format/samples against the pack manifest.",
             )
             return
-        section.content_md = buf.strip() + "\n"
-        section.word_count = len(buf.split())
+        cleaned = buf.strip()
+        if get_settings().enforce_voice_rules:
+            # Deterministically detect rule violations the model left in, repair
+            # them via the model, then backstop the mechanical tells.
+            cleaned = await enforce_voice_rules(cleaned, manifest, provider, model)
+        section.content_md = cleaned + "\n"
+        section.word_count = len(cleaned.split())
         section.status = "ready"
         section.last_error = None
         section.last_generated_at = datetime.now(UTC)

@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     # Set to False in tests to skip the S3 bucket bootstrap (tests use moto
     # in-process; they don't need the lifespan's ensure_bucket() side-effect).
     s3_bootstrap_on_boot: bool = True
+    # After generating a section, deterministically detect voice-rule violations
+    # (em/en dashes, ASCII `--`, banished words) and repair them via the model +
+    # a deterministic backstop. Default on — it's the tool's whole premise.
+    enforce_voice_rules: bool = True
 
     # Auth cookie flags. Default False so the test suite (which talks to
     # http://testserver) can replay the session cookie. Production deploys
