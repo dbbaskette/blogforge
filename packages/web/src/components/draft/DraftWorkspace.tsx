@@ -399,7 +399,7 @@ export function DraftWorkspace({
 
       {showFooter && (
         <WorkspaceFooter
-          draftId={draft.id}
+          draft={draft}
           totalWords={totalWords}
           draftedCount={draftedCount}
           sectionCount={draft.sections.length}

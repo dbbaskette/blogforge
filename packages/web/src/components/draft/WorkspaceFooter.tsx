@@ -1,27 +1,43 @@
 import { useState } from "react";
 
-import { downloadDraftUrl } from "../../api/drafts";
+import { type Draft, downloadDraftUrl } from "../../api/drafts";
+import { ReadingPreview } from "./ReadingPreview";
 
 interface WorkspaceFooterProps {
-  draftId: string;
+  /** Full draft — powers the publish-ready reading preview rendered from here. */
+  draft: Draft;
   totalWords: number;
   draftedCount: number;
   sectionCount: number;
   onLint: () => void;
   onRepurpose: () => void;
   onHeadlines: () => void;
+  /**
+   * Optional hook fired when the reading preview opens. The footer owns the
+   * preview's open/close state locally (DraftWorkspace can't host it), so this
+   * is purely a notification for the parent and is not required.
+   */
+  onPreview?: () => void;
 }
 
 export function WorkspaceFooter({
-  draftId,
+  draft,
   totalWords,
   draftedCount,
   sectionCount,
   onLint,
   onRepurpose,
   onHeadlines,
+  onPreview,
 }: WorkspaceFooterProps): JSX.Element {
+  const draftId = draft.id;
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const openPreview = (): void => {
+    setPreviewOpen(true);
+    onPreview?.();
+  };
 
   const handleCopy = async (): Promise<void> => {
     try {
@@ -87,6 +103,14 @@ export function WorkspaceFooter({
         <DownloadMenu draftId={draftId} />
         <button
           type="button"
+          onClick={openPreview}
+          className="nb-btn nb-btn-sm"
+          title="See the finished post as a typeset, publish-ready article"
+        >
+          Preview
+        </button>
+        <button
+          type="button"
           onClick={onLint}
           className="nb-btn nb-btn-primary nb-btn-sm"
           title="Proofread and fact-check the draft"
@@ -94,6 +118,7 @@ export function WorkspaceFooter({
           Review
         </button>
       </footer>
+      {previewOpen && <ReadingPreview draft={draft} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
 }

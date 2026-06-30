@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { logout } from "../api/auth";
 import { useMe } from "../hooks/useMe";
 import { useVersionCheck } from "../hooks/useVersionCheck";
+import { CommandPalette } from "./CommandPalette";
 
 export function AppShell(): JSX.Element {
   return (
@@ -52,6 +53,7 @@ function TopBar(): JSX.Element {
   const { user, refresh } = useMe();
   const navigate = useNavigate();
   const location = useLocation();
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const onSignOut = async (): Promise<void> => {
     try {
@@ -61,6 +63,19 @@ function TopBar(): JSX.Element {
       navigate("/login");
     }
   };
+
+  // Global ⌘K / Ctrl+K opens the command palette (signed-in users only).
+  useEffect(() => {
+    if (!user) return;
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [user]);
 
   // No top bar on the login page itself.
   if (location.pathname === "/login") return <></>;
@@ -79,6 +94,15 @@ function TopBar(): JSX.Element {
         </Link>
         {user && (
           <nav className="flex items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Open command palette"
+              title="Open command palette"
+              className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-[8px] text-[11px] text-muted hover:text-ink border border-ink/10 hover:border-ink/20 transition-colors"
+            >
+              <span aria-hidden="true">⌘K</span>
+            </button>
             <NavLink to="/" end className="nb-btn-ghost nb-btn nb-btn-sm">
               Drafts
             </NavLink>
@@ -112,6 +136,7 @@ function TopBar(): JSX.Element {
           </nav>
         )}
       </div>
+      {user && paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </header>
   );
 }
