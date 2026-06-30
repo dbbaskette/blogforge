@@ -8,6 +8,8 @@ import { PersonaCard } from "../components/voice/PersonaCard";
 import { RulesCard } from "../components/voice/RulesCard";
 import { SamplesList } from "../components/voice/SamplesList";
 import { SourcesCard } from "../components/voice/SourcesCard";
+import { VoiceAudition } from "../components/voice/VoiceAudition";
+import { VoiceFingerprint } from "../components/voice/VoiceFingerprint";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -78,9 +80,7 @@ export function VoicePage(): JSX.Element {
   if (!profile) return <></>;
 
   const statusLine = [
-    profile.distilled_at
-      ? `distilled ${relativeTime(profile.distilled_at)}`
-      : "not distilled yet",
+    profile.distilled_at ? `distilled ${relativeTime(profile.distilled_at)}` : "not distilled yet",
     `${profile.samples.length} ${profile.samples.length === 1 ? "sample" : "samples"}`,
     "used by default on every draft",
   ].join(" · ");
@@ -109,6 +109,8 @@ export function VoicePage(): JSX.Element {
 
       <LinkedInImportCard onImported={load} />
       <PersonaCard profile={profile} onChange={handleChange} />
+      <VoiceAudition />
+      <VoiceFingerprint />
       <RulesCard profile={profile} onChange={handleChange} />
       <SamplesList profile={profile} onChange={handleChange} onRefresh={handleRefresh} />
       <SourcesCard />

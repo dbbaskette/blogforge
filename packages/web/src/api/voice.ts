@@ -52,6 +52,35 @@ export interface VoiceProfile {
   samples: VoiceSample[];
 }
 
+/**
+ * The six tonal axes of a voice fingerprint, each 0–100. `null` when there's
+ * no model or too few samples to map tones.
+ */
+export interface VoiceDimensions {
+  casual: number;
+  vivid: number;
+  punchy: number;
+  warm: number;
+  concrete: number;
+  direct: number;
+}
+
+export interface VoiceFingerprint {
+  name: string;
+  one_line: string;
+  /** Overall voice strength, 0–100. */
+  strength: number;
+  sample_count: number;
+  /** Six tonal axes, or null if no model / too few samples. */
+  dimensions: VoiceDimensions | null;
+  signature_phrases: string[];
+  top_words: string[];
+  /** Sentence lengths (words), roughly 0–40 each. */
+  rhythm: number[];
+  avg_sentence_len: number;
+  banished: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Persona & rules
 // ---------------------------------------------------------------------------
@@ -174,6 +203,21 @@ export function distill(body?: { provider?: string; model?: string }): Promise<V
     body: JSON.stringify(body ?? {}),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Fingerprint & audition
+// ---------------------------------------------------------------------------
+
+/** Fetch the shareable voice fingerprint (radar, rhythm, signature phrases). */
+export const getVoiceFingerprint = (): Promise<VoiceFingerprint> =>
+  api<VoiceFingerprint>("/api/voice/fingerprint");
+
+/** Rewrite a snippet in the user's voice. Returns the original + rewritten. */
+export const auditionVoice = (text: string): Promise<{ original: string; rewritten: string }> =>
+  api<{ original: string; rewritten: string }>("/api/voice/audition", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
 
 // ---------------------------------------------------------------------------
 // LinkedIn import

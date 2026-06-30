@@ -24,7 +24,7 @@ import logging
 import re
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
@@ -454,3 +454,149 @@ async def export_guide(
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{slug}-voice-guide.md"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /api/voice/audition — rewrite arbitrary text in the user's voice
+# ---------------------------------------------------------------------------
+
+
+class _AuditionBody(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)
+
+
+@router.post("/audition")
+async def audition_voice(
+    body: _AuditionBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict:
+    """Rewrite a snippet of text in the user's voice — an instant 'try my voice' demo."""
+    import yaml
+
+    from blogforge.llm.resolve import build_provider_for
+    from blogforge.s3 import get_s3_client
+    from blogforge.voice import compose_prompt
+    from blogforge.voice.enforce import enforce_voice_rules
+    from blogforge.voice.packs.manifest import Manifest
+
+    store = _store(request)
+    profile = await store.get_or_create(current.id)
+    provider_name = await _auto_select_provider(current.id)
+    if provider_name is None:
+        raise HTTPException(
+            400,
+            detail={"error": {"code": "provider_missing_key",
+                              "message": "No writing model is available.",
+                              "hint": "Add a provider key in Settings, or use the Tanzu model."}},
+        )
+    prov = await build_provider_for(current.id, provider_name)
+    mdl = _default_model(provider_name)
+
+    s3 = get_s3_client()
+    sample_texts: dict[str, str] = {}
+    for s in profile.samples:
+        if s.exemplar and s.s3_key:
+            try:
+                sample_texts[s.id] = (await s3.get_object(s.s3_key)).decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001 — skip unreadable samples
+                pass
+    pack_root = await materialize(profile, sample_texts)
+    system = compose_prompt(pack_root)
+    prompt = (
+        f"{system}\n\nRewrite the text below so it reads in the author's voice described "
+        "above. Preserve the meaning and facts exactly; do not add or drop ideas. Return "
+        "ONLY the rewritten text.\n\nTEXT:\n" + body.text
+    )
+    resp = await prov.complete(model=mdl, prompt=prompt)
+    out = (resp.text or "").strip() or body.text
+    manifest = Manifest.model_validate(
+        yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
+    )
+    out = await enforce_voice_rules(out, manifest, prov, mdl)
+    return {"original": body.text, "rewritten": out}
+
+
+# ---------------------------------------------------------------------------
+# GET /api/voice/fingerprint — stylometric "voiceprint" for the card
+# ---------------------------------------------------------------------------
+
+_DIMENSIONS = ("casual", "vivid", "punchy", "warm", "concrete", "direct")
+_DIM_SCHEMA = {
+    "type": "object",
+    "properties": {k: {"type": "integer", "minimum": 0, "maximum": 100} for k in _DIMENSIONS},
+    "required": list(_DIMENSIONS),
+    "additionalProperties": False,
+}
+
+
+@router.get("/fingerprint")
+async def voice_fingerprint(
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict:
+    """A shareable 'voiceprint': tonal dimensions (LLM-scored) + deterministic
+    rhythm / signature phrases / vocabulary from the user's samples."""
+    from blogforge.s3 import get_s3_client
+    from blogforge.voice.fingerprint import compute_stats
+
+    store = _store(request)
+    profile = await store.get_or_create(current.id)
+
+    s3 = get_s3_client()
+    texts: list[str] = []
+    for s in profile.samples:
+        if s.s3_key:
+            try:
+                texts.append((await s3.get_object(s.s3_key)).decode("utf-8", "replace"))
+            except Exception:  # noqa: BLE001
+                pass
+    stats = compute_stats(texts)
+    n_samples = sum(1 for t in texts if t.strip())
+    n_exemplar = sum(1 for s in profile.samples if s.exemplar)
+    strength = min(
+        100,
+        n_samples * 12 + n_exemplar * 6 + (40 if profile.distilled_style_md.strip() else 0),
+    )
+
+    dimensions: dict | None = None
+    provider_name = await _auto_select_provider(current.id)
+    if provider_name and stats["word_count"] >= 60:
+        try:
+            import json
+
+            from blogforge.llm.resolve import build_provider_for
+            prov = await build_provider_for(current.id, provider_name)
+            sample = "\n\n".join(texts)[:6000]
+            prompt = (
+                "Rate this author's writing VOICE on each axis from 0 to 100, judging only "
+                "from the samples. 0 = left pole, 100 = right pole.\n"
+                "- casual: formal(0) … casual(100)\n"
+                "- vivid: plain(0) … vivid/sensory(100)\n"
+                "- punchy: long-flowing(0) … short-punchy(100)\n"
+                "- warm: detached(0) … warm(100)\n"
+                "- concrete: abstract(0) … concrete/specific(100)\n"
+                "- direct: hedged(0) … direct(100)\n\n"
+                "Return ONLY a JSON object with those six integer keys.\n\nSAMPLES:\n" + sample
+            )
+            resp = await prov.complete(
+                model=_default_model(provider_name), prompt=prompt, json_schema=_DIM_SCHEMA
+            )
+            raw = json.loads(resp.text)
+            dimensions = {k: max(0, min(100, int(raw.get(k, 50)))) for k in _DIMENSIONS}
+        except Exception as exc:  # noqa: BLE001 — dimensions are best-effort
+            logger.warning("fingerprint dimensions failed: %r", exc)
+            dimensions = None
+
+    return {
+        "name": profile.name or "Your voice",
+        "one_line": profile.persona_one_line,
+        "strength": strength,
+        "sample_count": n_samples,
+        "dimensions": dimensions,
+        "signature_phrases": stats["signature_phrases"],
+        "top_words": stats["top_words"],
+        "rhythm": stats["rhythm"],
+        "avg_sentence_len": stats["avg_sentence_len"],
+        "banished": list(profile.rules.banished_words)[:6],
+    }
