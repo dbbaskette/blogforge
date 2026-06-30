@@ -51,6 +51,19 @@ vi.mock("../../src/api/voice", () => {
     distill: vi.fn().mockResolvedValue(profile),
     voiceExportUrl: vi.fn().mockReturnValue("/api/voice/export"),
     voiceGuideUrl: vi.fn().mockReturnValue("/api/voice/guide.md"),
+    getVoiceFingerprint: vi.fn().mockResolvedValue({
+      name: "Test",
+      one_line: "",
+      strength: 0,
+      sample_count: 0,
+      dimensions: null,
+      signature_phrases: [],
+      top_words: [],
+      rhythm: [],
+      avg_sentence_len: 0,
+      banished: [],
+    }),
+    auditionVoice: vi.fn().mockResolvedValue({ original: "", rewritten: "" }),
     listSources: vi.fn().mockResolvedValue([]),
     addUrlSource: vi.fn().mockResolvedValue({ id: "src1", url: "https://example.com", name: "Example", status: "ready", extracted_chars: 0, added_at: "2026-01-01T00:00:00Z" }),
     deleteSource: vi.fn().mockResolvedValue(undefined),
@@ -79,7 +92,7 @@ describe("VoicePage", () => {
   it("renders the page heading and persona identity once loaded", async () => {
     renderPage();
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /your voice/i })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: /your voice/i, level: 1 })).toBeInTheDocument(),
     );
     expect(
       screen.getByDisplayValue("A technical writer who simplifies complexity"),
