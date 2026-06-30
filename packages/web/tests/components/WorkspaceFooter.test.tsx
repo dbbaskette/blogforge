@@ -1,10 +1,24 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Draft } from "../../src/api/drafts";
 import { WorkspaceFooter } from "../../src/components/draft/WorkspaceFooter";
 
+const draft: Draft = {
+  id: "d1",
+  created_at: "2026-05-01T00:00:00Z",
+  updated_at: "2026-05-01T00:00:00Z",
+  title: "My Essay",
+  stage: "sections",
+  idea: { topic: "My Essay", pack_slug: "dan", provider: "anthropic", model: "m" },
+  outline: { opening_hook: "", sections: [], estimated_words: 0 },
+  sections: [],
+  tags: [],
+  hero_image_key: null,
+};
+
 const baseProps = {
-  draftId: "d1",
+  draft,
   totalWords: 120,
   draftedCount: 2,
   sectionCount: 2,
