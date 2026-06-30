@@ -41,12 +41,15 @@ function jumpToSection(sectionId: string): void {
   window.setTimeout(() => el.classList.remove("lint-flash"), 1600);
 }
 
-const FIX_INSTRUCTION: Record<string, string> = {
-  violation:
-    "Rewrite this sentence to avoid the flagged wording while keeping the meaning and the author's voice. Return only the rewritten sentence.",
-  repetition:
-    "Rewrite this sentence to remove the repeated phrasing while keeping the meaning and voice. Return only the rewritten sentence.",
-};
+/** Build a fix instruction that names the exact flagged text, so the model
+ * actually removes it instead of vaguely "avoiding the flagged wording". */
+function fixInstruction(finding: LintFinding): string {
+  if (finding.kind === "repetition") {
+    return "Rewrite this sentence to remove the repeated phrasing, keeping the meaning and the author's voice. Do not use em dashes. Return only the rewritten sentence.";
+  }
+  const target = finding.match ? `the flagged text "${finding.match}"` : "the flagged wording";
+  return `Rewrite this sentence to remove ${target}, recasting it naturally while keeping the meaning and the author's voice. Do not use em dashes. Return only the rewritten sentence.`;
+}
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
@@ -402,7 +405,7 @@ function FindingCard({
       const { text } = await inlineEdit(draft.id, {
         text: sentence,
         action: "custom", // custom honors `instruction`; preset actions ignore it
-        instruction: FIX_INSTRUCTION[finding.kind] ?? FIX_INSTRUCTION.violation,
+        instruction: fixInstruction(finding),
       });
       setSuggestion(text.trim());
     } catch (e) {

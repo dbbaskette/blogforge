@@ -116,4 +116,19 @@ async def transform_text(
     user = _build_user_prompt(text, action, instruction)
     full_prompt = f"{system}\n\n---\n\n{user}"
     resp = await provider.complete(model=model, prompt=full_prompt)
-    return _clean_inline_output(resp.text)
+    out = _clean_inline_output(resp.text)
+    # Enforce the mechanical voice rules so an inline edit — including an
+    # accepted Proofreader fix — can't leave an em dash / `--` / banished tell
+    # behind (which would just get re-flagged on the next lint). Best-effort:
+    # never fail the edit if the manifest is an unexpected shape.
+    from blogforge.config import get_settings
+
+    if get_settings().enforce_voice_rules:
+        try:
+            from blogforge.voice.enforce import enforce_voice_rules
+            from blogforge.voice.packs.manifest import Manifest
+
+            out = await enforce_voice_rules(out, Manifest.model_validate(manifest), provider, model)
+        except Exception:  # noqa: BLE001 — enforcement is best-effort
+            pass
+    return out
