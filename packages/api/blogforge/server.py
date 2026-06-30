@@ -6,10 +6,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from blogforge.voice import PackStore
 
 from blogforge import __version__
@@ -242,12 +241,24 @@ def create_app() -> FastAPI:
     index = static_dir / "index.html"
 
     if index.is_file() and not _is_dev_mode():
+        static_root = static_dir.resolve()
 
         @app.get("/", response_class=FileResponse)
         def root() -> FileResponse:
             return FileResponse(index)
 
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+        # SPA fallback: serve a real static file when one exists (hashed assets,
+        # favicon, …), otherwise return index.html so client-side routes
+        # (/login, /voice, /drafts/:id) resolve on a hard navigation or refresh.
+        # /api/* stays a JSON 404 rather than silently returning the SPA shell.
+        @app.get("/{full_path:path}", response_class=FileResponse)
+        def spa_fallback(full_path: str) -> FileResponse:
+            if full_path == "api" or full_path.startswith("api/"):
+                raise HTTPException(status_code=404, detail="Not Found")
+            candidate = (static_dir / full_path).resolve()
+            if candidate.is_file() and str(candidate).startswith(f"{static_root}/"):
+                return FileResponse(candidate)
+            return FileResponse(index)
     else:
 
         @app.get("/", response_class=HTMLResponse)
