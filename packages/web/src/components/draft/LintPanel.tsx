@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   type ClaimResult,
@@ -47,6 +47,117 @@ const FIX_INSTRUCTION: Record<string, string> = {
   repetition:
     "Rewrite this sentence to remove the repeated phrasing while keeping the meaning and voice. Return only the rewritten sentence.",
 };
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+/**
+ * Humanity Score 0–100. Starts at 100, docks 6 per still-open finding, then
+ * nudges up by 2 per positive voice hit (capped, so a tell-ridden draft can't
+ * be bought back to clean). 0 open findings ⇒ 100 ⇒ celebratory state.
+ */
+function humanityScore(openCount: number, hitCount: number): number {
+  const base = 100 - openCount * 6;
+  const bonus = openCount === 0 ? 0 : Math.min(hitCount * 2, 10);
+  return clamp(base + bonus, 0, 100);
+}
+
+/** coral (low) → amber (mid) → leaf/green (high) */
+function scoreColor(score: number): string {
+  if (score >= 70) return "#0e7a50"; // leaf/green-ink
+  if (score >= 45) return "#92600a"; // amber
+  return "#b5321b"; // coral
+}
+
+function HumanityRing({
+  openCount,
+  hitCount,
+}: {
+  openCount: number;
+  hitCount: number;
+}): JSX.Element {
+  const score = humanityScore(openCount, hitCount);
+  const color = scoreColor(score);
+  const clean = openCount === 0;
+  const R = 26;
+  const C = 2 * Math.PI * R;
+  const offset = C * (1 - score / 100);
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative h-[68px] w-[68px] shrink-0">
+        <svg
+          viewBox="0 0 68 68"
+          className="h-full w-full -rotate-90"
+          aria-hidden="true"
+        >
+          <circle cx="34" cy="34" r={R} fill="none" stroke="#e7e3da" strokeWidth="6" />
+          <circle
+            cx="34"
+            cy="34"
+            r={R}
+            fill="none"
+            stroke={color}
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={C}
+            strokeDashoffset={offset}
+            style={{ transition: "stroke-dashoffset 600ms ease, stroke 400ms ease" }}
+          />
+        </svg>
+        <span
+          className="absolute inset-0 flex items-center justify-center font-serif text-xl font-medium tabular-nums"
+          style={{ color }}
+        >
+          {score}
+        </span>
+        {clean && (
+          <span className="pointer-events-none absolute inset-0" aria-hidden="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <span
+                key={i}
+                className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full animate-confetti-burst"
+                style={
+                  {
+                    background: i % 2 === 0 ? "#0e7a50" : "#2f6bff",
+                    "--burst-angle": `${i * 60}deg`,
+                    animationDelay: `${i * 40}ms`,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color }}>
+          Humanity
+        </p>
+        {clean ? (
+          <span
+            className="mt-1 inline-flex items-center gap-1 rounded-nb-sm px-2 py-0.5 text-xs font-medium animate-fade-in"
+            style={{ background: "#d9f2e5", color: "#0e7a50" }}
+          >
+            ✓ Clean — reads human
+          </span>
+        ) : (
+          <p className="mt-0.5 text-xs text-muted leading-snug">
+            AI tells remaining: <span className="font-medium text-ink-2 tabular-nums">{openCount}</span>
+          </p>
+        )}
+      </div>
+      <style>{`
+        @keyframes confetti-burst {
+          0%   { transform: translate(-50%, -50%) rotate(var(--burst-angle)) translateY(0) scale(0.4); opacity: 0; }
+          35%  { opacity: 1; }
+          100% { transform: translate(-50%, -50%) rotate(var(--burst-angle)) translateY(-26px) scale(1); opacity: 0; }
+        }
+        .animate-confetti-burst { animation: confetti-burst 900ms ease-out forwards; }
+      `}</style>
+    </div>
+  );
+}
 
 export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JSX.Element {
   const draftId = draft.id;
@@ -129,9 +240,14 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
             </button>
           </div>
         </div>
-        <h2 className="font-serif text-2xl font-medium text-ink tracking-tight mt-1">
-          Review {visible.length > 0 && <span className="text-coral">· {visible.length}</span>}
-        </h2>
+        <div className="mt-1 flex items-center justify-between gap-4">
+          <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">
+            Review {visible.length > 0 && <span className="text-coral">· {visible.length}</span>}
+          </h2>
+          {!error && !(loading && visible.length === 0) && (
+            <HumanityRing openCount={visible.length} hitCount={hits.length} />
+          )}
+        </div>
       </header>
 
       {error && (

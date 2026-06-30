@@ -303,6 +303,7 @@ export function SectionCard({
                   draftId={draftId}
                   sectionId={section.id}
                   refreshKey={section.content_md.length}
+                  currentContent={section.content_md}
                   onRevert={onRevert}
                 />
               )}

@@ -14,6 +14,9 @@ interface SectionsPanelProps {
   /** True while a single-pass whole-draft compose is running — show one
    * unified "writing the full draft" state instead of per-section spinners. */
   composingWholeDraft?: boolean;
+  /** Live total word count (sum of section word_counts) — drives the compose
+   * theater's word ticker. Owned by the workspace so it matches the footer. */
+  liveWords?: number;
   /** Section currently streaming live prose (single-section regenerate). */
   liveSectionId?: string | null;
   /** Accumulated live token text for liveSectionId. */
@@ -41,6 +44,7 @@ export function SectionsPanel({
   unfilledCount,
   jobRunning,
   composingWholeDraft = false,
+  liveWords: liveWordsProp,
   liveSectionId,
   liveText,
   onSectionSave,
@@ -99,6 +103,10 @@ export function SectionsPanel({
   ).length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const writtenCount = doneCount;
+  // Live word tally for the compose theater — sums each section's word_count as
+  // it fills, so the ticker climbs section-by-section as the draft lands. Prefer
+  // the workspace-owned total (matches the footer) when supplied.
+  const liveWords = liveWordsProp ?? sections.reduce((acc, s) => acc + s.word_count, 0);
 
   const submitRevise = async (): Promise<void> => {
     const note = reviseNote.trim();
@@ -205,6 +213,45 @@ export function SectionsPanel({
             </button>
           </div>
         </div>
+      )}
+
+      {composingWholeDraft && (
+        <output
+          className="block px-5 py-4 rounded-nb compose-theater-banner"
+          style={{
+            background: "linear-gradient(135deg, #eaf0ff 0%, #f3f0ff 100%)",
+            border: "1px solid #c2d4ff",
+          }}
+          aria-live="polite"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <span className="flex items-center gap-2 text-sm font-semibold text-cobalt-700">
+              <span aria-hidden className="compose-theater-quill">
+                ✍
+              </span>
+              Writing in your voice…
+            </span>
+            <span className="flex items-center gap-3 font-mono text-xs text-cobalt-700">
+              <span>
+                {doneCount} of {total} sections
+              </span>
+              <span
+                aria-hidden
+                className="inline-block w-px h-3.5 self-center"
+                style={{ background: "#c2d4ff" }}
+              />
+              <span className="tabular-nums text-amber-ink font-semibold">
+                {liveWords.toLocaleString()} {liveWords === 1 ? "word" : "words"}
+              </span>
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#c2d4ff" }}>
+            <div
+              className="h-full rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${pct}%`, background: "var(--cobalt-500, #2f6bff)" }}
+            />
+          </div>
+        </output>
       )}
 
       {jobRunning && !composingWholeDraft && (
@@ -314,38 +361,62 @@ export function SectionsPanel({
       )}
 
       {composingWholeDraft ? (
-        <ComposingDraftPanel titles={sections.map((s) => s.title)} />
+        <ComposingDraftPanel sections={sections} generatingIds={generatingIds} />
       ) : view === "read" ? (
         <DraftReadView draft={draft} />
       ) : (
         <div className="space-y-3">
-          {sections.map((section, i) => (
-            <SectionCard
-              key={section.id}
-              section={section}
-              index={i}
-              isGenerating={generatingIds.has(section.id)}
-              liveText={liveSectionId === section.id ? liveText : undefined}
-              draftId={draft.id}
-              onSave={(md, createVersion) => onSectionSave(section.id, md, createVersion)}
-              onRegenerate={(instruction) => onRegenerateSection(section.id, instruction)}
-              onRevert={(versionId) => onRevertSection(section.id, versionId)}
-              onMoveUp={() => moveSection(i, -1)}
-              onMoveDown={() => moveSection(i, 1)}
-              canMoveUp={i > 0}
-              canMoveDown={i < sections.length - 1}
-            />
-          ))}
+          {sections.map((section, i) => {
+            const isComposing = generatingIds.has(section.id);
+            const hasLanded = section.status === "ready" || section.status === "edited";
+            // The celebratory landing pop should only fire during an active job —
+            // a static, fully-written draft shouldn't pop every card on render.
+            return (
+              <div
+                key={section.id}
+                className={`rounded-[14px] transition-shadow duration-500 ${
+                  isComposing
+                    ? "section-card-composing"
+                    : jobRunning && hasLanded
+                      ? "section-card-landed"
+                      : ""
+                }`}
+              >
+                <SectionCard
+                  section={section}
+                  index={i}
+                  isGenerating={isComposing}
+                  liveText={liveSectionId === section.id ? liveText : undefined}
+                  draftId={draft.id}
+                  onSave={(md, createVersion) => onSectionSave(section.id, md, createVersion)}
+                  onRegenerate={(instruction) => onRegenerateSection(section.id, instruction)}
+                  onRevert={(versionId) => onRevertSection(section.id, versionId)}
+                  onMoveUp={() => moveSection(i, -1)}
+                  onMoveDown={() => moveSection(i, 1)}
+                  canMoveUp={i > 0}
+                  canMoveDown={i < sections.length - 1}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </section>
   );
 }
 
-/** Shown while the whole post is written in a single pass. One unified state —
- * not N spinning cards — so it reads as "writing one document". The outline
- * titles appear as a dimmed checklist so the author knows what's coming. */
-function ComposingDraftPanel({ titles }: { titles: string[] }): JSX.Element {
+/** The compose "theater": shown while the whole post is written in a single
+ * pass. One unified state — not N spinning cards — so it reads as "writing one
+ * document". Each outline title lights up as it composes (pulsing cobalt) and
+ * lands (a celebratory fade-in with a check), so the author watches the draft
+ * fill in real time. */
+function ComposingDraftPanel({
+  sections,
+  generatingIds,
+}: {
+  sections: Section[];
+  generatingIds: Set<string>;
+}): JSX.Element {
   return (
     <output
       className="block nb-card p-8 text-center animate-fade-in"
@@ -363,19 +434,47 @@ function ComposingDraftPanel({ titles }: { titles: string[] }): JSX.Element {
       </div>
       <p className="text-sm text-muted mt-2 max-w-md mx-auto leading-relaxed">
         Writing the whole post in one pass from your outline, so it reads as a single
-        coherent piece. All sections appear together when it's done.
+        coherent piece. Watch each section land below.
       </p>
-      {titles.length > 0 && (
-        <ul className="mt-5 inline-flex flex-col gap-1.5 text-left">
-          {titles.map((t, i) => (
-            <li
-              key={`${i}-${t}`}
-              className="flex items-center gap-2 text-sm text-muted-2 animate-pulse"
-            >
-              <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-cobalt-300" />
-              {t}
-            </li>
-          ))}
+      {sections.length > 0 && (
+        <ul className="mt-5 inline-flex flex-col gap-1 text-left">
+          {sections.map((s) => {
+            const landed = s.status === "ready" || s.status === "edited";
+            const composing = generatingIds.has(s.id);
+            return (
+              <li
+                key={s.id}
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-nb-sm text-sm transition-all duration-500 ${
+                  landed
+                    ? "compose-line-landed text-ink font-medium"
+                    : composing
+                      ? "compose-line-active text-cobalt-700 font-medium"
+                      : "text-muted-2"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className={`grid place-items-center w-4 h-4 shrink-0 ${
+                    composing ? "compose-quill-pulse text-cobalt-500" : ""
+                  }`}
+                >
+                  {landed ? (
+                    <span className="text-leaf compose-check-pop">✓</span>
+                  ) : composing ? (
+                    "✍"
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-cobalt-300" />
+                  )}
+                </span>
+                <span className="truncate">{s.title}</span>
+                {landed && s.word_count > 0 && (
+                  <span className="ml-auto pl-2 font-mono text-[11px] text-muted-2 tabular-nums">
+                    {s.word_count.toLocaleString()}w
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </output>
