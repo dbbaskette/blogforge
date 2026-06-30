@@ -83,10 +83,10 @@ describe("SectionsPanel", () => {
         onReviseDraft={noop}
       />,
     );
-    expect(screen.getByText(/composing your full draft/i)).toBeInTheDocument();
-    // The per-section card and the N/total per-section banner are suppressed.
+    // The compose "theater" shows one unified writing state.
+    expect(screen.getByText(/writing in your voice/i)).toBeInTheDocument();
+    // The per-section editor is suppressed during the whole-draft compose.
     expect(screen.queryByText(/the first section prose/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/sections$/i)).not.toBeInTheDocument();
   });
 
   it("submits a holistic revision instruction", async () => {

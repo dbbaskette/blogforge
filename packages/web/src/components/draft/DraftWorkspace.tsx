@@ -383,6 +383,7 @@ export function DraftWorkspace({
             unfilledCount={unfilledCount}
             jobRunning={jobRunning}
             composingWholeDraft={composingWholeDraft}
+            liveWords={totalWords}
             liveSectionId={liveSectionId}
             liveText={liveText}
             onSectionSave={onSectionSave}

@@ -353,6 +353,78 @@ input[type="range"] {
   border-radius: 12px;
 }
 
+/* ── Compose "theater" — whole-draft generation as a cinematic experience ── */
+
+/* Banner: gentle breathing glow while the draft writes itself. */
+@keyframes compose-banner-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47, 107, 255, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(47, 107, 255, 0.1); }
+}
+.compose-theater-banner {
+  animation: compose-banner-glow 2.4s ease-in-out infinite;
+}
+
+/* The quill in the banner — a soft pulse so it feels like it's writing. */
+@keyframes compose-quill {
+  0%, 100% { opacity: 0.55; transform: rotate(-6deg); }
+  50% { opacity: 1; transform: rotate(4deg); }
+}
+.compose-theater-quill {
+  display: inline-block;
+  animation: compose-quill 1.6s ease-in-out infinite;
+}
+.compose-quill-pulse {
+  animation: compose-quill 1.4s ease-in-out infinite;
+}
+
+/* Active checklist line — the section currently being written. */
+@keyframes compose-line-pulse {
+  0%, 100% { background: rgba(47, 107, 255, 0.06); }
+  50% { background: rgba(47, 107, 255, 0.14); }
+}
+.compose-line-active {
+  animation: compose-line-pulse 1.6s ease-in-out infinite;
+}
+
+/* Landed checklist line — a brief celebratory settle as the section arrives. */
+@keyframes compose-line-land {
+  0% { opacity: 0; transform: translateX(-4px); background: rgba(21, 160, 107, 0.16); }
+  60% { background: rgba(21, 160, 107, 0.12); }
+  100% { opacity: 1; transform: translateX(0); background: transparent; }
+}
+.compose-line-landed {
+  animation: compose-line-land 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The check mark pops in when a section lands. */
+@keyframes compose-check-pop {
+  0% { opacity: 0; transform: scale(0.4); }
+  60% { transform: scale(1.25); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.compose-check-pop {
+  display: inline-block;
+  animation: compose-check-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Section card composing — a subtle cobalt glow ring while it fills in. */
+@keyframes section-composing-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(47, 107, 255, 0.25), 0 0 18px -4px rgba(47, 107, 255, 0.35); }
+  50% { box-shadow: 0 0 0 1px rgba(47, 107, 255, 0.45), 0 0 28px -2px rgba(47, 107, 255, 0.5); }
+}
+.section-card-composing {
+  animation: section-composing-glow 1.8s ease-in-out infinite;
+}
+
+/* Section card landed — a quick celebratory scale-in once it arrives. */
+@keyframes section-landed-pop {
+  0% { opacity: 0.6; transform: scale(0.985); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.4); }
+  100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.section-card-landed {
+  animation: section-landed-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Respect the OS "reduce motion" preference: neutralize the fade/slide/expand
    animations applied across routes and panels. */
 @media (prefers-reduced-motion: reduce) {
