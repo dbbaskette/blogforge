@@ -1,53 +1,122 @@
-# BlogForge
+<div align="center">
 
-Local-first long-form drafting tool. Give BlogForge a topic and a [myvoice](https://github.com/dbbaskette/myvoice) style pack; it proposes an outline, lets you edit it, then writes the whole post in your voice — as one coherent piece, not a stack of disconnected sections.
+# ✍️ BlogForge
+
+**A workshop for long-form writing — that sounds like *you*, not a language model.**
+
+Give it a topic and your voice. It researches, outlines, and writes a full 1,000–3,000 word draft
+in a single coherent pass — then hands you a real editor, a proofreader that hunts AI tells, and a
+one-click path from rough idea to publish-ready post.
+
+Local-first · multi-user · bring-your-own model · runs on Docker or Tanzu Platform.
+
+</div>
+
+---
+
+## ✨ The cool stuff
+
+BlogForge is voice-first and allergic to robot-writing. These are the features that make it feel like magic:
+
+| | Feature | What it does |
+|---|---|---|
+| 🔬 | **Voice Fingerprint** | A shareable "voiceprint" of *your* writing — a radar of tonal dimensions (casual · vivid · punchy · warm · concrete · direct, LLM-scored from your samples) plus your signature phrases, sentence-rhythm sparkline, and banished words. Your voice, made visible. |
+| 🎤 | **Audition your voice** | Paste any flat sentence and watch it get rewritten in your voice, instantly. Proof the voice works before you write a word. |
+| 🚫 | **AI-tell enforcement** | Em dashes, `--`, and banished words are *guaranteed* gone: after generation we deterministically detect violations, feed the text back to the model to recast (keeping your meaning + voice), and apply a deterministic backstop if it still slips. Not a suggestion in a prompt — an enforced rule. |
+| 💯 | **Humanity Score** | The Proofreader shows a live 0–100 ring (coral → amber → green) that climbs as you clean AI tells — with a "reads human" flourish and confetti at 100. |
+| 🎬 | **Generation theater** | Watch your draft get written: the outline lights up section-by-section, cards glow while composing and pop when they land, and a live word-count ticker climbs. "Writing in your voice…" |
+| 📰 | **Publish-ready preview** | One tap flips the editor into a gorgeous typeset article — hero image, title, reading time, real blog typography. See the finished piece, not the workbench. |
+| 🧵 | **Repurpose → every channel** | "✨ Atomize all" turns a finished post into an X thread, LinkedIn post, newsletter, TL;DR, and SEO meta — rendered as realistic platform-styled preview cards you copy with one tap. |
+| ⌘ | **⌘K command palette** | Jump to anything — new draft, any existing draft, Your Voice, Settings — from anywhere. |
+| 🕰️ | **Section time-travel** | Every regenerate/edit snapshots a version; a per-section **diff** shows exactly what changed (adds green, deletes struck red) before you revert. |
+| 🖼️ | **AI hero images** | Generate a banner with Google Imagen, inlined into the HTML export and the Markdown frontmatter. |
+
+…on top of the fundamentals below.
+
+---
 
 ## Why
 
-[myvoice](https://github.com/dbbaskette/myvoice) gives writers a portable style pack and a Compose & test loop that rewrites paragraphs in their voice. BlogForge starts a level above: paste a topic, get a 1,000–3,000 word draft you can refine. Same voice rules, same lint, just a longer surface.
+Most AI writing tools give you a wall of generic prose with a dozen em dashes and a "delve" in
+every paragraph. BlogForge is built around the opposite premise: it starts from *your* voice (a
+distilled style + your own writing samples), writes the whole post as one coherent argument, then
+mechanically scrubs the tells the model leaves behind. The goal is a draft a human would actually
+publish under their own name.
+
+It builds on [myvoice](https://github.com/dbbaskette/myvoice) — a portable style pack + lint loop —
+absorbed directly into BlogForge for pack loading, AI-tell detection, and prompt composition.
 
 ## How it works
 
 Three stages per draft:
 
-1. **Research** — paste URLs, files, or notes as references; chat with the LLM about your topic until the proposed outline feels right. Accept to move on.
-2. **Outline** — edit the opening hook + section titles/briefs, reorder, or regenerate. The outline is planned as a single non-overlapping arc, with the section count right-sized to your target length (≈3–7 sections). References stay attached and inform every regeneration.
-3. **Sections** — BlogForge composes the **entire post in a single pass** from the outline, then splits it back onto the sections so you can edit or regenerate any one of them. Generating the whole piece at once is what keeps it coherent and non-repetitive. Edit by hand, regenerate a section, or revise the whole draft against one instruction. Export when you're done.
+1. **Research** — paste URLs, files, or notes as references; chat with the model about your topic
+   until the proposed outline feels right. References stay attached and inform every regeneration.
+2. **Outline** — edit the opening hook + section titles/briefs, reorder, or regenerate. The outline
+   is planned as a single non-overlapping arc, section count right-sized to your target length (≈3–7).
+3. **Sections** — BlogForge composes the **entire post in a single pass** from the outline, then
+   splits it back onto the sections so you can edit or regenerate any one. Writing the whole piece
+   at once is what keeps it coherent and non-repetitive. Edit by hand, regenerate a section, revise
+   the whole draft against one instruction, then export.
 
-Drafts (with their references and chat history) persist to Postgres + S3, multi-user, scoped per account. Bring your own database + object store, or use the bundled docker-compose stack below.
+Edits **autosave** as you type (with a "Saving…/✓ Saved" indicator and version history), so a
+regenerate or refetch can never wipe your work. Drafts — with their references and chat history —
+persist to Postgres + S3, multi-user, scoped per account.
 
-## Features
+## Core features
 
-- **Single-pass, coherent generation** — the post is written start-to-finish in one call so sections build on each other instead of restating the thesis.
-- **Inline AI editing** — select any text in the editor and rephrase / shorten / expand / fix / ask, in your voice.
-- **Repurpose** — turn a finished draft into an X thread, LinkedIn post, newsletter blurb, TL;DR, SEO meta description, or announcement email.
+- **Single-pass, coherent generation** — the post is written start-to-finish in one call, so
+  sections build on each other instead of restating the thesis.
+- **Inline AI editing** — select any text in the editor and rephrase / shorten / expand / fix / ask,
+  in your voice. (Edits autosave and respect your voice rules.)
+- **Proofreader** — style-rule lint + a repetition check (duplicate paragraphs, recycled phrases,
+  echoed openers) + the live Humanity Score, with one-click AI fixes.
+- **Fact-check** — checks the draft's factual claims against your attached references
+  (supported / unsupported / contradicted).
 - **Headline & hook lab** — generate and apply alternative titles or opening hooks.
-- **Fact-check** — the Proofreader checks the draft's factual claims against your attached references (supported / unsupported / contradicted).
-- **AI hero image** — generate a banner image with Google Imagen; embedded in the HTML export and added to the markdown frontmatter.
-- **Proofreader** — myvoice style-rule lint plus a repetition check (duplicate paragraphs, recycled phrases, echoed openers).
-- **Export** — Markdown, Markdown + YAML frontmatter, standalone HTML (hero image inlined), or Word (`.docx`).
+- **Export** — Markdown, Markdown + YAML frontmatter, standalone HTML (hero image inlined), or
+  Word (`.docx`).
+
+## Your voice
+
+Your Voice is where BlogForge learns to sound like you:
+
+- **Persona** — identity, one-liner, tone.
+- **Writing samples** — paste text, fetch a URL, or upload a file; star your strongest as
+  **exemplars** (weighted most heavily). Or **import from LinkedIn** (upload your data export) to
+  bootstrap a persona + samples in one shot.
+- **Distill** — an LLM pass over your samples that produces a reusable style guide.
+- **Rules** — banished words/phrases, no em dashes, no `--` — enforced at generation time.
+- **Voice Fingerprint** + **Audition** (see ✨ above), and a portable **voice guide** Markdown export
+  you can paste into any other LLM.
 
 ## Providers & models
 
 Pick a provider per draft:
 
-- **Anthropic / OpenAI / Google** — API-key providers. Each user adds their own keys in **Settings → Provider API keys** (encrypted at rest; myvoice config is used as a fallback). Per-draft cost estimates are shown from a static rate card.
-- **Tanzu** — on a Tanzu Platform deploy, a bound GenAI model is offered as the **Tanzu** provider with **no key required** (the model binding supplies the base URL + credentials). See **Tanzu Platform deployment** below.
-- **Claude CLI (subscription)** — generate through your locally logged-in [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI (`claude -p`) instead of an API key, with web search on so Claude can research while it writes. Requires running the API on the host where `claude` is installed and authenticated — see **Using the Claude CLI** below.
+- **Anthropic / OpenAI / Google** — API-key providers. Each user adds their own keys in
+  **Settings → Provider API keys** (encrypted at rest). Per-draft cost estimates from a static rate card.
+- **Tanzu** — on a Tanzu Platform deploy, a bound GenAI model is offered as the **Tanzu** provider
+  with **no key required** (the binding supplies the base URL + credentials).
+- **Claude CLI (subscription)** — generate through your locally logged-in
+  [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI (`claude -p`) instead of an API key,
+  with web search on. Requires running the API on the host where `claude` is installed — see below.
 
 ## Quickstart (Docker)
 
-Sign-in is **GitHub OAuth only** — there's no email/password. Before first start, register a GitHub OAuth App and set five env vars so the login button works.
+Sign-in is **GitHub OAuth only** — there's no email/password. Register a GitHub OAuth App and set
+five env vars before first start.
 
-1. Register a GitHub OAuth App (callback `http://localhost:7880/api/auth/github/callback`) and copy the Client ID + secret — full steps in [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md).
+1. Register a GitHub OAuth App (callback `http://localhost:7880/api/auth/github/callback`) and copy
+   the Client ID + secret — full steps in [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md).
 2. Put the config in a `.env` file Docker Compose will load:
 
    ```bash
    BLOGFORGE_GITHUB_CLIENT_ID=<client-id>
    BLOGFORGE_GITHUB_CLIENT_SECRET=<client-secret>
-   BLOGFORGE_GITHUB_ALLOWLIST=your-github-login   # comma-separated logins allowed to sign in
-   BLOGFORGE_GITHUB_ADMIN_LOGIN=your-github-login  # which login becomes the admin
-   BLOGFORGE_PUBLIC_URL=http://localhost:7880      # base URL used to build the OAuth callback
+   BLOGFORGE_GITHUB_ALLOWLIST=your-github-login    # comma-separated logins allowed to sign in
+   BLOGFORGE_GITHUB_ADMIN_LOGIN=your-github-login   # which login becomes the admin
+   BLOGFORGE_PUBLIC_URL=http://localhost:7880       # base URL used to build the OAuth callback
    ```
 
 3. Start it:
@@ -56,25 +125,32 @@ Sign-in is **GitHub OAuth only** — there's no email/password. Before first sta
    docker compose up --build
    ```
 
-Then open http://localhost:7880. On first start the API container runs database migrations (`alembic upgrade head`), then click **Sign in with GitHub**.
+Open http://localhost:7880. On first start the API runs migrations (`alembic upgrade head`); then
+click **Sign in with GitHub**.
 
-- Only logins in `BLOGFORGE_GITHUB_ALLOWLIST` may sign in; anyone else is rejected. The login in `BLOGFORGE_GITHUB_ADMIN_LOGIN` becomes the admin on first sign-in.
-- To add more users, add their GitHub login to the allowlist (or let them hit `/login`, which creates a pending request), then approve and manage roles under `/admin`.
-- Each user adds their own LLM provider keys in **Settings → Provider API keys** (Anthropic / OpenAI / Google).
+- Only logins in `BLOGFORGE_GITHUB_ALLOWLIST` may sign in. The `BLOGFORGE_GITHUB_ADMIN_LOGIN` becomes
+  the admin on first sign-in.
+- To add users: add their GitHub login to the allowlist (or let them hit `/login`, which files a
+  pending request), then approve + manage roles under `/admin`.
+- Each user adds their own provider keys in **Settings → Provider API keys**.
 
 ## Using the Claude CLI (subscription, no API key)
 
-The `claude` binary isn't in the slim container, so to use the **Claude CLI** provider you run the API on your host (where Claude Code is installed and logged in) while Postgres/MinIO stay in Docker:
+The `claude` binary isn't in the slim container, so run the API on your host (where Claude Code is
+installed and logged in) while Postgres/MinIO stay in Docker:
 
 ```bash
 ./scripts/serve-host.sh
 ```
 
-This stops the containerized API, builds the web bundle into the API's static dir, and serves on http://localhost:7880 from your Mac. Confirm the CLI is authenticated first with `claude auth status`. Then pick **claude (CLI · subscription)** as the provider on a draft.
+This stops the containerized API, builds the web bundle into the API's static dir, and serves on
+http://localhost:7880. Confirm the CLI is authenticated first (`claude auth status`), then pick
+**claude (CLI · subscription)** as the provider on a draft.
 
 ## Local dev (without Docker)
 
-Run Postgres and MinIO via Docker, but the API/web from your host. Note the host-mapped Postgres port is **5433** (avoids colliding with a system Postgres on 5432):
+Run Postgres + MinIO in Docker, API/web from your host. The host-mapped Postgres port is **5433**
+(avoids colliding with a system Postgres on 5432):
 
 ```bash
 docker compose up postgres minio -d
@@ -92,13 +168,11 @@ BLOGFORGE_CORS_ORIGINS=http://localhost:7881 \
   uv run blogforge serve --port 7880
 ```
 
-(The GitHub OAuth vars are the same five from the Quickstart — see [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md). `./scripts/serve-host.sh` and `./scripts/run-local.sh` default the allowlist/admin/public-URL for you.)
-
-In another terminal, the web dev server:
+(`./scripts/serve-host.sh` and `./scripts/run-local.sh` default the allowlist/admin/public-URL for
+you.) Then the web dev server:
 
 ```bash
-cd packages/web && pnpm dev
-# vite serves :7881; API calls hit :7880 via CORS with credentials
+cd packages/web && pnpm dev    # vite :7881, API on :7880 via CORS with credentials
 ```
 
 ## Tanzu Platform deployment
@@ -112,8 +186,8 @@ cf create-service seaweedfs default blogforge-s3
 cf create-service ai-models tanzu-all-models blogforge-ai   # bound GenAI model -> keyless "Tanzu" provider
 
 # 2. Register a GitHub OAuth App (callback https://<route>/api/auth/github/callback),
-#    then copy the secrets template and fill it in:
-cp vars.example.yml vars.yml          # gitignored — holds non-secret config AND secrets, NEVER commit
+#    then fill in the gitignored secrets file (NEVER commit it):
+cp vars.example.yml vars.yml
 #   non-secret: app_name, apps_domain, admin_email, github_allowlist, github_admin_login
 #   secret:     github_client_id, github_client_secret, session_secret (openssl rand -hex 32)
 
@@ -122,23 +196,41 @@ cp vars.example.yml vars.yml          # gitignored — holds non-secret config A
 cf push --vars-file vars.yml
 ```
 
-The `blogforge.config.tanzu` adapter translates `VCAP_SERVICES` into the env vars the app reads, so no manual database / S3 / model wiring is needed: the `blogforge-postgres` binding sets `BLOGFORGE_DATABASE_URL`, `blogforge-s3` sets `BLOGFORGE_S3_*`, and `blogforge-ai` sets `BLOGFORGE_TANZU_API_BASE` / `BLOGFORGE_TANZU_API_KEY` (surfaced as the keyless **Tanzu** provider). Migrations run on first boot (`BLOGFORGE_RUN_MIGRATIONS_ON_BOOT=true`). Sign in with GitHub; the `github_admin_login` lands as admin. (The Claude CLI provider isn't available in a cloud deploy — use the Tanzu model or the API-key providers there.)
+`blogforge.config.tanzu` translates `VCAP_SERVICES` into the env the app reads — no manual DB / S3 /
+model wiring: `blogforge-postgres` → `BLOGFORGE_DATABASE_URL`, `blogforge-s3` → `BLOGFORGE_S3_*`,
+`blogforge-ai` → `BLOGFORGE_TANZU_*` (the keyless **Tanzu** provider). Migrations run on first boot.
+Sign in with GitHub; `github_admin_login` lands as admin. (The Claude CLI provider isn't available in
+a cloud deploy — use the Tanzu model or API-key providers there.)
+
+## Architecture
+
+```
+packages/
+  api/blogforge/    FastAPI app — drafts, generation (SSE streaming), voice, auth, jobs
+    voice/          absorbed myvoice: packs, lint/AI-tells, compose, enforce, fingerprint
+    config/tanzu    VCAP_SERVICES → env adapter
+  web/              React + TypeScript + Vite + Tailwind ("liquid-glass" UI), TipTap editor
+```
+
+- **Backend:** FastAPI · SQLAlchemy + Alembic (Postgres) · S3/MinIO/SeaweedFS for blobs · SSE for
+  live generation · per-user encrypted provider keys · GitHub OAuth sessions.
+- **Frontend:** React Router SPA, served by the API with a catch-all fallback; ⌘K palette, toasts,
+  autosave, command-driven flow.
 
 ## Requires
 
-- [myvoice](https://github.com/dbbaskette/myvoice) (BlogForge imports it as a library for pack loading + lint + prompt composition).
-- At least one of: an **API key** for Anthropic / OpenAI / Google (added in **Settings → Provider API keys**), a bound **Tanzu** model (on a Tanzu Platform deploy, no key needed), **or** the **Claude Code CLI** installed and logged in (for the Claude CLI provider).
-- A **GitHub OAuth App** for sign-in (GitHub is the only login method) — see [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md).
-
-## Design
-
-Design specs live in `docs/superpowers/specs/` (e.g. `2026-05-26-pencraft-v1-design.md` — BlogForge was formerly "Pencraft" — plus auth, admin-keys, and research-stage designs).
+- At least one model: an **API key** for Anthropic / OpenAI / Google (in Settings), a bound **Tanzu**
+  model (on Tanzu Platform, no key), **or** the **Claude Code CLI** installed and logged in.
+- A **GitHub OAuth App** for sign-in (GitHub is the only login method) —
+  see [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md).
 
 ## Development
 
 ```bash
-./scripts/dev.sh             # backend on :7880, Vite dev on :7881
+./scripts/dev.sh             # backend :7880, Vite dev :7881
 ./scripts/serve-host.sh      # host API + web bundle on :7880 (enables the Claude CLI provider)
 ./scripts/install-local.sh   # build wheel + install into local-venv/
 make test                    # backend pytest + web vitest
 ```
+
+Design specs live in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
