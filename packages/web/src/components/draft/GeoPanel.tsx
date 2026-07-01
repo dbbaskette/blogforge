@@ -39,11 +39,14 @@ function flashSection(sectionId: string): void {
 // ── Persistent record of GEO-added content (opener / FAQ), per draft, so the
 // Remove buttons survive closing and reopening the panel. The color highlight
 // is editor-chrome only; the saved markdown stays clean for export. ──
-interface Addition {
+export interface Addition {
   sectionId: string;
   text: string;
+  /** A duplicated-title heading the opener fix moved out of the way; restored
+   * verbatim by Remove. */
+  removed?: string;
 }
-interface Additions {
+export interface Additions {
   opener?: Addition;
   faq?: Addition;
 }
@@ -66,6 +69,68 @@ function saveAdditions(draftId: string, a: Additions): void {
   }
 }
 
+/**
+ * Carve GEO-added content (opener prefix / FAQ suffix) out of a section body
+ * before sending it to the model for a rewrite, so one fix can't mangle or
+ * erase what another fix just added — the addition is re-attached verbatim
+ * afterwards (`prefix + rewritten + suffix`) and its Remove button keeps
+ * working. Pure and exported for tests.
+ */
+const normalizeTitle = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+/**
+ * If a section body OPENS with a heading (or bold line) that just repeats the
+ * draft title, split it off — the definitional-opener fix moves it out of the
+ * way so the opener becomes the true first line instead of being wedged
+ * between duplicate headings. Pure and exported for tests.
+ */
+export function stripDuplicateTitleHeading(
+  title: string,
+  content: string,
+): { rest: string; removed: string } {
+  const lines = content.split("\n");
+  const firstIdx = lines.findIndex((l) => l.trim() !== "");
+  if (firstIdx === -1) return { rest: content, removed: "" };
+  // Strip heading markers / bold wrapping / quotes, then compare to the title.
+  const text = lines[firstIdx]
+    .trim()
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^\*\*|\*\*$/g, "")
+    .trim();
+  const duplicatesTitle =
+    normalizeTitle(title).length > 0 && normalizeTitle(text) === normalizeTitle(title);
+  if (!duplicatesTitle) return { rest: content, removed: "" };
+  const rest = lines
+    .slice(firstIdx + 1)
+    .join("\n")
+    .replace(/^\s+/, "");
+  return { rest, removed: lines[firstIdx] };
+}
+
+export function carveProtectedAdditions(
+  additions: Additions,
+  sectionId: string,
+  content: string,
+): { core: string; prefix: string; suffix: string } {
+  let core = content;
+  let prefix = "";
+  let suffix = "";
+  const op = additions.opener;
+  if (op && op.sectionId === sectionId && core.startsWith(op.text)) {
+    prefix = `${op.text}\n\n`;
+    core = core.slice(op.text.length).replace(/^\s+/, "");
+  }
+  const fq = additions.faq;
+  if (fq && fq.sectionId === sectionId) {
+    const trimmed = core.replace(/\s+$/, "");
+    if (trimmed.endsWith(fq.text)) {
+      suffix = `\n\n${fq.text}`;
+      core = trimmed.slice(0, trimmed.length - fq.text.length).replace(/\s+$/, "");
+    }
+  }
+  return { core, prefix, suffix };
+}
+
 /** A rewrite we can undo: the section's content (or title) before the fix. */
 type UndoEntry =
   | { kind: "content"; sectionId: string; prev: string }
@@ -74,8 +139,9 @@ type UndoEntry =
 const REWRITE_INSTRUCTION: Record<string, string> = {
   answer_first:
     "Rewrite this section so it OPENS with a direct, self-contained answer of about 40-60 words, then the supporting detail. Keep the author's voice and all substance. Return only the section body, no heading.",
+  // Applied to ONE dense paragraph (the finding's target), not the section.
   bullets:
-    "Restructure this section for skimmability: keep the strongest framing sentences as prose and convert the dense middle into a tight bulleted list (one idea per bullet). Keep the author's voice and all substance. Return only the section body, no heading.",
+    "Convert this single dense paragraph into a one-sentence lead-in followed by 3-6 tight bullets (one idea each). Keep the author's voice and every fact. Return only the replacement markdown.",
   self_contained:
     "Rewrite this section so it stands alone: replace back-references like 'as mentioned above' or 'in the previous section' with the actual context in a few words. Keep the author's voice and all substance. Return only the section body, no heading.",
 };
@@ -106,6 +172,9 @@ export function GeoPanel({
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
   // Applied rewrites (keyed by finding) → previous content, so Apply ⇄ Undo.
   const [undoable, setUndoable] = useState<Map<string, UndoEntry>>(new Map());
+  // Sibling findings invalidated because a rewrite restructured their section —
+  // hidden (with a re-analyze nudge) rather than left actionable on stale info.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   // Persistent additions (opener / FAQ) → Remove buttons.
   const [additions, setAdditions] = useState<Additions>(() => loadAdditions(draft.id));
   const [stale, setStale] = useState(false);
@@ -126,6 +195,7 @@ export function GeoPanel({
     try {
       setReport(await analyzeGeo(draft.id));
       setUndoable(new Map());
+      setHidden(new Set());
       setStale(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -177,9 +247,13 @@ export function GeoPanel({
     setNotice(null);
     try {
       const opener = await generateOpener(draft.id);
-      const next = `${opener}\n\n${first.content_md}`.trim();
+      // If the section body opens with a duplicated title heading, move it out
+      // of the way so the opener is the TRUE first line — not an afterthought
+      // wedged between duplicate headings. Remove restores it.
+      const { rest, removed } = stripDuplicateTitleHeading(draft.title, first.content_md);
+      const next = `${opener}\n\n${rest}`.trim();
       await onSectionSave(first.id, next);
-      recordAddition("opener", { sectionId: first.id, text: opener });
+      recordAddition("opener", { sectionId: first.id, text: opener, removed });
       flashSection(first.id);
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
@@ -198,10 +272,12 @@ export function GeoPanel({
     }
     setApplyingKey(`remove-${kind}`);
     try {
-      const next = section.content_md
+      let next = section.content_md
         .replace(a.text, "")
         .replace(/\n{3,}/g, "\n\n")
         .trim();
+      // Put back the duplicated-title heading the opener fix moved aside.
+      if (a.removed) next = `${a.removed}\n\n${next}`.trim();
       await onSectionSave(a.sectionId, next);
       recordAddition(kind, undefined);
     } catch (e) {
@@ -237,7 +313,12 @@ export function GeoPanel({
   // ── Rewrite fixes: apply via inline edit, remember the previous content so
   // the button flips to Undo. ──
 
-  async function applyRewrite(key: string, sectionId: string, fix: string): Promise<void> {
+  async function applyRewrite(
+    key: string,
+    sectionId: string,
+    fix: string,
+    target?: string,
+  ): Promise<void> {
     const section = draft.sections.find((s) => s.id === sectionId);
     if (!section) {
       showNotice("That section changed — re-analyze and try again.");
@@ -256,16 +337,47 @@ export function GeoPanel({
         const title = text.trim().replace(/^#+\s*/, "");
         await applyTitle(sectionId, title);
         setUndoable((m) => new Map(m).set(key, { kind: "title", sectionId, prev: section.title }));
-      } else {
+      } else if (fix === "bullets" && target) {
+        // Surgical: bulletize ONLY the flagged dense paragraph and splice it
+        // back — the rest of the section (and any GEO additions) untouched.
+        if (!section.content_md.includes(target)) {
+          showNotice("That paragraph changed — re-analyze and try again.");
+          return;
+        }
         const { text } = await inlineEdit(draft.id, {
-          text: section.content_md,
+          text: target,
           action: "custom",
-          instruction: REWRITE_INSTRUCTION[fix],
+          instruction: REWRITE_INSTRUCTION.bullets,
         });
-        await onSectionSave(sectionId, text.trim());
+        const next = section.content_md.replace(target, text.trim());
+        await onSectionSave(sectionId, next);
         setUndoable((m) =>
           new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
         );
+      } else {
+        // Protect content another fix added: strip the tracked opener/FAQ out
+        // of what the model sees, then re-attach it verbatim.
+        const { core, prefix, suffix } = carveProtectedAdditions(
+          additions,
+          sectionId,
+          section.content_md,
+        );
+        if (!core.trim()) {
+          showNotice("Nothing to rewrite here besides content GEO already added.");
+          return;
+        }
+        const { text } = await inlineEdit(draft.id, {
+          text: core,
+          action: "custom",
+          instruction: REWRITE_INSTRUCTION[fix],
+        });
+        await onSectionSave(sectionId, `${prefix}${text.trim()}${suffix}`);
+        setUndoable((m) =>
+          new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
+        );
+        // The rewrite restructured this section, so its OTHER findings now
+        // describe text that no longer exists — hide them until a re-analyze.
+        hideStaleSiblings(key, sectionId);
       }
       setStale(true);
       flashSection(sectionId);
@@ -274,6 +386,22 @@ export function GeoPanel({
     } finally {
       setApplyingKey(null);
     }
+  }
+
+  /** Hide every OTHER finding that points at a section a rewrite just
+   * restructured — their quoted text/notes are stale. Re-analyze restores. */
+  function hideStaleSiblings(appliedKey: string, sectionId: string): void {
+    if (!report) return;
+    setHidden((prev) => {
+      const next = new Set(prev);
+      for (const lever of report.levers) {
+        for (const f of lever.findings) {
+          const k = findingKey(lever, f);
+          if (k !== appliedKey && f.section_id === sectionId) next.add(k);
+        }
+      }
+      return next;
+    });
   }
 
   async function applyTitle(sectionId: string, title: string): Promise<void> {
@@ -376,11 +504,11 @@ export function GeoPanel({
       )}
       {stale && !busy && (
         <div className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
-          Draft changed.{" "}
+          Draft changed{hidden.size > 0 ? " — findings on rewritten sections are set aside" : ""}.{" "}
           <button type="button" onClick={run} className="underline">
             Re-analyze
           </button>{" "}
-          to refresh your score.
+          to refresh the score{hidden.size > 0 ? " and findings" : ""}.
         </div>
       )}
 
@@ -414,13 +542,16 @@ export function GeoPanel({
 
                 {lever.findings.map((f) => {
                   const key = findingKey(lever, f);
+                  if (hidden.has(key)) return null;
                   const applying = applyingKey === key;
                   const undone = undoable.has(key);
                   const canFix = !!f.fix && !!f.section_id && !!REWRITE_LABEL[f.fix];
                   return (
                     <div key={key} className="border-l-2 border-rule pl-2 space-y-1">
                       {f.target && (
-                        <p className="text-xs italic text-ink-2 leading-snug">“{f.target}”</p>
+                        <p className="text-xs italic text-ink-2 leading-snug">
+                          “{f.target.length > 180 ? `${f.target.slice(0, 180)}…` : f.target}”
+                        </p>
                       )}
                       <p className="text-xs text-muted leading-snug">{f.note}</p>
                       {f.suggestion && (
@@ -441,7 +572,7 @@ export function GeoPanel({
                             type="button"
                             disabled={applying}
                             onClick={() =>
-                              applyRewrite(key, f.section_id as string, f.fix as string)
+                              applyRewrite(key, f.section_id as string, f.fix as string, f.target)
                             }
                             className="nb-btn nb-btn-ghost nb-btn-sm"
                           >

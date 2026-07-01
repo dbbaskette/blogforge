@@ -32,6 +32,30 @@ async def test_download_unknown_404(authed_client) -> None:
     assert r.status_code == 404
 
 
+async def test_download_title_with_typographic_punctuation(authed_client) -> None:
+    """Curly quotes / em dashes / typographic apostrophes are not latin-1, and
+    HTTP headers must be — an unsanitized filename raised UnicodeEncodeError
+    (a 500) the moment a title used smart punctuation."""
+    client, _ = authed_client
+    created = client.post(
+        "/api/drafts",
+        json={
+            "topic": "“Faster is Still Safer” — the Three R’s",
+            "pack_slug": "dan",
+            "provider": "anthropic",
+            "model": "m",
+        },
+    ).json()
+    r = client.get(f"/api/drafts/{created['id']}/download")
+    assert r.status_code == 200
+    cd = r.headers["content-disposition"]
+    assert "attachment" in cd and ".md" in cd
+    # The header filename must be plain ASCII with no stray quotes.
+    filename = cd.split('filename="', 1)[1].rstrip('"')
+    assert filename.isascii()
+    assert '"' not in filename
+
+
 def _seed_written(client) -> str:
     created = client.post(
         "/api/drafts",

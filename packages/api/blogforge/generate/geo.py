@@ -111,9 +111,13 @@ def _is_question(title: str) -> bool:
     return first in _QUESTION_WORDS
 
 
-def _longest_paragraph_chars(text: str) -> int:
+def _longest_paragraph(text: str) -> str:
     paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
-    return max((len(p) for p in paras), default=0)
+    return max(paras, key=len, default="")
+
+
+def _longest_paragraph_chars(text: str) -> int:
+    return len(_longest_paragraph(text))
 
 
 def _draft_text(draft: Draft) -> str:
@@ -172,7 +176,11 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         findings=[
             {
                 "section_id": s.id,
-                "note": f'"{s.title}" is a dense block — break it into bullets or a table.',
+                # The exact dense paragraph, so the fix bulletizes ONLY this
+                # block and splices it back — not the whole section.
+                "target": _longest_paragraph(s.content_md),
+                "note": f'This paragraph in "{s.title}" is dense — a lead-in line plus a few '
+                "bullets would read faster.",
                 "fix": "bullets",
             }
             for s in walls
