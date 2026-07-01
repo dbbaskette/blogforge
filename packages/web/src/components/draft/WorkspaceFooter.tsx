@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { type Draft, downloadDraftUrl } from "../../api/drafts";
+import { PublishDialog } from "./PublishDialog";
 import { ReadingPreview } from "./ReadingPreview";
 
 interface WorkspaceFooterProps {
@@ -104,6 +105,7 @@ export function WorkspaceFooter({
   const draftId = draft.id;
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
 
   const openPreview = (): void => {
     setPreviewOpen(true);
@@ -173,6 +175,11 @@ export function WorkspaceFooter({
   ];
 
   const exportItems: MenuItem[] = [
+    {
+      label: "🐙 Publish to GitHub…",
+      hint: "Open your blog repo's new-file editor with this post ready to commit",
+      onClick: () => setPublishOpen(true),
+    },
     { label: "Copy markdown", hint: "Copy the whole draft as Markdown", onClick: handleCopy },
     ...DOWNLOAD_OPTIONS.map((o) => ({ label: o.label, onClick: () => download(o.opts) })),
     {
@@ -223,6 +230,7 @@ export function WorkspaceFooter({
         </button>
       </footer>
       {previewOpen && <ReadingPreview draft={draft} onClose={() => setPreviewOpen(false)} />}
+      {publishOpen && <PublishDialog draft={draft} onClose={() => setPublishOpen(false)} />}
     </div>
   );
 }
