@@ -158,11 +158,21 @@ body {
 }
 
 /* Color-coded accents — left border + soft tint */
-.accent-blue  { border-left: 3px solid #2f6bff; }
-.accent-teal  { border-left: 3px solid #16c2b3; }
-.accent-amber { border-left: 3px solid #f59e0b; }
-.accent-coral { border-left: 3px solid #e6492d; }
-.accent-green { border-left: 3px solid #15a06b; }
+.accent-blue {
+  border-left: 3px solid #2f6bff;
+}
+.accent-teal {
+  border-left: 3px solid #16c2b3;
+}
+.accent-amber {
+  border-left: 3px solid #f59e0b;
+}
+.accent-coral {
+  border-left: 3px solid #e6492d;
+}
+.accent-green {
+  border-left: 3px solid #15a06b;
+}
 
 /* Status pill */
 .nb-pill {
@@ -183,11 +193,28 @@ body {
   border-radius: 50%;
   background: currentColor;
 }
-.nb-pill-ready  { background: #e3f5ec; color: #0e7a50; }
-.nb-pill-empty  { background: #f6f7f9; color: #6e7682; border: 1px dashed #d0d4dc; padding-block: 1px; }
-.nb-pill-failed { background: #fde7e2; color: #b5321b; }
-.nb-pill-gen    { background: #fbf1de; color: #92600a; }
-.nb-pill-edited { background: #eaf0ff; color: #1741b8; }
+.nb-pill-ready {
+  background: #e3f5ec;
+  color: #0e7a50;
+}
+.nb-pill-empty {
+  background: #f6f7f9;
+  color: #6e7682;
+  border: 1px dashed #d0d4dc;
+  padding-block: 1px;
+}
+.nb-pill-failed {
+  background: #fde7e2;
+  color: #b5321b;
+}
+.nb-pill-gen {
+  background: #fbf1de;
+  color: #92600a;
+}
+.nb-pill-edited {
+  background: #eaf0ff;
+  color: #1741b8;
+}
 
 /* Buttons */
 .nb-btn {
@@ -344,12 +371,43 @@ input[type="range"] {
 
 /* Proofreader: transient flash when jumping to a flagged section */
 @keyframes lint-flash {
-  0% { box-shadow: 0 0 0 3px rgba(47, 107, 255, 0); }
-  20% { box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.45); }
-  100% { box-shadow: 0 0 0 3px rgba(47, 107, 255, 0); }
+  0% {
+    box-shadow: 0 0 0 3px rgba(47, 107, 255, 0);
+  }
+  20% {
+    box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(47, 107, 255, 0);
+  }
 }
 .lint-flash {
   animation: lint-flash 1.4s ease-out;
+  border-radius: 12px;
+}
+
+/* GEO optimizer: sustained green wash on a section the tool just added to or
+   rewrote — editor-chrome only, never persisted into the markdown. */
+@keyframes geo-flash {
+  0% {
+    box-shadow: 0 0 0 3px rgba(21, 160, 107, 0);
+    background-color: transparent;
+  }
+  10% {
+    box-shadow: 0 0 0 3px rgba(21, 160, 107, 0.55);
+    background-color: rgba(21, 160, 107, 0.08);
+  }
+  80% {
+    box-shadow: 0 0 0 3px rgba(21, 160, 107, 0.35);
+    background-color: rgba(21, 160, 107, 0.05);
+  }
+  100% {
+    box-shadow: 0 0 0 3px rgba(21, 160, 107, 0);
+    background-color: transparent;
+  }
+}
+.geo-flash {
+  animation: geo-flash 6s ease-out;
   border-radius: 12px;
 }
 
@@ -357,8 +415,13 @@ input[type="range"] {
 
 /* Banner: gentle breathing glow while the draft writes itself. */
 @keyframes compose-banner-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(47, 107, 255, 0); }
-  50% { box-shadow: 0 0 0 4px rgba(47, 107, 255, 0.1); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 107, 255, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(47, 107, 255, 0.1);
+  }
 }
 .compose-theater-banner {
   animation: compose-banner-glow 2.4s ease-in-out infinite;
@@ -366,8 +429,15 @@ input[type="range"] {
 
 /* The quill in the banner — a soft pulse so it feels like it's writing. */
 @keyframes compose-quill {
-  0%, 100% { opacity: 0.55; transform: rotate(-6deg); }
-  50% { opacity: 1; transform: rotate(4deg); }
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: rotate(-6deg);
+  }
+  50% {
+    opacity: 1;
+    transform: rotate(4deg);
+  }
 }
 .compose-theater-quill {
   display: inline-block;
@@ -379,8 +449,13 @@ input[type="range"] {
 
 /* Active checklist line — the section currently being written. */
 @keyframes compose-line-pulse {
-  0%, 100% { background: rgba(47, 107, 255, 0.06); }
-  50% { background: rgba(47, 107, 255, 0.14); }
+  0%,
+  100% {
+    background: rgba(47, 107, 255, 0.06);
+  }
+  50% {
+    background: rgba(47, 107, 255, 0.14);
+  }
 }
 .compose-line-active {
   animation: compose-line-pulse 1.6s ease-in-out infinite;
@@ -388,9 +463,19 @@ input[type="range"] {
 
 /* Landed checklist line — a brief celebratory settle as the section arrives. */
 @keyframes compose-line-land {
-  0% { opacity: 0; transform: translateX(-4px); background: rgba(21, 160, 107, 0.16); }
-  60% { background: rgba(21, 160, 107, 0.12); }
-  100% { opacity: 1; transform: translateX(0); background: transparent; }
+  0% {
+    opacity: 0;
+    transform: translateX(-4px);
+    background: rgba(21, 160, 107, 0.16);
+  }
+  60% {
+    background: rgba(21, 160, 107, 0.12);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+    background: transparent;
+  }
 }
 .compose-line-landed {
   animation: compose-line-land 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -398,9 +483,17 @@ input[type="range"] {
 
 /* The check mark pops in when a section lands. */
 @keyframes compose-check-pop {
-  0% { opacity: 0; transform: scale(0.4); }
-  60% { transform: scale(1.25); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .compose-check-pop {
   display: inline-block;
@@ -409,8 +502,13 @@ input[type="range"] {
 
 /* Section card composing — a subtle cobalt glow ring while it fills in. */
 @keyframes section-composing-glow {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(47, 107, 255, 0.25), 0 0 18px -4px rgba(47, 107, 255, 0.35); }
-  50% { box-shadow: 0 0 0 1px rgba(47, 107, 255, 0.45), 0 0 28px -2px rgba(47, 107, 255, 0.5); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(47, 107, 255, 0.25), 0 0 18px -4px rgba(47, 107, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(47, 107, 255, 0.45), 0 0 28px -2px rgba(47, 107, 255, 0.5);
+  }
 }
 .section-card-composing {
   animation: section-composing-glow 1.8s ease-in-out infinite;
@@ -418,8 +516,16 @@ input[type="range"] {
 
 /* Section card landed — a quick celebratory scale-in once it arrives. */
 @keyframes section-landed-pop {
-  0% { opacity: 0.6; transform: scale(0.985); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.4); }
-  100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  0% {
+    opacity: 0.6;
+    transform: scale(0.985);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.4);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
 }
 .section-card-landed {
   animation: section-landed-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;

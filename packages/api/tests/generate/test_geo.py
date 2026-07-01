@@ -3,6 +3,7 @@ from uuid import uuid4
 from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.generate.geo import (
     build_report,
+    clean_opener,
     parse_faq,
     parse_semantic,
     score_structural,
@@ -49,6 +50,14 @@ def test_faq_presence_detected() -> None:
     assert present["fix"] is None and present["score"] == 100
 
 
+def test_faq_detected_inside_section_content() -> None:
+    # The GEO fix appends "### FAQ" INTO the last section instead of adding a
+    # new section card — the detector must still see it.
+    d = _draft([_sec("Intro", "Body text.\n\n### FAQ\n\n**What is it?**\n\nA thing.")])
+    present = score_structural(d)["faq"]
+    assert present["score"] == 100 and present["fix"] is None
+
+
 def test_chunking_flags_backreferences() -> None:
     d = _draft([_sec("Intro", "As mentioned above, this matters.")])
     chunk = score_structural(d)["chunking"]
@@ -93,6 +102,27 @@ def test_build_report_weights_and_grades() -> None:
     assert len(report["levers"]) == 7
     # answer_first is displayed first.
     assert report["levers"][0]["key"] == "answer_first"
+
+
+def test_parse_semantic_carries_thin_spot_suggestion() -> None:
+    d = _draft([_sec("Intro", "x")])
+    raw = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 90, "note": "ok"},'
+        '"factual_density": {"score": 40, "note": "vague", "thin_spots": ['
+        '{"target": "Teams love it.", "note": "unsupported", '
+        '"suggestion": "Add your NPS score or a named customer quote."}]}}'
+    )
+    fd = parse_semantic(raw, d)["factual_density"]
+    assert fd["findings"][0]["suggestion"] == "Add your NPS score or a named customer quote."
+
+
+def test_clean_opener_strips_noise() -> None:
+    assert clean_opener('"BlogForge is a drafting tool that keeps your voice."\n\nExtra.') == (
+        "BlogForge is a drafting tool that keeps your voice."
+    )
+    assert clean_opener("## Heading style") == "Heading style"
+    assert clean_opener("   \n") == ""
 
 
 def test_parse_faq() -> None:

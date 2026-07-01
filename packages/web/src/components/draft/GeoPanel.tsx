@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { type Draft, type Section, inlineEdit } from "../../api/drafts";
+import { type Draft, inlineEdit } from "../../api/drafts";
 import {
   type GeoFinding,
   type GeoLever,
   type GeoReport,
   analyzeGeo,
   generateFaq,
+  generateOpener,
 } from "../../api/geo";
 import { useDialogA11y } from "../ui/useDialogA11y";
-
-const FIX_LABEL: Record<string, string> = {
-  answer_first: "Rewrite answer-first",
-  question_heading: "Rephrase as a question",
-  definitional: "Add a definitional opener",
-  faq: "Generate an FAQ section",
-};
 
 function gradeColor(grade: string): { bg: string; fg: string; bd: string } {
   if (grade === "A" || grade === "B") return { bg: "#e3f5ec", fg: "#0e7a50", bd: "#bfe8d3" };
@@ -32,7 +26,66 @@ function barColor(score: number): string {
 const findingKey = (lever: GeoLever, f: GeoFinding): string =>
   `${lever.key}:${f.section_id || f.target || f.note}`;
 
-const wordCount = (t: string): number => t.split(/\s+/).filter(Boolean).length;
+/** Scroll the section card into view and hold a green "GEO added/changed"
+ * highlight on it for a few seconds — the visual cue that content changed. */
+function flashSection(sectionId: string): void {
+  const el = document.getElementById(`section-${sectionId}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("geo-flash");
+  window.setTimeout(() => el.classList.remove("geo-flash"), 6000);
+}
+
+// ── Persistent record of GEO-added content (opener / FAQ), per draft, so the
+// Remove buttons survive closing and reopening the panel. The color highlight
+// is editor-chrome only; the saved markdown stays clean for export. ──
+interface Addition {
+  sectionId: string;
+  text: string;
+}
+interface Additions {
+  opener?: Addition;
+  faq?: Addition;
+}
+
+const additionsKey = (draftId: string): string => `bf.geo.additions.${draftId}`;
+
+function loadAdditions(draftId: string): Additions {
+  try {
+    return JSON.parse(localStorage.getItem(additionsKey(draftId)) ?? "{}") as Additions;
+  } catch {
+    return {};
+  }
+}
+
+function saveAdditions(draftId: string, a: Additions): void {
+  try {
+    localStorage.setItem(additionsKey(draftId), JSON.stringify(a));
+  } catch {
+    /* storage disabled — Remove just won't survive a reload */
+  }
+}
+
+/** A rewrite we can undo: the section's content (or title) before the fix. */
+type UndoEntry =
+  | { kind: "content"; sectionId: string; prev: string }
+  | { kind: "title"; sectionId: string; prev: string };
+
+const REWRITE_INSTRUCTION: Record<string, string> = {
+  answer_first:
+    "Rewrite this section so it OPENS with a direct, self-contained answer of about 40-60 words, then the supporting detail. Keep the author's voice and all substance. Return only the section body, no heading.",
+  bullets:
+    "Restructure this section for skimmability: keep the strongest framing sentences as prose and convert the dense middle into a tight bulleted list (one idea per bullet). Keep the author's voice and all substance. Return only the section body, no heading.",
+  self_contained:
+    "Rewrite this section so it stands alone: replace back-references like 'as mentioned above' or 'in the previous section' with the actual context in a few words. Keep the author's voice and all substance. Return only the section body, no heading.",
+};
+
+const REWRITE_LABEL: Record<string, string> = {
+  answer_first: "Rewrite answer-first",
+  question_heading: "Rephrase as a question",
+  bullets: "Convert to bullets",
+  self_contained: "Make self-contained",
+};
 
 export function GeoPanel({
   draft,
@@ -51,8 +104,20 @@ export function GeoPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
-  const [done, setDone] = useState<Set<string>>(new Set());
+  // Applied rewrites (keyed by finding) → previous content, so Apply ⇄ Undo.
+  const [undoable, setUndoable] = useState<Map<string, UndoEntry>>(new Map());
+  // Persistent additions (opener / FAQ) → Remove buttons.
+  const [additions, setAdditions] = useState<Additions>(() => loadAdditions(draft.id));
   const [stale, setStale] = useState(false);
+
+  // A notice the writer can't miss: surface it at the top and scroll there.
+  const showNotice = useCallback(
+    (msg: string): void => {
+      setNotice(msg);
+      panelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [panelRef],
+  );
 
   const run = useCallback(async (): Promise<void> => {
     setBusy(true);
@@ -60,7 +125,7 @@ export function GeoPanel({
     setNotice(null);
     try {
       setReport(await analyzeGeo(draft.id));
-      setDone(new Set());
+      setUndoable(new Map());
       setStale(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -69,116 +134,177 @@ export function GeoPanel({
     }
   }, [draft.id]);
 
-  // Auto-run when the panel opens — the writer clicked GEO to see the score.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
     run();
   }, []);
 
-  const markDone = (key: string): void => {
-    setDone((p) => new Set(p).add(key));
+  // Drop stored additions whose text is no longer present (manually edited away).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconcile whenever sections change
+  useEffect(() => {
+    const next: Additions = { ...additions };
+    let changed = false;
+    for (const k of ["opener", "faq"] as const) {
+      const a = next[k];
+      if (!a) continue;
+      const section = draft.sections.find((s) => s.id === a.sectionId);
+      if (!section || !section.content_md.includes(a.text)) {
+        delete next[k];
+        changed = true;
+      }
+    }
+    if (changed) {
+      setAdditions(next);
+      saveAdditions(draft.id, next);
+    }
+  }, [draft.sections]);
+
+  function recordAddition(kind: "opener" | "faq", a: Addition | undefined): void {
+    const next = { ...additions, [kind]: a };
+    if (!a) delete next[kind];
+    setAdditions(next);
+    saveAdditions(draft.id, next);
     setStale(true);
-  };
-
-  async function fixSectionRewrite(
-    key: string,
-    sectionId: string,
-    instruction: string,
-  ): Promise<void> {
-    const section = draft.sections.find((s) => s.id === sectionId);
-    if (!section) {
-      setNotice("That section changed — re-analyze and try again.");
-      return;
-    }
-    setApplyingKey(key);
-    setNotice(null);
-    try {
-      const { text } = await inlineEdit(draft.id, {
-        text: section.content_md,
-        action: "custom",
-        instruction,
-      });
-      await onSectionSave(section.id, text.trim());
-      markDone(key);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
-    } finally {
-      setApplyingKey(null);
-    }
   }
 
-  async function fixHeading(key: string, sectionId: string): Promise<void> {
-    const section = draft.sections.find((s) => s.id === sectionId);
-    if (!section) {
-      setNotice("That section changed — re-analyze and try again.");
-      return;
-    }
-    setApplyingKey(key);
-    setNotice(null);
-    try {
-      const { text } = await inlineEdit(draft.id, {
-        text: section.title,
-        action: "custom",
-        instruction:
-          "Rephrase this blog section heading as a concise question a reader would ask. End with a question mark. Return only the heading text.",
-      });
-      const title = text.trim().replace(/^#+\s*/, "");
-      const nextSections = draft.sections.map((s) => (s.id === sectionId ? { ...s, title } : s));
-      const nextOutline = draft.outline
-        ? {
-            ...draft.outline,
-            sections: draft.outline.sections.map((o) => (o.id === sectionId ? { ...o, title } : o)),
-          }
-        : draft.outline;
-      await onChange({ ...draft, sections: nextSections, outline: nextOutline });
-      markDone(key);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
-    } finally {
-      setApplyingKey(null);
-    }
-  }
+  // ── Additive fixes: generate ONLY the new content, insert it into an existing
+  // section (no new section card), highlight it, and offer Remove. ──
 
-  async function fixDefinitional(key: string): Promise<void> {
+  async function addOpener(): Promise<void> {
     const first = draft.sections[0];
     if (!first) return;
-    await fixSectionRewrite(
-      key,
-      first.id,
-      `Add ONE citable opening sentence that defines this post's subject in the form "<Subject> is a <category> that <does what>", then keep the existing text unchanged. Subject: ${draft.title}. Keep the author's voice. Return only the section body, no heading.`,
-    );
+    setApplyingKey("opener");
+    setNotice(null);
+    try {
+      const opener = await generateOpener(draft.id);
+      const next = `${opener}\n\n${first.content_md}`.trim();
+      await onSectionSave(first.id, next);
+      recordAddition("opener", { sectionId: first.id, text: opener });
+      flashSection(first.id);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyingKey(null);
+    }
   }
 
-  async function fixFaq(key: string): Promise<void> {
-    setApplyingKey(key);
+  async function removeAddition(kind: "opener" | "faq"): Promise<void> {
+    const a = additions[kind];
+    if (!a) return;
+    const section = draft.sections.find((s) => s.id === a.sectionId);
+    if (!section || !section.content_md.includes(a.text)) {
+      recordAddition(kind, undefined);
+      return;
+    }
+    setApplyingKey(`remove-${kind}`);
+    try {
+      const next = section.content_md
+        .replace(a.text, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      await onSectionSave(a.sectionId, next);
+      recordAddition(kind, undefined);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyingKey(null);
+    }
+  }
+
+  async function addFaq(): Promise<void> {
+    const last = draft.sections[draft.sections.length - 1];
+    if (!last) return;
+    setApplyingKey("faq");
     setNotice(null);
     try {
       const faqs = await generateFaq(draft.id);
       if (faqs.length === 0) {
-        setNotice("No FAQ came back — try again.");
+        showNotice("No FAQ came back — try again.");
         return;
       }
-      const id = crypto.randomUUID().replace(/-/g, "");
-      const content = faqs.map((f) => `**${f.q}**\n\n${f.a}`).join("\n\n");
-      const section: Section = {
-        id,
-        title: "FAQ",
-        brief: "",
-        content_md: content,
-        status: "edited",
-        last_generated_at: null,
-        word_count: wordCount(content),
-      };
-      const nextOutline = draft.outline
-        ? {
-            ...draft.outline,
-            sections: [...draft.outline.sections, { id, title: "FAQ", brief: "" }],
-          }
-        : { opening_hook: "", sections: [{ id, title: "FAQ", brief: "" }], estimated_words: 0 };
-      await onChange({ ...draft, sections: [...draft.sections, section], outline: nextOutline });
-      markDone(key);
+      const block = `### FAQ\n\n${faqs.map((f) => `**${f.q}**\n\n${f.a}`).join("\n\n")}`;
+      const next = `${last.content_md.trim()}\n\n${block}`;
+      await onSectionSave(last.id, next);
+      recordAddition("faq", { sectionId: last.id, text: block });
+      flashSection(last.id);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : String(e));
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyingKey(null);
+    }
+  }
+
+  // ── Rewrite fixes: apply via inline edit, remember the previous content so
+  // the button flips to Undo. ──
+
+  async function applyRewrite(key: string, sectionId: string, fix: string): Promise<void> {
+    const section = draft.sections.find((s) => s.id === sectionId);
+    if (!section) {
+      showNotice("That section changed — re-analyze and try again.");
+      return;
+    }
+    setApplyingKey(key);
+    setNotice(null);
+    try {
+      if (fix === "question_heading") {
+        const { text } = await inlineEdit(draft.id, {
+          text: section.title,
+          action: "custom",
+          instruction:
+            "Rephrase this blog section heading as a concise question a reader would ask. End with a question mark. Return only the heading text.",
+        });
+        const title = text.trim().replace(/^#+\s*/, "");
+        await applyTitle(sectionId, title);
+        setUndoable((m) => new Map(m).set(key, { kind: "title", sectionId, prev: section.title }));
+      } else {
+        const { text } = await inlineEdit(draft.id, {
+          text: section.content_md,
+          action: "custom",
+          instruction: REWRITE_INSTRUCTION[fix],
+        });
+        await onSectionSave(sectionId, text.trim());
+        setUndoable((m) =>
+          new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
+        );
+      }
+      setStale(true);
+      flashSection(sectionId);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyingKey(null);
+    }
+  }
+
+  async function applyTitle(sectionId: string, title: string): Promise<void> {
+    const nextSections = draft.sections.map((s) => (s.id === sectionId ? { ...s, title } : s));
+    const nextOutline = draft.outline
+      ? {
+          ...draft.outline,
+          sections: draft.outline.sections.map((o) => (o.id === sectionId ? { ...o, title } : o)),
+        }
+      : draft.outline;
+    await onChange({ ...draft, sections: nextSections, outline: nextOutline });
+  }
+
+  async function undoRewrite(key: string): Promise<void> {
+    const entry = undoable.get(key);
+    if (!entry) return;
+    setApplyingKey(key);
+    try {
+      if (entry.kind === "title") {
+        await applyTitle(entry.sectionId, entry.prev);
+      } else {
+        await onSectionSave(entry.sectionId, entry.prev);
+      }
+      setUndoable((m) => {
+        const next = new Map(m);
+        next.delete(key);
+        return next;
+      });
+      flashSection(entry.sectionId);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
     } finally {
       setApplyingKey(null);
     }
@@ -250,7 +376,7 @@ export function GeoPanel({
       )}
       {stale && !busy && (
         <div className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
-          Applied a fix.{" "}
+          Draft changed.{" "}
           <button type="button" onClick={run} className="underline">
             Re-analyze
           </button>{" "}
@@ -265,9 +391,8 @@ export function GeoPanel({
           )}
 
           {report?.levers.map((lever) => {
-            const perFinding = lever.fix === "answer_first" || lever.fix === "question_heading";
-            const leverLevelFix = lever.fix === "faq" || lever.fix === "definitional";
-            const leverKey = lever.key;
+            const openerAdded = lever.key === "definitional_opener" && !!additions.opener;
+            const faqAdded = lever.key === "faq" && !!additions.faq;
             return (
               <section key={lever.key} className="glass-card p-3 space-y-2">
                 <div className="flex items-center justify-between gap-3">
@@ -289,48 +414,99 @@ export function GeoPanel({
 
                 {lever.findings.map((f) => {
                   const key = findingKey(lever, f);
-                  if (done.has(key)) return null;
                   const applying = applyingKey === key;
+                  const undone = undoable.has(key);
+                  const canFix = !!f.fix && !!f.section_id && !!REWRITE_LABEL[f.fix];
                   return (
                     <div key={key} className="border-l-2 border-rule pl-2 space-y-1">
                       {f.target && (
                         <p className="text-xs italic text-ink-2 leading-snug">“{f.target}”</p>
                       )}
                       <p className="text-xs text-muted leading-snug">{f.note}</p>
-                      {perFinding && f.section_id && (
-                        <button
-                          type="button"
-                          disabled={applying}
-                          onClick={() =>
-                            lever.fix === "answer_first"
-                              ? fixSectionRewrite(
-                                  key,
-                                  f.section_id as string,
-                                  "Rewrite this section so it OPENS with a direct, self-contained answer of about 40-60 words, then the supporting detail. Keep the author's voice and all substance. Return only the section body, no heading.",
-                                )
-                              : fixHeading(key, f.section_id as string)
-                          }
-                          className="nb-btn nb-btn-ghost nb-btn-sm"
-                        >
-                          {applying ? "Applying…" : FIX_LABEL[lever.fix as string]}
-                        </button>
+                      {f.suggestion && (
+                        <p className="text-xs leading-snug text-cobalt-700">→ {f.suggestion}</p>
                       )}
+                      {canFix &&
+                        (undone ? (
+                          <button
+                            type="button"
+                            disabled={applying}
+                            onClick={() => undoRewrite(key)}
+                            className="nb-btn nb-btn-ghost nb-btn-sm"
+                          >
+                            {applying ? "Undoing…" : "↩ Undo"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={applying}
+                            onClick={() =>
+                              applyRewrite(key, f.section_id as string, f.fix as string)
+                            }
+                            className="nb-btn nb-btn-ghost nb-btn-sm"
+                          >
+                            {applying ? "Applying…" : REWRITE_LABEL[f.fix as string]}
+                          </button>
+                        ))}
                     </div>
                   );
                 })}
 
-                {leverLevelFix && !done.has(leverKey) && (
-                  <button
-                    type="button"
-                    disabled={applyingKey === leverKey}
-                    onClick={() =>
-                      lever.fix === "faq" ? fixFaq(leverKey) : fixDefinitional(leverKey)
-                    }
-                    className="nb-btn nb-btn-primary nb-btn-sm"
-                  >
-                    {applyingKey === leverKey ? "Applying…" : FIX_LABEL[lever.fix as string]}
-                  </button>
-                )}
+                {lever.key === "definitional_opener" &&
+                  (openerAdded ? (
+                    <div className="space-y-1">
+                      <p className="text-xs leading-snug text-green-ink bg-green-soft rounded-nb-sm px-2 py-1">
+                        Added: “{additions.opener?.text}”
+                      </p>
+                      <button
+                        type="button"
+                        disabled={applyingKey === "remove-opener"}
+                        onClick={() => removeAddition("opener")}
+                        className="nb-btn nb-btn-ghost nb-btn-sm"
+                      >
+                        {applyingKey === "remove-opener" ? "Removing…" : "✕ Remove opener"}
+                      </button>
+                    </div>
+                  ) : (
+                    lever.fix === "definitional" && (
+                      <button
+                        type="button"
+                        disabled={applyingKey === "opener"}
+                        onClick={addOpener}
+                        className="nb-btn nb-btn-primary nb-btn-sm"
+                      >
+                        {applyingKey === "opener" ? "Writing…" : "Add a definitional opener"}
+                      </button>
+                    )
+                  ))}
+
+                {lever.key === "faq" &&
+                  (faqAdded ? (
+                    <div className="space-y-1">
+                      <p className="text-xs leading-snug text-green-ink bg-green-soft rounded-nb-sm px-2 py-1">
+                        FAQ added to the end of your last section.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={applyingKey === "remove-faq"}
+                        onClick={() => removeAddition("faq")}
+                        className="nb-btn nb-btn-ghost nb-btn-sm"
+                      >
+                        {applyingKey === "remove-faq" ? "Removing…" : "✕ Remove FAQ"}
+                      </button>
+                    </div>
+                  ) : (
+                    lever.fix === "faq" && (
+                      <button
+                        type="button"
+                        disabled={applyingKey === "faq"}
+                        onClick={addFaq}
+                        className="nb-btn nb-btn-primary nb-btn-sm"
+                      >
+                        {applyingKey === "faq" ? "Writing…" : "Generate an FAQ section"}
+                      </button>
+                    )
+                  ))}
               </section>
             );
           })}

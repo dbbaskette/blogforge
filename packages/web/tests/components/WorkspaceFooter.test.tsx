@@ -30,46 +30,77 @@ const baseProps = {
 };
 
 beforeEach(() => {
-  // jsdom lacks clipboard; stub it so the Copy button doesn't blow up.
+  vi.clearAllMocks();
+  // jsdom lacks clipboard; stub it so the Copy action doesn't blow up.
   Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
 });
 
 describe("WorkspaceFooter", () => {
-  it("renders Copy, Download and Review and fires onLint", () => {
+  it("shows the grouped menus + Preview + Review, and fires onLint", () => {
     render(<WorkspaceFooter {...baseProps} />);
-    expect(screen.getByRole("button", { name: /copy markdown/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /download/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /improve/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /export/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^preview$/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^review$/i }));
     expect(baseProps.onLint).toHaveBeenCalled();
   });
 
-  it("fires onRepurpose when the Repurpose button is clicked", () => {
+  it("Improve menu opens the Shape / GEO / Headlines panels", () => {
     render(<WorkspaceFooter {...baseProps} />);
-    fireEvent.click(screen.getByRole("button", { name: /^repurpose$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
+    fireEvent.click(screen.getByRole("button", { name: /shape assistant/i }));
+    expect(baseProps.onShape).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
+    fireEvent.click(screen.getByRole("button", { name: /geo optimizer/i }));
+    expect(baseProps.onGeo).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
+    fireEvent.click(screen.getByRole("button", { name: /headlines & hooks/i }));
+    expect(baseProps.onHeadlines).toHaveBeenCalled();
+  });
+
+  it("Export menu lists copy, every format, and repurpose", () => {
+    render(<WorkspaceFooter {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /export/i }));
+    expect(screen.getByRole("button", { name: /copy markdown/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^markdown \(\.md\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /frontmatter/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /web page \(\.html\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /word \(\.docx\)/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /repurpose/i }));
     expect(baseProps.onRepurpose).toHaveBeenCalled();
   });
 
-  it("fires onShape when the Shape button is clicked", () => {
+  it("downloads via fetch with credentials and the right URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'attachment; filename="post.md"' },
+      blob: async () => new Blob(["# hi"]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    URL.createObjectURL = vi.fn().mockReturnValue("blob:x");
+    URL.revokeObjectURL = vi.fn();
+
     render(<WorkspaceFooter {...baseProps} />);
-    fireEvent.click(screen.getByRole("button", { name: /^shape$/i }));
-    expect(baseProps.onShape).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /export/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^markdown \(\.md\)/i }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/drafts/d1/download?format=md"),
+        expect.objectContaining({ credentials: "include" }),
+      ),
+    );
+    vi.unstubAllGlobals();
   });
 
-  it("fires onGeo when the GEO button is clicked", () => {
+  it("shows an error instead of downloading when the export fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }));
     render(<WorkspaceFooter {...baseProps} />);
-    fireEvent.click(screen.getByRole("button", { name: /^geo$/i }));
-    expect(baseProps.onGeo).toHaveBeenCalled();
-  });
-
-  it("opens a menu with every export format", () => {
-    render(<WorkspaceFooter {...baseProps} />);
-    fireEvent.click(screen.getByRole("button", { name: /download/i }));
-    const html = screen.getByRole("link", { name: /web page \(\.html\)/i });
-    const docx = screen.getByRole("link", { name: /word \(\.docx\)/i });
-    expect(screen.getByRole("link", { name: /^markdown \(\.md\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /frontmatter/i })).toBeInTheDocument();
-    expect(html).toHaveAttribute("href", expect.stringContaining("format=html"));
-    expect(docx).toHaveAttribute("href", expect.stringContaining("format=docx"));
+    fireEvent.click(screen.getByRole("button", { name: /export/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^markdown \(\.md\)/i }));
+    await vi.waitFor(() => expect(screen.getByText(/session expired/i)).toBeInTheDocument());
+    vi.unstubAllGlobals();
   });
 
   it("shows the word + drafted-count stats", () => {

@@ -9,7 +9,6 @@ from typing import Literal
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Request
-from blogforge.voice.compose import ComposeError
 from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
@@ -18,13 +17,16 @@ from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.inline import transform_text
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
+from blogforge.voice.compose import ComposeError
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["inline"])
 
-# Selections longer than this are almost certainly "rewrite the whole section"
-# — which is what regenerate/revise are for. Keep inline edits fragment-sized.
-_MAX_CHARS = 4000
+# Generous cap: the GEO/Shape panels legitimately send a whole section body for
+# targeted rewrites (answer-first, convert-to-bullets), and real sections run
+# past 4k chars — the old 4000 cap made those buttons silently 422. ~12k chars
+# ≈ a 2,000-word section; anything beyond that is misuse, not an edit.
+_MAX_CHARS = 12_000
 
 
 class _InlineBody(BaseModel):
