@@ -13,6 +13,7 @@ interface WorkspaceFooterProps {
   onRepurpose: () => void;
   onHeadlines: () => void;
   onShape: () => void;
+  onGeo: () => void;
   /**
    * Optional hook fired when the reading preview opens. The footer owns the
    * preview's open/close state locally (DraftWorkspace can't host it), so this
@@ -30,6 +31,7 @@ export function WorkspaceFooter({
   onRepurpose,
   onHeadlines,
   onShape,
+  onGeo,
   onPreview,
 }: WorkspaceFooterProps): JSX.Element {
   const draftId = draft.id;
@@ -118,6 +120,14 @@ export function WorkspaceFooter({
           title="Get suggestions: claims worth verifying, sharper wordings, and where to expand"
         >
           Shape
+        </button>
+        <button
+          type="button"
+          onClick={onGeo}
+          className="nb-btn nb-btn-sm"
+          title="Score & optimize for AI answer engines (GEO): answer-first, factual density, question headings, FAQ"
+        >
+          GEO
         </button>
         <button
           type="button"

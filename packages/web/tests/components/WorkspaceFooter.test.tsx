@@ -26,6 +26,7 @@ const baseProps = {
   onRepurpose: vi.fn(),
   onHeadlines: vi.fn(),
   onShape: vi.fn(),
+  onGeo: vi.fn(),
 };
 
 beforeEach(() => {
@@ -52,6 +53,12 @@ describe("WorkspaceFooter", () => {
     render(<WorkspaceFooter {...baseProps} />);
     fireEvent.click(screen.getByRole("button", { name: /^shape$/i }));
     expect(baseProps.onShape).toHaveBeenCalled();
+  });
+
+  it("fires onGeo when the GEO button is clicked", () => {
+    render(<WorkspaceFooter {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /^geo$/i }));
+    expect(baseProps.onGeo).toHaveBeenCalled();
   });
 
   it("opens a menu with every export format", () => {

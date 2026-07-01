@@ -9,7 +9,6 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
-from blogforge.voice import PackStore
 
 from blogforge import __version__
 from blogforge.api.events import EventBus
@@ -20,6 +19,7 @@ from blogforge.db.seed import ensure_admin_user
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.jobs.registry import JobRegistry
 from blogforge.templates.store import TemplateStore
+from blogforge.voice import PackStore
 from blogforge.voice.store import SqlVoiceStore
 
 # Translate VCAP_SERVICES into BLOGFORGE_* env vars before Settings is read.
@@ -159,8 +159,9 @@ def create_app() -> FastAPI:
 
     install_exception_handler(app)
 
-    from blogforge.llm.exceptions import ProviderMissingKey
     from fastapi.responses import JSONResponse
+
+    from blogforge.llm.exceptions import ProviderMissingKey
 
     @app.exception_handler(ProviderMissingKey)
     async def _missing_provider_key(_request, exc: ProviderMissingKey) -> JSONResponse:
@@ -183,18 +184,19 @@ def create_app() -> FastAPI:
 
     from blogforge.api.admin import router as admin_router
     from blogforge.api.auth import router as auth_router
-    from blogforge.api.keys import router as keys_router
     from blogforge.api.auth_github import router as auth_github_router
     from blogforge.api.claims import router as claims_router
     from blogforge.api.download import router as download_router
     from blogforge.api.drafts import router as drafts_router
     from blogforge.api.events import router as events_router
     from blogforge.api.expand import router as expand_router
+    from blogforge.api.geo import router as geo_router
     from blogforge.api.headlines import router as headlines_router
     from blogforge.api.hero import router as hero_router
     from blogforge.api.ideation import router as ideation_router
     from blogforge.api.inline import router as inline_router
     from blogforge.api.jobs import router as jobs_router
+    from blogforge.api.keys import router as keys_router
     from blogforge.api.library import router as library_router
     from blogforge.api.lint import router as lint_router
     from blogforge.api.outline import router as outline_router
@@ -233,6 +235,7 @@ def create_app() -> FastAPI:
     app.include_router(lint_router)
     app.include_router(claims_router)
     app.include_router(events_router)
+    app.include_router(geo_router)
     app.include_router(suggest_router)
     app.include_router(topics_router)
     app.include_router(voice_router)
