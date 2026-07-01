@@ -21,6 +21,35 @@ async def test_create_draft(authed_client) -> None:
     assert body["stage"] == "research"
 
 
+async def test_import_keeps_the_opening_above_the_first_section(authed_client) -> None:
+    """Prose before the first ## is the article's opening — it lands in
+    outline.opening_hook (which exports above the sections), NOT folded under the
+    first heading. This is the fidelity guarantee for imported posts."""
+    client, _ = authed_client
+    md = (
+        "# Faster is Still Safer\n\n"
+        "In January 2017, the team wrote a post.\n\n"
+        "## ROTATE\n\n"
+        "The 2017 baseline."
+    )
+    r = client.post(
+        "/api/drafts/import",
+        json={
+            "text": md,
+            "pack_slug": "dan",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-6",
+        },
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["stage"] == "sections"
+    assert body["outline"]["opening_hook"] == "In January 2017, the team wrote a post."
+    assert [s["title"] for s in body["sections"]] == ["ROTATE"]
+    # The first section holds only its own body — the opening isn't duplicated in.
+    assert body["sections"][0]["content_md"] == "The 2017 baseline."
+
+
 async def test_list_drafts(authed_client) -> None:
     client, _ = authed_client
     client.post("/api/drafts", json=_idea_json())

@@ -28,7 +28,16 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
     [draft.sections],
   );
 
-  const totalWords = useMemo(() => sections.reduce((acc, s) => acc + s.word_count, 0), [sections]);
+  // The article's opening/lede lives above the sections (never under the first
+  // heading), so the preview must render it first — same as export.
+  const opening = draft.outline?.opening_hook?.trim() ?? "";
+  const openingHtml = useMemo(() => (opening ? (marked.parse(opening) as string) : ""), [opening]);
+  const openingWords = opening ? opening.split(/\s+/).length : 0;
+
+  const totalWords = useMemo(
+    () => sections.reduce((acc, s) => acc + s.word_count, 0) + openingWords,
+    [sections, openingWords],
+  );
   const readMinutes = Math.max(1, Math.ceil(totalWords / WORDS_PER_MINUTE));
 
   // Each section rendered once to HTML; memoized so re-renders don't re-parse.
@@ -89,8 +98,12 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
           <hr className="mx-auto mt-8 h-px w-16 border-0 bg-rule-2" />
         </header>
 
-        {bodyHtml.length > 0 ? (
+        {openingHtml || bodyHtml.length > 0 ? (
           <div className="prose-body">
+            {openingHtml && (
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted, server-authored draft markdown rendered with marked (same path as the editor)
+              <section dangerouslySetInnerHTML={{ __html: openingHtml }} />
+            )}
             {bodyHtml.map((s) => (
               // biome-ignore lint/security/noDangerouslySetInnerHtml: trusted, server-authored draft markdown rendered with marked (same path as the editor)
               <section key={s.id} dangerouslySetInnerHTML={{ __html: s.html }} />

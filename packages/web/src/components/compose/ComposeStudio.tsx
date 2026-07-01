@@ -250,7 +250,8 @@ export function ComposeStudio(): JSX.Element {
       });
       saveDefaults(settings);
       saveLastMode("paste");
-      navigate(`/drafts/${draft.id}?shape=1`);
+      // Land in the editor verbatim — no tool runs until the writer asks.
+      navigate(`/drafts/${draft.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

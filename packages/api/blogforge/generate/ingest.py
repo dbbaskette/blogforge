@@ -31,6 +31,9 @@ _MAX_TITLE = 120
 class Ingested:
     title: str
     sections: list[Section]
+    # Prose written above the first H2 — the article's opening/lede. Kept apart
+    # from the sections so it stays the opener (see ``ingest_document``).
+    opening: str = ""
 
 
 def _word_count(text: str) -> int:
@@ -67,10 +70,15 @@ def _section(title: str, content: str) -> Section:
 
 
 def ingest_document(markdown: str) -> Ingested:
-    """Parse pasted markdown into a title + editable sections.
+    """Parse pasted markdown into a title + editable sections + an opening.
 
     - Title: first ``# H1``, else the first non-empty line, else a default.
-    - Sections split on ``## H2``; text before the first H2 folds into section 1.
+    - Sections split on ``## H2``.
+    - Prose before the first H2 is the article's *opening* — returned separately
+      (``Ingested.opening``), NOT folded into the first section. Folding it in
+      would place it under that section's heading, so on export the opening would
+      move BELOW the first ``## `` and read as if it had been cut. Kept apart, it
+      round-trips as the opener above the sections.
     - No H2 headings at all → a single section holding the whole draft.
     - Empty input → no sections (the caller rejects it).
     """
@@ -90,13 +98,12 @@ def ingest_document(markdown: str) -> Ingested:
     if not h2s:
         return Ingested(title=title, sections=[_section(title, body)])
 
-    lead = body[: h2s[0].start()].strip()
+    # Content before the first H2 is the article's opening — keep it standalone.
+    opening = body[: h2s[0].start()].strip()
     sections: list[Section] = []
     for i, m in enumerate(h2s):
         start = m.end()
         end = h2s[i + 1].start() if i + 1 < len(h2s) else len(body)
         content = body[start:end].strip()
-        if i == 0 and lead:
-            content = f"{lead}\n\n{content}".strip()
         sections.append(_section(m.group(1), content))
-    return Ingested(title=title, sections=sections)
+    return Ingested(title=title, sections=sections, opening=opening)
