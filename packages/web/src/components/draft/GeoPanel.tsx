@@ -79,6 +79,33 @@ function saveAdditions(draftId: string, a: Additions): void {
 const normalizeTitle = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 /**
+ * Is an equivalent opener already in the content? The tracker (localStorage)
+ * can lose its record, but the CONTENT is the source of truth — adding on top
+ * of an existing definition produced verbatim back-to-back duplicates.
+ * "exact": the sentence is present verbatim (adoptable for Remove tracking);
+ * "similar": present modulo quotes/punctuation/case near the top. Pure,
+ * exported for tests.
+ */
+export function openerPresence(opener: string, content: string): "exact" | "similar" | null {
+  if (!opener.trim()) return null;
+  if (content.includes(opener)) return "exact";
+  const n = normalizeTitle(opener);
+  if (n && normalizeTitle(content.slice(0, opener.length * 3 + 400)).includes(n)) {
+    return "similar";
+  }
+  return null;
+}
+
+/** Keep only the first copy of a back-to-back duplicated opening block (the
+ * server identifies the block; sentence boundary mirrors its regex). */
+export function dedupeOpeningBlock(block: string): string {
+  const m = /(?<=[.!?])["'”’)]*\s+/.exec(block);
+  if (!m) return block;
+  const trailer = m[0].replace(/\s+$/, "");
+  return block.slice(0, m.index + trailer.length);
+}
+
+/**
  * If a section body OPENS with a heading (or bold line) that just repeats the
  * draft title, split it off — the definitional-opener fix moves it out of the
  * way so the opener becomes the true first line instead of being wedged
@@ -151,6 +178,7 @@ const REWRITE_LABEL: Record<string, string> = {
   question_heading: "Rephrase as a question",
   bullets: "Convert to bullets",
   self_contained: "Make self-contained",
+  dedupe_opening: "Remove duplicate sentence",
 };
 
 export function GeoPanel({
@@ -247,6 +275,22 @@ export function GeoPanel({
     setNotice(null);
     try {
       const opener = await generateOpener(draft.id);
+      // The CONTENT is the source of truth, not our tracking record: if an
+      // equivalent definition is already in the section (the generator often
+      // reproduces it verbatim), adding again creates back-to-back duplicates.
+      const presence = openerPresence(opener, first.content_md);
+      if (presence === "exact") {
+        recordAddition("opener", { sectionId: first.id, text: opener });
+        showNotice("An equivalent opener already exists — tracked it; nothing was added.");
+        flashSection(first.id);
+        return;
+      }
+      if (presence === "similar") {
+        showNotice(
+          "A matching definition already opens the piece — nothing added, to avoid a duplicate.",
+        );
+        return;
+      }
       // If the section body opens with a duplicated title heading, move it out
       // of the way so the opener is the TRUE first line — not an afterthought
       // wedged between duplicate headings. Remove restores it.
@@ -337,6 +381,18 @@ export function GeoPanel({
         const title = text.trim().replace(/^#+\s*/, "");
         await applyTitle(sectionId, title);
         setUndoable((m) => new Map(m).set(key, { kind: "title", sectionId, prev: section.title }));
+      } else if (fix === "dedupe_opening" && target) {
+        // Deterministic: the server identified the duplicated opening block;
+        // keep only its first copy. No model call.
+        if (!section.content_md.includes(target)) {
+          showNotice("That passage changed — re-analyze and try again.");
+          return;
+        }
+        const next = section.content_md.replace(target, dedupeOpeningBlock(target));
+        await onSectionSave(sectionId, next);
+        setUndoable((m) =>
+          new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
+        );
       } else if (fix === "bullets" && target) {
         // Surgical: bulletize ONLY the flagged dense paragraph and splice it
         // back — the rest of the section (and any GEO additions) untouched.

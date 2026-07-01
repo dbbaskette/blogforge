@@ -3,7 +3,12 @@ import { api } from "./client";
 export type GeoFix = "answer_first" | "question_heading" | "definitional" | "faq" | null;
 
 /** Per-finding one-click action (server-tagged). */
-export type GeoFindingFix = "answer_first" | "question_heading" | "bullets" | "self_contained";
+export type GeoFindingFix =
+  | "answer_first"
+  | "question_heading"
+  | "bullets"
+  | "self_contained"
+  | "dedupe_opening";
 
 export interface GeoFinding {
   section_id?: string;

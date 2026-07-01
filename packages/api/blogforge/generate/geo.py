@@ -116,6 +116,61 @@ def _longest_paragraph(text: str) -> str:
     return max(paras, key=len, default="")
 
 
+# Sentence boundary: punctuation, optional closing quotes/paren, whitespace.
+# u201d/u2019 are the typographic closing double/single quotes.
+_SENT_SPLIT = re.compile(r"(?<=[.!?])[\"'\u201d\u2019)]*\s+")
+
+
+def _norm_sentence(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", s.lower())
+
+
+def detect_duplicate_opening(content: str) -> str | None:
+    """Return the verbatim leading block when a section OPENS with the same
+    sentence twice back-to-back (quote-glyph/punctuation differences ignored)
+    — the signature of an opener inserted next to an existing one. None when
+    the opening is clean."""
+    body = content.strip()
+    m1 = _SENT_SPLIT.search(body)
+    if not m1:
+        return None
+    s1 = body[: m1.start()]
+    rest = body[m1.end() :]
+    m2 = _SENT_SPLIT.search(rest)
+    s2 = rest[: m2.start()] if m2 else rest
+    if not _norm_sentence(s1) or _norm_sentence(s1) != _norm_sentence(s2):
+        return None
+    end = m1.end() + (m2.start() if m2 else len(rest))
+    # Include the second copy's closing quotes so the block splices cleanly.
+    while end < len(body) and body[end] in "\"'\u201d\u2019)":
+        end += 1
+    return body[:end]
+
+
+def augment_definitional(levers: dict[str, dict[str, Any]], draft: Draft) -> None:
+    """Deterministic addendum to the semantic definitional-opener lever: a
+    back-to-back duplicated opening sentence is an objective defect with a
+    mechanical fix — surface it first with a one-click dedupe and cap the
+    lever score."""
+    lever = levers.get("definitional_opener")
+    if not lever or not draft.sections:
+        return
+    first = draft.sections[0]
+    dup = detect_duplicate_opening(first.content_md)
+    if not dup:
+        return
+    lever["findings"] = [
+        {
+            "section_id": first.id,
+            "target": dup,
+            "note": "The opening sentence appears twice back-to-back — keep one copy.",
+            "fix": "dedupe_opening",
+        },
+        *lever["findings"],
+    ]
+    lever["score"] = min(lever["score"], 45)
+
+
 def _longest_paragraph_chars(text: str) -> int:
     return len(_longest_paragraph(text))
 
@@ -251,8 +306,12 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
         },
         "definitional_opener": {
             "type": "object",
-            "properties": {"score": {"type": "integer"}, "note": {"type": "string"}},
-            "required": ["score", "note"],
+            "properties": {
+                "score": {"type": "integer"},
+                "note": {"type": "string"},
+                "has_definition": {"type": "boolean"},
+            },
+            "required": ["score", "note", "has_definition"],
         },
         "factual_density": {
             "type": "object",
@@ -285,7 +344,11 @@ _SEMANTIC_DIRECTIVE = (
     "(40-60 words) before context? List the titles of sections that bury the answer "
     "in `weak_sections`.\n"
     "2) definitional_opener: does the piece open with a clear, citable one-line "
-    "definition of its subject/thesis?\n"
+    "definition of its subject/thesis? Set `has_definition` true if such a "
+    "sentence EXISTS anywhere near the top (even if badly placed, duplicated, or "
+    "buried) — the score reflects execution; `has_definition` reflects existence. "
+    "This decides whether the tool offers to ADD one: adding on top of an "
+    "existing definition creates duplicates.\n"
     "3) factual_density: does it use specific statistics, named sources, and quotes "
     "rather than vague claims? In `thin_spots`, quote vague passages that WOULD be "
     "stronger with real data; in `note` name the problem, and in `suggestion` say "
@@ -340,12 +403,17 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         data.get("definitional_opener") if isinstance(data.get("definitional_opener"), dict) else {}
     )
     do_score = _clampi(do.get("score"))
+    # Existence vs execution: only offer to ADD an opener when the model says
+    # none exists. A low score with has_definition=True means the definition is
+    # badly placed/duplicated — inserting another one made duplicates. Missing
+    # field (older/junk replies) defaults to True: never risk a duplicate add.
+    has_definition = bool(do.get("has_definition", True))
     definitional = _lever(
         "definitional_opener",
         do_score,
         str(do.get("note", "")).strip()
         or "Whether a citable one-liner defines the subject up top.",
-        fix="definitional" if do_score < 70 else None,
+        fix="definitional" if do_score < 70 and not has_definition else None,
     )
 
     fd = data.get("factual_density") if isinstance(data.get("factual_density"), dict) else {}
@@ -412,13 +480,16 @@ async def analyze_geo(
     prompt = (
         f"{system}\n\n---\n\n{_SEMANTIC_DIRECTIVE}\n\n"
         'Return JSON matching: {"answer_first": {"score": 0, "note": "", '
-        '"weak_sections": []}, "definitional_opener": {"score": 0, "note": ""}, '
+        '"weak_sections": []}, "definitional_opener": {"score": 0, "note": "", '
+        '"has_definition": false}, '
         '"factual_density": {"score": 0, "note": "", "thin_spots": []}}.\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
     semantic = parse_semantic(resp.text, draft)
-    return build_report({**structural, **semantic})
+    levers = {**structural, **semantic}
+    augment_definitional(levers, draft)
+    return build_report(levers)
 
 
 _FAQ_SCHEMA: dict[str, object] = {
