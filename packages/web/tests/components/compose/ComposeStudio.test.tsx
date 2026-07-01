@@ -19,6 +19,7 @@ vi.mock("../../../src/api/drafts", () => ({
   updateDraft: vi.fn().mockResolvedValue({}),
   expandSections: vi.fn().mockResolvedValue({ job_id: "j1" }),
   generateOutline: vi.fn().mockResolvedValue({}),
+  importDraft: vi.fn().mockResolvedValue({ id: "d9" }),
 }));
 vi.mock("../../../src/api/templates", () => ({
   listTemplates: vi.fn().mockResolvedValue([]),
@@ -36,7 +37,13 @@ vi.mock("../../../src/api/providers", () => ({
   listModels: vi.fn().mockResolvedValue([{ id: "m1", label: "Model One" }]),
 }));
 
-import { createDraft, expandSections, generateOutline, updateDraft } from "../../../src/api/drafts";
+import {
+  createDraft,
+  expandSections,
+  generateOutline,
+  importDraft,
+  updateDraft,
+} from "../../../src/api/drafts";
 import { ComposeStudio } from "../../../src/components/compose/ComposeStudio";
 
 const renderStudio = () =>
@@ -128,5 +135,18 @@ describe("ComposeStudio", () => {
     fireEvent.click(btn);
     await waitFor(() => expect(generateOutline).toHaveBeenCalledWith("d1"));
     expect(navigate).toHaveBeenCalledWith("/drafts/d1");
+  });
+
+  it("Paste mode imports a draft and navigates to the editor with ?shape=1", async () => {
+    renderStudio();
+    fireEvent.click(screen.getByText(/I already wrote it/));
+    fireEvent.change(screen.getByLabelText(/paste your draft/i), {
+      target: { value: "# Title\n\n## One\n\nBody." },
+    });
+    const btn = screen.getByRole("button", { name: /import & shape/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+    await waitFor(() => expect(importDraft).toHaveBeenCalled());
+    expect(navigate).toHaveBeenCalledWith("/drafts/d9?shape=1");
   });
 });

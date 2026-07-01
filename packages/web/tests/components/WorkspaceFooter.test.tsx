@@ -25,6 +25,7 @@ const baseProps = {
   onLint: vi.fn(),
   onRepurpose: vi.fn(),
   onHeadlines: vi.fn(),
+  onShape: vi.fn(),
 };
 
 beforeEach(() => {
@@ -45,6 +46,12 @@ describe("WorkspaceFooter", () => {
     render(<WorkspaceFooter {...baseProps} />);
     fireEvent.click(screen.getByRole("button", { name: /^repurpose$/i }));
     expect(baseProps.onRepurpose).toHaveBeenCalled();
+  });
+
+  it("fires onShape when the Shape button is clicked", () => {
+    render(<WorkspaceFooter {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /^shape$/i }));
+    expect(baseProps.onShape).toHaveBeenCalled();
   });
 
   it("opens a menu with every export format", () => {

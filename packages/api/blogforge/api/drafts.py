@@ -1,13 +1,23 @@
 """Draft CRUD routes — user-scoped via Postgres."""
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
-from blogforge.drafts.models import Draft, DraftStage, DraftSummary, IdeaInput
+from blogforge.drafts.models import (
+    Draft,
+    DraftStage,
+    DraftSummary,
+    IdeaInput,
+    OutlineProposal,
+    OutlineSection,
+)
 from blogforge.drafts.sql_store import SqlDraftStore
+from blogforge.generate.ingest import ingest_document
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
@@ -96,6 +106,68 @@ async def create_draft(
         {"type": "draft:created", "id": draft.id, "title": draft.title}
     )
     return draft
+
+
+class _ImportBody(BaseModel):
+    """A finished draft pasted in the "I already wrote it" compose mode.
+
+    Topic is derived from the paste (first H1 / first line), so only the voice
+    + provider setup travels alongside the text.
+    """
+
+    text: str = Field(min_length=1, max_length=200_000)
+    pack_slug: str = ""
+    format: str | None = None
+    provider: Literal["anthropic", "openai", "google", "claude-cli", "tanzu"]
+    model: str = Field(min_length=1)
+    target_words: int = Field(default=1500, ge=300, le=10000)
+    use_voice_profile: bool = True
+
+
+# NOTE: declared before GET /{draft_id}; distinct method+path so no capture.
+@router.post("/import", response_model=Draft, status_code=status.HTTP_201_CREATED)
+async def import_draft(
+    body: _ImportBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    """Ingest a pasted draft into an editable, sections-stage draft.
+
+    Splits the text on H2 headings (single section if none), then lands it as a
+    normal draft so every shaping tool works on it unchanged. Nothing is
+    rewritten — the writer's words are preserved verbatim.
+    """
+    ingested = ingest_document(body.text)
+    if not ingested.sections:
+        raise HTTPException(
+            422,
+            detail={"error": {"code": "empty_draft", "message": "Paste some text to import."}},
+        )
+
+    idea = IdeaInput(
+        topic=ingested.title,
+        pack_slug=body.pack_slug,
+        format=body.format,
+        provider=body.provider,
+        model=body.model,
+        target_words=body.target_words,
+        use_voice_profile=body.use_voice_profile,
+    )
+    store = _store(request)
+    draft = await store.create(user_id=current.id, idea=idea)
+    draft.title = ingested.title
+    draft.sections = ingested.sections
+    draft.outline = OutlineProposal(
+        sections=[OutlineSection(id=s.id, title=s.title) for s in ingested.sections]
+    )
+    draft.stage = "sections"
+    updated = await store.update(draft.id, draft, user_id=current.id)
+    if updated is None:  # pragma: no cover — draft was just created
+        raise _not_found(draft.id)
+    await request.app.state.event_bus.emit(
+        {"type": "draft:created", "id": updated.id, "title": updated.title}
+    )
+    return updated
 
 
 @router.get("/{draft_id}", response_model=Draft)

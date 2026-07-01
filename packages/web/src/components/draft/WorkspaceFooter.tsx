@@ -12,6 +12,7 @@ interface WorkspaceFooterProps {
   onLint: () => void;
   onRepurpose: () => void;
   onHeadlines: () => void;
+  onShape: () => void;
   /**
    * Optional hook fired when the reading preview opens. The footer owns the
    * preview's open/close state locally (DraftWorkspace can't host it), so this
@@ -28,6 +29,7 @@ export function WorkspaceFooter({
   onLint,
   onRepurpose,
   onHeadlines,
+  onShape,
   onPreview,
 }: WorkspaceFooterProps): JSX.Element {
   const draftId = draft.id;
@@ -108,6 +110,14 @@ export function WorkspaceFooter({
           title="See the finished post as a typeset, publish-ready article"
         >
           Preview
+        </button>
+        <button
+          type="button"
+          onClick={onShape}
+          className="nb-btn nb-btn-sm"
+          title="Get suggestions: claims worth verifying, sharper wordings, and where to expand"
+        >
+          Shape
         </button>
         <button
           type="button"

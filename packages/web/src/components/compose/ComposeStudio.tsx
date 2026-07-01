@@ -7,6 +7,7 @@ import {
   createDraft,
   expandSections,
   generateOutline,
+  importDraft,
   updateDraft,
 } from "../../api/drafts";
 import { listProviderAvailability } from "../../api/providers";
@@ -19,6 +20,7 @@ import { ExpressPanel } from "./ExpressPanel";
 import { InlineKeySetup } from "./InlineKeySetup";
 import { type ComposeMode, ModePicker } from "./ModePicker";
 import { OutlineInPanel } from "./OutlineInPanel";
+import { PastePanel } from "./PastePanel";
 import { ProposePanel } from "./ProposePanel";
 import { SetupSummary } from "./SetupSummary";
 import { SparkIdeas } from "./SparkIdeas";
@@ -50,6 +52,7 @@ export function ComposeStudio(): JSX.Element {
   const [settings, setSettings] = useState<ComposeSettings>(() => loadDefaults());
   const [topic, setTopic] = useState("");
   const [outlineText, setOutlineText] = useState("");
+  const [pasteText, setPasteText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // When a multi-step flow fails after the draft is created, offer a way into
@@ -229,6 +232,32 @@ export function ComposeStudio(): JSX.Element {
     }
   }
 
+  // PASTE — ingest an already-written draft into an editable, sections-stage
+  // draft (no generation), then land in the editor where the shaping tools live.
+  async function runPaste(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    setResumeDraftId(null);
+    try {
+      const draft = await importDraft({
+        text: pasteText,
+        pack_slug: settings.pack_slug,
+        format: settings.format,
+        provider: settings.provider,
+        model: settings.model,
+        target_words: settings.target_words,
+        use_voice_profile: settings.use_voice_profile,
+      });
+      saveDefaults(settings);
+      saveLastMode("paste");
+      navigate(`/drafts/${draft.id}?shape=1`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header row */}
@@ -340,6 +369,15 @@ export function ComposeStudio(): JSX.Element {
               outlineText={outlineText}
               onOutlineText={setOutlineText}
               onRun={runOutline}
+              busy={busy}
+              disabled={!canRun}
+            />
+          )}
+          {mode === "paste" && (
+            <PastePanel
+              text={pasteText}
+              onText={setPasteText}
+              onRun={runPaste}
               busy={busy}
               disabled={!canRun}
             />

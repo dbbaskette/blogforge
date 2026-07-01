@@ -93,3 +93,38 @@ async def test_put_does_not_regress_stage_or_clobber_outline(authed_client) -> N
     assert body["stage"] == "outline", "stage should not regress research ← outline"
     assert body["outline"] is not None, "outline must not be clobbered by stale PUT"
     assert len(body["sections"]) == 1, "sections must not be clobbered"
+
+
+def _import_body(text: str) -> dict:  # type: ignore[type-arg]
+    return {"text": text, "pack_slug": "dan", "provider": "anthropic", "model": "m"}
+
+
+async def test_import_draft_splits_by_headings(authed_client) -> None:
+    client, _ = authed_client
+    r = client.post(
+        "/api/drafts/import",
+        json=_import_body("# My Post\n\n## Intro\n\nHello.\n\n## Body\n\nStuff."),
+    )
+    assert r.status_code == 201
+    d = r.json()
+    assert d["title"] == "My Post"
+    assert d["stage"] == "sections"
+    assert [s["title"] for s in d["sections"]] == ["Intro", "Body"]
+    assert d["sections"][0]["content_md"] == "Hello."
+    # A matching outline is seeded so the Outline view stays consistent.
+    assert [s["title"] for s in d["outline"]["sections"]] == ["Intro", "Body"]
+
+
+async def test_import_draft_no_headings_single_section(authed_client) -> None:
+    client, _ = authed_client
+    r = client.post("/api/drafts/import", json=_import_body("Just prose, no headings here."))
+    assert r.status_code == 201
+    d = r.json()
+    assert len(d["sections"]) == 1
+    assert d["sections"][0]["content_md"] == "Just prose, no headings here."
+
+
+async def test_import_draft_empty_rejected(authed_client) -> None:
+    client, _ = authed_client
+    r = client.post("/api/drafts/import", json=_import_body("   \n  "))
+    assert r.status_code == 422

@@ -62,6 +62,21 @@ export async function listDrafts(init?: RequestInit): Promise<DraftSummary[]> {
 export async function createDraft(idea: IdeaInput): Promise<Draft> {
   return api<Draft>("/api/drafts", { method: "POST", body: JSON.stringify(idea) });
 }
+
+export interface ImportDraftInput {
+  text: string;
+  pack_slug: string;
+  format?: string | null;
+  provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
+  model: string;
+  target_words?: number;
+  use_voice_profile?: boolean;
+}
+
+/** Ingest a pasted, already-written draft into an editable sections-stage draft. */
+export async function importDraft(input: ImportDraftInput): Promise<Draft> {
+  return api<Draft>("/api/drafts/import", { method: "POST", body: JSON.stringify(input) });
+}
 export async function getDraft(id: string, init?: RequestInit): Promise<Draft> {
   return api<Draft>(`/api/drafts/${encodeURIComponent(id)}`, init);
 }

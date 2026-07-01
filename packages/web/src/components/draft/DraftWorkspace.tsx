@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/drafts";
 import { createTemplateFromDraft } from "../../api/templates";
@@ -8,14 +8,15 @@ import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
 import { LintPanel } from "./LintPanel";
-import { RepurposePanel } from "./RepurposePanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
+import { RepurposePanel } from "./RepurposePanel";
 import { ResearchPanel } from "./ResearchPanel";
 import { SectionsPanel } from "./SectionsPanel";
-import { StageNav } from "./StageNav";
 import { SetupDisclosure } from "./SetupDisclosure";
+import { ShapePanel } from "./ShapePanel";
+import { StageNav } from "./StageNav";
 import { WorkspaceFooter } from "./WorkspaceFooter";
 
 const INLINE_AI_HINT_KEY = "bf.inlineai.hint.dismissed";
@@ -58,6 +59,19 @@ export function DraftWorkspace({
   const [lintOpen, setLintOpen] = useState(false);
   const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [headlinesOpen, setHeadlinesOpen] = useState(false);
+  const [shapeOpen, setShapeOpen] = useState(false);
+  // The paste/import flow navigates here with ?shape=1 to auto-offer the Shape
+  // Assistant (it also auto-runs its first pass). Consume the flag once.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [autoRunShape, setAutoRunShape] = useState(false);
+  useEffect(() => {
+    if (searchParams.get("shape") === "1") {
+      setShapeOpen(true);
+      setAutoRunShape(true);
+      searchParams.delete("shape");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   // One-time hint pointing authors at select-text inline AI. Persisted dismissed.
   const [inlineHintDismissed, setInlineHintDismissed] = useState(
     () => localStorage.getItem(INLINE_AI_HINT_KEY) === "1",
@@ -407,14 +421,19 @@ export function DraftWorkspace({
           onLint={() => setLintOpen(true)}
           onRepurpose={() => setRepurposeOpen(true)}
           onHeadlines={() => setHeadlinesOpen(true)}
+          onShape={() => setShapeOpen(true)}
         />
       )}
 
       {lintOpen && (
-        <LintPanel
+        <LintPanel draft={draft} onSectionSave={onSectionSave} onClose={() => setLintOpen(false)} />
+      )}
+      {shapeOpen && (
+        <ShapePanel
           draft={draft}
           onSectionSave={onSectionSave}
-          onClose={() => setLintOpen(false)}
+          autoRun={autoRunShape}
+          onClose={() => setShapeOpen(false)}
         />
       )}
       {repurposeOpen && (
