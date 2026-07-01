@@ -39,11 +39,11 @@ function flashSection(sectionId: string): void {
 // ── Persistent record of GEO-added content (opener / FAQ), per draft, so the
 // Remove buttons survive closing and reopening the panel. The color highlight
 // is editor-chrome only; the saved markdown stays clean for export. ──
-interface Addition {
+export interface Addition {
   sectionId: string;
   text: string;
 }
-interface Additions {
+export interface Additions {
   opener?: Addition;
   faq?: Addition;
 }
@@ -64,6 +64,37 @@ function saveAdditions(draftId: string, a: Additions): void {
   } catch {
     /* storage disabled — Remove just won't survive a reload */
   }
+}
+
+/**
+ * Carve GEO-added content (opener prefix / FAQ suffix) out of a section body
+ * before sending it to the model for a rewrite, so one fix can't mangle or
+ * erase what another fix just added — the addition is re-attached verbatim
+ * afterwards (`prefix + rewritten + suffix`) and its Remove button keeps
+ * working. Pure and exported for tests.
+ */
+export function carveProtectedAdditions(
+  additions: Additions,
+  sectionId: string,
+  content: string,
+): { core: string; prefix: string; suffix: string } {
+  let core = content;
+  let prefix = "";
+  let suffix = "";
+  const op = additions.opener;
+  if (op && op.sectionId === sectionId && core.startsWith(op.text)) {
+    prefix = `${op.text}\n\n`;
+    core = core.slice(op.text.length).replace(/^\s+/, "");
+  }
+  const fq = additions.faq;
+  if (fq && fq.sectionId === sectionId) {
+    const trimmed = core.replace(/\s+$/, "");
+    if (trimmed.endsWith(fq.text)) {
+      suffix = `\n\n${fq.text}`;
+      core = trimmed.slice(0, trimmed.length - fq.text.length).replace(/\s+$/, "");
+    }
+  }
+  return { core, prefix, suffix };
 }
 
 /** A rewrite we can undo: the section's content (or title) before the fix. */
@@ -106,6 +137,9 @@ export function GeoPanel({
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
   // Applied rewrites (keyed by finding) → previous content, so Apply ⇄ Undo.
   const [undoable, setUndoable] = useState<Map<string, UndoEntry>>(new Map());
+  // Sibling findings invalidated because a rewrite restructured their section —
+  // hidden (with a re-analyze nudge) rather than left actionable on stale info.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   // Persistent additions (opener / FAQ) → Remove buttons.
   const [additions, setAdditions] = useState<Additions>(() => loadAdditions(draft.id));
   const [stale, setStale] = useState(false);
@@ -126,6 +160,7 @@ export function GeoPanel({
     try {
       setReport(await analyzeGeo(draft.id));
       setUndoable(new Map());
+      setHidden(new Set());
       setStale(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -257,15 +292,29 @@ export function GeoPanel({
         await applyTitle(sectionId, title);
         setUndoable((m) => new Map(m).set(key, { kind: "title", sectionId, prev: section.title }));
       } else {
+        // Protect content another fix added: strip the tracked opener/FAQ out
+        // of what the model sees, then re-attach it verbatim.
+        const { core, prefix, suffix } = carveProtectedAdditions(
+          additions,
+          sectionId,
+          section.content_md,
+        );
+        if (!core.trim()) {
+          showNotice("Nothing to rewrite here besides content GEO already added.");
+          return;
+        }
         const { text } = await inlineEdit(draft.id, {
-          text: section.content_md,
+          text: core,
           action: "custom",
           instruction: REWRITE_INSTRUCTION[fix],
         });
-        await onSectionSave(sectionId, text.trim());
+        await onSectionSave(sectionId, `${prefix}${text.trim()}${suffix}`);
         setUndoable((m) =>
           new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
         );
+        // The rewrite restructured this section, so its OTHER findings now
+        // describe text that no longer exists — hide them until a re-analyze.
+        hideStaleSiblings(key, sectionId);
       }
       setStale(true);
       flashSection(sectionId);
@@ -274,6 +323,22 @@ export function GeoPanel({
     } finally {
       setApplyingKey(null);
     }
+  }
+
+  /** Hide every OTHER finding that points at a section a rewrite just
+   * restructured — their quoted text/notes are stale. Re-analyze restores. */
+  function hideStaleSiblings(appliedKey: string, sectionId: string): void {
+    if (!report) return;
+    setHidden((prev) => {
+      const next = new Set(prev);
+      for (const lever of report.levers) {
+        for (const f of lever.findings) {
+          const k = findingKey(lever, f);
+          if (k !== appliedKey && f.section_id === sectionId) next.add(k);
+        }
+      }
+      return next;
+    });
   }
 
   async function applyTitle(sectionId: string, title: string): Promise<void> {
@@ -376,11 +441,11 @@ export function GeoPanel({
       )}
       {stale && !busy && (
         <div className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
-          Draft changed.{" "}
+          Draft changed{hidden.size > 0 ? " — findings on rewritten sections are set aside" : ""}.{" "}
           <button type="button" onClick={run} className="underline">
             Re-analyze
           </button>{" "}
-          to refresh your score.
+          to refresh the score{hidden.size > 0 ? " and findings" : ""}.
         </div>
       )}
 
@@ -414,6 +479,7 @@ export function GeoPanel({
 
                 {lever.findings.map((f) => {
                   const key = findingKey(lever, f);
+                  if (hidden.has(key)) return null;
                   const applying = applyingKey === key;
                   const undone = undoable.has(key);
                   const canFix = !!f.fix && !!f.section_id && !!REWRITE_LABEL[f.fix];
