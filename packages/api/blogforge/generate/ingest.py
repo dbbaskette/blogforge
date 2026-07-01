@@ -26,27 +26,6 @@ _H2_RE = re.compile(r"(?m)^##[ \t]+(.+?)[ \t]*$")
 
 _MAX_TITLE = 120
 
-# Inline-emphasis markers that shouldn't survive into a plain-text HEADING —
-# a pasted "## **ROTATE**" would otherwise show the literal ** in the title.
-_CODE_RE = re.compile(r"`([^`]+)`")
-_BOLD_STAR_RE = re.compile(r"\*\*([^*]+)\*\*")
-_BOLD_UNDER_RE = re.compile(r"__([^_]+)__")
-_ITALIC_STAR_RE = re.compile(r"\*([^*]+)\*")
-_ITALIC_UNDER_RE = re.compile(r"(^|[^\w])_([^_]+)_(?![\w])")
-
-
-def strip_heading_emphasis(text: str) -> str:
-    """Remove inline Markdown emphasis (bold/italic/code) from heading text so
-    section titles and the draft title render clean — including stray/unbalanced
-    markers left by a truncated heading."""
-    text = _CODE_RE.sub(r"\1", text)
-    text = _BOLD_STAR_RE.sub(r"\1", text)
-    text = _BOLD_UNDER_RE.sub(r"\1", text)
-    text = _ITALIC_STAR_RE.sub(r"\1", text)
-    text = _ITALIC_UNDER_RE.sub(r"\1\2", text)
-    text = text.replace("**", "").replace("`", "")
-    return text.strip()
-
 
 @dataclass
 class Ingested:
@@ -67,7 +46,10 @@ def _first_nonempty_line(text: str) -> str:
 
 
 def _clamp_title(title: str) -> str:
-    title = strip_heading_emphasis(title)
+    # Preserve the writer's markdown verbatim — emphasis is stripped only for
+    # DISPLAY (frontend) and for GEO title matching, never in the stored doc,
+    # so exports stay faithful.
+    title = title.strip()
     if len(title) > _MAX_TITLE:
         return title[: _MAX_TITLE - 1].rstrip() + "…"
     return title
@@ -77,7 +59,7 @@ def _section(title: str, content: str) -> Section:
     content = content.strip()
     return Section(
         id=uuid4().hex,
-        title=strip_heading_emphasis(title),
+        title=title.strip(),
         content_md=content,
         status="edited",
         word_count=_word_count(content),

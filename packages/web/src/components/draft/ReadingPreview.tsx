@@ -2,8 +2,8 @@ import { marked } from "marked";
 import { useMemo } from "react";
 
 import { type Draft, heroImageUrl } from "../../api/drafts";
-import { stripInlineEmphasis } from "../../lib/headingText";
 import { Icon } from "../ui/Icon";
+import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
 interface ReadingPreviewProps {
@@ -41,7 +41,7 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
     [sections],
   );
 
-  const title = stripInlineEmphasis(draft.title.trim()) || "Untitled draft";
+  const title = draft.title.trim() || "Untitled draft";
 
   return (
     <div
@@ -77,7 +77,7 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
 
         <header className="mb-10 text-center">
           <h1 className="font-serif text-4xl md:text-5xl font-medium leading-[1.12] tracking-tight text-ink text-balance">
-            {title}
+            <InlineMarkdown text={title} />
           </h1>
           <p className="mt-5 flex items-center justify-center gap-2 text-sm text-muted">
             <span>{readMinutes} min read</span>

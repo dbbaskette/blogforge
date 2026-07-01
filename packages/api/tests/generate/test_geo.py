@@ -97,25 +97,38 @@ def test_parse_semantic_maps_weak_sections_to_ids() -> None:
     assert levers["factual_density"]["findings"][0]["target"] == "It is fast."
 
 
-def test_low_definitional_score_with_existing_definition_never_offers_add() -> None:
-    """The 45-score live case: a definition EXISTS but is duplicated/badly
-    placed. Offering "Add" here is what created the duplicate — execution
-    problems get targeted fixes, never another insertion."""
+def test_low_definitional_score_with_existing_definition_offers_improve() -> None:
+    """The 40/45-score live case: a definition EXISTS but is buried. We don't
+    ADD (that made duplicates) — we offer to IMPROVE (hoist it up), so the
+    writer isn't stuck with the score."""
     d = _draft([_sec("Intro", "x")])
     raw = (
         '{"answer_first": {"score": 80, "note": "ok"},'
-        '"definitional_opener": {"score": 45, "note": "exists but duplicated", '
+        '"definitional_opener": {"score": 40, "note": "buried in narrative", '
         '"has_definition": true},'
         '"factual_density": {"score": 80, "note": "ok"}}'
     )
-    assert parse_semantic(raw, d)["definitional_opener"]["fix"] is None
-    # Missing field defaults to "exists" — never risk a duplicate add.
-    raw_missing = (
-        '{"answer_first": {"score": 80, "note": "ok"},'
-        '"definitional_opener": {"score": 40, "note": "meh"},'
-        '"factual_density": {"score": 80, "note": "ok"}}'
+    assert parse_semantic(raw, d)["definitional_opener"]["fix"] == "definitional_improve"
+    # No definition at all → offer to ADD one.
+    raw_none = raw.replace('"has_definition": true', '"has_definition": false')
+    assert parse_semantic(raw_none, d)["definitional_opener"]["fix"] == "definitional"
+
+
+def test_answer_first_matches_emphasis_wrapped_titles() -> None:
+    """Stored titles keep their markdown (** for export), but the model returns
+    clean titles — matching must ignore emphasis so the fix resolves a section."""
+    rotate = _sec("**ROTATE: identity**", "buried answer")
+    d = _draft([rotate])
+    raw = (
+        '{"answer_first": {"score": 30, "note": "buries", "weak_sections": ["ROTATE: identity"]},'
+        '"definitional_opener": {"score": 90, "note": "ok", "has_definition": true},'
+        '"factual_density": {"score": 90, "note": "ok"}}'
     )
-    assert parse_semantic(raw_missing, d)["definitional_opener"]["fix"] is None
+    af = parse_semantic(raw, d)["answer_first"]
+    assert af["findings"][0]["section_id"] == rotate.id
+    assert af["findings"][0]["fix"] == "answer_first"
+    # The displayed note is clean (no ** shown).
+    assert af["findings"][0]["note"].startswith('"ROTATE: identity"')
 
 
 def test_parse_semantic_tolerates_junk() -> None:
