@@ -110,6 +110,18 @@ body {
   padding-left: 1.4em;
   margin: 0 0 1em 0;
 }
+/* Tailwind's preflight resets list-style to none — without restoring it,
+   bullet/numbered lists render as bare indented paragraphs ("my bullets got
+   stripped"). The markdown was always intact; only the markers were hidden. */
+.prose-body ul {
+  list-style: disc outside;
+}
+.prose-body ol {
+  list-style: decimal outside;
+}
+.prose-body ul ul {
+  list-style: circle outside;
+}
 .prose-body li {
   margin: 0.25em 0;
 }
