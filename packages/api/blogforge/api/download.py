@@ -1,6 +1,8 @@
 """GET /api/drafts/{id}/download — export as Markdown, HTML, or .docx."""
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from blogforge.auth.dependencies import get_current_user
@@ -15,7 +17,16 @@ _DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.do
 
 
 def _filename(draft: Draft) -> str:
-    return (draft.title or draft.idea.topic).strip().replace(" ", "-") or "post"
+    """ASCII-safe filename for the Content-Disposition header.
+
+    HTTP headers are latin-1; titles use typographic punctuation (curly
+    quotes, em dashes, smart apostrophes) that isn't — an unsanitized name
+    raised UnicodeEncodeError (a 500) on download. Collapse anything outside
+    a safe ASCII set to hyphens.
+    """
+    raw = (draft.title or draft.idea.topic).strip()
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "-", raw).strip("-.")
+    return safe or "post"
 
 
 @router.get("/api/drafts/{draft_id}/download")
