@@ -5,6 +5,7 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { GeoPanel } from "./GeoPanel";
 import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
 import { LintPanel } from "./LintPanel";
@@ -60,6 +61,7 @@ export function DraftWorkspace({
   const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [headlinesOpen, setHeadlinesOpen] = useState(false);
   const [shapeOpen, setShapeOpen] = useState(false);
+  const [geoOpen, setGeoOpen] = useState(false);
   // The paste/import flow navigates here with ?shape=1 to auto-offer the Shape
   // Assistant (it also auto-runs its first pass). Consume the flag once.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -422,6 +424,7 @@ export function DraftWorkspace({
           onRepurpose={() => setRepurposeOpen(true)}
           onHeadlines={() => setHeadlinesOpen(true)}
           onShape={() => setShapeOpen(true)}
+          onGeo={() => setGeoOpen(true)}
         />
       )}
 
@@ -434,6 +437,14 @@ export function DraftWorkspace({
           onSectionSave={onSectionSave}
           autoRun={autoRunShape}
           onClose={() => setShapeOpen(false)}
+        />
+      )}
+      {geoOpen && (
+        <GeoPanel
+          draft={draft}
+          onSectionSave={onSectionSave}
+          onChange={onChange}
+          onClose={() => setGeoOpen(false)}
         />
       )}
       {repurposeOpen && (
