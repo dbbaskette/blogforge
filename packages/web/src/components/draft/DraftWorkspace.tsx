@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/drafts";
 import { createTemplateFromDraft } from "../../api/templates";
@@ -11,6 +11,7 @@ import { GeoPanel } from "./GeoPanel";
 import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
 import { LintPanel } from "./LintPanel";
+import { OpeningCard } from "./OpeningCard";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
@@ -65,18 +66,9 @@ export function DraftWorkspace({
   const [shapeOpen, setShapeOpen] = useState(false);
   const [geoOpen, setGeoOpen] = useState(false);
   const [checkupOpen, setCheckupOpen] = useState(false);
-  // The paste/import flow navigates here with ?shape=1 to auto-offer the Shape
-  // Assistant (it also auto-runs its first pass). Consume the flag once.
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [autoRunShape, setAutoRunShape] = useState(false);
-  useEffect(() => {
-    if (searchParams.get("shape") === "1") {
-      setShapeOpen(true);
-      setAutoRunShape(true);
-      searchParams.delete("shape");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
+  // Import lands here verbatim — no tool runs and nothing is edited until the
+  // writer asks for it (Improve ▾ → Shape/GEO/Proofread). The shaping pass is
+  // never auto-run on an imported draft.
   // One-time hint pointing authors at select-text inline AI. Persisted dismissed.
   const [inlineHintDismissed, setInlineHintDismissed] = useState(
     () => localStorage.getItem(INLINE_AI_HINT_KEY) === "1",
@@ -202,6 +194,17 @@ export function DraftWorkspace({
     },
     [draft, onChange],
   );
+
+  // Persist an edit to the article's opening (stored as outline.opening_hook).
+  const handleOpeningChange = useCallback(
+    (opening_hook: string) => {
+      const outline = draft.outline ?? { opening_hook: "", sections: [], estimated_words: 0 };
+      onChange({ ...draft, outline: { ...outline, opening_hook } });
+    },
+    [draft, onChange],
+  );
+
+  const hasOpening = (draft.outline?.opening_hook?.trim().length ?? 0) > 0;
 
   // Debounce title edits separately so typing doesn't fire one save per keystroke.
   const titleSave = useDebouncedSave(
@@ -415,6 +418,10 @@ export function DraftWorkspace({
           </div>
         )}
 
+        {draft.stage === "sections" && hasOpening && (
+          <OpeningCard value={draft.outline?.opening_hook ?? ""} onSave={handleOpeningChange} />
+        )}
+
         {draft.stage === "sections" && (
           <SectionsPanel
             draft={draft}
@@ -461,7 +468,6 @@ export function DraftWorkspace({
         <ShapePanel
           draft={draft}
           onSectionSave={onSectionSave}
-          autoRun={autoRunShape}
           onClose={() => setShapeOpen(false)}
         />
       )}

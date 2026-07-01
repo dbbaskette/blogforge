@@ -135,7 +135,7 @@ export function PastePanel({
         onClick={onRun}
         disabled={busy || disabled || sections === 0}
       >
-        {busy ? "Importing…" : "Import & shape →"}
+        {busy ? "Importing…" : "Import →"}
       </button>
     </>
   );

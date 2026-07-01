@@ -31,13 +31,26 @@ def test_h1_title_and_h2_sections() -> None:
     assert result.sections[0].word_count == 2
 
 
-def test_lead_text_before_first_heading_folds_into_first_section() -> None:
+def test_lead_text_before_first_heading_becomes_the_opening() -> None:
+    """A lede written above the first ## is the article's opening. It must NOT be
+    folded under the first section's heading — that would move it BELOW that
+    heading on export (import→export wouldn't round-trip) and read as if the
+    opening were cut. It's returned separately as the opening instead."""
     md = "# Title\n\nA punchy opening line.\n\n## First\n\nBody one."
     result = ingest_document(md)
-    assert len(result.sections) == 1 or result.sections[0].title == "First"
-    first = result.sections[0]
-    assert "A punchy opening line." in first.content_md
-    assert "Body one." in first.content_md
+    assert result.opening == "A punchy opening line."
+    assert [s.title for s in result.sections] == ["First"]
+    # The first section holds only its own body — the opening isn't duplicated in.
+    assert result.sections[0].content_md == "Body one."
+    assert "A punchy opening line." not in result.sections[0].content_md
+
+
+def test_no_lead_before_first_heading_has_empty_opening() -> None:
+    # H1 immediately followed by H2 (no lede) → no separate opening.
+    md = "# My Great Post\n\n## Intro\n\nHello there.\n\n## Body\n\nThe meat."
+    result = ingest_document(md)
+    assert result.opening == ""
+    assert result.sections[0].content_md == "Hello there."
 
 
 def test_no_headings_becomes_one_section() -> None:

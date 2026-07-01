@@ -137,16 +137,17 @@ describe("ComposeStudio", () => {
     expect(navigate).toHaveBeenCalledWith("/drafts/d1");
   });
 
-  it("Paste mode imports a draft and navigates to the editor with ?shape=1", async () => {
+  it("Paste mode imports a draft and lands in the editor verbatim (no auto-run)", async () => {
     renderStudio();
     fireEvent.click(screen.getByText(/I already wrote it/));
     fireEvent.change(screen.getByLabelText(/paste your draft/i), {
       target: { value: "# Title\n\n## One\n\nBody." },
     });
-    const btn = screen.getByRole("button", { name: /import & shape/i });
+    const btn = screen.getByRole("button", { name: /import →/i });
     await waitFor(() => expect(btn).toBeEnabled());
     fireEvent.click(btn);
     await waitFor(() => expect(importDraft).toHaveBeenCalled());
-    expect(navigate).toHaveBeenCalledWith("/drafts/d9?shape=1");
+    // No ?shape=1 — import must not auto-run any shaping/analysis pass.
+    expect(navigate).toHaveBeenCalledWith("/drafts/d9");
   });
 });

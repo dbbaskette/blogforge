@@ -1,4 +1,5 @@
 """Draft CRUD routes — user-scoped via Postgres."""
+
 from __future__ import annotations
 
 from typing import Literal
@@ -133,9 +134,11 @@ async def import_draft(
 ) -> Draft:
     """Ingest a pasted draft into an editable, sections-stage draft.
 
-    Splits the text on H2 headings (single section if none), then lands it as a
+    Splits the text on H2 headings (single section if none); prose before the
+    first heading becomes the article's opening (``outline.opening_hook``), kept
+    above the sections rather than folded under the first heading. Lands as a
     normal draft so every shaping tool works on it unchanged. Nothing is
-    rewritten — the writer's words are preserved verbatim.
+    rewritten and no tool is auto-run — the writer's words are preserved verbatim.
     """
     ingested = ingest_document(body.text)
     if not ingested.sections:
@@ -158,7 +161,8 @@ async def import_draft(
     draft.title = ingested.title
     draft.sections = ingested.sections
     draft.outline = OutlineProposal(
-        sections=[OutlineSection(id=s.id, title=s.title) for s in ingested.sections]
+        opening_hook=ingested.opening,
+        sections=[OutlineSection(id=s.id, title=s.title) for s in ingested.sections],
     )
     draft.stage = "sections"
     updated = await store.update(draft.id, draft, user_id=current.id)
@@ -307,9 +311,7 @@ async def delete_draft(
         ok = await store.hard_delete(draft_id, user_id=current.id)
         if not ok:
             raise _not_found(draft_id)
-        await request.app.state.event_bus.emit(
-            {"type": "draft:purged", "id": draft_id}
-        )
+        await request.app.state.event_bus.emit({"type": "draft:purged", "id": draft_id})
         return
     draft = await store.get(draft_id, user_id=current.id)
     if draft is None:
