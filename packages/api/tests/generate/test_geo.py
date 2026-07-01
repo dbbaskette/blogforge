@@ -43,6 +43,17 @@ def test_skimmability_penalizes_no_lists() -> None:
     assert score_structural(d2)["skimmability"]["score"] >= 90
 
 
+def test_skimmability_wall_finding_targets_the_dense_paragraph() -> None:
+    dense = "x" * 800
+    d = _draft([_sec("Intro", f"Short lead.\n\n{dense}\n\nShort tail.")])
+    findings = score_structural(d)["skimmability"]["findings"]
+    assert len(findings) == 1
+    # The finding pinpoints the ONE dense paragraph, so the fix can splice
+    # just that block instead of rewriting the whole section.
+    assert findings[0]["target"] == dense
+    assert findings[0]["fix"] == "bullets"
+
+
 def test_faq_presence_detected() -> None:
     absent = score_structural(_draft([_sec("Intro", "hi")]))["faq"]
     assert absent["fix"] == "faq" and absent["score"] == 30

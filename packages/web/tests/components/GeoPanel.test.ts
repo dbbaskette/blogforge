@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { type Additions, carveProtectedAdditions } from "../../src/components/draft/GeoPanel";
+import {
+  type Additions,
+  carveProtectedAdditions,
+  stripDuplicateTitleHeading,
+} from "../../src/components/draft/GeoPanel";
 
 const OPENER = "BlogForge is a drafting tool that keeps your voice.";
 const FAQ = "### FAQ\n\n**What is it?**\n\nA tool.";
@@ -52,5 +56,41 @@ describe("carveProtectedAdditions", () => {
     const { core, prefix } = carveProtectedAdditions(additions, "s1", content);
     expect(core).toBe(content);
     expect(prefix).toBe("");
+  });
+});
+
+describe("stripDuplicateTitleHeading", () => {
+  const TITLE = "Faster is Still Safer";
+
+  it("strips a heading that repeats the draft title", () => {
+    const { rest, removed } = stripDuplicateTitleHeading(
+      TITLE,
+      `## Faster is Still Safer\n\nThe body starts here.`,
+    );
+    expect(removed).toBe("## Faster is Still Safer");
+    expect(rest).toBe("The body starts here.");
+  });
+
+  it("matches loosely: quotes, bold, punctuation, case", () => {
+    const { rest, removed } = stripDuplicateTitleHeading(
+      TITLE,
+      `**"faster is still safer"**\n\nBody.`,
+    );
+    expect(removed).toBe(`**"faster is still safer"**`);
+    expect(rest).toBe("Body.");
+  });
+
+  it("leaves a genuine opening line alone", () => {
+    const content = "Speed is the best defense.\n\nMore body.";
+    const { rest, removed } = stripDuplicateTitleHeading(TITLE, content);
+    expect(removed).toBe("");
+    expect(rest).toBe(content);
+  });
+
+  it("leaves a non-duplicate heading alone", () => {
+    const content = "## Why speed wins\n\nBody.";
+    const { rest, removed } = stripDuplicateTitleHeading(TITLE, content);
+    expect(removed).toBe("");
+    expect(rest).toBe(content);
   });
 });
