@@ -11,8 +11,9 @@ import {
 import { listProviderAvailability } from "../api/providers";
 import { getVoiceProfile } from "../api/voice";
 import { OnboardingChecklist, type OnboardingStep } from "../components/OnboardingChecklist";
-import { Icon } from "../components/ui/Icon";
+import { DraftHealthBadges } from "../components/draft/DraftHealthBadges";
 import { useConfirm } from "../components/ui/ConfirmDialog";
+import { Icon } from "../components/ui/Icon";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
 
 const ONBOARDING_DISMISSED_KEY = "bf.onboarding.dismissed";
@@ -86,7 +87,15 @@ export function DraftsPage(): JSX.Element {
   useGlobalEvents(onEvent);
 
   const onDelete = async (id: string): Promise<void> => {
-    if (!(await confirm({ title: "Move this draft to the trash?", message: "You can restore it any time from Trash.", confirmLabel: "Move to trash", danger: true }))) return;
+    if (
+      !(await confirm({
+        title: "Move this draft to the trash?",
+        message: "You can restore it any time from Trash.",
+        confirmLabel: "Move to trash",
+        danger: true,
+      }))
+    )
+      return;
     await deleteDraft(id);
     reload();
   };
@@ -142,15 +151,24 @@ export function DraftsPage(): JSX.Element {
 
   const onboardingSteps = useMemo<OnboardingStep[]>(
     () => [
-      { key: "provider", label: "Add a provider key or use Tanzu", to: "/settings", done: hasProvider },
+      {
+        key: "provider",
+        label: "Add a provider key or use Tanzu",
+        to: "/settings",
+        done: hasProvider,
+      },
       { key: "voice", label: "Set up Your Voice", to: "/voice", done: hasVoice },
-      { key: "draft", label: "Write your first piece", to: "/compose", done: (drafts?.length ?? 0) > 0 },
+      {
+        key: "draft",
+        label: "Write your first piece",
+        to: "/compose",
+        done: (drafts?.length ?? 0) > 0,
+      },
     ],
     [hasProvider, hasVoice, drafts],
   );
 
-  const showOnboarding =
-    !onboardingDismissed && onboardingSteps.some((s) => !s.done);
+  const showOnboarding = !onboardingDismissed && onboardingSteps.some((s) => !s.done);
 
   const dismissOnboarding = useCallback(() => {
     localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
@@ -282,7 +300,6 @@ export function DraftsPage(): JSX.Element {
           </div>
         )}
       </section>
-
     </div>
   );
 }
@@ -356,6 +373,7 @@ function DraftRow({
               )}
               <span className="text-xs text-muted-2">· {updated}</span>
             </div>
+            <DraftHealthBadges draftId={draft.id} stage={draft.stage} />
           </Link>
           <TagEditor tags={draft.tags} onChange={onTagsChange} />
         </div>
