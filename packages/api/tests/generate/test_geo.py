@@ -2,8 +2,10 @@ from uuid import uuid4
 
 from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.generate.geo import (
+    augment_definitional,
     build_report,
     clean_opener,
+    detect_duplicate_opening,
     parse_faq,
     parse_semantic,
     score_structural,
@@ -81,18 +83,39 @@ def test_parse_semantic_maps_weak_sections_to_ids() -> None:
     d = _draft([intro])
     raw = (
         '{"answer_first": {"score": 55, "note": "buries answers", "weak_sections": ["Intro"]},'
-        '"definitional_opener": {"score": 40, "note": "no opener"},'
+        '"definitional_opener": {"score": 40, "note": "no opener", "has_definition": false},'
         '"factual_density": {"score": 30, "note": "vague", "thin_spots": ['
         '{"target": "It is fast.", "note": "add a benchmark"}]}}'
     )
     levers = parse_semantic(raw, d)
     assert levers["answer_first"]["fix"] == "answer_first"
     assert levers["answer_first"]["findings"][0]["section_id"] == intro.id
-    # Low definitional score offers the fix.
+    # Low score AND no existing definition → offer to add one.
     assert levers["definitional_opener"]["fix"] == "definitional"
     # Factual density is flag-only — never a fix.
     assert levers["factual_density"]["fix"] is None
     assert levers["factual_density"]["findings"][0]["target"] == "It is fast."
+
+
+def test_low_definitional_score_with_existing_definition_never_offers_add() -> None:
+    """The 45-score live case: a definition EXISTS but is duplicated/badly
+    placed. Offering "Add" here is what created the duplicate — execution
+    problems get targeted fixes, never another insertion."""
+    d = _draft([_sec("Intro", "x")])
+    raw = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 45, "note": "exists but duplicated", '
+        '"has_definition": true},'
+        '"factual_density": {"score": 80, "note": "ok"}}'
+    )
+    assert parse_semantic(raw, d)["definitional_opener"]["fix"] is None
+    # Missing field defaults to "exists" — never risk a duplicate add.
+    raw_missing = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 40, "note": "meh"},'
+        '"factual_density": {"score": 80, "note": "ok"}}'
+    )
+    assert parse_semantic(raw_missing, d)["definitional_opener"]["fix"] is None
 
 
 def test_parse_semantic_tolerates_junk() -> None:
@@ -104,9 +127,18 @@ def test_parse_semantic_tolerates_junk() -> None:
 
 def test_build_report_weights_and_grades() -> None:
     # All levers at 100 → score 100 → grade A.
-    perfect = {k: {"key": k, "label": k, "score": 100, "detail": "", "findings": [], "fix": None}
-               for k in ("answer_first", "factual_density", "definitional_opener",
-                         "question_headings", "skimmability", "faq", "chunking")}
+    perfect = {
+        k: {"key": k, "label": k, "score": 100, "detail": "", "findings": [], "fix": None}
+        for k in (
+            "answer_first",
+            "factual_density",
+            "definitional_opener",
+            "question_headings",
+            "skimmability",
+            "faq",
+            "chunking",
+        )
+    }
     report = build_report(perfect)
     assert report["score"] == 100
     assert report["grade"] == "A"
@@ -134,6 +166,67 @@ def test_clean_opener_strips_noise() -> None:
     )
     assert clean_opener("## Heading style") == "Heading style"
     assert clean_opener("   \n") == ""
+
+
+OPENER_SENT = "BlogForge is a drafting tool that keeps your voice."
+
+
+def test_detect_duplicate_opening_back_to_back() -> None:
+    content = f"{OPENER_SENT}\n\n{OPENER_SENT}\n\nThen the real body starts."
+    block = detect_duplicate_opening(content)
+    assert block is not None
+    assert block.count("BlogForge is a drafting tool") == 2
+    assert "real body" not in block
+
+
+def test_detect_duplicate_opening_tolerates_quote_glyphs() -> None:
+    # First copy straight-quoted, second curly-quoted — still a duplicate.
+    content = f'"{OPENER_SENT}" “{OPENER_SENT}” More text follows here.'
+    assert detect_duplicate_opening(content) is not None
+
+
+def test_detect_duplicate_opening_clean_content() -> None:
+    assert detect_duplicate_opening("One sentence. A different second sentence.") is None
+    assert detect_duplicate_opening("Only one sentence here.") is None
+    assert detect_duplicate_opening("") is None
+
+
+def test_augment_definitional_injects_dedupe_finding_and_caps_score() -> None:
+    first = _sec("Intro", f"{OPENER_SENT} {OPENER_SENT} Then more.")
+    d = _draft([first])
+    levers = {
+        "definitional_opener": {
+            "key": "definitional_opener",
+            "label": "Definitional opener",
+            "score": 90,
+            "detail": "",
+            "findings": [],
+            "fix": None,
+        }
+    }
+    augment_definitional(levers, d)
+    lever = levers["definitional_opener"]
+    assert lever["score"] == 45
+    assert lever["findings"][0]["fix"] == "dedupe_opening"
+    assert lever["findings"][0]["section_id"] == first.id
+    assert OPENER_SENT in lever["findings"][0]["target"]
+
+
+def test_augment_definitional_noop_when_clean() -> None:
+    d = _draft([_sec("Intro", "A clean opening. Followed by different prose.")])
+    levers = {
+        "definitional_opener": {
+            "key": "definitional_opener",
+            "label": "Definitional opener",
+            "score": 90,
+            "detail": "",
+            "findings": [],
+            "fix": None,
+        }
+    }
+    augment_definitional(levers, d)
+    assert levers["definitional_opener"]["score"] == 90
+    assert levers["definitional_opener"]["findings"] == []
 
 
 def test_parse_faq() -> None:

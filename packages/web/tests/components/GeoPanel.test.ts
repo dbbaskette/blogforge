@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   type Additions,
   carveProtectedAdditions,
+  dedupeOpeningBlock,
+  openerPresence,
   stripDuplicateTitleHeading,
 } from "../../src/components/draft/GeoPanel";
 
@@ -92,5 +94,38 @@ describe("stripDuplicateTitleHeading", () => {
     const { rest, removed } = stripDuplicateTitleHeading(TITLE, content);
     expect(removed).toBe("");
     expect(rest).toBe(content);
+  });
+});
+
+describe("openerPresence", () => {
+  it("detects a verbatim opener already in the content", () => {
+    expect(openerPresence(OPENER, `${OPENER}\n\nMore body.`)).toBe("exact");
+  });
+
+  it("detects an equivalent opener despite quote glyphs and case", () => {
+    const content = `“blogforge IS a drafting tool that keeps your voice.”\n\nMore body.`;
+    expect(openerPresence(OPENER, content)).toBe("similar");
+  });
+
+  it("returns null when no equivalent opener exists near the top", () => {
+    expect(openerPresence(OPENER, "A totally different opening line.\n\nBody.")).toBeNull();
+    expect(openerPresence("", "anything")).toBeNull();
+  });
+});
+
+describe("dedupeOpeningBlock", () => {
+  it("keeps only the first copy of a duplicated block", () => {
+    const block = `${OPENER} ${OPENER}`;
+    expect(dedupeOpeningBlock(block)).toBe(OPENER);
+  });
+
+  it("keeps the first copy's closing quote", () => {
+    const quoted = `“${OPENER}”`;
+    const block = `${quoted}\n\n${quoted}`;
+    expect(dedupeOpeningBlock(block)).toBe(quoted);
+  });
+
+  it("returns a single-sentence block unchanged", () => {
+    expect(dedupeOpeningBlock(OPENER)).toBe(OPENER);
   });
 });
