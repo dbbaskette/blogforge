@@ -8,7 +8,14 @@ vi.mock("react-router-dom", async (orig) => ({
   useNavigate: () => navigate,
 }));
 vi.mock("../../../src/api/drafts", () => ({
-  createDraft: vi.fn().mockResolvedValue({ id: "d1", title: "", stage: "research", idea: {}, sections: [], outline: null }),
+  createDraft: vi.fn().mockResolvedValue({
+    id: "d1",
+    title: "",
+    stage: "research",
+    idea: {},
+    sections: [],
+    outline: null,
+  }),
   updateDraft: vi.fn().mockResolvedValue({}),
   expandSections: vi.fn().mockResolvedValue({ job_id: "j1" }),
   generateOutline: vi.fn().mockResolvedValue({}),
@@ -17,7 +24,9 @@ vi.mock("../../../src/api/templates", () => ({
   listTemplates: vi.fn().mockResolvedValue([]),
   deleteTemplate: vi.fn(),
 }));
-vi.mock("../../../src/api/voice", () => ({ getVoiceProfile: vi.fn().mockResolvedValue({ name: "Dan" }) }));
+vi.mock("../../../src/api/voice", () => ({
+  getVoiceProfile: vi.fn().mockResolvedValue({ name: "Dan" }),
+}));
 vi.mock("../../../src/api/packs", () => ({
   listPacks: vi.fn().mockResolvedValue([{ slug: "house", valid: true }]),
   getManifest: vi.fn().mockResolvedValue({ formats: [] }),
@@ -30,10 +39,18 @@ vi.mock("../../../src/api/providers", () => ({
 import { createDraft, expandSections, generateOutline, updateDraft } from "../../../src/api/drafts";
 import { ComposeStudio } from "../../../src/components/compose/ComposeStudio";
 
-const renderStudio = () => render(<MemoryRouter><ComposeStudio /></MemoryRouter>);
+const renderStudio = () =>
+  render(
+    <MemoryRouter>
+      <ComposeStudio />
+    </MemoryRouter>,
+  );
 
 describe("ComposeStudio", () => {
-  beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
 
   it("shows the four modes", () => {
     renderStudio();
@@ -41,6 +58,19 @@ describe("ComposeStudio", () => {
     expect(screen.getByText(/Help me shape it/)).toBeInTheDocument();
     expect(screen.getByText(/Just write it/)).toBeInTheDocument();
     expect(screen.getByText(/Blank page/)).toBeInTheDocument();
+  });
+
+  it("badges the fastest mode and shows starters when no templates are saved", () => {
+    renderStudio();
+    expect(screen.getByText(/Fastest/i)).toBeInTheDocument();
+    expect(screen.getByText(/not sure where to start/i)).toBeInTheDocument();
+    expect(screen.getByText(/How-to guide/i)).toBeInTheDocument();
+  });
+
+  it("surfaces the setup summary once a model resolves", async () => {
+    renderStudio();
+    await waitFor(() => expect(screen.getByText(/Writing in/i)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /^Edit$/i })).toBeInTheDocument();
   });
 
   // The pre-flight guard disables the run buttons until an available provider +
@@ -58,15 +88,22 @@ describe("ComposeStudio", () => {
   it("Outline-in parses, injects outline, expands, navigates", async () => {
     renderStudio();
     fireEvent.click(screen.getByText(/I have an outline/));
-    fireEvent.change(screen.getByLabelText(/your outline/i), { target: { value: "# T\n## One\n## Two" } });
+    fireEvent.change(screen.getByLabelText(/your outline/i), {
+      target: { value: "# T\n## One\n## Two" },
+    });
     const btn = screen.getByRole("button", { name: /write draft/i });
     await waitFor(() => expect(btn).toBeEnabled());
     fireEvent.click(btn);
     await waitFor(() => expect(expandSections).toHaveBeenCalledWith("d1"));
     expect(createDraft).toHaveBeenCalled();
-    expect(updateDraft).toHaveBeenCalledWith("d1", expect.objectContaining({
-      outline: expect.objectContaining({ sections: expect.arrayContaining([expect.objectContaining({ title: "One" })]) }),
-    }));
+    expect(updateDraft).toHaveBeenCalledWith(
+      "d1",
+      expect.objectContaining({
+        outline: expect.objectContaining({
+          sections: expect.arrayContaining([expect.objectContaining({ title: "One" })]),
+        }),
+      }),
+    );
     expect(navigate).toHaveBeenCalledWith("/drafts/d1");
   });
 

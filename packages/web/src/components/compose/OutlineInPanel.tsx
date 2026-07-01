@@ -16,12 +16,31 @@ export function OutlineInPanel({
   const parsed = parseOutline(outlineText);
   const sectionCount = parsed.sections.length;
 
+  const EXAMPLE =
+    "# Your post title\n" +
+    "## Set up the problem\n" +
+    "## The key idea\n" +
+    "## How it works in practice\n" +
+    "## What to watch out for\n" +
+    "## Conclusion";
+
   return (
     <>
       <div>
-        <label htmlFor="outline-text" className="nb-label">
-          Your outline
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="outline-text" className="nb-label">
+            Your outline
+          </label>
+          {outlineText.trim() === "" && (
+            <button
+              type="button"
+              className="text-xs text-cobalt-600 hover:text-cobalt-700 underline underline-offset-2"
+              onClick={() => onOutlineText(EXAMPLE)}
+            >
+              Insert example structure
+            </button>
+          )}
+        </div>
         <textarea
           id="outline-text"
           aria-label="Your outline"
@@ -38,7 +57,9 @@ export function OutlineInPanel({
           <p>Add a heading or bullet to see parsed sections.</p>
         ) : (
           <>
-            <p className="font-medium text-ink">Parsed · {sectionCount} section{sectionCount !== 1 ? "s" : ""}</p>
+            <p className="font-medium text-ink">
+              Parsed · {sectionCount} section{sectionCount !== 1 ? "s" : ""}
+            </p>
             <ul className="list-disc list-inside space-y-0.5">
               {parsed.sections.map((s, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: sections have no stable id here

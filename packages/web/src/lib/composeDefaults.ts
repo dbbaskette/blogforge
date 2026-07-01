@@ -38,3 +38,25 @@ export function saveDefaults(s: ComposeSettings): void {
     /* storage disabled — non-fatal */
   }
 }
+
+const MODE_KEY = "bf.compose.lastMode";
+const VALID_MODES = ["outline", "propose", "express", "blank"] as const;
+export type StoredMode = (typeof VALID_MODES)[number];
+
+/** The mode the writer last composed with, so returning users skip re-picking. */
+export function loadLastMode(): StoredMode | null {
+  try {
+    const raw = localStorage.getItem(MODE_KEY);
+    return VALID_MODES.includes(raw as StoredMode) ? (raw as StoredMode) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastMode(mode: StoredMode): void {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    /* storage disabled — non-fatal */
+  }
+}

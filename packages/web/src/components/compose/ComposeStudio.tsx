@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import {
   type IdeaInput,
@@ -11,14 +11,18 @@ import {
 } from "../../api/drafts";
 import { listProviderAvailability } from "../../api/providers";
 import { type Template, deleteTemplate, listTemplates } from "../../api/templates";
-import { loadDefaults, saveDefaults } from "../../lib/composeDefaults";
+import { loadDefaults, loadLastMode, saveDefaults, saveLastMode } from "../../lib/composeDefaults";
 import { parseOutline } from "../../lib/parseOutline";
 import { type ComposeSettings, SetupFields } from "../SetupFields";
 import { BlankPanel } from "./BlankPanel";
 import { ExpressPanel } from "./ExpressPanel";
+import { InlineKeySetup } from "./InlineKeySetup";
 import { type ComposeMode, ModePicker } from "./ModePicker";
 import { OutlineInPanel } from "./OutlineInPanel";
 import { ProposePanel } from "./ProposePanel";
+import { SetupSummary } from "./SetupSummary";
+import { SparkIdeas } from "./SparkIdeas";
+import { type Starter, StarterIdeas } from "./StarterIdeas";
 import { VoiceIndicator } from "./VoiceIndicator";
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -29,18 +33,28 @@ const PROVIDER_LABELS: Record<string, string> = {
   tanzu: "Tanzu",
 };
 
-function ideaFrom(settings: ComposeSettings, topic: string, bullets: string[] = [], notes = ""): IdeaInput {
+function ideaFrom(
+  settings: ComposeSettings,
+  topic: string,
+  bullets: string[] = [],
+  notes = "",
+): IdeaInput {
   return { topic, bullets, notes, ...settings };
 }
 
 export function ComposeStudio(): JSX.Element {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<ComposeMode | null>(null);
+  // Preselect the fastest mode (Express) for a running start, but honor the
+  // mode the writer last used so returning users skip re-picking.
+  const [mode, setMode] = useState<ComposeMode | null>(() => loadLastMode() ?? "express");
   const [settings, setSettings] = useState<ComposeSettings>(() => loadDefaults());
   const [topic, setTopic] = useState("");
   const [outlineText, setOutlineText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When a multi-step flow fails after the draft is created, offer a way into
+  // the half-built draft instead of stranding the writer on the compose page.
+  const [resumeDraftId, setResumeDraftId] = useState<string | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [bullets, setBullets] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
@@ -53,14 +67,30 @@ export function ComposeStudio(): JSX.Element {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  function refreshProviders(): void {
     listProviderAvailability()
       .then(setProviders)
       .catch(() => {});
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot on mount; refreshProviders is stable enough for this use
+  useEffect(() => {
+    refreshProviders();
   }, []);
 
   const canRun = !!settings.model && providers[settings.provider] === true;
+  const providersLoaded = Object.keys(providers).length > 0;
+  const hasAnyProvider = Object.values(providers).some(Boolean);
   const providerLabel = PROVIDER_LABELS[settings.provider] ?? settings.provider;
+
+  function applyStarter(s: Starter): void {
+    setMode(s.mode);
+    if (s.mode === "outline") {
+      setOutlineText(s.outline);
+    } else {
+      setTopic(s.topic);
+    }
+  }
 
   function applyTemplate(t: Template): void {
     setTopic(t.topic);
@@ -89,10 +119,12 @@ export function ComposeStudio(): JSX.Element {
   async function runBlank(): Promise<void> {
     setBusy(true);
     setError(null);
+    setResumeDraftId(null);
     try {
       const idea = ideaFrom(settings, topic.trim() || "Untitled", bullets, notes);
       const draft = await createDraft(idea);
       saveDefaults(settings);
+      saveLastMode("blank");
       navigate(`/drafts/${draft.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -110,9 +142,12 @@ export function ComposeStudio(): JSX.Element {
     }
     setBusy(true);
     setError(null);
+    setResumeDraftId(null);
+    let createdId: string | null = null;
     try {
       const idea = ideaFrom(settings, parsed.title || "Untitled", bullets, notes);
       const draft = await createDraft(idea);
+      createdId = draft.id;
       const outline: OutlineProposal = {
         opening_hook: "",
         sections: parsed.sections.map((s) => ({
@@ -133,9 +168,11 @@ export function ComposeStudio(): JSX.Element {
       await updateDraft(draft.id, withOutline);
       await expandSections(draft.id);
       saveDefaults(settings);
+      saveLastMode("outline");
       navigate(`/drafts/${draft.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      if (createdId) setResumeDraftId(createdId);
     } finally {
       setBusy(false);
     }
@@ -148,15 +185,20 @@ export function ComposeStudio(): JSX.Element {
   async function runExpress(): Promise<void> {
     setBusy(true);
     setError(null);
+    setResumeDraftId(null);
+    let createdId: string | null = null;
     try {
       const idea = ideaFrom(settings, topic.trim(), bullets, notes);
       const draft = await createDraft(idea);
+      createdId = draft.id;
       await generateOutline(draft.id);
       await expandSections(draft.id);
       saveDefaults(settings);
+      saveLastMode("express");
       navigate(`/drafts/${draft.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      if (createdId) setResumeDraftId(createdId);
     } finally {
       setBusy(false);
     }
@@ -169,14 +211,19 @@ export function ComposeStudio(): JSX.Element {
   async function runPropose(): Promise<void> {
     setBusy(true);
     setError(null);
+    setResumeDraftId(null);
+    let createdId: string | null = null;
     try {
       const idea = ideaFrom(settings, topic.trim(), bullets, notes);
       const draft = await createDraft(idea);
+      createdId = draft.id;
       await generateOutline(draft.id);
       saveDefaults(settings);
+      saveLastMode("propose");
       navigate(`/drafts/${draft.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      if (createdId) setResumeDraftId(createdId);
     } finally {
       setBusy(false);
     }
@@ -190,8 +237,8 @@ export function ComposeStudio(): JSX.Element {
         <VoiceIndicator />
       </div>
 
-      {/* Template chips */}
-      {templates.length > 0 && (
+      {/* Template chips, or curated starters for first-timers with none saved */}
+      {templates.length > 0 ? (
         <div>
           <p className="nb-label mb-2">Start from template</p>
           <div className="flex flex-wrap gap-2">
@@ -219,43 +266,74 @@ export function ComposeStudio(): JSX.Element {
             ))}
           </div>
         </div>
+      ) : (
+        <StarterIdeas onPick={applyStarter} />
       )}
 
       {/* Mode picker */}
       <ModePicker active={mode} onPick={setMode} />
 
-      {/* Chosen provider/model — visible even when Advanced is collapsed */}
-      {canRun && (
+      {/* Setup summary (canRun) surfaces the auto-picked voice/model/length with
+          a one-click Edit. When nothing is ready, offer the fix inline instead
+          of a dead-end: add a key right here if truly none, else point to
+          Advanced to pick a model. */}
+      {canRun ? (
+        <SetupSummary
+          settings={settings}
+          providerLabel={providerLabel}
+          onEdit={() => setAdvancedOpen(true)}
+        />
+      ) : providersLoaded && !hasAnyProvider ? (
+        <InlineKeySetup onSaved={refreshProviders} />
+      ) : providersLoaded ? (
         <p className="text-sm text-muted">
-          Writing with {providerLabel} · {settings.model}
+          Almost ready — pick a model under{" "}
+          <button
+            type="button"
+            className="text-cobalt-600 hover:text-cobalt-700 underline underline-offset-2"
+            onClick={() => setAdvancedOpen(true)}
+          >
+            Advanced
+          </button>
+          .
         </p>
-      )}
-
-      {/* Pre-flight guard: no usable provider/model resolved */}
-      {!canRun && (
-        <p
-          className="px-4 py-3 rounded text-sm"
-          style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-        >
-          No writing model is ready yet — add a key in{" "}
-          <Link to="/settings" className="underline">
-            Settings
-          </Link>{" "}
-          → Provider API keys, or choose one under Advanced.
-        </p>
-      )}
+      ) : null}
 
       {/* Active-mode panel */}
       {mode !== null && (
         <div className="glass-card p-4 space-y-3">
           {mode === "blank" && (
-            <BlankPanel topic={topic} onTopic={setTopic} onRun={runBlank} busy={busy} disabled={!canRun} />
+            <BlankPanel
+              topic={topic}
+              onTopic={setTopic}
+              onRun={runBlank}
+              busy={busy}
+              disabled={!canRun}
+            />
           )}
           {mode === "express" && (
-            <ExpressPanel topic={topic} onTopic={setTopic} onRun={runExpress} busy={busy} disabled={!canRun} />
+            <>
+              <ExpressPanel
+                topic={topic}
+                onTopic={setTopic}
+                onRun={runExpress}
+                busy={busy}
+                disabled={!canRun}
+              />
+              <SparkIdeas seed={topic} settings={settings} disabled={!canRun} onPick={setTopic} />
+            </>
           )}
           {mode === "propose" && (
-            <ProposePanel topic={topic} onTopic={setTopic} onRun={runPropose} busy={busy} disabled={!canRun} />
+            <>
+              <ProposePanel
+                topic={topic}
+                onTopic={setTopic}
+                onRun={runPropose}
+                busy={busy}
+                disabled={!canRun}
+              />
+              <SparkIdeas seed={topic} settings={settings} disabled={!canRun} onPick={setTopic} />
+            </>
           )}
           {mode === "outline" && (
             <OutlineInPanel
@@ -269,14 +347,24 @@ export function ComposeStudio(): JSX.Element {
         </div>
       )}
 
-      {/* Error banner */}
+      {/* Error banner — if a draft was created before the failure, offer a way
+          into it rather than stranding the writer here with a phantom draft. */}
       {error && (
-        <p
-          className="px-4 py-3 rounded text-sm"
+        <div
+          className="px-4 py-3 rounded text-sm space-y-2"
           style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
         >
-          {error}
-        </p>
+          <p>{error}</p>
+          {resumeDraftId && (
+            <button
+              type="button"
+              className="nb-btn text-sm"
+              onClick={() => navigate(`/drafts/${resumeDraftId}`)}
+            >
+              Continue to your draft →
+            </button>
+          )}
+        </div>
       )}
 
       {/* Advanced settings */}
