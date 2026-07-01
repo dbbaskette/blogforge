@@ -1,4 +1,24 @@
-from blogforge.generate.ingest import ingest_document
+from blogforge.generate.ingest import ingest_document, strip_heading_emphasis
+
+
+def test_strip_heading_emphasis() -> None:
+    assert strip_heading_emphasis("**ROTATE: Beyond static secrets**") == (
+        "ROTATE: Beyond static secrets"
+    )
+    assert strip_heading_emphasis("*Faster* is `still` safer") == "Faster is still safer"
+    # Stray/unbalanced markers (truncated heading) are dropped too.
+    assert strip_heading_emphasis("**Faster is Still Safer") == "Faster is Still Safer"
+    # snake_case is left alone.
+    assert strip_heading_emphasis("the get_user_id flag") == "the get_user_id flag"
+
+
+def test_ingest_strips_emphasis_from_headings() -> None:
+    md = "# **Faster is Still Safer**\n\n## **ROTATE: identity**\n\nBody with **bold** kept."
+    result = ingest_document(md)
+    assert result.title == "Faster is Still Safer"
+    assert result.sections[0].title == "ROTATE: identity"
+    # Body markdown is untouched — it renders as real bold in the editor.
+    assert "**bold**" in result.sections[0].content_md
 
 
 def test_h1_title_and_h2_sections() -> None:

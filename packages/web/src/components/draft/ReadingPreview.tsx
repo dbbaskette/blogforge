@@ -2,6 +2,7 @@ import { marked } from "marked";
 import { useMemo } from "react";
 
 import { type Draft, heroImageUrl } from "../../api/drafts";
+import { stripInlineEmphasis } from "../../lib/headingText";
 import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
@@ -27,10 +28,7 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
     [draft.sections],
   );
 
-  const totalWords = useMemo(
-    () => sections.reduce((acc, s) => acc + s.word_count, 0),
-    [sections],
-  );
+  const totalWords = useMemo(() => sections.reduce((acc, s) => acc + s.word_count, 0), [sections]);
   const readMinutes = Math.max(1, Math.ceil(totalWords / WORDS_PER_MINUTE));
 
   // Each section rendered once to HTML; memoized so re-renders don't re-parse.
@@ -43,7 +41,7 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
     [sections],
   );
 
-  const title = draft.title.trim() || "Untitled draft";
+  const title = stripInlineEmphasis(draft.title.trim()) || "Untitled draft";
 
   return (
     <div
