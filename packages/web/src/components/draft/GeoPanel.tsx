@@ -210,6 +210,10 @@ export function GeoPanel({
   // When the shown report came from cache (unchanged draft), this is when it
   // was originally scored — surfaced so the writer knows it isn't stale.
   const [cachedAt, setCachedAt] = useState<number | null>(null);
+  // "Add data" micro-flow: which factual-density finding has its input open,
+  // and the real fact the writer typed (never fabricated by the tool).
+  const [addingKey, setAddingKey] = useState<string | null>(null);
+  const [factText, setFactText] = useState("");
 
   const contentHash = useMemo(() => hashDraftContent(draft), [draft]);
 
@@ -488,6 +492,40 @@ export function GeoPanel({
     await onChange({ ...draft, sections: nextSections, outline: nextOutline });
   }
 
+  /** Weave a real, author-supplied fact into a flagged passage, in voice.
+   * The tool never invents the data — the writer provides it here. */
+  async function addData(key: string, target: string): Promise<void> {
+    const fact = factText.trim();
+    if (!fact) return;
+    const section = draft.sections.find((s) => s.content_md.includes(target));
+    if (!section) {
+      showNotice("That passage changed — re-analyze and try again.");
+      return;
+    }
+    setApplyingKey(key);
+    setNotice(null);
+    try {
+      const { text } = await inlineEdit(draft.id, {
+        text: target,
+        action: "custom",
+        instruction: `Weave this real, author-supplied fact into the passage naturally and in the author's voice. Do NOT change the passage's meaning and do NOT invent anything beyond the fact given. Fact to incorporate: "${fact}". Return only the rewritten passage.`,
+      });
+      const next = section.content_md.replace(target, text.trim());
+      await onSectionSave(section.id, next);
+      setUndoable((m) =>
+        new Map(m).set(key, { kind: "content", sectionId: section.id, prev: section.content_md }),
+      );
+      setAddingKey(null);
+      setFactText("");
+      setStale(true);
+      flashSection(section.id);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyingKey(null);
+    }
+  }
+
   async function undoRewrite(key: string): Promise<void> {
     const entry = undoable.get(key);
     if (!entry) return;
@@ -655,6 +693,64 @@ export function GeoPanel({
                             className="nb-btn nb-btn-ghost nb-btn-sm"
                           >
                             {applying ? "Applying…" : REWRITE_LABEL[f.fix as string]}
+                          </button>
+                        ))}
+
+                      {/* Factual density: you supply the real data, the tool
+                          weaves it in — it never invents a number or source. */}
+                      {lever.key === "factual_density" &&
+                        f.target &&
+                        (undone ? (
+                          <button
+                            type="button"
+                            disabled={applying}
+                            onClick={() => undoRewrite(key)}
+                            className="nb-btn nb-btn-ghost nb-btn-sm"
+                          >
+                            {applying ? "Undoing…" : "↩ Undo"}
+                          </button>
+                        ) : addingKey === key ? (
+                          <div className="space-y-1.5">
+                            <textarea
+                              className="nb-input w-full text-sm min-h-[3.5rem]"
+                              placeholder="Paste the real stat, quote, or source — e.g. “40% fewer incidents (2026 internal audit, n=312)”"
+                              value={factText}
+                              onChange={(e) => setFactText(e.target.value)}
+                              // biome-ignore lint/a11y/noAutofocus: focus the input the writer just opened
+                              autoFocus
+                            />
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                disabled={applying || !factText.trim()}
+                                onClick={() => addData(key, f.target as string)}
+                                className="nb-btn nb-btn-primary nb-btn-sm"
+                              >
+                                {applying ? "Weaving in…" : "Weave in"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={applying}
+                                onClick={() => {
+                                  setAddingKey(null);
+                                  setFactText("");
+                                }}
+                                className="nb-btn nb-btn-ghost nb-btn-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddingKey(key);
+                              setFactText("");
+                            }}
+                            className="nb-btn nb-btn-ghost nb-btn-sm"
+                          >
+                            ＋ Add data
                           </button>
                         ))}
                     </div>
