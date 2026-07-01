@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { type Draft, inlineEdit } from "../../api/drafts";
 import {
@@ -7,6 +7,7 @@ import {
   type Suggestion,
   suggestImprovements,
 } from "../../api/suggest";
+import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
 const KIND_META: Record<SuggestKind, { icon: string; label: string; hint: string }> = {
@@ -48,24 +49,38 @@ export function ShapePanel({
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
+
+  const contentHash = useMemo(() => hashDraftContent(draft), [draft]);
 
   const run = useCallback(async (): Promise<void> => {
     setBusy(true);
     setError(null);
     setNotice(null);
+    setCachedAt(null);
     try {
-      setResult(await suggestImprovements(draft.id));
+      const fresh = await suggestImprovements(draft.id);
+      setResult(fresh);
+      setCached("shape", draft.id, hashDraftContent(draft), fresh);
       setDismissed(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }, [draft.id]);
+  }, [draft]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount when auto-offered
+  // On open: reuse the last result if the draft is unchanged (even when not
+  // auto-offered); otherwise auto-run only when offered. Re-run bypasses cache.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
-    if (autoRun) run();
+    const hit = getCached<SuggestResult>("shape", draft.id, contentHash);
+    if (hit) {
+      setResult(hit.data);
+      setCachedAt(hit.at);
+    } else if (autoRun) {
+      run();
+    }
   }, []);
 
   const dismiss = (key: string): void => setDismissed((p) => new Set(p).add(key));
@@ -164,6 +179,11 @@ export function ShapePanel({
         <h2 className="mt-1 font-serif text-2xl font-medium text-ink tracking-tight">
           Shape your draft {total > 0 && <span className="text-cobalt-600">· {total}</span>}
         </h2>
+        {cachedAt !== null && !busy && (
+          <p className="mt-1 text-xs text-muted-2">
+            Suggested {formatAgo(cachedAt)} · draft unchanged since
+          </p>
+        )}
       </header>
 
       {error && (
