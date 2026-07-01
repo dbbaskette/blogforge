@@ -5,6 +5,7 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { stripInlineEmphasis } from "../../lib/headingText";
 import { CheckupPanel } from "./CheckupPanel";
 import { GeoPanel } from "./GeoPanel";
 import { HeadlineLab } from "./HeadlineLab";
@@ -174,9 +175,12 @@ export function DraftWorkspace({
 
   // ── Local editable state for research / outline, debounced into onChange. ──
   const [advancing, setAdvancing] = useState(false);
-  const [topic, setTopic] = useState(draft.title);
+  // Strip stray markdown emphasis (e.g. a pasted "# **Title**") from the
+  // editable title so it never shows literal ** — and the clean form persists
+  // on the next debounced save.
+  const [topic, setTopic] = useState(() => stripInlineEmphasis(draft.title));
 
-  useEffect(() => setTopic(draft.title), [draft.title]);
+  useEffect(() => setTopic(stripInlineEmphasis(draft.title)), [draft.title]);
 
   // Build the next draft from a partial research/idea or outline patch, then push it.
   const handleIdeaChange = useCallback(

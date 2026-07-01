@@ -1,4 +1,5 @@
 import type { Draft, Section } from "../../api/drafts";
+import { stripInlineEmphasis } from "../../lib/headingText";
 
 interface OutlineSidebarProps {
   draft: Draft;
@@ -55,7 +56,9 @@ export function OutlineSidebar({
                 {String(i + 1).padStart(2, "0")}
               </span>
               <StatusIcon status={s.status} />
-              <span className="text-[13px] truncate leading-tight">{s.title}</span>
+              <span className="text-[13px] truncate leading-tight">
+                {stripInlineEmphasis(s.title)}
+              </span>
               <span className="font-mono text-[10px] text-muted-2">
                 {s.words > 0 ? `${s.words}w` : "—"}
               </span>
