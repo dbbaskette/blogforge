@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { type Draft, inlineEdit } from "../../api/drafts";
 import {
@@ -9,6 +9,7 @@ import {
   generateFaq,
   generateOpener,
 } from "../../api/geo";
+import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
 function gradeColor(grade: string): { bg: string; fg: string; bd: string } {
@@ -206,6 +207,11 @@ export function GeoPanel({
   // Persistent additions (opener / FAQ) → Remove buttons.
   const [additions, setAdditions] = useState<Additions>(() => loadAdditions(draft.id));
   const [stale, setStale] = useState(false);
+  // When the shown report came from cache (unchanged draft), this is when it
+  // was originally scored — surfaced so the writer knows it isn't stale.
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
+
+  const contentHash = useMemo(() => hashDraftContent(draft), [draft]);
 
   // A notice the writer can't miss: surface it at the top and scroll there.
   const showNotice = useCallback(
@@ -220,8 +226,11 @@ export function GeoPanel({
     setBusy(true);
     setError(null);
     setNotice(null);
+    setCachedAt(null);
     try {
-      setReport(await analyzeGeo(draft.id));
+      const fresh = await analyzeGeo(draft.id);
+      setReport(fresh);
+      setCached("geo", draft.id, hashDraftContent(draft), fresh);
       setUndoable(new Map());
       setHidden(new Set());
       setStale(false);
@@ -230,11 +239,19 @@ export function GeoPanel({
     } finally {
       setBusy(false);
     }
-  }, [draft.id]);
+  }, [draft]);
 
+  // On open: show the last result instantly if the draft hasn't changed since;
+  // otherwise run a fresh scan. Re-analyze always bypasses the cache.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
-    run();
+    const hit = getCached<GeoReport>("geo", draft.id, contentHash);
+    if (hit) {
+      setReport(hit.data);
+      setCachedAt(hit.at);
+    } else {
+      run();
+    }
   }, []);
 
   // Drop stored additions whose text is no longer present (manually edited away).
@@ -540,6 +557,11 @@ export function GeoPanel({
             </span>
           </p>
         </div>
+        {cachedAt !== null && !busy && (
+          <p className="mt-1.5 text-xs text-muted-2">
+            Scored {formatAgo(cachedAt)} · draft unchanged since
+          </p>
+        )}
       </header>
 
       {error && (
