@@ -152,6 +152,37 @@ const DOWNLOAD_OPTIONS: { label: string; opts: Parameters<typeof downloadDraftUr
 
 function DownloadMenu({ draftId }: { draftId: string }): JSX.Element {
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch → blob instead of a bare <a href>: a failed export (expired session,
+  // server hiccup) used to silently save the JSON error body as
+  // "download.json". Now failures surface as a message and save nothing.
+  const download = async (opts: Parameters<typeof downloadDraftUrl>[1]): Promise<void> => {
+    setError(null);
+    setOpen(false);
+    try {
+      const res = await fetch(downloadDraftUrl(draftId, opts), { credentials: "include" });
+      if (!res.ok) {
+        throw new Error(
+          res.status === 401
+            ? "Session expired — sign in again, then retry."
+            : `Export failed (HTTP ${res.status}).`,
+        );
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const name = /filename="([^"]+)"/.exec(cd)?.[1] ?? `post.${opts?.format ?? "md"}`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setTimeout(() => setError(null), 5000);
+    }
+  };
 
   return (
     <div className="relative">
@@ -167,15 +198,14 @@ function DownloadMenu({ draftId }: { draftId: string }): JSX.Element {
           />
           <div className="absolute bottom-full right-0 mb-2 z-10 w-52 nb-card shadow-nb-pop py-1.5 animate-fade-in">
             {DOWNLOAD_OPTIONS.map((o) => (
-              <a
+              <button
                 key={o.label}
-                href={downloadDraftUrl(draftId, o.opts)}
-                download
-                onClick={() => setOpen(false)}
-                className="block px-4 py-1.5 text-sm text-ink hover:bg-card-2 no-underline"
+                type="button"
+                onClick={() => download(o.opts)}
+                className="block w-full text-left px-4 py-1.5 text-sm text-ink hover:bg-card-2"
               >
                 {o.label}
-              </a>
+              </button>
             ))}
           </div>
         </>
@@ -186,7 +216,7 @@ function DownloadMenu({ draftId }: { draftId: string }): JSX.Element {
         aria-expanded={open}
         className="nb-btn nb-btn-sm"
       >
-        Download ▾
+        {error ?? "Download ▾"}
       </button>
     </div>
   );

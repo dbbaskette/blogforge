@@ -76,6 +76,11 @@ _BACKREF_RE = re.compile(
     r"(?:above|earlier|previously|below)\b|\bin the (?:previous|next|preceding) section\b"
 )
 _FAQ_TITLE_RE = re.compile(r"(?i)\b(faqs?|frequently asked|common questions|q ?& ?a|q and a)\b")
+# FAQ appended inside a section (the GEO fix adds "### FAQ" to the last section
+# rather than spawning a new section card).
+_FAQ_CONTENT_RE = re.compile(
+    r"(?im)^#{2,4}\s*(faqs?|frequently asked|common questions|q ?& ?a|q and a)\b"
+)
 
 _LONG_PARA_CHARS = 700
 _LONG_SECTION_WORDS = 400
@@ -128,7 +133,11 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     q = sum(1 for s in sections if _is_question(s.title))
     share = q / n
     qh_findings = [
-        {"section_id": s.id, "note": f'Heading "{s.title}" isn\'t phrased as a question.'}
+        {
+            "section_id": s.id,
+            "note": f'Heading "{s.title}" isn\'t phrased as a question.',
+            "fix": "question_heading",
+        }
         for s in sections
         if not _is_question(s.title)
     ]
@@ -163,14 +172,17 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         findings=[
             {
                 "section_id": s.id,
-                "note": f'"{s.title}" is a dense block — consider bullets or a table.',
+                "note": f'"{s.title}" is a dense block — break it into bullets or a table.',
+                "fix": "bullets",
             }
             for s in walls
         ],
     )
 
-    # FAQ presence.
-    has_faq = any(_FAQ_TITLE_RE.search(s.title) for s in sections)
+    # FAQ presence — as a section title OR an in-section heading.
+    has_faq = any(
+        _FAQ_TITLE_RE.search(s.title) or _FAQ_CONTENT_RE.search(s.content_md) for s in sections
+    )
     faq = _lever(
         "faq",
         100 if has_faq else 30,
@@ -185,13 +197,18 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     for s in sections:
         for m in _BACKREF_RE.finditer(s.content_md):
             backrefs.append(
-                {"section_id": s.id, "note": f'"{m.group(0)}" breaks the passage out of context.'}
+                {
+                    "section_id": s.id,
+                    "note": f'"{m.group(0)}" breaks the passage out of context.',
+                    "fix": "self_contained",
+                }
             )
     longsecs = [s for s in sections if s.word_count > _LONG_SECTION_WORDS]
     ch_findings = backrefs + [
         {
             "section_id": s.id,
-            "note": f'"{s.title}" is long ({s.word_count} words) — split for cleaner chunks.',
+            "note": f'"{s.title}" is long ({s.word_count} words) — split it into two sections '
+            "with their own headings so each chunk stands alone.",
         }
         for s in longsecs
     ]
@@ -238,7 +255,11 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "properties": {"target": {"type": "string"}, "note": {"type": "string"}},
+                        "properties": {
+                            "target": {"type": "string"},
+                            "note": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                        },
                         "required": ["target"],
                     },
                 },
@@ -259,8 +280,11 @@ _SEMANTIC_DIRECTIVE = (
     "definition of its subject/thesis?\n"
     "3) factual_density: does it use specific statistics, named sources, and quotes "
     "rather than vague claims? In `thin_spots`, quote vague passages that WOULD be "
-    "stronger with real data and say what kind of data. You CANNOT invent facts — "
-    "never supply statistics or sources, only flag where the author should add them."
+    "stronger with real data; in `note` name the problem, and in `suggestion` say "
+    "concretely WHAT KIND of data the author should add and where they'd find it "
+    '(e.g. "Add your actual deployment count or a p95 latency benchmark from your '
+    'monitoring"). You CANNOT invent facts — never supply statistics or sources, '
+    "only describe what to add."
 )
 
 
@@ -293,6 +317,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
             {
                 "section_id": sid or "",
                 "note": f'"{title}" buries its answer — lead with a direct one.',
+                "fix": "answer_first" if sid else "",
             }
         )
     answer_first = _lever(
@@ -322,6 +347,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
             "target": str(t.get("target", "")).strip(),
             "note": str(t.get("note", "")).strip()
             or "Add a real statistic, source, or quote here.",
+            "suggestion": str(t.get("suggestion", "")).strip(),
         }
         for t in thin
         if isinstance(t, dict) and str(t.get("target", "")).strip()
@@ -444,3 +470,38 @@ async def generate_faq(
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_FAQ_SCHEMA)
     return parse_faq(resp.text, n)
+
+
+def clean_opener(raw: str) -> str:
+    """Reduce the model's reply to one plain sentence: strip quotes/headings and
+    keep only the first line with content."""
+    line = next((ln.strip() for ln in raw.strip().splitlines() if ln.strip()), "")
+    return line.strip("\"'`“”").lstrip("#").strip()
+
+
+async def generate_opener(
+    draft: Draft,
+    pack_root: Path,
+    manifest: dict[str, Any],
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> str:
+    """One citable definitional sentence for the top of the post, in voice.
+
+    Generated from the draft itself (not spliced by rewriting a whole section),
+    so the client can prepend it verbatim — and remove exactly it on undo.
+    """
+    from blogforge.voice import compose_prompt
+
+    system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    prompt = (
+        f"{system}\n\n---\n\nWrite ONE citable opening sentence for this post that "
+        "defines its subject: what it is, what category it belongs to, and what it "
+        'does or argues — the pattern "<Subject> is a <category> that <differentiator>", '
+        "adapted naturally to the author's voice. Ground it in the draft; invent "
+        "nothing. Return ONLY the sentence — no quotes, no heading, no explanation.\n\n"
+        f"DRAFT:\n{_draft_text(draft)}"
+    )
+    resp = await provider.complete(model=model, prompt=prompt)
+    return clean_opener(resp.text)

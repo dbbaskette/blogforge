@@ -61,15 +61,39 @@ describe("WorkspaceFooter", () => {
     expect(baseProps.onGeo).toHaveBeenCalled();
   });
 
-  it("opens a menu with every export format", () => {
+  it("opens a menu with every export format and fetches the right URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'attachment; filename="post.md"' },
+      blob: async () => new Blob(["# hi"]),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    URL.createObjectURL = vi.fn().mockReturnValue("blob:x");
+    URL.revokeObjectURL = vi.fn();
+
     render(<WorkspaceFooter {...baseProps} />);
     fireEvent.click(screen.getByRole("button", { name: /download/i }));
-    const html = screen.getByRole("link", { name: /web page \(\.html\)/i });
-    const docx = screen.getByRole("link", { name: /word \(\.docx\)/i });
-    expect(screen.getByRole("link", { name: /^markdown \(\.md\)/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /frontmatter/i })).toBeInTheDocument();
-    expect(html).toHaveAttribute("href", expect.stringContaining("format=html"));
-    expect(docx).toHaveAttribute("href", expect.stringContaining("format=docx"));
+    expect(screen.getByRole("button", { name: /web page \(\.html\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /word \(\.docx\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /frontmatter/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^markdown \(\.md\)/i }));
+    await vi.waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/drafts/d1/download?format=md"),
+        expect.objectContaining({ credentials: "include" }),
+      ),
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("shows an error instead of downloading when the export fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }));
+    render(<WorkspaceFooter {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^markdown \(\.md\)/i }));
+    await vi.waitFor(() => expect(screen.getByText(/session expired/i)).toBeInTheDocument());
+    vi.unstubAllGlobals();
   });
 
   it("shows the word + drafted-count stats", () => {

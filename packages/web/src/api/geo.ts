@@ -2,10 +2,16 @@ import { api } from "./client";
 
 export type GeoFix = "answer_first" | "question_heading" | "definitional" | "faq" | null;
 
+/** Per-finding one-click action (server-tagged). */
+export type GeoFindingFix = "answer_first" | "question_heading" | "bullets" | "self_contained";
+
 export interface GeoFinding {
   section_id?: string;
   target?: string;
   note: string;
+  /** For factual density: WHAT real data to add (never invented values). */
+  suggestion?: string;
+  fix?: GeoFindingFix | "";
 }
 
 export interface GeoLever {
@@ -40,4 +46,16 @@ export async function generateFaq(draftId: string, n = 4): Promise<FaqItem[]> {
     { method: "POST", body: JSON.stringify({ n }) },
   );
   return faqs;
+}
+
+/**
+ * One citable definitional sentence generated from the draft. The client
+ * prepends it verbatim — and can remove exactly it on undo.
+ */
+export async function generateOpener(draftId: string): Promise<string> {
+  const { opener } = await api<{ opener: string }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/opener`,
+    { method: "POST" },
+  );
+  return opener;
 }

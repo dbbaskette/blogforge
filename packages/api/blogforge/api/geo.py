@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
-from blogforge.generate.geo import analyze_geo, generate_faq
+from blogforge.generate.geo import analyze_geo, generate_faq, generate_opener
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.compose import ComposeError
@@ -88,3 +88,26 @@ async def geo_faq(
     except (ProviderMissingKey, ProviderError, ComposeError) as e:
         raise _provider_error(e) from e
     return {"faqs": faqs}
+
+
+@router.post("/api/drafts/{draft_id}/geo/opener")
+async def geo_opener(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """One citable definitional sentence, generated from the draft — the client
+    prepends it verbatim so it can also be removed verbatim (undo)."""
+    draft, pack_root, manifest, provider = await _load(request, draft_id, current)
+    try:
+        opener = await generate_opener(draft, pack_root, manifest, provider, model=draft.idea.model)
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    if not opener:
+        raise HTTPException(
+            502,
+            detail={
+                "error": {"code": "empty_opener", "message": "No opener came back — try again."}
+            },
+        )
+    return {"opener": opener}
