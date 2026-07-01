@@ -27,6 +27,7 @@ const baseProps = {
   onHeadlines: vi.fn(),
   onShape: vi.fn(),
   onGeo: vi.fn(),
+  onCheckup: vi.fn(),
 };
 
 beforeEach(() => {
@@ -36,17 +37,21 @@ beforeEach(() => {
 });
 
 describe("WorkspaceFooter", () => {
-  it("shows the grouped menus + Preview + Review, and fires onLint", () => {
+  it("shows the grouped menus + Preview + Checkup, and fires onCheckup", () => {
     render(<WorkspaceFooter {...baseProps} />);
     expect(screen.getByRole("button", { name: /improve/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /export/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^preview$/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^review$/i }));
-    expect(baseProps.onLint).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /checkup/i }));
+    expect(baseProps.onCheckup).toHaveBeenCalled();
   });
 
-  it("Improve menu opens the Shape / GEO / Headlines panels", () => {
+  it("Improve menu opens Proofread / Shape / GEO / Headlines", () => {
     render(<WorkspaceFooter {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
+    fireEvent.click(screen.getByRole("button", { name: /proofread/i }));
+    expect(baseProps.onLint).toHaveBeenCalled();
+
     fireEvent.click(screen.getByRole("button", { name: /improve/i }));
     fireEvent.click(screen.getByRole("button", { name: /shape assistant/i }));
     expect(baseProps.onShape).toHaveBeenCalled();

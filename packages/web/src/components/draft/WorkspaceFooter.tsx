@@ -15,6 +15,7 @@ interface WorkspaceFooterProps {
   onHeadlines: () => void;
   onShape: () => void;
   onGeo: () => void;
+  onCheckup: () => void;
   /**
    * Optional hook fired when the reading preview opens. The footer owns the
    * preview's open/close state locally (DraftWorkspace can't host it), so this
@@ -100,6 +101,7 @@ export function WorkspaceFooter({
   onHeadlines,
   onShape,
   onGeo,
+  onCheckup,
   onPreview,
 }: WorkspaceFooterProps): JSX.Element {
   const draftId = draft.id;
@@ -157,6 +159,11 @@ export function WorkspaceFooter({
   };
 
   const improveItems: MenuItem[] = [
+    {
+      label: "🔎 Proofread & fact-check",
+      hint: "Voice-rule violations, repetition, and AI-tells",
+      onClick: onLint,
+    },
     {
       label: "✨ Shape assistant",
       hint: "Claims worth verifying, sharper wordings, and where to expand",
@@ -222,11 +229,11 @@ export function WorkspaceFooter({
         </button>
         <button
           type="button"
-          onClick={onLint}
+          onClick={onCheckup}
           className="nb-btn nb-btn-primary nb-btn-sm"
-          title="Proofread and fact-check the draft"
+          title="Run Review + GEO + Shape together and see a prioritized summary"
         >
-          Review
+          ✨ Checkup
         </button>
       </footer>
       {previewOpen && <ReadingPreview draft={draft} onClose={() => setPreviewOpen(false)} />}
