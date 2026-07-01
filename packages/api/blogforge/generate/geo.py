@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from blogforge.drafts.models import Draft
+from blogforge.generate.textutil import strip_inline_emphasis
 from blogforge.llm.base import LLMProvider
 
 # Weights sum to 1.0; the two most-cited levers (answer-first, factual density)
@@ -104,7 +105,8 @@ def _lever(
 
 
 def _is_question(title: str) -> bool:
-    t = title.strip().lower()
+    # Strip emphasis first so a bold question heading (**How…?**) still counts.
+    t = strip_inline_emphasis(title).lower()
     if t.endswith("?"):
         return True
     first = t.split(" ", 1)[0] if t else ""
@@ -194,7 +196,7 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     qh_findings = [
         {
             "section_id": s.id,
-            "note": f'Heading "{s.title}" isn\'t phrased as a question.',
+            "note": f'Heading "{strip_inline_emphasis(s.title)}" isn\'t phrased as a question.',
             "fix": "question_heading",
         }
         for s in sections
@@ -234,8 +236,8 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
                 # The exact dense paragraph, so the fix bulletizes ONLY this
                 # block and splices it back — not the whole section.
                 "target": _longest_paragraph(s.content_md),
-                "note": f'This paragraph in "{s.title}" is dense — a lead-in line plus a few '
-                "bullets would read faster.",
+                "note": f'This paragraph in "{strip_inline_emphasis(s.title)}" is dense — a '
+                "lead-in line plus a few bullets would read faster.",
                 "fix": "bullets",
             }
             for s in walls
@@ -270,8 +272,8 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     ch_findings = backrefs + [
         {
             "section_id": s.id,
-            "note": f'"{s.title}" is long ({s.word_count} words) — split it into two sections '
-            "with their own headings so each chunk stands alone.",
+            "note": f'"{strip_inline_emphasis(s.title)}" is long ({s.word_count} words) — split it '
+            "into two sections with their own headings so each chunk stands alone.",
         }
         for s in longsecs
     ]
@@ -377,17 +379,23 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
     if not isinstance(data, dict):
         data = {}
 
-    by_title = {s.title.strip().lower(): s.id for s in draft.sections}
+    # Match on the emphasis-stripped, lowercased title so a stored "**ROTATE**"
+    # still resolves to the section when the model returns a clean "ROTATE".
+    def _key(t: str) -> str:
+        return strip_inline_emphasis(t).lower()
+
+    by_title = {_key(s.title): s.id for s in draft.sections}
 
     af = data.get("answer_first") if isinstance(data.get("answer_first"), dict) else {}
     weak = af.get("weak_sections") if isinstance(af.get("weak_sections"), list) else []
     af_findings = []
     for title in weak:
-        sid = by_title.get(str(title).strip().lower())
+        sid = by_title.get(_key(str(title)))
+        clean = strip_inline_emphasis(str(title))
         af_findings.append(
             {
                 "section_id": sid or "",
-                "note": f'"{title}" buries its answer — lead with a direct one.',
+                "note": f'"{clean}" buries its answer — lead with a direct one.',
                 "fix": "answer_first" if sid else "",
             }
         )
@@ -408,12 +416,21 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
     # badly placed/duplicated — inserting another one made duplicates. Missing
     # field (older/junk replies) defaults to True: never risk a duplicate add.
     has_definition = bool(do.get("has_definition", True))
+    # Low score → offer an action so the writer isn't stuck: ADD one if none
+    # exists, or IMPROVE (hoist the buried definition into a clean citable line)
+    # when one exists but is badly placed.
+    if do_score >= 70:
+        def_fix = None
+    elif has_definition:
+        def_fix = "definitional_improve"
+    else:
+        def_fix = "definitional"
     definitional = _lever(
         "definitional_opener",
         do_score,
         str(do.get("note", "")).strip()
         or "Whether a citable one-liner defines the subject up top.",
-        fix="definitional" if do_score < 70 and not has_definition else None,
+        fix=def_fix,
     )
 
     fd = data.get("factual_density") if isinstance(data.get("factual_density"), dict) else {}

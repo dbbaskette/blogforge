@@ -5,7 +5,7 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
-import { stripInlineEmphasis } from "../../lib/headingText";
+import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { CheckupPanel } from "./CheckupPanel";
 import { GeoPanel } from "./GeoPanel";
 import { HeadlineLab } from "./HeadlineLab";
@@ -175,12 +175,12 @@ export function DraftWorkspace({
 
   // ── Local editable state for research / outline, debounced into onChange. ──
   const [advancing, setAdvancing] = useState(false);
-  // Strip stray markdown emphasis (e.g. a pasted "# **Title**") from the
-  // editable title so it never shows literal ** — and the clean form persists
-  // on the next debounced save.
-  const [topic, setTopic] = useState(() => stripInlineEmphasis(draft.title));
+  const [titleEditing, setTitleEditing] = useState(false);
+  // The stored title keeps its markdown verbatim (so exports stay faithful);
+  // the heading RENDERS it, and editing works on the raw text.
+  const [topic, setTopic] = useState(draft.title);
 
-  useEffect(() => setTopic(stripInlineEmphasis(draft.title)), [draft.title]);
+  useEffect(() => setTopic(draft.title), [draft.title]);
 
   // Build the next draft from a partial research/idea or outline patch, then push it.
   const handleIdeaChange = useCallback(
@@ -337,15 +337,34 @@ export function DraftWorkspace({
 
         <StageNav draft={draft} onJump={onJumpStage} />
 
-        {/* Hero — editable title */}
+        {/* Hero — title renders its markdown (so a pasted "**Title**" shows
+            bold, not literal **) and switches to an input on click to edit. */}
         <header className="mb-6">
-          <input
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Untitled draft"
-            className="w-full bg-transparent border-0 px-0 py-1 font-serif text-3xl md:text-4xl font-medium text-ink leading-tight tracking-tight focus:outline-none placeholder:text-muted-2"
-            aria-label="Draft title"
-          />
+          {titleEditing ? (
+            <input
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onBlur={() => setTitleEditing(false)}
+              placeholder="Untitled draft"
+              // biome-ignore lint/a11y/noAutofocus: focus the field the writer just clicked
+              autoFocus
+              className="w-full bg-transparent border-0 px-0 py-1 font-serif text-3xl md:text-4xl font-medium text-ink leading-tight tracking-tight focus:outline-none placeholder:text-muted-2"
+              aria-label="Draft title"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setTitleEditing(true)}
+              className="block w-full text-left px-0 py-1 font-serif text-3xl md:text-4xl font-medium text-ink leading-tight tracking-tight hover:text-cobalt-700 transition-colors"
+              title="Click to edit the title"
+            >
+              {topic.trim() ? (
+                <InlineMarkdown text={topic} />
+              ) : (
+                <span className="text-muted-2">Untitled draft</span>
+              )}
+            </button>
+          )}
         </header>
 
         {/* Setup — collapsed unless we're at the research stage */}

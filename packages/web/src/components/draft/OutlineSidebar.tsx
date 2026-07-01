@@ -1,5 +1,5 @@
 import type { Draft, Section } from "../../api/drafts";
-import { stripInlineEmphasis } from "../../lib/headingText";
+import { InlineMarkdown } from "../ui/InlineMarkdown";
 
 interface OutlineSidebarProps {
   draft: Draft;
@@ -57,7 +57,7 @@ export function OutlineSidebar({
               </span>
               <StatusIcon status={s.status} />
               <span className="text-[13px] truncate leading-tight">
-                {stripInlineEmphasis(s.title)}
+                <InlineMarkdown text={s.title} />
               </span>
               <span className="font-mono text-[10px] text-muted-2">
                 {s.words > 0 ? `${s.words}w` : "—"}

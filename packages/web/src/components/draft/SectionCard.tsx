@@ -1,8 +1,8 @@
 import { useState } from "react";
 
 import type { Section } from "../../api/drafts";
-import { stripInlineEmphasis } from "../../lib/headingText";
 import { Icon } from "../ui/Icon";
+import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { SectionVersionHistory } from "./SectionVersionHistory";
 
@@ -137,7 +137,7 @@ export function SectionCard({
           </span>
           <div className="min-w-0">
             <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight">
-              {stripInlineEmphasis(section.title)}
+              <InlineMarkdown text={section.title} />
             </h3>
             <div className="mt-1.5 flex items-center gap-2 flex-wrap text-xs">
               <StatusPill status={displayStatus} />

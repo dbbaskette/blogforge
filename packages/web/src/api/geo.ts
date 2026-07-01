@@ -1,6 +1,12 @@
 import { api } from "./client";
 
-export type GeoFix = "answer_first" | "question_heading" | "definitional" | "faq" | null;
+export type GeoFix =
+  | "answer_first"
+  | "question_heading"
+  | "definitional"
+  | "definitional_improve"
+  | "faq"
+  | null;
 
 /** Per-finding one-click action (server-tagged). */
 export type GeoFindingFix =

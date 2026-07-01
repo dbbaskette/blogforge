@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type Draft, inlineEdit } from "../../api/drafts";
 import {
@@ -226,15 +226,21 @@ export function GeoPanel({
     [panelRef],
   );
 
+  // The content hash the shown report was computed for; when the draft drifts
+  // from this (a fix applied), the score auto-refreshes.
+  const reportHashRef = useRef<string | null>(null);
+
   const run = useCallback(async (): Promise<void> => {
     setBusy(true);
     setError(null);
     setNotice(null);
     setCachedAt(null);
     try {
+      const h = hashDraftContent(draft);
       const fresh = await analyzeGeo(draft.id);
       setReport(fresh);
-      setCached("geo", draft.id, hashDraftContent(draft), fresh);
+      setCached("geo", draft.id, h, fresh);
+      reportHashRef.current = h;
       setUndoable(new Map());
       setHidden(new Set());
       setStale(false);
@@ -245,6 +251,11 @@ export function GeoPanel({
     }
   }, [draft]);
 
+  const runRef = useRef(run);
+  runRef.current = run;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+
   // On open: show the last result instantly if the draft hasn't changed since;
   // otherwise run a fresh scan. Re-analyze always bypasses the cache.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
@@ -253,10 +264,21 @@ export function GeoPanel({
     if (hit) {
       setReport(hit.data);
       setCachedAt(hit.at);
+      reportHashRef.current = contentHash;
     } else {
       run();
     }
   }, []);
+
+  // Auto re-score: after a fix changes the draft (content hash drifts from the
+  // report's), refresh the score — debounced so a burst of fixes coalesces.
+  useEffect(() => {
+    if (reportHashRef.current === null || reportHashRef.current === contentHash) return;
+    const t = window.setTimeout(() => {
+      if (!busyRef.current) runRef.current();
+    }, 1400);
+    return () => window.clearTimeout(t);
+  }, [contentHash]);
 
   // Drop stored additions whose text is no longer present (manually edited away).
   // biome-ignore lint/correctness/useExhaustiveDependencies: reconcile whenever sections change
@@ -345,6 +367,34 @@ export function GeoPanel({
       if (a.removed) next = `${a.removed}\n\n${next}`.trim();
       await onSectionSave(a.sectionId, next);
       recordAddition(kind, undefined);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyingKey(null);
+    }
+  }
+
+  /** A definition exists but is buried in narrative — rewrite the opening
+   * section so it LEADS with a clean, standalone, citable definition. */
+  async function improveOpener(): Promise<void> {
+    const first = draft.sections[0];
+    if (!first) return;
+    const key = "improve-opener";
+    setApplyingKey(key);
+    setNotice(null);
+    try {
+      const { text } = await inlineEdit(draft.id, {
+        text: first.content_md,
+        action: "custom",
+        instruction:
+          "This section already defines the subject, but the definition is buried in narrative. Rewrite so it OPENS with a single clean, standalone, citable sentence that defines the subject (what it is + what it does), then keep the rest of the content and its order. Keep the author's voice; invent nothing. Return only the section body, no heading.",
+      });
+      await onSectionSave(first.id, text.trim());
+      setUndoable((m) =>
+        new Map(m).set(key, { kind: "content", sectionId: first.id, prev: first.content_md }),
+      );
+      setStale(true);
+      flashSection(first.id);
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
     } finally {
@@ -620,11 +670,10 @@ export function GeoPanel({
       )}
       {stale && !busy && (
         <div className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
-          Draft changed{hidden.size > 0 ? " — findings on rewritten sections are set aside" : ""}.{" "}
+          Draft changed — updating the score…{" "}
           <button type="button" onClick={run} className="underline">
-            Re-analyze
-          </button>{" "}
-          to refresh the score{hidden.size > 0 ? " and findings" : ""}.
+            refresh now
+          </button>
         </div>
       )}
 
@@ -772,18 +821,37 @@ export function GeoPanel({
                         {applyingKey === "remove-opener" ? "Removing…" : "✕ Remove opener"}
                       </button>
                     </div>
-                  ) : (
-                    lever.fix === "definitional" && (
+                  ) : lever.fix === "definitional" ? (
+                    <button
+                      type="button"
+                      disabled={applyingKey === "opener"}
+                      onClick={addOpener}
+                      className="nb-btn nb-btn-primary nb-btn-sm"
+                    >
+                      {applyingKey === "opener" ? "Writing…" : "Add a definitional opener"}
+                    </button>
+                  ) : lever.fix === "definitional_improve" ? (
+                    undoable.has("improve-opener") ? (
                       <button
                         type="button"
-                        disabled={applyingKey === "opener"}
-                        onClick={addOpener}
-                        className="nb-btn nb-btn-primary nb-btn-sm"
+                        disabled={applyingKey === "improve-opener"}
+                        onClick={() => undoRewrite("improve-opener")}
+                        className="nb-btn nb-btn-ghost nb-btn-sm"
                       >
-                        {applyingKey === "opener" ? "Writing…" : "Add a definitional opener"}
+                        {applyingKey === "improve-opener" ? "Undoing…" : "↩ Undo"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={applyingKey === "improve-opener"}
+                        onClick={improveOpener}
+                        className="nb-btn nb-btn-primary nb-btn-sm"
+                        title="Hoist the buried definition into a clean, standalone opening line"
+                      >
+                        {applyingKey === "improve-opener" ? "Rewriting…" : "Improve the opener"}
                       </button>
                     )
-                  ))}
+                  ) : null)}
 
                 {lever.key === "faq" &&
                   (faqAdded ? (
