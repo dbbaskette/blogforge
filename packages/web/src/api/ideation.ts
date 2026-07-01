@@ -37,3 +37,27 @@ export const postIdeationMessage = (
 
 export const acceptIdeation = (draftId: string): Promise<Draft> =>
   api<Draft>(`${base(draftId)}/accept`, { method: "POST" });
+
+export interface TopicIdea {
+  title: string;
+  angle: string;
+}
+
+export interface SparkTopicsInput {
+  seed?: string;
+  provider: string;
+  model: string;
+  use_voice_profile: boolean;
+  pack_slug: string;
+  n?: number;
+}
+
+/**
+ * Draft-free topic brainstorm for the compose screen's "Spark ideas" button.
+ * Returns voice-aware post ideas the writer can click to fill the Topic box.
+ */
+export const sparkTopics = (input: SparkTopicsInput): Promise<{ topics: TopicIdea[] }> =>
+  api<{ topics: TopicIdea[] }>("/api/ideation/topics", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });

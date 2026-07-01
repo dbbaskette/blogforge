@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { type ComposeSettings, loadDefaults, saveDefaults } from "../../src/lib/composeDefaults";
+import {
+  type ComposeSettings,
+  loadDefaults,
+  loadLastMode,
+  saveDefaults,
+  saveLastMode,
+} from "../../src/lib/composeDefaults";
 
 const sample: ComposeSettings = {
   pack_slug: "house",
@@ -33,5 +39,16 @@ describe("composeDefaults", () => {
   it("returns the fallback when stored JSON is corrupt", () => {
     localStorage.setItem("bf.compose.defaults", "{not json");
     expect(loadDefaults().target_words).toBe(1500);
+  });
+
+  it("round-trips the last-used mode", () => {
+    expect(loadLastMode()).toBeNull();
+    saveLastMode("outline");
+    expect(loadLastMode()).toBe("outline");
+  });
+
+  it("ignores an unknown stored mode", () => {
+    localStorage.setItem("bf.compose.lastMode", "bogus");
+    expect(loadLastMode()).toBeNull();
   });
 });

@@ -1,10 +1,42 @@
 export type ComposeMode = "outline" | "propose" | "express" | "blank";
 
-const MODES: { id: ComposeMode; accent: string; icon: string; title: string; blurb: string }[] = [
-  { id: "outline", accent: "accent-blue", icon: "📋", title: "I have an outline", blurb: "Paste your structure — AI writes the full draft from it." },
-  { id: "propose", accent: "accent-teal", icon: "💬", title: "Help me shape it", blurb: "Describe the topic — get an outline to tweak, then AI writes it." },
-  { id: "express", accent: "accent-amber", icon: "⚡", title: "Just write it", blurb: "A topic in, a full draft out — one shot." },
-  { id: "blank", accent: "accent-green", icon: "📝", title: "Blank page", blurb: "Start empty and write yourself, with inline AI tools." },
+const MODES: {
+  id: ComposeMode;
+  accent: string;
+  icon: string;
+  title: string;
+  blurb: string;
+  badge?: string;
+}[] = [
+  {
+    id: "express",
+    accent: "accent-amber",
+    icon: "⚡",
+    title: "Just write it",
+    blurb: "A topic in, a full draft out — one shot.",
+    badge: "Fastest",
+  },
+  {
+    id: "propose",
+    accent: "accent-teal",
+    icon: "💬",
+    title: "Help me shape it",
+    blurb: "Describe the topic — get an outline to tweak, then AI writes it.",
+  },
+  {
+    id: "outline",
+    accent: "accent-blue",
+    icon: "📋",
+    title: "I have an outline",
+    blurb: "Paste your structure — AI writes the full draft from it.",
+  },
+  {
+    id: "blank",
+    accent: "accent-green",
+    icon: "📝",
+    title: "Blank page",
+    blurb: "Start empty and write yourself, with inline AI tools.",
+  },
 ];
 
 export function ModePicker({
@@ -31,8 +63,15 @@ export function ModePicker({
             active === m.id ? "ring-2 ring-cobalt-400" : ""
           }`}
         >
-          <p className="font-semibold text-ink">
-            <span aria-hidden="true">{m.icon}</span> {m.title}
+          <p className="font-semibold text-ink flex items-center gap-2">
+            <span>
+              <span aria-hidden="true">{m.icon}</span> {m.title}
+            </span>
+            {m.badge && (
+              <span className="text-[0.65rem] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-soft text-amber-ink">
+                {m.badge}
+              </span>
+            )}
           </p>
           <p className="text-sm text-muted mt-1 leading-snug">{m.blurb}</p>
         </button>
