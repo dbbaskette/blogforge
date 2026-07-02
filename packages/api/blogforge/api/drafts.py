@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -16,6 +18,7 @@ from blogforge.drafts.models import (
     IdeaInput,
     OutlineProposal,
     OutlineSection,
+    ReferenceWarning,
 )
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.ingest import ingest_document
@@ -102,7 +105,29 @@ async def create_draft(
     request: Request,
     current: User = Depends(get_current_user),
 ) -> Draft:
-    draft = await _store(request).create(user_id=current.id, idea=idea)
+    store = _store(request)
+    draft = await store.create(user_id=current.id, idea=idea)
+    warnings: list[ReferenceWarning] = []
+    if idea.source_urls:
+        # Fetch each source URL as a grounding reference BEFORE returning, so the
+        # first outline/expand pass (which reads the draft's references) is
+        # grounded. A failed fetch is non-fatal — it becomes a warning.
+        from blogforge.api.references import ingest_url_reference
+
+        draft_uuid = UUID(draft.id)
+        results = await asyncio.gather(
+            *[ingest_url_reference(draft.id, draft_uuid, u) for u in idea.source_urls],
+            return_exceptions=True,
+        )
+        warnings = [
+            ReferenceWarning(url=u, error=str(r) or r.__class__.__name__)
+            for u, r in zip(idea.source_urls, results, strict=True)
+            if isinstance(r, Exception)
+        ]
+        refreshed = await store.get(draft.id, user_id=current.id)
+        if refreshed is not None:
+            draft = refreshed
+    draft.reference_warnings = warnings
     await request.app.state.event_bus.emit(
         {"type": "draft:created", "id": draft.id, "title": draft.title}
     )
