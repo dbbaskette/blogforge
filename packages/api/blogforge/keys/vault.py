@@ -1,8 +1,10 @@
 """KeyVault — per-user provider keys, encrypted at rest."""
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
+from cryptography.fernet import InvalidToken
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +12,8 @@ from blogforge.auth.crypto import SecretCipher
 from blogforge.config import get_settings
 from blogforge.db.engine import get_sessionmaker
 from blogforge.db.models import UserProviderKey
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED_PROVIDERS: tuple[str, ...] = ("anthropic", "openai", "google")
 
@@ -48,7 +52,18 @@ class KeyVault:
         async with get_sessionmaker()() as session:
             row = await self._load(session, provider)
             if row is not None:
-                return _cipher().decrypt(row.encrypted_key)
+                try:
+                    return _cipher().decrypt(row.encrypted_key)
+                except InvalidToken:
+                    # The stored key was encrypted under a different
+                    # session_secret (rotated / a fresh local setup). Treat it
+                    # as unset rather than 500-ing the keys page — the user can
+                    # re-enter it to re-encrypt under the current secret.
+                    logger.warning(
+                        "provider key for %r can't be decrypted (session_secret "
+                        "changed); treating as unset", provider
+                    )
+                    return ""
         return ""
 
     async def set(self, provider: str, api_key: str) -> None:
