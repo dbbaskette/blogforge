@@ -8,6 +8,7 @@ from typing import Any
 from jinja2 import Template
 
 from blogforge.drafts.models import Draft, Section
+from blogforge.generate.builtin_formats import builtin_format_section_note
 from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider, StreamChunk
 
@@ -139,6 +140,11 @@ async def stream_section(
         samples=sample_ids if sample_ids else None,
         draft=None,
     )
+    # Built-in formats aren't pack-defined; layer their per-section conventions
+    # on top (as context, so the section fits the format without duplicating it).
+    note = builtin_format_section_note(draft.idea.format)
+    if note:
+        system = f"{system}\n\n{note}"
     if instruction.strip() and section.content_md.strip():
         # The section already has prose — apply the note as a surgical edit of
         # that text (change only what's needed) rather than rewriting from brief.

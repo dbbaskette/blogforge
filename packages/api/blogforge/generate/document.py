@@ -17,6 +17,7 @@ from typing import Any
 from jinja2 import Template
 
 from blogforge.drafts.models import Draft, Section
+from blogforge.generate.builtin_formats import builtin_format_directive
 from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
 
@@ -104,6 +105,11 @@ async def generate_document(
         samples=sample_ids if sample_ids else None,
         draft=None,
     )
+    # Built-in formats aren't defined by any pack, so resolve_format ignores them.
+    # Their structural directive is layered on top of the composed voice prompt.
+    builtin = builtin_format_directive(draft.idea.format)
+    if builtin:
+        system = f"{system}\n\n{builtin}"
     user = _render_document_prompt(draft)
     if reference_context:
         user = f"{reference_context}\n\n---\n\n{user}"

@@ -31,6 +31,7 @@ vi.mock("../../../src/api/voice", () => ({
 vi.mock("../../../src/api/packs", () => ({
   listPacks: vi.fn().mockResolvedValue([{ slug: "house", valid: true }]),
   getManifest: vi.fn().mockResolvedValue({ formats: [] }),
+  listFormats: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("../../../src/api/providers", () => ({
   listProviderAvailability: vi.fn().mockResolvedValue({ anthropic: true }),
