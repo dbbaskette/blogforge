@@ -1,6 +1,8 @@
 """FastAPI application factory."""
+
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -35,6 +37,17 @@ def _resolve_static_dir() -> Path:
     return Path(env) if env else _default_static_dir()
 
 
+def _build_info() -> dict[str, str]:
+    """Deploy identity written into the static dir at build time
+    (scripts/cf-prepare.sh): the git ``commit`` and ``built_at``. Absent in
+    dev/tests → empty dict, so /api/health still reports the semver."""
+    try:
+        data = json.loads((_resolve_static_dir() / "build_info.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {k: str(data[k]) for k in ("commit", "built_at") if isinstance(data.get(k), str)}
+
+
 def _is_dev_mode() -> bool:
     return os.environ.get("BLOGFORGE_DEV", "").lower() in ("1", "true", "yes")
 
@@ -62,11 +75,13 @@ def _resolve_pack_roots() -> list[Path]:
     candidates.extend(_read_myvoice_pack_paths())
     # Sibling-repo candidates: try common locations for a dev checkout.
     cwd = Path.cwd()
-    candidates.extend([
-        cwd / ".." / "myvoice" / "packs",
-        cwd.parent / "myvoice" / "packs",
-        Path(__file__).resolve().parents[3].parent / "myvoice" / "packs",
-    ])
+    candidates.extend(
+        [
+            cwd / ".." / "myvoice" / "packs",
+            cwd.parent / "myvoice" / "packs",
+            Path(__file__).resolve().parents[3].parent / "myvoice" / "packs",
+        ]
+    )
     # Dedupe by resolved path, keeping insertion order.
     seen: set[Path] = set()
     roots: list[Path] = []
@@ -167,9 +182,13 @@ def create_app() -> FastAPI:
     async def _missing_provider_key(_request, exc: ProviderMissingKey) -> JSONResponse:
         return JSONResponse(
             status_code=400,
-            content={"error": {"code": "provider_missing_key",
-                               "message": str(exc) or "No API key configured for this provider.",
-                               "hint": "Add your key in Settings → Provider API keys."}},
+            content={
+                "error": {
+                    "code": "provider_missing_key",
+                    "message": str(exc) or "No API key configured for this provider.",
+                    "hint": "Add your key in Settings → Provider API keys.",
+                }
+            },
         )
 
     if settings.cors_origins:
@@ -242,7 +261,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "version": __version__}
+        return {"status": "ok", "version": __version__, **_build_info()}
 
     static_dir = _resolve_static_dir()
     index = static_dir / "index.html"
