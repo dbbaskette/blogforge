@@ -276,6 +276,12 @@ def _longest_paragraph_chars(text: str) -> int:
 
 def _draft_text(draft: Draft) -> str:
     parts = [f"# {draft.title or draft.idea.topic}"]
+    # The opening/lede lives above the first section (outline.opening_hook), so
+    # it must lead the text the model scores — otherwise the definitional-opener
+    # and answer-first levers judge the first SECTION instead of the real intro.
+    opening = draft.outline.opening_hook.strip() if draft.outline else ""
+    if opening:
+        parts.append(opening)
     for s in draft.sections:
         body = s.content_md.strip()
         parts.append(f"## {s.title}\n\n{body}" if body else f"## {s.title}")

@@ -33,6 +33,9 @@ export function OutlineSidebar({
     (s) => s.status === "ready" || s.status === "edited",
   ).length;
 
+  // The Intro (opening/lede) lives above the sections — surface it here too.
+  const hasOpening = (draft.outline?.opening_hook?.trim().length ?? 0) > 0;
+
   return (
     <aside className="hidden lg:block sticky top-14 self-start h-[calc(100vh-3.5rem)] overflow-y-auto py-6 pr-2">
       <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">
@@ -46,6 +49,26 @@ export function OutlineSidebar({
       )}
 
       <ol className="m-0 p-0 list-none space-y-0.5">
+        {hasOpening && (
+          <li>
+            <a
+              href="#opening"
+              className="group grid grid-cols-[22px_16px_1fr_auto] gap-2 items-center px-3 py-1.5 rounded-nb-sm text-ink-2 hover:bg-white transition-colors no-underline"
+            >
+              <span className="font-mono text-[11px] text-muted-2 group-hover:text-cobalt-600">
+                ¶
+              </span>
+              <span
+                className="w-3.5 h-3.5 rounded grid place-items-center bg-cobalt-500 text-white text-[8px] font-bold"
+                aria-hidden="true"
+              >
+                I
+              </span>
+              <span className="text-[13px] truncate leading-tight font-medium">Intro</span>
+              <span className="font-mono text-[10px] text-muted-2">—</span>
+            </a>
+          </li>
+        )}
         {sections.map((s, i) => (
           <li key={s.id}>
             <a
