@@ -64,6 +64,7 @@ vi.mock("../../src/api/references", () => ({
 vi.mock("../../src/api/packs", () => ({
   listPacks: vi.fn().mockResolvedValue([]),
   getManifest: vi.fn().mockResolvedValue({ formats: [] }),
+  listFormats: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../src/api/providers", () => ({

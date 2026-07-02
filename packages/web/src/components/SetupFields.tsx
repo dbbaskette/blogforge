@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
-import { type PackFormatEntry, type PackSummary, getManifest, listPacks } from "../api/packs";
+import {
+  type PackFormatEntry,
+  type PackSummary,
+  getManifest,
+  listFormats,
+  listPacks,
+} from "../api/packs";
 import { type ModelInfo, listModels, listProviderAvailability } from "../api/providers";
 import type { ComposeSettings } from "../lib/composeDefaults";
 
@@ -115,18 +121,27 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [formats, setFormats] = useState<PackFormatEntry[]>([]);
+  // Built-in formats — available in every voice mode; loaded once on mount.
+  const [builtinFormats, setBuiltinFormats] = useState<PackFormatEntry[]>([]);
+  const builtinNamesRef = useRef<Set<string>>(new Set());
 
   const valueRef = useRef(value);
   valueRef.current = value;
   const providerAutoPicked = useRef(false);
 
-  // Load packs and providers on mount
+  // Load packs, providers, and built-in formats on mount
   useEffect(() => {
     listPacks()
       .then(setPacks)
       .catch(() => {});
     listProviderAvailability()
       .then(setProviders)
+      .catch(() => {});
+    listFormats()
+      .then((f) => {
+        setBuiltinFormats(f);
+        builtinNamesRef.current = new Set(f.map((x) => x.name));
+      })
       .catch(() => {});
   }, []);
 
@@ -157,7 +172,13 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
         if (cancelled) return;
         const raw = (m.formats as PackFormatEntry[] | undefined) ?? [];
         setFormats(raw);
-        if (value.format && !raw.some((f) => f.name === value.format)) {
+        // Clear a stale PACK format on pack switch, but never a built-in format
+        // (those are pack-independent and stay selected across packs).
+        if (
+          value.format &&
+          !raw.some((f) => f.name === value.format) &&
+          !builtinNamesRef.current.has(value.format)
+        ) {
           onChange({ ...valueRef.current, format: null });
         }
       })
@@ -201,6 +222,13 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
       onChange({ ...valueRef.current, model: models[0].id });
     }
   }, [models, value.model]);
+
+  // Built-in formats show in every voice mode; a selected pack adds its own
+  // named formats on top (deduped by name, built-ins first).
+  const formatOptions: PackFormatEntry[] = [
+    ...builtinFormats,
+    ...formats.filter((f) => !builtinNamesRef.current.has(f.name)),
+  ];
 
   return (
     <div className="space-y-5">
@@ -288,27 +316,26 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
         </Field>
       )}
 
-      {/* Format select — only for voice packs; profiles carry no named formats. */}
+      {/* Format shapes the article's STRUCTURE; the voice source controls tone.
+          Built-in formats apply in every mode, so this is enabled with a profile too. */}
       <Field label="Format" id="sf-format">
         <select
           id="sf-format"
-          value={value.use_voice_profile ? "" : (value.format ?? "")}
+          value={value.format ?? ""}
           onChange={(e) => onChange({ ...value, format: e.target.value || null })}
-          disabled={value.use_voice_profile || formats.length === 0}
+          disabled={formatOptions.length === 0}
           className="nb-select disabled:opacity-60"
         >
           <option value="">— none —</option>
-          {formats.map((f) => (
+          {formatOptions.map((f) => (
             <option key={f.name} value={f.name}>
               {f.description ? `${f.name} — ${f.description}` : f.name}
             </option>
           ))}
         </select>
-        {value.use_voice_profile && (
-          <p className="text-xs text-muted mt-1">
-            Named formats apply to voice packs — your profile writes in its distilled voice.
-          </p>
-        )}
+        <p className="text-xs text-muted mt-1">
+          Structures the post — your voice still sets the tone.
+        </p>
       </Field>
 
       {/* Provider / Model grid */}
