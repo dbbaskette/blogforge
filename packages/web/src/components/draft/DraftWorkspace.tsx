@@ -8,11 +8,11 @@ import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { CheckupPanel } from "./CheckupPanel";
-import { GeoPanel } from "./GeoPanel";
 import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
 import { LintPanel } from "./LintPanel";
 import { OpeningCard } from "./OpeningCard";
+import { OptimizePanel } from "./OptimizePanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
@@ -523,10 +523,9 @@ export function DraftWorkspace({
         />
       )}
       {geoOpen && (
-        <GeoPanel
+        <OptimizePanel
           draft={draft}
           onSectionSave={onSectionSave}
-          onTrackChange={handleTrackChange}
           onChange={onChange}
           onClose={() => setGeoOpen(false)}
         />
