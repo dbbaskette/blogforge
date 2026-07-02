@@ -47,6 +47,31 @@ const FIX_LEVER: Record<string, string> = {
   answer_first: "answer_first",
 };
 
+/** Each lever's share of the total, mirroring the backend's _WEIGHTS. Kept here
+ * (rather than trusting lever.weight) so the total still recomputes correctly
+ * even for a report cached by an older bundle whose levers lack `weight`. */
+const LEVER_WEIGHTS: Record<string, number> = {
+  answer_first: 0.2,
+  factual_density: 0.2,
+  definitional_opener: 0.1,
+  question_headings: 0.1,
+  skimmability: 0.1,
+  brand_explicit: 0.08,
+  comparison_table: 0.06,
+  faq: 0.08,
+  chunking: 0.08,
+};
+
+/** Weighted overall score (0-100) from the current levers — so a targeted
+ * per-lever re-score updates the TOTAL too. Pure; exported for tests. */
+export function computeTotalScore(
+  levers: { key: string; score: number; weight?: number }[],
+): number {
+  return Math.round(
+    levers.reduce((sum, l) => sum + l.score * (LEVER_WEIGHTS[l.key] ?? l.weight ?? 0), 0),
+  );
+}
+
 const findingKey = (lever: GeoLever, f: GeoFinding): string =>
   `${lever.key}:${f.section_id || f.target || f.note}`;
 
@@ -309,7 +334,7 @@ export function GeoPanel({
       setReport((prev) => {
         if (!prev) return prev;
         const levers = prev.levers.map((l) => fresh[l.key] ?? l);
-        const score = Math.round(levers.reduce((s, l) => s + l.score * (l.weight ?? 0), 0));
+        const score = computeTotalScore(levers);
         return { ...prev, levers, score, grade: localGrade(score) };
       });
     } catch (e) {
