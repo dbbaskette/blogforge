@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from blogforge.utctime import UtcDatetime
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -33,7 +35,7 @@ class VoiceSample(BaseModel):
     extracted_chars: int = 0
     exemplar: bool = False
     status: SampleStatus = "ready"
-    added_at: datetime = Field(default_factory=_now)
+    added_at: UtcDatetime = Field(default_factory=_now)
 
 
 class VoiceSource(BaseModel):
@@ -43,7 +45,7 @@ class VoiceSource(BaseModel):
     s3_key: str
     extracted_chars: int = 0
     status: SourceStatus = "ready"
-    added_at: datetime = Field(default_factory=_now)
+    added_at: UtcDatetime = Field(default_factory=_now)
 
 
 class VoiceProfile(BaseModel):
@@ -55,6 +57,6 @@ class VoiceProfile(BaseModel):
     persona_tone: str = ""
     rules: VoiceRules = Field(default_factory=VoiceRules)
     distilled_style_md: str = ""
-    distilled_at: datetime | None = None
+    distilled_at: UtcDatetime | None = None
     version: int = 1
     samples: list[VoiceSample] = Field(default_factory=list)
