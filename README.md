@@ -134,6 +134,25 @@ click **Sign in with GitHub**.
   pending request), then approve + manage roles under `/admin`.
 - Each user adds their own provider keys in **Settings → Provider API keys**.
 
+## Simplest local run (no containers)
+
+The defaults are zero-infra: the database is a file-SQLite at `~/.blogforge/blogforge.db` and blobs
+are written under `~/.blogforge/blobs/` — no Postgres or MinIO container. Just run the app on your
+host (you still register a GitHub OAuth App, since sign-in is GitHub-only):
+
+```bash
+BLOGFORGE_GITHUB_CLIENT_ID=<client-id> \
+BLOGFORGE_GITHUB_CLIENT_SECRET=<client-secret> \
+BLOGFORGE_GITHUB_ALLOWLIST=your-github-login \
+BLOGFORGE_GITHUB_ADMIN_LOGIN=your-github-login \
+BLOGFORGE_PUBLIC_URL=http://localhost:7880 \
+  uv run blogforge serve --port 7880
+```
+
+Everything lives under `data_dir` (`BLOGFORGE_DATA_DIR`, default `~/.blogforge`). Pair it with the
+Claude CLI below and you need no API keys either. The Docker path (Postgres + MinIO) below stays
+available for a production-like setup.
+
 ## Using the Claude CLI (subscription, no API key)
 
 The `claude` binary isn't in the slim container, so run the API on your host (where Claude Code is
@@ -180,9 +199,10 @@ cd packages/web && pnpm dev    # vite :7881, API on :7880 via CORS with credenti
 Pure `cf push` with the `python_buildpack` — no Docker. Full guide in [`docs/cf-deploy.md`](docs/cf-deploy.md).
 
 ```bash
-# 1. Bind the three services the manifest expects:
+# 1. Bind the three services the manifest expects (check `cf marketplace` for
+#    the Block Storage offering + plan names on your foundation):
 cf create-service postgres on-demand-postgres-small blogforge-postgres
-cf create-service seaweedfs default blogforge-s3
+cf create-service <block-storage-service> <plan> blogforge-blobs   # persistent volume -> fs blob store
 cf create-service ai-models tanzu-all-models blogforge-ai   # bound GenAI model -> keyless "Tanzu" provider
 
 # 2. Register a GitHub OAuth App (callback https://<route>/api/auth/github/callback),
@@ -196,9 +216,10 @@ cp vars.example.yml vars.yml
 cf push --vars-file vars.yml
 ```
 
-`blogforge.config.tanzu` translates `VCAP_SERVICES` into the env the app reads — no manual DB / S3 /
-model wiring: `blogforge-postgres` → `BLOGFORGE_DATABASE_URL`, `blogforge-s3` → `BLOGFORGE_S3_*`,
-`blogforge-ai` → `BLOGFORGE_TANZU_*` (the keyless **Tanzu** provider). Migrations run on first boot.
+`blogforge.config.tanzu` translates `VCAP_SERVICES` into the env the app reads — no manual DB / blob /
+model wiring: `blogforge-postgres` → `BLOGFORGE_DATABASE_URL`, `blogforge-blobs` (Block Storage volume)
+→ `BLOGFORGE_STORAGE_BACKEND=fs` + `BLOGFORGE_STORAGE_DIR=<mount>/blobs`, `blogforge-ai` →
+`BLOGFORGE_TANZU_*` (the keyless **Tanzu** provider). Migrations run on first boot.
 Sign in with GitHub; `github_admin_login` lands as admin. (The Claude CLI provider isn't available in
 a cloud deploy — use the Tanzu model or API-key providers there.)
 
@@ -212,8 +233,9 @@ packages/
   web/              React + TypeScript + Vite + Tailwind ("liquid-glass" UI), TipTap editor
 ```
 
-- **Backend:** FastAPI · SQLAlchemy + Alembic (Postgres) · S3/MinIO/SeaweedFS for blobs · SSE for
-  live generation · per-user encrypted provider keys · GitHub OAuth sessions.
+- **Backend:** FastAPI · SQLAlchemy + Alembic (Postgres) or file-SQLite locally · filesystem
+  (local `~/.blogforge` + Tanzu Block Storage volume) or S3/MinIO for blobs · SSE for live generation
+  · per-user encrypted provider keys · GitHub OAuth sessions.
 - **Frontend:** React Router SPA, served by the API with a catch-all fallback; ⌘K palette, toasts,
   autosave, command-driven flow.
 

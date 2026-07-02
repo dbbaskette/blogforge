@@ -54,3 +54,4 @@ local-data/
 vars.yml
 vars-*.yml
 !vars.example.yml
+.data/

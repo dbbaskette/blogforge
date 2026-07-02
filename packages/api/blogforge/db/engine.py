@@ -5,9 +5,11 @@ Use `async with session_scope() as session:` in route handlers — it
 commits on success and rolls back on exception, and is safe to nest
 shallowly under FastAPI's Depends() lifecycle.
 """
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import lru_cache
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -19,10 +21,22 @@ from sqlalchemy.ext.asyncio import (
 from blogforge.config import get_settings
 
 
+def _ensure_sqlite_parent_dir(url: str) -> None:
+    """A file-based SQLite URL can't open if its directory is missing — create it
+    so the no-Docker local default (`sqlite+aiosqlite:///.data/blogforge.db`)
+    just works. No-op for :memory: and non-sqlite URLs."""
+    if not url.startswith("sqlite"):
+        return
+    path = url.split(":///", 1)[-1]
+    if path and path != ":memory:":
+        Path(path).expanduser().parent.mkdir(parents=True, exist_ok=True)
+
+
 @lru_cache(maxsize=1)
 def get_engine() -> AsyncEngine:
     """Lazy singleton. First call constructs; subsequent calls return same instance."""
     settings = get_settings()
+    _ensure_sqlite_parent_dir(settings.database_url)
     return create_async_engine(
         settings.database_url,
         echo=False,

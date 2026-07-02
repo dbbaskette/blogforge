@@ -35,6 +35,9 @@ services:
       dockerfile: packages/api/Dockerfile
     environment:
       BLOGFORGE_DATABASE_URL: "postgresql+asyncpg://blogforge:blogforge@postgres:5432/blogforge"
+      # This compose stack runs the object-storage path against MinIO; local runs
+      # without Docker default to the "fs" backend (no MinIO needed).
+      BLOGFORGE_STORAGE_BACKEND: s3
       BLOGFORGE_S3_ENDPOINT_URL: "http://minio:9000"
       BLOGFORGE_S3_ACCESS_KEY: blogforge
       BLOGFORGE_S3_SECRET_KEY: blogforge-minio-secret

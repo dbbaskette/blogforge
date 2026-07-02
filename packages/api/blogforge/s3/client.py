@@ -10,6 +10,7 @@ Reads bucket name + endpoint + creds + region from
 blogforge.config.Settings so the same code paths work locally against
 MinIO and on Tanzu against SeaweedFS.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -21,7 +22,7 @@ from botocore.exceptions import ClientError
 from blogforge.config import get_settings
 
 if TYPE_CHECKING:
-    pass
+    from blogforge.s3.fs import FsStorage
 
 
 class S3Error(Exception):
@@ -61,6 +62,25 @@ class S3Client:
             region_name=self._region,
             verify=self._verify_ssl,
         )
+
+    async def bootstrap(self) -> None:
+        """Create the configured bucket if it doesn't exist. Idempotent — the S3
+        equivalent of FsStorage.bootstrap()."""
+        async with self._client_ctx() as client:
+            try:
+                await client.head_bucket(Bucket=self._bucket)
+                return  # already exists
+            except ClientError as err:
+                code = err.response.get("Error", {}).get("Code")
+                if code not in {"404", "NoSuchBucket", "NotFound"}:
+                    raise S3Error(f"head_bucket({self._bucket!r}) failed: {err}") from err
+            try:
+                await client.create_bucket(Bucket=self._bucket)
+            except ClientError as err:
+                code = err.response.get("Error", {}).get("Code")
+                if code in {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"}:
+                    return  # raced; someone else made it
+                raise S3Error(f"create_bucket({self._bucket!r}) failed: {err}") from err
 
     async def put_object(
         self, key: str, body: bytes, content_type: str = "application/octet-stream"
@@ -110,9 +130,7 @@ class S3Client:
         async with self._client_ctx() as client:
             paginator = client.get_paginator("list_objects_v2")
             async for page in paginator.paginate(Bucket=self._bucket, Prefix=prefix):
-                keys = [
-                    {"Key": obj["Key"]} for obj in page.get("Contents", []) or []
-                ]
+                keys = [{"Key": obj["Key"]} for obj in page.get("Contents", []) or []]
                 if not keys:
                     continue
                 try:
@@ -120,22 +138,26 @@ class S3Client:
                         Bucket=self._bucket, Delete={"Objects": keys, "Quiet": True}
                     )
                 except ClientError as err:
-                    raise S3Error(
-                        f"delete_prefix({prefix!r}) failed: {err}"
-                    ) from err
+                    raise S3Error(f"delete_prefix({prefix!r}) failed: {err}") from err
                 # delete_objects returns errors per object if any
                 errors = resp.get("Errors") or []
                 if errors:
-                    raise S3Error(
-                        f"delete_prefix({prefix!r}) partial failure: {errors!r}"
-                    )
+                    raise S3Error(f"delete_prefix({prefix!r}) partial failure: {errors!r}")
                 deleted += len(keys)
         return deleted
 
 
 @lru_cache(maxsize=1)
-def get_s3_client() -> S3Client:
-    """Process-wide singleton. Cleared by reset_s3_client_for_tests()."""
+def get_s3_client() -> S3Client | FsStorage:
+    """Process-wide blob-storage singleton. Returns the filesystem backend when
+    `storage_backend=fs` (default — no MinIO needed locally, a mounted volume on
+    Tanzu) or the S3 client for `storage_backend=s3` (MinIO / SeaweedFS). Both
+    share the same method surface, so callers don't care which. Cleared by
+    reset_s3_client_for_tests()."""
+    if get_settings().storage_backend == "fs":
+        from blogforge.s3.fs import FsStorage
+
+        return FsStorage()
     return S3Client()
 
 

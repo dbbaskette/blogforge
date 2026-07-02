@@ -8,6 +8,7 @@ and falls back to instance name. Never overwrites an env var the operator
 already set explicitly — so `cf set-env BLOGFORGE_DATABASE_URL ...` always
 wins over bound-service inference.
 """
+
 import json
 import logging
 import os
@@ -37,8 +38,27 @@ def apply_vcap_services() -> None:
                 instances.append((label, b))
 
     _apply_postgres(instances)
+    # Volume first: if a Block Storage volume is bound, it wins as the blob store
+    # (storage_backend=fs at its mount). _apply_s3 then only claims backend=s3 if
+    # a volume didn't already (via _set_if_unset).
+    _apply_volume(instances)
     _apply_s3(instances)
     _apply_genai(instances)
+
+
+def _apply_volume(instances: list[tuple[str, dict[str, Any]]]) -> None:
+    """A bound Cloud Foundry volume service (Block Storage) mounts a directory
+    into the container; use it as the filesystem blob store."""
+    for _label, inst in instances:
+        mounts = inst.get("volume_mounts")
+        if not isinstance(mounts, list) or not mounts or not isinstance(mounts[0], dict):
+            continue
+        container_dir = mounts[0].get("container_dir")
+        if not container_dir:
+            continue
+        _set_if_unset("BLOGFORGE_STORAGE_BACKEND", "fs")
+        _set_if_unset("BLOGFORGE_STORAGE_DIR", f"{container_dir.rstrip('/')}/blobs")
+        return
 
 
 def _apply_postgres(instances: list[tuple[str, dict[str, Any]]]) -> None:
@@ -51,9 +71,9 @@ def _apply_postgres(instances: list[tuple[str, dict[str, Any]]]) -> None:
             continue
         # Cloud Foundry hands us `postgres://...`. Convert to the asyncpg driver.
         if uri.startswith("postgres://"):
-            uri = "postgresql+asyncpg://" + uri[len("postgres://"):]
+            uri = "postgresql+asyncpg://" + uri[len("postgres://") :]
         elif uri.startswith("postgresql://"):
-            uri = "postgresql+asyncpg://" + uri[len("postgresql://"):]
+            uri = "postgresql+asyncpg://" + uri[len("postgresql://") :]
         _set_if_unset("BLOGFORGE_DATABASE_URL", uri)
         return
 
@@ -71,6 +91,9 @@ def _apply_s3(instances: list[tuple[str, dict[str, Any]]]) -> None:
         bucket = creds.get("bucket")
         region = creds.get("region")
         if endpoint:
+            # Object storage is bound → use the s3 backend (unless a volume already
+            # claimed fs above).
+            _set_if_unset("BLOGFORGE_STORAGE_BACKEND", "s3")
             _set_if_unset("BLOGFORGE_S3_ENDPOINT_URL", endpoint)
         if access:
             _set_if_unset("BLOGFORGE_S3_ACCESS_KEY", access)
@@ -91,7 +114,10 @@ def _apply_s3(instances: list[tuple[str, dict[str, Any]]]) -> None:
 
 def _apply_genai(instances: list[tuple[str, dict[str, Any]]]) -> None:
     for label, inst in instances:
-        if label not in ("genai", "tanzu-genai", "ai-models") and inst.get("name") != "blogforge-ai":
+        if (
+            label not in ("genai", "tanzu-genai", "ai-models")
+            and inst.get("name") != "blogforge-ai"
+        ):
             continue
         creds = inst.get("credentials", {}) or {}
         # The Tanzu GenAI tile nests the real values under "endpoint"
