@@ -42,6 +42,8 @@ e2e/test-results/
 
 # Local config (user secrets)
 ~/.blogforge/
+.env
+.env.local
 
 # Stale artifacts from before this repo existed
 myvoice-centered-check.png
