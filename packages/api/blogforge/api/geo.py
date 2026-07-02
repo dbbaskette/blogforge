@@ -14,7 +14,13 @@ from pydantic import BaseModel, Field
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
-from blogforge.generate.geo import analyze_geo, generate_faq, generate_opener, generate_table
+from blogforge.generate.geo import (
+    analyze_geo,
+    generate_faq,
+    generate_opener,
+    generate_table,
+    rescore_geo,
+)
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.compose import ComposeError
@@ -67,6 +73,28 @@ async def geo_report(
         return await analyze_geo(draft, pack_root, manifest, provider, model=draft.idea.model)
     except (ProviderMissingKey, ProviderError, ComposeError) as e:
         raise _provider_error(e) from e
+
+
+class _RescoreBody(BaseModel):
+    # Which levers to re-score after a targeted fix (1-9). Others are left as-is.
+    levers: list[str] = Field(min_length=1, max_length=9)
+
+
+@router.post("/api/drafts/{draft_id}/geo/rescore")
+async def geo_rescore(
+    draft_id: str,
+    body: _RescoreBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, object]:
+    """Re-score only the given levers (after applying one fix) and return just
+    those — the client merges them into the report without a full re-analysis."""
+    draft, pack_root, _manifest, provider = await _load(request, draft_id, current)
+    try:
+        levers = await rescore_geo(draft, body.levers, pack_root, provider, model=draft.idea.model)
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    return {"levers": levers}
 
 
 class _FaqBody(BaseModel):

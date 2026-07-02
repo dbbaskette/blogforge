@@ -159,6 +159,9 @@ def _lever(
         "key": key,
         "label": _LABELS[key],
         "score": max(0, min(100, round(score))),
+        # Its share of the overall score — carried so a targeted per-lever
+        # re-score can recompute the total on the client without a full re-run.
+        "weight": _WEIGHTS.get(key, 0.0),
         "detail": detail,
         "findings": findings or [],
         "fix": fix,
@@ -651,18 +654,24 @@ def build_report(levers: dict[str, dict[str, Any]]) -> dict[str, Any]:
     return {"score": score, "grade": _grade(score), "levers": ordered}
 
 
-async def analyze_geo(
-    draft: Draft,
-    pack_root: Path,
-    manifest: dict[str, Any],
-    provider: LLMProvider,
-    *,
-    model: str,
-) -> dict[str, Any]:
-    """Full GEO report: deterministic structural levers + one semantic LLM pass."""
+# Which levers recompute instantly off the markdown vs. need the LLM pass —
+# drives targeted per-lever re-scoring after a fix.
+_STRUCTURAL_KEYS = frozenset(
+    {"question_headings", "skimmability", "faq", "chunking", "comparison_table"}
+)
+_SEMANTIC_KEYS = frozenset(
+    {"answer_first", "definitional_opener", "factual_density", "brand_explicit"}
+)
+
+
+async def _run_semantic(
+    draft: Draft, pack_root: Path, provider: LLMProvider, *, model: str
+) -> dict[str, dict[str, Any]]:
+    """The single voice-aware LLM pass → the four judgment levers (answer-first,
+    definitional opener, factual density, brand), with the deterministic augments
+    applied. Shared by the full report and the targeted re-score."""
     from blogforge.voice import compose_prompt
 
-    structural = score_structural(draft)
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
     prompt = (
         f"{system}\n\n---\n\n{_SEMANTIC_DIRECTIVE}\n\n"
@@ -677,10 +686,46 @@ async def analyze_geo(
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
     semantic = parse_semantic(resp.text, draft)
-    levers = {**structural, **semantic}
-    augment_definitional(levers, draft)
-    augment_factual_density(levers, draft)
-    return build_report(levers)
+    augment_definitional(semantic, draft)
+    augment_factual_density(semantic, draft)
+    return semantic
+
+
+async def analyze_geo(
+    draft: Draft,
+    pack_root: Path,
+    manifest: dict[str, Any],
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> dict[str, Any]:
+    """Full GEO report: deterministic structural levers + one semantic LLM pass."""
+    structural = score_structural(draft)
+    semantic = await _run_semantic(draft, pack_root, provider, model=model)
+    return build_report({**structural, **semantic})
+
+
+async def rescore_geo(
+    draft: Draft,
+    keys: list[str],
+    pack_root: Path,
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> dict[str, dict[str, Any]]:
+    """Re-score ONLY the requested levers after a targeted fix. Structural levers
+    recompute instantly (no LLM); semantic levers need one LLM pass. Everything
+    else is left untouched — so applying a fix refreshes just that part, not the
+    whole document."""
+    want = {k for k in keys if k in _ORDER}
+    out: dict[str, dict[str, Any]] = {}
+    if want & _STRUCTURAL_KEYS:
+        structural = score_structural(draft)
+        out.update({k: structural[k] for k in want & _STRUCTURAL_KEYS if k in structural})
+    if want & _SEMANTIC_KEYS:
+        semantic = await _run_semantic(draft, pack_root, provider, model=model)
+        out.update({k: semantic[k] for k in want & _SEMANTIC_KEYS if k in semantic})
+    return out
 
 
 _FAQ_SCHEMA: dict[str, object] = {

@@ -9,6 +9,7 @@ import {
   generateFaq,
   generateOpener,
   generateTable,
+  rescoreGeo,
 } from "../../api/geo";
 import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
 import { useDialogA11y } from "../ui/useDialogA11y";
@@ -24,6 +25,26 @@ function barColor(score: number): string {
   if (score >= 58) return "#f59e0b";
   return "#e6492d";
 }
+
+/** Grade thresholds mirror the backend's _grade — used to recompute the letter
+ * grade after a targeted per-lever re-score merges new scores in. */
+function localGrade(score: number): string {
+  if (score >= 85) return "A";
+  if (score >= 72) return "B";
+  if (score >= 58) return "C";
+  if (score >= 45) return "D";
+  return "F";
+}
+
+/** Which lever each per-finding rewrite affects — so applying it re-scores only
+ * that lever. Additive fixes (opener/faq/table/data) pass their lever directly. */
+const FIX_LEVER: Record<string, string> = {
+  question_heading: "question_headings",
+  bullets: "skimmability",
+  self_contained: "chunking",
+  dedupe_opening: "definitional_opener",
+  answer_first: "answer_first",
+};
 
 const findingKey = (lever: GeoLever, f: GeoFinding): string =>
   `${lever.key}:${f.section_id || f.target || f.note}`;
@@ -218,7 +239,8 @@ export function GeoPanel({
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   // Persistent additions (opener / FAQ) → Remove buttons.
   const [additions, setAdditions] = useState<Additions>(() => loadAdditions(draft.id));
-  const [stale, setStale] = useState(false);
+  // True while a targeted per-lever re-score is in flight after a fix.
+  const [rescoring, setRescoring] = useState(false);
   // When the shown report came from cache (unchanged draft), this is when it
   // was originally scored — surfaced so the writer knows it isn't stale.
   const [cachedAt, setCachedAt] = useState<number | null>(null);
@@ -238,10 +260,6 @@ export function GeoPanel({
     [panelRef],
   );
 
-  // The content hash the shown report was computed for; when the draft drifts
-  // from this (a fix applied), the score auto-refreshes.
-  const reportHashRef = useRef<string | null>(null);
-
   const run = useCallback(async (): Promise<void> => {
     setBusy(true);
     setError(null);
@@ -252,21 +270,14 @@ export function GeoPanel({
       const fresh = await analyzeGeo(draft.id);
       setReport(fresh);
       setCached("geo", draft.id, h, fresh);
-      reportHashRef.current = h;
       setUndoable(new Map());
       setHidden(new Set());
-      setStale(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }, [draft]);
-
-  const runRef = useRef(run);
-  runRef.current = run;
-  const busyRef = useRef(busy);
-  busyRef.current = busy;
 
   // On open: show the last result instantly if the draft hasn't changed since;
   // otherwise run a fresh scan. Re-analyze always bypasses the cache.
@@ -276,21 +287,46 @@ export function GeoPanel({
     if (hit) {
       setReport(hit.data);
       setCachedAt(hit.at);
-      reportHashRef.current = contentHash;
     } else {
       run();
     }
   }, []);
 
-  // Auto re-score: after a fix changes the draft (content hash drifts from the
-  // report's), refresh the score — debounced so a burst of fixes coalesces.
-  useEffect(() => {
-    if (reportHashRef.current === null || reportHashRef.current === contentHash) return;
-    const t = window.setTimeout(() => {
-      if (!busyRef.current) runRef.current();
-    }, 1400);
-    return () => window.clearTimeout(t);
-  }, [contentHash]);
+  // ── Targeted re-score: after a fix, re-score ONLY the affected lever(s) and
+  // merge them back in, recomputing the total from each lever's weight. Other
+  // levers are never re-run. Debounced so a burst of fixes coalesces. ──
+  const pendingRescore = useRef<Set<string>>(new Set());
+  const rescoreTimer = useRef<number | null>(null);
+
+  const flushRescore = useCallback(async (): Promise<void> => {
+    const keys = [...pendingRescore.current].filter(Boolean);
+    pendingRescore.current = new Set();
+    if (keys.length === 0) return;
+    setRescoring(true);
+    try {
+      const fresh = await rescoreGeo(draft.id, keys);
+      setReport((prev) => {
+        if (!prev) return prev;
+        const levers = prev.levers.map((l) => fresh[l.key] ?? l);
+        const score = Math.round(levers.reduce((s, l) => s + l.score * (l.weight ?? 0), 0));
+        return { ...prev, levers, score, grade: localGrade(score) };
+      });
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRescoring(false);
+    }
+  }, [draft.id, showNotice]);
+
+  const queueRescore = useCallback(
+    (leverKey: string): void => {
+      if (!leverKey) return;
+      pendingRescore.current.add(leverKey);
+      if (rescoreTimer.current) window.clearTimeout(rescoreTimer.current);
+      rescoreTimer.current = window.setTimeout(() => void flushRescore(), 900);
+    },
+    [flushRescore],
+  );
 
   // Drop stored additions whose text is no longer present (manually edited away).
   // biome-ignore lint/correctness/useExhaustiveDependencies: reconcile whenever sections change
@@ -317,7 +353,7 @@ export function GeoPanel({
     if (!a) delete next[kind];
     setAdditions(next);
     saveAdditions(draft.id, next);
-    setStale(true);
+    queueRescore(kind === "opener" ? "definitional_opener" : "faq");
   }
 
   // ── Additive fixes: generate ONLY the new content, insert it, highlight it. ──
@@ -344,7 +380,7 @@ export function GeoPanel({
       const existing = (draft.outline?.opening_hook ?? "").trim();
       await saveOpening(existing ? `${opener}\n\n${existing}` : opener);
       setUndoable((m) => new Map(m).set(key, { kind: "opening", prev: existing }));
-      setStale(true);
+      queueRescore("definitional_opener");
       flashOpening();
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
@@ -395,7 +431,7 @@ export function GeoPanel({
       });
       await saveOpening(text.trim());
       setUndoable((m) => new Map(m).set(key, { kind: "opening", prev: opening }));
-      setStale(true);
+      queueRescore("definitional_opener");
       flashOpening();
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
@@ -425,7 +461,7 @@ export function GeoPanel({
       setUndoable((m) =>
         new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
       );
-      setStale(true);
+      queueRescore("comparison_table");
       flashSection(sectionId);
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
@@ -534,33 +570,15 @@ export function GeoPanel({
         setUndoable((m) =>
           new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
         );
-        // The rewrite restructured this section, so its OTHER findings now
-        // describe text that no longer exists — hide them until a re-analyze.
-        hideStaleSiblings(key, sectionId);
       }
-      setStale(true);
+      // Re-score ONLY this fix's lever — sibling findings stay applicable.
+      queueRescore(FIX_LEVER[fix] ?? "");
       flashSection(sectionId);
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
     } finally {
       setApplyingKey(null);
     }
-  }
-
-  /** Hide every OTHER finding that points at a section a rewrite just
-   * restructured — their quoted text/notes are stale. Re-analyze restores. */
-  function hideStaleSiblings(appliedKey: string, sectionId: string): void {
-    if (!report) return;
-    setHidden((prev) => {
-      const next = new Set(prev);
-      for (const lever of report.levers) {
-        for (const f of lever.findings) {
-          const k = findingKey(lever, f);
-          if (k !== appliedKey && f.section_id === sectionId) next.add(k);
-        }
-      }
-      return next;
-    });
   }
 
   async function applyTitle(sectionId: string, title: string): Promise<void> {
@@ -599,7 +617,7 @@ export function GeoPanel({
       );
       setAddingKey(null);
       setFactText("");
-      setStale(true);
+      queueRescore("factual_density");
       flashSection(section.id);
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
@@ -625,6 +643,9 @@ export function GeoPanel({
         next.delete(key);
         return next;
       });
+      // Re-score the reverted lever too. The key is either "opener-fix" or a
+      // findingKey ("<lever>:<...>"), so the lever is the part before the ":".
+      queueRescore(key === "opener-fix" ? "definitional_opener" : (key.split(":")[0] ?? ""));
       if (entry.kind === "opening") flashOpening();
       else flashSection(entry.sectionId);
     } catch (e) {
@@ -703,12 +724,9 @@ export function GeoPanel({
           {notice}
         </div>
       )}
-      {stale && !busy && (
+      {rescoring && !busy && (
         <div className="mx-6 mt-6 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
-          Draft changed — updating the score…{" "}
-          <button type="button" onClick={run} className="underline">
-            refresh now
-          </button>
+          Re-scoring the changed lever…
         </div>
       )}
 

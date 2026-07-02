@@ -353,3 +353,67 @@ def test_parse_faq() -> None:
     )
     assert parse_faq(raw, 4) == [{"q": "What is it?", "a": "A tool."}]
     assert parse_faq("junk", 4) == []
+
+
+def test_lever_carries_its_weight_for_client_rescore() -> None:
+    # Each scored lever exposes its weight so a targeted re-score can recompute
+    # the overall total on the client without re-running everything.
+    sk = score_structural(_draft([_sec("Intro", "hi")]))["skimmability"]
+    assert sk["weight"] > 0
+
+
+class _NoLLM:
+    name = "no"
+
+    async def complete(self, **_kw):  # type: ignore[no-untyped-def]
+        raise AssertionError("structural-only rescore must not call the LLM")
+
+
+class _JsonLLM:
+    name = "json"
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    async def complete(self, **_kw):  # type: ignore[no-untyped-def]
+        from blogforge.llm.base import LLMResponse
+
+        return LLMResponse(
+            text=self._text, input_tokens=1, output_tokens=1, model="m", finish_reason="stop"
+        )
+
+
+def _fake_pack(tmp_path):  # type: ignore[no-untyped-def]
+    root = tmp_path / "pack"
+    root.mkdir()
+    (root / "stylepack.yaml").write_text(
+        "spec_version: '1.0'\npack:\n  slug: dan\n  name: Dan\n  version: '1.0'\n  author: Dan\n"
+        "persona:\n  identity: x\n  one_line: y\n"
+    )
+    (root / "style-guide.md").write_text("Be brief.\n")
+    return root
+
+
+async def test_rescore_structural_only_skips_the_llm(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from blogforge.generate.geo import rescore_geo
+
+    d = _draft([_sec("Intro", "Plain prose with no lists at all.")])
+    out = await rescore_geo(d, ["skimmability"], tmp_path, _NoLLM(), model="m")
+    # Only the requested lever comes back, computed with no LLM call.
+    assert set(out) == {"skimmability"}
+    assert out["skimmability"]["key"] == "skimmability"
+
+
+async def test_rescore_returns_only_the_requested_semantic_lever(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from blogforge.generate.geo import rescore_geo
+
+    raw = (
+        '{"answer_first": {"score": 55, "note": "ok"},'
+        '"definitional_opener": {"score": 90, "note": "ok", "has_definition": true},'
+        '"factual_density": {"score": 70, "note": "ok"},'
+        '"brand_explicit": {"score": 40, "note": "implied"}}'
+    )
+    d = _draft([_sec("Intro", "x")])
+    out = await rescore_geo(d, ["answer_first"], _fake_pack(tmp_path), _JsonLLM(raw), model="m")
+    assert set(out) == {"answer_first"}
+    assert out["answer_first"]["score"] == 55

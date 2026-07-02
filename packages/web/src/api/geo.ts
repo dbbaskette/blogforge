@@ -31,6 +31,9 @@ export interface GeoLever {
   key: string;
   label: string;
   score: number;
+  /** This lever's share of the overall score — used to recompute the total
+   * client-side after a targeted per-lever re-score. */
+  weight?: number;
   detail: string;
   findings: GeoFinding[];
   fix: GeoFix;
@@ -50,6 +53,23 @@ export interface FaqItem {
 /** Deterministic structural checks + one voice-aware LLM pass → GEO report. */
 export function analyzeGeo(draftId: string): Promise<GeoReport> {
   return api<GeoReport>(`/api/drafts/${encodeURIComponent(draftId)}/geo`, { method: "POST" });
+}
+
+/**
+ * Re-score ONLY the given levers after a targeted fix. Returns just those
+ * (keyed by lever key); the caller merges them into the current report so
+ * unaffected levers keep their scores. Structural levers recompute instantly;
+ * semantic ones cost one LLM pass.
+ */
+export async function rescoreGeo(
+  draftId: string,
+  levers: string[],
+): Promise<Record<string, GeoLever>> {
+  const res = await api<{ levers: Record<string, GeoLever> }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/rescore`,
+    { method: "POST", body: JSON.stringify({ levers }) },
+  );
+  return res.levers;
 }
 
 /** Generate grounded FAQ pairs from the draft to add an FAQ section. */
