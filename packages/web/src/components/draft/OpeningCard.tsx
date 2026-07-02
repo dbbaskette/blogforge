@@ -12,10 +12,13 @@ export function OpeningCard({
   value,
   draftId,
   onSave,
+  pendingTexts,
 }: {
   value: string;
   draftId: string;
   onSave: (next: string) => void | Promise<void>;
+  /** Unapproved panel-applied runs to color in this editor. */
+  pendingTexts?: string[];
 }): JSX.Element {
   return (
     <section id="opening" className="mb-6 rounded-nb border border-rule bg-surface/60 p-4">
@@ -28,6 +31,7 @@ export function OpeningCard({
       <MarkdownEditor
         initialMarkdown={value}
         draftId={draftId}
+        pendingTexts={pendingTexts}
         onSave={async (md) => {
           await onSave(md);
         }}

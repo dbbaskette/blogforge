@@ -22,6 +22,8 @@ interface SectionsPanelProps {
   /** Accumulated live token text for liveSectionId. */
   liveText?: string;
   onSectionSave: (sectionId: string, content_md: string, createVersion?: boolean) => Promise<void>;
+  /** Unapproved panel-applied runs to color, per section id. */
+  pendingTextsForSection?: (sectionId: string) => string[];
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
@@ -48,6 +50,7 @@ export function SectionsPanel({
   liveSectionId,
   liveText,
   onSectionSave,
+  pendingTextsForSection,
   onRegenerateSection,
   onRevertSection,
   onReorder,
@@ -98,9 +101,7 @@ export function SectionsPanel({
   };
 
   const total = sections.length;
-  const doneCount = sections.filter(
-    (s) => s.status === "ready" || s.status === "edited",
-  ).length;
+  const doneCount = sections.filter((s) => s.status === "ready" || s.status === "edited").length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const writtenCount = doneCount;
   // Live word tally for the compose theater — sums each section's word_count as
@@ -388,6 +389,7 @@ export function SectionsPanel({
                   isGenerating={isComposing}
                   liveText={liveSectionId === section.id ? liveText : undefined}
                   draftId={draft.id}
+                  pendingTexts={pendingTextsForSection?.(section.id)}
                   onSave={(md, createVersion) => onSectionSave(section.id, md, createVersion)}
                   onRegenerate={(instruction) => onRegenerateSection(section.id, instruction)}
                   onRevert={(versionId) => onRevertSection(section.id, versionId)}
@@ -433,8 +435,8 @@ function ComposingDraftPanel({
         </span>
       </div>
       <p className="text-sm text-muted mt-2 max-w-md mx-auto leading-relaxed">
-        Writing the whole post in one pass from your outline, so it reads as a single
-        coherent piece. Watch each section land below.
+        Writing the whole post in one pass from your outline, so it reads as a single coherent
+        piece. Watch each section land below.
       </p>
       {sections.length > 0 && (
         <ul className="mt-5 inline-flex flex-col gap-1 text-left">

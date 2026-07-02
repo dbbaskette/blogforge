@@ -261,11 +261,15 @@ export function GeoPanel({
   onSectionSave,
   onChange,
   onClose,
+  onTrackChange,
 }: {
   draft: Draft;
   onSectionSave: (sectionId: string, content_md: string, createVersion?: boolean) => Promise<void>;
   onChange: (next: Draft) => Promise<void>;
   onClose: () => void;
+  /** Record a panel-applied edit so the editor colors it until approved. The
+   *  opening/lede uses the synthetic section id "opening". */
+  onTrackChange?: (sectionId: string, before: string, after: string, source: string) => void;
 }): JSX.Element {
   const panelRef = useDialogA11y(true, onClose);
   const [report, setReport] = useState<GeoReport | null>(null);
@@ -420,7 +424,9 @@ export function GeoPanel({
     try {
       const opener = await generateOpener(draft.id);
       const existing = (draft.outline?.opening_hook ?? "").trim();
-      await saveOpening(existing ? `${opener}\n\n${existing}` : opener);
+      const nextOpening = existing ? `${opener}\n\n${existing}` : opener;
+      await saveOpening(nextOpening);
+      onTrackChange?.("opening", existing, nextOpening, "geo:opener");
       setUndoable((m) => new Map(m).set(key, { kind: "opening", prev: existing }));
       queueRescore("definitional_opener");
       flashOpening();
@@ -482,6 +488,7 @@ export function GeoPanel({
         return;
       }
       await saveOpening(next);
+      onTrackChange?.("opening", opening, next, "geo:definitional_improve");
       setUndoable((m) => new Map(m).set(key, { kind: "opening", prev: opening }));
       queueRescore("definitional_opener");
       flashOpening();
@@ -510,6 +517,7 @@ export function GeoPanel({
       }
       const next = `${section.content_md.trim()}\n\n${table}`;
       await onSectionSave(sectionId, next, true);
+      onTrackChange?.(sectionId, section.content_md, next, "geo:comparison_table");
       setUndoable((m) =>
         new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
       );
@@ -536,6 +544,7 @@ export function GeoPanel({
       const block = `### FAQ\n\n${faqs.map((f) => `**${f.q}**\n\n${f.a}`).join("\n\n")}`;
       const next = `${last.content_md.trim()}\n\n${block}`;
       await onSectionSave(last.id, next);
+      onTrackChange?.(last.id, last.content_md, next, "geo:faq");
       recordAddition("faq", { sectionId: last.id, text: block });
       flashSection(last.id);
     } catch (e) {
@@ -581,6 +590,7 @@ export function GeoPanel({
         }
         const next = section.content_md.replace(target, dedupeOpeningBlock(target));
         await onSectionSave(sectionId, next);
+        onTrackChange?.(sectionId, section.content_md, next, "geo:dedupe_opening");
         setUndoable((m) =>
           new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
         );
@@ -598,6 +608,7 @@ export function GeoPanel({
         });
         const next = section.content_md.replace(target, text.trim());
         await onSectionSave(sectionId, next);
+        onTrackChange?.(sectionId, section.content_md, next, "geo:bullets");
         setUndoable((m) =>
           new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
         );
@@ -618,7 +629,9 @@ export function GeoPanel({
           action: "custom",
           instruction: REWRITE_INSTRUCTION[fix],
         });
-        await onSectionSave(sectionId, `${prefix}${text.trim()}${suffix}`);
+        const nextContent = `${prefix}${text.trim()}${suffix}`;
+        await onSectionSave(sectionId, nextContent);
+        onTrackChange?.(sectionId, section.content_md, nextContent, `geo:${fix}`);
         setUndoable((m) =>
           new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
         );

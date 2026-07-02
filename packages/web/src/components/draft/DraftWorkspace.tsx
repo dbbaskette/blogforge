@@ -5,6 +5,7 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { CheckupPanel } from "./CheckupPanel";
 import { GeoPanel } from "./GeoPanel";
@@ -173,6 +174,30 @@ export function DraftWorkspace({
   const [topic, setTopic] = useState(draft.title);
 
   useEffect(() => setTopic(draft.title), [draft.title]);
+
+  // Tracked changes: panel-applied edits (GEO/Proofreader) colored in the
+  // editors until approved. The "opening" lede uses the synthetic id "opening".
+  const [pending, setPending] = useState(() => loadPending(draft.id));
+  const refreshPending = useCallback(() => setPending(loadPending(draft.id)), [draft.id]);
+  const pendingTextsForSection = useCallback(
+    (sectionId: string): string[] =>
+      pending.filter((c) => c.sectionId === sectionId).map((c) => c.text),
+    [pending],
+  );
+  const handleTrackChange = useCallback(
+    (sectionId: string, before: string, after: string, source: string): void => {
+      trackChange(draft.id, sectionId, before, after, source);
+      refreshPending();
+    },
+    [draft.id, refreshPending],
+  );
+  // Drop runs the writer edited away; re-read whenever draft content changes.
+  useEffect(() => {
+    const secs = draft.sections.map((s) => ({ id: s.id, content_md: s.content_md }));
+    secs.push({ id: "opening", content_md: draft.outline?.opening_hook ?? "" });
+    prunePending(draft.id, secs);
+    setPending(loadPending(draft.id));
+  }, [draft.id, draft.sections, draft.outline]);
 
   // Build the next draft from a partial research/idea or outline patch, then push it.
   const handleIdeaChange = useCallback(
@@ -418,10 +443,26 @@ export function DraftWorkspace({
           </div>
         )}
 
+        {draft.stage === "sections" && pending.length > 0 && (
+          <div className="mb-3 flex items-center justify-end">
+            <button
+              type="button"
+              className="nb-btn nb-btn-ghost nb-btn-sm text-cobalt-700"
+              onClick={() => {
+                approveAll(draft.id);
+                refreshPending();
+              }}
+            >
+              Approve changes ({pending.length})
+            </button>
+          </div>
+        )}
+
         {draft.stage === "sections" && hasOpening && (
           <OpeningCard
             value={draft.outline?.opening_hook ?? ""}
             draftId={draft.id}
+            pendingTexts={pendingTextsForSection("opening")}
             onSave={handleOpeningChange}
           />
         )}
@@ -439,6 +480,7 @@ export function DraftWorkspace({
             liveSectionId={liveSectionId}
             liveText={liveText}
             onSectionSave={onSectionSave}
+            pendingTextsForSection={pendingTextsForSection}
             onRegenerateSection={handleRegenerateSection}
             onRevertSection={onRevertSection}
             onReviseDraft={handleReviseDraft}
@@ -466,7 +508,12 @@ export function DraftWorkspace({
       )}
 
       {lintOpen && (
-        <LintPanel draft={draft} onSectionSave={onSectionSave} onClose={() => setLintOpen(false)} />
+        <LintPanel
+          draft={draft}
+          onSectionSave={onSectionSave}
+          onTrackChange={handleTrackChange}
+          onClose={() => setLintOpen(false)}
+        />
       )}
       {shapeOpen && (
         <ShapePanel
@@ -479,6 +526,7 @@ export function DraftWorkspace({
         <GeoPanel
           draft={draft}
           onSectionSave={onSectionSave}
+          onTrackChange={handleTrackChange}
           onChange={onChange}
           onClose={() => setGeoOpen(false)}
         />

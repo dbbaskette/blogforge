@@ -17,6 +17,8 @@ interface LintPanelProps {
   draft: Draft;
   /** Persist a section's new markdown (applies an accepted fix). */
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
+  /** Record an applied fix so the editor colors the change until approved. */
+  onTrackChange?: (sectionId: string, before: string, after: string, source: string) => void;
   onClose: () => void;
 }
 
@@ -159,7 +161,12 @@ function HumanityRing({
   );
 }
 
-export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JSX.Element {
+export function LintPanel({
+  draft,
+  onSectionSave,
+  onTrackChange,
+  onClose,
+}: LintPanelProps): JSX.Element {
   const draftId = draft.id;
   const [loading, setLoading] = useState(true);
   const [violations, setViolations] = useState<LintFinding[]>([]);
@@ -282,6 +289,7 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
                   finding={f}
                   draft={draft}
                   onSectionSave={onSectionSave}
+                  onTrackChange={onTrackChange}
                   onDismiss={() => onDismiss(f.id)}
                   onApplied={runLint}
                   onResolved={() => setResolved((p) => new Set(p).add(f.id))}
@@ -362,6 +370,7 @@ function FindingCard({
   finding,
   draft,
   onSectionSave,
+  onTrackChange,
   onDismiss,
   onApplied,
   onResolved,
@@ -369,6 +378,7 @@ function FindingCard({
   finding: LintFinding;
   draft: Draft;
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
+  onTrackChange?: (sectionId: string, before: string, after: string, source: string) => void;
   onDismiss: () => void;
   onApplied: () => void;
   onResolved: () => void;
@@ -428,6 +438,7 @@ function FindingCard({
       const next =
         section.content_md.slice(0, span.s) + suggestion + section.content_md.slice(span.e);
       await onSectionSave(section.id, next);
+      onTrackChange?.(section.id, section.content_md, next, "lint:fix");
       setSuggestion(null);
       onResolved(); // remove this finding from the list right away
       onApplied(); // re-lint to refresh the rest

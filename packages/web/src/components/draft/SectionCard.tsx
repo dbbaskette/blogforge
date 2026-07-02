@@ -15,6 +15,8 @@ interface SectionCardProps {
   defaultOpen?: boolean;
   /** Draft id — needed to load this section's version history. */
   draftId: string;
+  /** Unapproved panel-applied runs to color in this section's editor. */
+  pendingTexts?: string[];
   onSave: (content_md: string, createVersion?: boolean) => Promise<void>;
   /** `instruction` steers a guided regeneration ("tighten", "add an example"). */
   onRegenerate: (instruction?: string) => Promise<void>;
@@ -72,6 +74,7 @@ export function SectionCard({
   liveText,
   defaultOpen,
   draftId,
+  pendingTexts,
   onSave,
   onRegenerate,
   onRevert,
@@ -235,6 +238,7 @@ export function SectionCard({
               initialMarkdown={section.content_md}
               onSave={onSave}
               draftId={draftId}
+              pendingTexts={pendingTexts}
             />
           ) : (
             <div
