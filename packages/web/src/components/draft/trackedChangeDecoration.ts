@@ -1,13 +1,16 @@
 /**
- * TipTap extension that colors "pending" text runs (panel-applied edits not yet
- * approved). Pure view chrome — it adds inline ProseMirror decorations over the
- * matching substrings and never touches the document, so autosave / turndown
- * round-trips are unaffected.
+ * TipTap extension that highlights text runs in the editor. Pure view chrome —
+ * it adds inline ProseMirror decorations over matching substrings and never
+ * touches the document, so autosave / turndown round-trips are unaffected.
  *
- * The runs to color live in the plugin's state, updated by dispatching a
- * transaction with `setMeta(trackedChangeKey, texts)`. Decorations are rebuilt
- * from the current doc on every view update, so they stay correct as the writer
- * types (no offset mapping to get wrong).
+ * Three kinds, distinguished by CSS class:
+ *   - `pending`      — a panel-applied edit not yet approved (legacy tracked-changes)
+ *   - `under-review` — a fix just applied and awaiting accept (review state)
+ *   - `locate`       — a transient highlight from the "Highlight" action
+ *
+ * Runs live in the plugin's state, updated by dispatching a transaction with
+ * `setMeta(trackedChangeKey, runs)`. Decorations are rebuilt from the current
+ * doc on every view update, so they stay correct as the writer types.
  */
 
 import type { Node as PMNode } from "@tiptap/pm/model";
@@ -15,25 +18,44 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Extension } from "@tiptap/react";
 
-export const trackedChangeKey = new PluginKey<string[]>("trackedChange");
+export type TrackedChangeKind = "pending" | "under-review" | "locate";
 
-function buildDecorations(doc: PMNode, texts: string[]): DecorationSet {
-  const runs = [...new Set(texts.map((t) => t.trim()).filter((t) => t.length > 0))]
+export interface TrackedRun {
+  text: string;
+  kind: TrackedChangeKind;
+}
+
+/** Meta may be a bare string[] (legacy → "pending") or typed runs. */
+export type TrackedChangeMeta = string[] | TrackedRun[];
+
+export const trackedChangeKey = new PluginKey<TrackedRun[]>("trackedChange");
+
+function normalize(meta: TrackedChangeMeta | undefined): TrackedRun[] {
+  if (!meta) return [];
+  return meta.map((m) => (typeof m === "string" ? { text: m, kind: "pending" as const } : m));
+}
+
+export function buildDecorations(doc: PMNode, runs: TrackedRun[]): DecorationSet {
+  const clean = runs
+    .map((r) => ({ text: r.text.trim(), kind: r.kind }))
+    .filter((r) => r.text.length > 0)
     // Longest first so a longer run wins over a shorter one it contains.
-    .sort((a, b) => b.length - a.length);
-  if (runs.length === 0) return DecorationSet.empty;
+    .sort((a, b) => b.text.length - a.text.length);
+  if (clean.length === 0) return DecorationSet.empty;
 
   const decos: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;
     const text = node.text;
-    for (const run of runs) {
-      let idx = text.indexOf(run);
+    for (const run of clean) {
+      let idx = text.indexOf(run.text);
       while (idx !== -1) {
         decos.push(
-          Decoration.inline(pos + idx, pos + idx + run.length, { class: "tracked-change" }),
+          Decoration.inline(pos + idx, pos + idx + run.text.length, {
+            class: `tracked-change tracked-change--${run.kind}`,
+          }),
         );
-        idx = text.indexOf(run, idx + run.length);
+        idx = text.indexOf(run.text, idx + run.text.length);
       }
     }
   });
@@ -44,19 +66,19 @@ export const TrackedChangeDecoration = Extension.create({
   name: "trackedChange",
   addProseMirrorPlugins() {
     return [
-      new Plugin<string[]>({
+      new Plugin<TrackedRun[]>({
         key: trackedChangeKey,
         state: {
           init: () => [],
           apply(tr, old) {
-            const meta = tr.getMeta(trackedChangeKey) as string[] | undefined;
-            return meta ?? old;
+            const meta = tr.getMeta(trackedChangeKey) as TrackedChangeMeta | undefined;
+            return meta === undefined ? old : normalize(meta);
           },
         },
         props: {
           decorations(state) {
-            const texts = trackedChangeKey.getState(state) ?? [];
-            return buildDecorations(state.doc, texts);
+            const runs = trackedChangeKey.getState(state) ?? [];
+            return buildDecorations(state.doc, runs);
           },
         },
       }),
