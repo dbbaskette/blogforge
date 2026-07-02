@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../src/api/packs", () => ({
   listPacks: vi.fn().mockResolvedValue([{ slug: "house", valid: true }]),
   getManifest: vi.fn().mockResolvedValue({ formats: [] }),
+  listFormats: vi.fn().mockResolvedValue([
+    { name: "product-release", description: "Product release / launch — announce a release." },
+    { name: "how-to", description: "How-to / tutorial — step-by-step guide." },
+  ]),
 }));
 vi.mock("../../src/api/providers", () => ({
   listProviderAvailability: vi.fn().mockResolvedValue({ anthropic: true }),
@@ -38,5 +42,18 @@ describe("SetupFields", () => {
     await waitFor(() => {});
     fireEvent.click(screen.getByRole("button", { name: /a voice pack/i }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ use_voice_profile: false }));
+  });
+
+  it("shows built-in formats and stays enabled in voice-profile mode", async () => {
+    const onChange = vi.fn();
+    render(<SetupFields value={base} onChange={onChange} />);
+    const select = screen.getByLabelText(/Format/i) as HTMLSelectElement;
+    // Built-in options load regardless of use_voice_profile=true.
+    await waitFor(() =>
+      expect(screen.getByRole("option", { name: /product-release/i })).toBeInTheDocument(),
+    );
+    expect(select.disabled).toBe(false);
+    fireEvent.change(select, { target: { value: "product-release" } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ format: "product-release" }));
   });
 });
