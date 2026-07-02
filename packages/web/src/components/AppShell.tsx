@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { logout } from "../api/auth";
 import { useMe } from "../hooks/useMe";
 import { useVersionCheck } from "../hooks/useVersionCheck";
+import { versionLabel, versionTitle } from "../lib/version";
 import { CommandPalette } from "./CommandPalette";
 
 export function AppShell(): JSX.Element {
@@ -89,7 +90,12 @@ function TopBar(): JSX.Element {
           </span>
           <span className="flex flex-col leading-tight">
             <span className="font-semibold text-[15px] text-ink tracking-tight">BlogForge</span>
-            <span className="text-[11px] text-muted leading-none mt-0.5">a workshop</span>
+            <span className="text-[11px] text-muted leading-none mt-0.5">
+              a workshop ·{" "}
+              <span className="font-mono" title={versionTitle()}>
+                {versionLabel()}
+              </span>
+            </span>
           </span>
         </Link>
         {user && (
@@ -122,11 +128,7 @@ function TopBar(): JSX.Element {
             </NavLink>
             <span className="inline-flex items-center gap-1.5 hidden sm:inline-flex ml-1">
               {user.avatar_url && (
-                <img
-                  src={user.avatar_url}
-                  alt=""
-                  className="w-6 h-6 rounded-full"
-                />
+                <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full" />
               )}
               <span className="text-xs text-muted">{user.github_login ?? user.email ?? "—"}</span>
             </span>

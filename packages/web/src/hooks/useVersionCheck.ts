@@ -5,14 +5,17 @@ import { api } from "../api/client";
 interface Health {
   status: string;
   version: string;
+  /** Short git SHA of the deployed build — changes every deploy (the semver
+   * usually doesn't), so it's the reliable staleness signal. */
+  commit?: string;
 }
 
 /**
  * Guards against a stale cached JS bundle. On mount it records the API's
- * reported version (the version this bundle was loaded against), then polls
- * `/api/health` on an interval. When the server reports a different version,
+ * reported build id (the build this bundle was loaded against), then polls
+ * `/api/health` on an interval. When the server reports a different build,
  * the loaded bundle is stale and `stale` flips to true so the UI can prompt
- * a reload.
+ * a reload. Keys off the per-deploy `commit` (falling back to `version`).
  */
 export function useVersionCheck(intervalMs = 60_000): { stale: boolean } {
   const [stale, setStale] = useState(false);
@@ -24,11 +27,12 @@ export function useVersionCheck(intervalMs = 60_000): { stale: boolean } {
     const check = async (): Promise<void> => {
       try {
         const health = await api<Health>("/api/health");
-        if (cancelled || !health?.version) return;
+        const id = health?.commit || health?.version;
+        if (cancelled || !id) return;
         if (loadedVersion.current === null) {
           // First successful fetch records the baseline.
-          loadedVersion.current = health.version;
-        } else if (health.version !== loadedVersion.current) {
+          loadedVersion.current = id;
+        } else if (id !== loadedVersion.current) {
           setStale(true);
         }
       } catch {
