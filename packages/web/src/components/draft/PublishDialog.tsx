@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { type Draft, downloadDraftUrl } from "../../api/drafts";
+import { buildGeoSetup } from "../../lib/geoSetup";
 import {
   type FrontmatterPreset,
   type PublishConfig,
@@ -36,6 +37,18 @@ export function PublishDialog({
   const [done, setDone] = useState<{ prefilled: boolean } | null>(null);
 
   const patch = (p: Partial<PublishConfig>): void => setConfig((c) => ({ ...c, ...p }));
+
+  // One-time, site-level GEO setup (crawler access, SSR, schema, E-E-A-T,
+  // freshness) — the signals the per-post GEO panel can't see.
+  function downloadGeoSetup(): void {
+    const blob = new Blob([buildGeoSetup(config)], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "GEO-SETUP.md";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const onPreset = (preset: FrontmatterPreset): void => {
     const pres = PRESETS.find((p) => p.value === preset);
@@ -112,6 +125,17 @@ export function PublishDialog({
         <p className="text-sm text-muted leading-snug">
           Opens your repo's new-file editor with this post ready to commit — review and open the PR
           from there. The post is copied to your clipboard too.
+        </p>
+        <p className="text-xs text-muted leading-snug">
+          First time?{" "}
+          <button
+            type="button"
+            onClick={downloadGeoSetup}
+            className="text-cobalt-600 hover:text-cobalt-700 underline underline-offset-2"
+          >
+            Download the one-time GEO site setup guide
+          </button>{" "}
+          — crawler access, SSR, schema, author bio, freshness.
         </p>
 
         {done ? (
