@@ -11,6 +11,7 @@ import TurndownService from "turndown";
 import { tables as gfmTables } from "turndown-plugin-gfm";
 
 import { type InlineAction, inlineEdit } from "../../api/drafts";
+import { TrackedChangeDecoration, trackedChangeKey } from "./trackedChangeDecoration";
 
 export interface MarkdownEditorProps {
   initialMarkdown: string;
@@ -22,6 +23,11 @@ export interface MarkdownEditorProps {
   onSave: (md: string, createVersion: boolean) => Promise<void>;
   /** Draft id — when set, the rich editor shows a floating AI toolbar on selection. */
   draftId?: string;
+  /**
+   * Word runs applied by a panel fix and not yet approved — colored in the rich
+   * editor so the writer sees what changed. View-only; never edits the content.
+   */
+  pendingTexts?: string[];
 }
 
 type Mode = "rich" | "raw";
@@ -33,6 +39,7 @@ export function MarkdownEditor({
   initialMarkdown,
   onSave,
   draftId,
+  pendingTexts,
 }: MarkdownEditorProps): JSX.Element {
   const [raw, setRaw] = useState<string>(initialMarkdown);
   const [mode, setMode] = useState<Mode>("rich");
@@ -106,6 +113,7 @@ export function MarkdownEditor({
       TableRow,
       TableHeader,
       TableCell,
+      TrackedChangeDecoration,
     ],
     content: "",
     editorProps: {
@@ -159,6 +167,16 @@ export function MarkdownEditor({
     versionedRef.current = false; // a fresh baseline → next edit snapshots it
     setStatus("saved");
   }, [initialMarkdown, editor]);
+
+  // Push the pending-change runs into the decoration plugin. A meta-only
+  // transaction doesn't change the doc, but we still guard the autosave flag so
+  // no editor build interprets it as a user edit.
+  useEffect(() => {
+    if (!editor) return;
+    applyingExternalRef.current = true;
+    editor.view.dispatch(editor.state.tr.setMeta(trackedChangeKey, pendingTexts ?? []));
+    applyingExternalRef.current = false;
+  }, [editor, pendingTexts]);
 
   // Warn before leaving the page with an unsaved or in-flight edit.
   useEffect(() => {
