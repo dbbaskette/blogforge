@@ -8,6 +8,7 @@ synchronously via provider.complete(); these outputs are short.
 Voice setup mirrors section generation (same compose_prompt path) so the
 repurposed copy reads like the same author wrote it for the new channel.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,7 +19,7 @@ from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
 
 RepurposeFormat = Literal[
-    "x_thread", "linkedin", "newsletter", "tldr", "meta_description", "email"
+    "x_thread", "linkedin", "linkedin_article", "newsletter", "tldr", "meta_description", "email"
 ]
 
 # label is for the UI; directive is the channel-specific instruction.
@@ -27,31 +28,44 @@ FORMATS: dict[str, dict[str, str]] = {
         "label": "X / Twitter thread",
         "directive": (
             "Turn the post into an X (Twitter) thread. Open with a scroll-stopping "
-            "hook tweet, then 4–8 numbered tweets that carry the argument. Each tweet "
+            "hook tweet, then 4-8 numbered tweets that carry the argument. Each tweet "
             "stands alone and stays under 280 characters. Number them like 1/, 2/. "
             "No hashtags unless they're genuinely useful."
         ),
     },
     "linkedin": {
-        "label": "LinkedIn post",
+        "label": "LinkedIn post (feed)",
         "directive": (
-            "Turn the post into a LinkedIn post: a strong first line (it's the only "
-            "part shown before 'see more'), short punchy paragraphs with line breaks, "
-            "a concrete takeaway, and a soft prompt for discussion at the end. "
-            "Professional but human — no buzzword soup."
+            "Turn the post into a LinkedIn FEED post of 50-299 words (don't pad it to "
+            "look longer — short posts get cited as often). A strong first line (the "
+            "only part shown before 'see more'), short punchy paragraphs with line "
+            "breaks, and one concrete thing the reader LEARNS — teach, don't just "
+            "announce. Name the product/brand explicitly at least once so a citation "
+            "travels with it. End with a soft prompt for discussion. No buzzword soup."
+        ),
+    },
+    "linkedin_article": {
+        "label": "LinkedIn article (Pulse)",
+        "directive": (
+            "Turn the post into a long-form LinkedIn (Pulse) ARTICLE of 800-1,200 words "
+            "— Pulse articles get cited by AI far more often than feed posts. Keep a "
+            "clear title, short teaching sections with subheadings, and at least one "
+            "concrete takeaway per section. Lead with substance the reader can act on "
+            "(instruct, don't announce), name the product/brand explicitly, and keep it "
+            "original and first-hand. Return the article body in Markdown."
         ),
     },
     "newsletter": {
         "label": "Newsletter blurb",
         "directive": (
-            "Write a short newsletter intro (90–150 words) that teases the post and "
+            "Write a short newsletter intro (90-150 words) that teases the post and "
             "makes the reader want to click through. End on an implicit 'read more'."
         ),
     },
     "tldr": {
         "label": "TL;DR summary",
         "directive": (
-            "Write a TL;DR: one framing sentence, then 3–5 tight bullet points capturing "
+            "Write a TL;DR: one framing sentence, then 3-5 tight bullet points capturing "
             "the key claims. No fluff."
         ),
     },
@@ -66,7 +80,7 @@ FORMATS: dict[str, dict[str, str]] = {
         "label": "Announcement email",
         "directive": (
             "Write a short announcement email: a subject line (prefix it 'Subject: '), "
-            "then a 100–160 word body that frames why this post matters and links the "
+            "then a 100-160 word body that frames why this post matters and links the "
             "reader to it. Warm, direct, one clear call to action."
         ),
     },

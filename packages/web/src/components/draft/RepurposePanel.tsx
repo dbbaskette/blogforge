@@ -140,6 +140,11 @@ function LinkedInCard({
         </span>
         <span className="ml-auto text-muted-2">{label}</span>
       </div>
+      <p className="mt-2 text-[11px] leading-snug text-muted-2">
+        {text.trim().split(/\s+/).filter(Boolean).length} words · GEO: publish under a named person
+        (not just the company page), post 1–3×/week, and name your product explicitly so the
+        citation travels with it.
+      </p>
     </article>
   );
 }
