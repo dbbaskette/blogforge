@@ -15,6 +15,7 @@ import { type Template, deleteTemplate, listTemplates } from "../../api/template
 import { loadDefaults, loadLastMode, saveDefaults, saveLastMode } from "../../lib/composeDefaults";
 import { parseOutline } from "../../lib/parseOutline";
 import { type ComposeSettings, SetupFields } from "../SetupFields";
+import { useToast } from "../ui/Toast";
 import { BlankPanel } from "./BlankPanel";
 import { ExpressPanel } from "./ExpressPanel";
 import { InlineKeySetup } from "./InlineKeySetup";
@@ -40,17 +41,33 @@ function ideaFrom(
   topic: string,
   bullets: string[] = [],
   notes = "",
+  sourceUrls: string[] = [],
 ): IdeaInput {
-  return { topic, bullets, notes, ...settings };
+  return { topic, bullets, notes, source_urls: sourceUrls, ...settings };
 }
 
 export function ComposeStudio(): JSX.Element {
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Non-fatal: a source URL that couldn't be fetched at compose-start. The
+  // draft is still created; the toast survives the navigate into it.
+  function toastRefWarnings(warnings?: { url: string }[]): void {
+    if (warnings && warnings.length > 0) {
+      const urls = warnings.map((w) => w.url).join(", ");
+      toast(
+        `Couldn't fetch ${warnings.length} source${warnings.length > 1 ? "s" : ""}: ${urls}`,
+        "error",
+      );
+    }
+  }
+
   // Preselect the fastest mode (Express) for a running start, but honor the
   // mode the writer last used so returning users skip re-picking.
   const [mode, setMode] = useState<ComposeMode | null>(() => loadLastMode() ?? "express");
   const [settings, setSettings] = useState<ComposeSettings>(() => loadDefaults());
   const [topic, setTopic] = useState("");
+  const [sourceUrls, setSourceUrls] = useState<string[]>([]);
   const [outlineText, setOutlineText] = useState("");
   const [pasteText, setPasteText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -124,8 +141,9 @@ export function ComposeStudio(): JSX.Element {
     setError(null);
     setResumeDraftId(null);
     try {
-      const idea = ideaFrom(settings, topic.trim() || "Untitled", bullets, notes);
+      const idea = ideaFrom(settings, topic.trim() || "Untitled", bullets, notes, sourceUrls);
       const draft = await createDraft(idea);
+      toastRefWarnings(draft.reference_warnings);
       saveDefaults(settings);
       saveLastMode("blank");
       navigate(`/drafts/${draft.id}`);
@@ -191,9 +209,10 @@ export function ComposeStudio(): JSX.Element {
     setResumeDraftId(null);
     let createdId: string | null = null;
     try {
-      const idea = ideaFrom(settings, topic.trim(), bullets, notes);
+      const idea = ideaFrom(settings, topic.trim(), bullets, notes, sourceUrls);
       const draft = await createDraft(idea);
       createdId = draft.id;
+      toastRefWarnings(draft.reference_warnings);
       await generateOutline(draft.id);
       await expandSections(draft.id);
       saveDefaults(settings);
@@ -217,9 +236,10 @@ export function ComposeStudio(): JSX.Element {
     setResumeDraftId(null);
     let createdId: string | null = null;
     try {
-      const idea = ideaFrom(settings, topic.trim(), bullets, notes);
+      const idea = ideaFrom(settings, topic.trim(), bullets, notes, sourceUrls);
       const draft = await createDraft(idea);
       createdId = draft.id;
+      toastRefWarnings(draft.reference_warnings);
       await generateOutline(draft.id);
       saveDefaults(settings);
       saveLastMode("propose");
@@ -336,6 +356,8 @@ export function ComposeStudio(): JSX.Element {
             <BlankPanel
               topic={topic}
               onTopic={setTopic}
+              sourceUrls={sourceUrls}
+              onSourceUrls={setSourceUrls}
               onRun={runBlank}
               busy={busy}
               disabled={!canRun}
@@ -346,6 +368,8 @@ export function ComposeStudio(): JSX.Element {
               <ExpressPanel
                 topic={topic}
                 onTopic={setTopic}
+                sourceUrls={sourceUrls}
+                onSourceUrls={setSourceUrls}
                 onRun={runExpress}
                 busy={busy}
                 disabled={!canRun}
@@ -358,6 +382,8 @@ export function ComposeStudio(): JSX.Element {
               <ProposePanel
                 topic={topic}
                 onTopic={setTopic}
+                sourceUrls={sourceUrls}
+                onSourceUrls={setSourceUrls}
                 onRun={runPropose}
                 busy={busy}
                 disabled={!canRun}

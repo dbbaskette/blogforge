@@ -1,12 +1,18 @@
+import { SourceUrlsField } from "./SourceUrlsField";
+
 export function BlankPanel({
   topic,
   onTopic,
+  sourceUrls,
+  onSourceUrls,
   onRun,
   busy,
   disabled = false,
 }: {
   topic: string;
   onTopic: (v: string) => void;
+  sourceUrls: string[];
+  onSourceUrls: (v: string[]) => void;
   onRun: () => void;
   busy: boolean;
   disabled?: boolean;
@@ -26,6 +32,7 @@ export function BlankPanel({
           onChange={(e) => onTopic(e.target.value)}
         />
       </div>
+      <SourceUrlsField value={sourceUrls} onChange={onSourceUrls} />
       <button
         type="button"
         className="nb-btn nb-btn-primary"

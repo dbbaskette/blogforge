@@ -19,6 +19,9 @@ def _uuid() -> str:
 class IdeaInput(BaseModel):
     topic: str = Field(min_length=1)
     bullets: list[str] = Field(default_factory=list)
+    # URLs pasted at compose-start. create_draft fetches each as a reference so
+    # the first outline/draft is grounded in real source material. Capped at 10.
+    source_urls: list[str] = Field(default_factory=list, max_length=10)
     # Required only when generating from a pack. In voice-profile mode the pack
     # is irrelevant (resolve_voice materializes the profile and never reads
     # pack_slug), so a fresh profile-only user can compose without picking one.
@@ -120,6 +123,13 @@ class IdeationSession(BaseModel):
     messages: list[IdeationMessage] = Field(default_factory=list)
 
 
+class ReferenceWarning(BaseModel):
+    """A source URL that couldn't be fetched at compose-start (non-fatal)."""
+
+    url: str
+    error: str
+
+
 class Draft(BaseModel):
     id: str = Field(default_factory=_uuid)
     created_at: datetime = Field(default_factory=_now)
@@ -130,6 +140,9 @@ class Draft(BaseModel):
     outline: OutlineProposal | None = None
     sections: list[Section] = Field(default_factory=list)
     references: list[Reference] = Field(default_factory=list)
+    # Transient: only create_draft populates this (a source URL that failed to
+    # fetch at compose-start). Empty on every other Draft response.
+    reference_warnings: list[ReferenceWarning] = Field(default_factory=list)
     ideation_messages: list[IdeationMessage] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     # S3 key of the AI-generated hero image, if any. Served via the hero-image

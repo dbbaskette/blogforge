@@ -3,6 +3,8 @@ import { api } from "./client";
 export interface IdeaInput {
   topic: string;
   bullets?: string[];
+  /** URLs pasted at compose-start; fetched as grounding references (max 10). */
+  source_urls?: string[];
   pack_slug: string;
   format?: string | null;
   provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
@@ -10,6 +12,12 @@ export interface IdeaInput {
   target_words?: number;
   notes?: string;
   use_voice_profile?: boolean;
+}
+
+/** A source URL that couldn't be fetched at compose-start (non-fatal). */
+export interface ReferenceWarning {
+  url: string;
+  error: string;
 }
 
 export interface OutlineSection {
@@ -45,6 +53,8 @@ export interface Draft {
   sections: Section[];
   tags: string[];
   hero_image_key: string | null;
+  /** Populated only by create_draft: source URLs that failed to fetch. */
+  reference_warnings?: ReferenceWarning[];
 }
 export interface DraftSummary {
   id: string;

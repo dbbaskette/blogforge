@@ -149,6 +149,31 @@ async def _persist(
         )
 
 
+async def ingest_url_reference(
+    draft_id_str: str, draft_uuid: UUID, url: str, name: str | None = None
+) -> Reference:
+    """Fetch a URL, extract clean text, and persist it as a 'url' reference.
+
+    Shared by the /references/url endpoint and compose-start (create_draft).
+    Raises ValueError on fetch/extract failure (propagated from extract_url)."""
+    extraction = await extract_url(url)
+    if name:
+        extraction = ExtractionResult(
+            name=name,
+            extracted=extraction.extracted,
+            extracted_chars=extraction.extracted_chars,
+        )
+    return await _persist(
+        draft_id_str=draft_id_str,
+        draft_uuid=draft_uuid,
+        kind="url",
+        extraction=extraction,
+        original_bytes=url.encode("utf-8"),
+        original_ext=file_extension_for_kind("url"),
+        url=url,
+    )
+
+
 async def _resolve_draft(request: Request, draft_id: str, current: User) -> UUID:
     """Return the draft's UUID, or raise 404 (also catches cross-user access)."""
     draft = await _store(request).get(draft_id, user_id=current.id)
@@ -189,30 +214,13 @@ async def add_url_reference(
     draft_uuid = await _resolve_draft(request, draft_id, current)
 
     try:
-        extraction = await extract_url(body.url)
+        # User-supplied name overrides the extractor's title guess.
+        return await ingest_url_reference(draft_id, draft_uuid, body.url, body.name or None)
     except ValueError as err:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"error": {"code": "url_fetch_failed", "message": str(err)}},
         ) from err
-
-    # User-supplied name overrides the extractor's title guess.
-    if body.name:
-        extraction = ExtractionResult(
-            name=body.name,
-            extracted=extraction.extracted,
-            extracted_chars=extraction.extracted_chars,
-        )
-
-    return await _persist(
-        draft_id_str=draft_id,
-        draft_uuid=draft_uuid,
-        kind="url",
-        extraction=extraction,
-        original_bytes=body.url.encode("utf-8"),
-        original_ext=file_extension_for_kind("url"),
-        url=body.url,
-    )
 
 
 # ---------- POST /references/text ----------
