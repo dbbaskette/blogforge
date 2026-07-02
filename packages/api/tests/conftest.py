@@ -4,6 +4,7 @@ The TestClient `client` fixture is the legacy entry point still used by
 test_server.py and the existing API route tests. Task 18 will sweep those
 to authenticated SQL-backed clients; until then we leave it in place.
 """
+
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
@@ -30,6 +31,9 @@ def _force_sqlite_for_tests(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("BLOGFORGE_SESSION_SECRET", "test-session-secret")
     monkeypatch.setenv("BLOGFORGE_RUN_MIGRATIONS_ON_BOOT", "false")
     monkeypatch.setenv("BLOGFORGE_S3_BOOTSTRAP_ON_BOOT", "false")
+    # Storage defaults to "fs" in production; the suite's blob tests use the moto
+    # S3 path, so pin s3 here. FsStorage has its own dedicated test.
+    monkeypatch.setenv("BLOGFORGE_STORAGE_BACKEND", "s3")
     get_settings.cache_clear()
     reset_engine_for_tests()
 

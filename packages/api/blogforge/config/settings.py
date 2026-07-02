@@ -1,6 +1,7 @@
 """Application settings, loaded from BLOGFORGE_*-prefixed env vars."""
+
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -40,13 +41,27 @@ class Settings(BaseSettings):
 
     tanzu_api_base: str = ""
     tanzu_api_key: str = ""
-    tanzu_models: Annotated[list[str], NoDecode] = Field(default_factory=lambda: [
-        "openai/gpt-oss-120b", "Qwen/Qwen3.5-27B-GPTQ-Int4", "google/gemma-4-31B-it",
-    ])
+    tanzu_models: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: [
+            "openai/gpt-oss-120b",
+            "Qwen/Qwen3.5-27B-GPTQ-Int4",
+            "google/gemma-4-31B-it",
+        ]
+    )
     # Like s3_verify_ssl: the bound GenAI proxy presents a self-signed cert from
     # the foundation's internal CA, so config/tanzu._apply_genai flips this to
     # False for the bound gateway. Default True keeps real OpenAI strict.
     tanzu_verify_ssl: bool = True
+
+    # Blob storage (hero images, voice samples, uploads). "fs" writes to a local
+    # or mounted directory — no MinIO/Docker locally, and a bound Block Storage
+    # volume on Tanzu. "s3" uses object storage (MinIO locally / SeaweedFS on
+    # Tanzu). Default "fs" so the app runs with zero infra; the Tanzu adapter or
+    # docker-compose flips it to "s3" when object storage is bound.
+    storage_backend: Literal["fs", "s3"] = "fs"
+    # Base dir for the "fs" backend. On Tanzu this is set to the bound volume's
+    # mount path by the VCAP adapter.
+    storage_dir: str = ".data/blobs"
 
     s3_endpoint_url: str = "http://localhost:9000"
     s3_access_key: str = "blogforge"
