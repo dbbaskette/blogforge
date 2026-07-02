@@ -38,5 +38,12 @@ async def test_falls_back_to_claude_cli_when_installed_and_no_keys(
 async def test_returns_none_when_no_keys_no_cli_no_tanzu(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from blogforge.config import get_settings
+
     monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: False)
+    # Order-independence: a prior tanzu test can leave BLOGFORGE_TANZU_* in the
+    # shared settings cache, which would make _auto_select fall through to tanzu.
+    monkeypatch.delenv("BLOGFORGE_TANZU_API_BASE", raising=False)
+    monkeypatch.delenv("BLOGFORGE_TANZU_API_KEY", raising=False)
+    get_settings.cache_clear()
     assert await _auto_select_provider(uuid.uuid4()) is None
