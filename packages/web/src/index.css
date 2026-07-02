@@ -134,6 +134,24 @@ body {
 .prose-body a:hover {
   color: #1741b8;
 }
+/* Comparison / data tables (shared by the editor, reading preview, export). */
+.prose-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 1em 0;
+  font-size: 0.95em;
+}
+.prose-body th,
+.prose-body td {
+  border: 1px solid #e0dccf;
+  padding: 0.4em 0.6em;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-body thead th {
+  background: #f3f1ea;
+  font-weight: 600;
+}
 
 /* ──────────────────────────── Components ──────────────────────────── */
 

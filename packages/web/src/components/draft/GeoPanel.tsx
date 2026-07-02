@@ -12,6 +12,7 @@ import {
   rescoreGeo,
 } from "../../api/geo";
 import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
+import { BusyOverlay } from "../ui/BusyOverlay";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
 function gradeColor(grade: string): { bg: string; fg: string; bd: string } {
@@ -414,8 +415,9 @@ export function GeoPanel({
     }
   }
 
-  /** A definition exists but is buried — rewrite the INTRO so it LEADS with a
-   * clean, standalone, citable definition of the whole subject/thesis. */
+  /** The intro exists but doesn't OPEN with a clean definition — lightly reword
+   * it so its first sentence is citable, keeping the rest of the intro intact.
+   * A guard rejects a result that collapses the intro. */
   async function improveOpener(): Promise<void> {
     const opening = (draft.outline?.opening_hook ?? "").trim();
     if (!opening) return;
@@ -427,9 +429,18 @@ export function GeoPanel({
         text: opening,
         action: "custom",
         instruction:
-          "This is the article's OPENING/lede (it sits above the first section). Rewrite it so it OPENS with a single clean, standalone, citable sentence that defines the article's whole subject/thesis — what it is and what it argues — then keep the rest of the opening's substance and order. Keep the author's voice; invent nothing. Return only the opening prose, no heading.",
+          "This is the article's intro/lede. Do NOT summarize, shorten, or drop any of it. Return the ENTIRE intro with only a light touch: make its FIRST sentence a clean, standalone, citable one-line definition of the article's subject/thesis — reword that first sentence, or add one short sentence at the very start — then keep every other sentence exactly as written, in the same order. Keep the author's voice; invent nothing. Return the full intro prose, no heading.",
       });
-      await saveOpening(text.trim());
+      const next = text.trim();
+      // A real reword returns roughly the whole intro. If it came back much
+      // shorter, the model collapsed it — refuse rather than delete the intro.
+      if (next.length < Math.round(opening.length * 0.7)) {
+        showNotice(
+          "That rewrite came back much shorter than your intro, so I didn't apply it — try again, or reword the first sentence yourself.",
+        );
+        return;
+      }
+      await saveOpening(next);
       setUndoable((m) => new Map(m).set(key, { kind: "opening", prev: opening }));
       queueRescore("definitional_opener");
       flashOpening();
@@ -657,6 +668,19 @@ export function GeoPanel({
 
   const grade = report ? gradeColor(report.grade) : gradeColor("F");
 
+  // A blocking "please wait" modal for the slow (LLM) fixes — labelled by op.
+  // Instant ops (remove-*) get no modal so it doesn't flash.
+  const busyLabel = ((): string => {
+    if (rescoring) return "Re-scoring the changed lever…";
+    const k = applyingKey;
+    if (!k || k.startsWith("remove-")) return "";
+    if (k === "opener-fix") return "Reworking your intro…";
+    if (k === "faq") return "Writing the FAQ…";
+    if (k.startsWith("comparison_table")) return "Building the comparison table…";
+    if (k.startsWith("factual_density")) return "Weaving your data in…";
+    return "Rewriting with AI…";
+  })();
+
   return (
     <div
       ref={panelRef}
@@ -665,6 +689,7 @@ export function GeoPanel({
       aria-label="GEO optimizer"
       className="fixed right-0 top-0 z-30 h-full w-[460px] max-w-full overflow-y-auto glass-card border-l border-rule shadow-glass-lg animate-slide-in-right"
     >
+      {busyLabel && <BusyOverlay label={busyLabel} />}
       <header className="px-6 pt-6 pb-4 border-b border-rule glass-bar sticky top-0 z-10">
         <div className="flex items-baseline justify-between">
           <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600">

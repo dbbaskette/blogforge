@@ -8,6 +8,7 @@ import {
   suggestImprovements,
 } from "../../api/suggest";
 import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
+import { BusyOverlay } from "../ui/BusyOverlay";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
 const KIND_META: Record<SuggestKind, { icon: string; label: string; hint: string }> = {
@@ -157,6 +158,11 @@ export function ShapePanel({
       aria-label="Shape Assistant"
       className="fixed right-0 top-0 z-30 h-full w-[440px] max-w-full overflow-y-auto glass-card border-l border-rule shadow-glass-lg animate-slide-in-right"
     >
+      {applyingKey && (
+        <BusyOverlay
+          label={applyingKey.startsWith("expand") ? "Expanding with AI…" : "Applying the rewrite…"}
+        />
+      )}
       <header className="px-6 pt-6 pb-4 border-b border-rule glass-bar sticky top-0 z-10">
         <div className="flex items-baseline justify-between">
           <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600">
