@@ -55,6 +55,14 @@ export function ProviderKeysCard(): JSX.Element {
             ))}
           </ul>
         )}
+        <p className="text-xs text-muted leading-snug px-3 py-2 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200">
+          <strong className="text-ink-2 font-medium">No key? Claude CLI (subscription).</strong> When
+          the <code className="font-mono">claude</code> CLI is installed on the host and you have no
+          API key, it's offered as a keyless provider in the draft picker. It uses your Claude Code
+          login — if generation fails with an authentication error, run{" "}
+          <code className="font-mono">claude /login</code> in your terminal, then restart BlogForge
+          from that terminal. Not available on cloud deploys (the CLI isn't in the container).
+        </p>
       </div>
     </section>
   );
