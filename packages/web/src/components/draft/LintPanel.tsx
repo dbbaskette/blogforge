@@ -90,11 +90,7 @@ function HumanityRing({
   return (
     <div className="flex items-center gap-3">
       <div className="relative h-[68px] w-[68px] shrink-0">
-        <svg
-          viewBox="0 0 68 68"
-          className="h-full w-full -rotate-90"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 68 68" className="h-full w-full -rotate-90" aria-hidden="true">
           <circle cx="34" cy="34" r={R} fill="none" stroke="#e7e3da" strokeWidth="6" />
           <circle
             cx="34"
@@ -146,7 +142,8 @@ function HumanityRing({
           </span>
         ) : (
           <p className="mt-0.5 text-xs text-muted leading-snug">
-            AI tells remaining: <span className="font-medium text-ink-2 tabular-nums">{openCount}</span>
+            AI tells remaining:{" "}
+            <span className="font-medium text-ink-2 tabular-nums">{openCount}</span>
           </p>
         )}
       </div>
@@ -198,12 +195,14 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
   const onDismiss = (id: string): void => setDismissed(dismissFinding(draftId, id));
   const onRestore = (id: string): void => setDismissed(restore(draftId, id));
 
-  const actionable = useMemo(
-    () => [...violations, ...repetitions],
-    [violations, repetitions],
-  );
+  const actionable = useMemo(() => [...violations, ...repetitions], [violations, repetitions]);
   const visible = actionable.filter((f) => !dismissed.has(f.id) && !resolved.has(f.id));
   const hiddenCount = actionable.length - visible.length;
+  // The Humanity Score reflects what's still WRONG IN THE TEXT — only fixing a
+  // finding (or editing it away, so a re-lint drops it) improves it. Dismissing
+  // an item just declutters the list; leaving an em-dash in place doesn't make
+  // the writing more human, so a dismissed-but-unfixed finding still counts.
+  const scoreOpen = actionable.filter((f) => !resolved.has(f.id)).length;
 
   const runClaims = async (): Promise<void> => {
     setClaimsLoading(true);
@@ -235,7 +234,12 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
             Proofreader
           </p>
           <div className="flex items-center gap-1">
-            <button type="button" onClick={runLint} className="nb-btn nb-btn-ghost nb-btn-sm" disabled={loading}>
+            <button
+              type="button"
+              onClick={runLint}
+              className="nb-btn nb-btn-ghost nb-btn-sm"
+              disabled={loading}
+            >
               {loading ? "Linting…" : "Re-lint"}
             </button>
             <button type="button" onClick={onClose} className="nb-icon-btn" aria-label="Close">
@@ -248,7 +252,7 @@ export function LintPanel({ draft, onSectionSave, onClose }: LintPanelProps): JS
             Review {visible.length > 0 && <span className="text-coral">· {visible.length}</span>}
           </h2>
           {!error && !(loading && visible.length === 0) && (
-            <HumanityRing openCount={visible.length} hitCount={hits.length} />
+            <HumanityRing openCount={scoreOpen} hitCount={hits.length} />
           )}
         </div>
       </header>
@@ -452,7 +456,12 @@ function FindingCard({
             {suggestion}
           </p>
           <div className="mt-2 flex gap-2">
-            <button type="button" onClick={accept} disabled={busy} className="nb-btn nb-btn-primary nb-btn-sm">
+            <button
+              type="button"
+              onClick={accept}
+              disabled={busy}
+              className="nb-btn nb-btn-primary nb-btn-sm"
+            >
               {busy ? "Applying…" : "Accept"}
             </button>
             <button
@@ -549,7 +558,12 @@ function FactCheck({
               ))}
             </ul>
           )}
-          <button type="button" onClick={onRun} disabled={loading} className="nb-btn nb-btn-ghost nb-btn-sm mt-2">
+          <button
+            type="button"
+            onClick={onRun}
+            disabled={loading}
+            className="nb-btn nb-btn-ghost nb-btn-sm mt-2"
+          >
             {loading ? `Checking… ${secs}s` : "Re-check"}
           </button>
         </>

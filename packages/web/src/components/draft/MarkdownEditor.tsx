@@ -1,9 +1,14 @@
 import Link from "@tiptap/extension-link";
+import Table from "@tiptap/extension-table";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import TableRow from "@tiptap/extension-table-row";
 import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { marked } from "marked";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TurndownService from "turndown";
+import { tables as gfmTables } from "turndown-plugin-gfm";
 
 import { type InlineAction, inlineEdit } from "../../api/drafts";
 
@@ -24,7 +29,11 @@ type SaveStatus = "saved" | "dirty" | "saving" | "error";
 
 const AUTOSAVE_MS = 1000;
 
-export function MarkdownEditor({ initialMarkdown, onSave, draftId }: MarkdownEditorProps): JSX.Element {
+export function MarkdownEditor({
+  initialMarkdown,
+  onSave,
+  draftId,
+}: MarkdownEditorProps): JSX.Element {
   const [raw, setRaw] = useState<string>(initialMarkdown);
   const [mode, setMode] = useState<Mode>("rich");
   const [status, setStatus] = useState<SaveStatus>("saved");
@@ -33,15 +42,18 @@ export function MarkdownEditor({ initialMarkdown, onSave, draftId }: MarkdownEdi
   const [aiAnchor, setAiAnchor] = useState<{ top: number; left: number } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
 
-  const turndown = useMemo(
-    () =>
-      new TurndownService({
-        headingStyle: "atx",
-        codeBlockStyle: "fenced",
-        bulletListMarker: "-",
-      }),
-    [],
-  );
+  const turndown = useMemo(() => {
+    const td = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+      bulletListMarker: "-",
+    });
+    // Without the GFM tables rule, turndown flattens an HTML <table> into
+    // concatenated cell text — which is how generated comparison tables lost
+    // all their formatting on the editor's save round-trip.
+    td.use(gfmTables);
+    return td;
+  }, []);
 
   // Autosave bookkeeping. Refs (not state) because the editor's onUpdate is
   // bound once at creation and must read the freshest values at call time.
@@ -85,7 +97,16 @@ export function MarkdownEditor({ initialMarkdown, onSave, draftId }: MarkdownEdi
   scheduleSaveRef.current = scheduleSave;
 
   const editor = useEditor({
-    extensions: [StarterKit, Link.configure({ openOnClick: false })],
+    // Table.* let the rich editor keep a markdown table as real table nodes
+    // instead of dropping it (StarterKit has no table support).
+    extensions: [
+      StarterKit,
+      Link.configure({ openOnClick: false }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
+    ],
     content: "",
     editorProps: {
       attributes: {
