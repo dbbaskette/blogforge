@@ -573,3 +573,13 @@ input[type="range"] {
     scroll-behavior: auto !important;
   }
 }
+
+/* Panel-applied edits not yet approved — colored so the writer sees what
+   changed at a glance (cobalt, faint underline; not error-red). Cleared on
+   approve or when the writer edits the text themselves. */
+.tracked-change {
+  color: #1d3fb0;
+  text-decoration: underline;
+  text-decoration-color: #9db4f0;
+  text-underline-offset: 2px;
+}
