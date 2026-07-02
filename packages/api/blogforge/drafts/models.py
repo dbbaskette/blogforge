@@ -7,6 +7,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from blogforge.utctime import UtcDatetime
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -61,7 +63,7 @@ class Section(BaseModel):
     brief: str = ""
     content_md: str = ""
     status: SectionStatus = "empty"
-    last_generated_at: datetime | None = None
+    last_generated_at: UtcDatetime | None = None
     last_error: str | None = None
     word_count: int = 0
 
@@ -80,7 +82,7 @@ class SectionVersion(BaseModel):
     word_count: int = 0
     status: SectionStatus = "ready"
     source: VersionSource = "regenerate"
-    created_at: datetime = Field(default_factory=_now)
+    created_at: UtcDatetime = Field(default_factory=_now)
 
 
 DraftStage = Literal["research", "outline", "sections"]
@@ -102,7 +104,7 @@ class Reference(BaseModel):
     url: str | None = None
     original_filename: str | None = None
     extracted_chars: int = 0
-    added_at: datetime = Field(default_factory=_now)
+    added_at: UtcDatetime = Field(default_factory=_now)
 
 
 IdeationRole = Literal["user", "assistant"]
@@ -114,7 +116,7 @@ class IdeationMessage(BaseModel):
     role: IdeationRole
     content: str
     proposed_outline: OutlineProposal | None = None
-    timestamp: datetime = Field(default_factory=_now)
+    timestamp: UtcDatetime = Field(default_factory=_now)
 
 
 class IdeationSession(BaseModel):
@@ -132,8 +134,8 @@ class ReferenceWarning(BaseModel):
 
 class Draft(BaseModel):
     id: str = Field(default_factory=_uuid)
-    created_at: datetime = Field(default_factory=_now)
-    updated_at: datetime = Field(default_factory=_now)
+    created_at: UtcDatetime = Field(default_factory=_now)
+    updated_at: UtcDatetime = Field(default_factory=_now)
     title: str = ""
     stage: DraftStage = "research"
     idea: IdeaInput
@@ -171,6 +173,6 @@ class DraftSummary(BaseModel):
     title: str
     stage: DraftStage
     pack_slug: str
-    updated_at: datetime
+    updated_at: UtcDatetime
     word_count: int
     tags: list[str] = Field(default_factory=list)
