@@ -1,4 +1,5 @@
 """GET /api/drafts/{id}/download."""
+
 from __future__ import annotations
 
 
@@ -69,9 +70,12 @@ def _seed_written(client) -> str:
     }
     created["sections"] = [
         {
-            "id": "s1", "title": "First", "brief": "",
+            "id": "s1",
+            "title": "First",
+            "brief": "",
             "content_md": "Some **bold** prose and a [link](https://x.com).",
-            "status": "ready", "word_count": 7,
+            "status": "ready",
+            "word_count": 7,
         },
     ]
     created["stage"] = "sections"
@@ -91,7 +95,7 @@ async def test_download_html(authed_client) -> None:
     assert "<title>My Essay</title>" in r.text
     # Markdown inline emphasis is rendered to real HTML.
     assert "<strong>bold</strong>" in r.text
-    assert '<h2>First</h2>' in r.text
+    assert "<h2>First</h2>" in r.text
 
 
 async def test_download_docx(authed_client) -> None:
@@ -117,6 +121,47 @@ async def test_download_markdown_with_frontmatter(authed_client) -> None:
     assert "essay" in r.text  # tag in the frontmatter list
     # Body still present after the frontmatter block.
     assert "## First" in r.text
+
+
+async def test_download_html_embeds_article_schema_and_updated_byline(authed_client) -> None:
+    client, _ = authed_client
+    did = _seed_written(client)
+    r = client.get(f"/api/drafts/{did}/download?format=html")
+    assert '"@type": "Article"' in r.text
+    assert '"dateModified"' in r.text
+    assert "application/ld+json" in r.text
+    assert 'class="byline">Updated ' in r.text
+
+
+async def test_download_html_emits_faqpage_schema_when_faq_present(authed_client) -> None:
+    client, _ = authed_client
+    created = client.post(
+        "/api/drafts",
+        json={"topic": "T", "pack_slug": "dan", "provider": "anthropic", "model": "m"},
+    ).json()
+    created["title"] = "T"
+    created["sections"] = [
+        {
+            "id": "s1",
+            "title": "Body",
+            "brief": "",
+            "content_md": "Prose here.\n\n### FAQ\n\n**What is it?**\n\nA tool that helps.",
+            "status": "ready",
+            "word_count": 3,
+        },
+    ]
+    created["stage"] = "sections"
+    client.put(f"/api/drafts/{created['id']}", json=created)
+    r = client.get(f"/api/drafts/{created['id']}/download?format=html")
+    assert '"@type": "FAQPage"' in r.text
+    assert '"What is it?"' in r.text
+
+
+async def test_download_markdown_frontmatter_has_lastmod(authed_client) -> None:
+    client, _ = authed_client
+    did = _seed_written(client)
+    r = client.get(f"/api/drafts/{did}/download?format=md&frontmatter=true")
+    assert "lastmod:" in r.text
 
 
 async def test_download_unsupported_format_422(authed_client) -> None:

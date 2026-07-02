@@ -75,7 +75,7 @@ async def download_draft(
             except Exception:
                 hero_data_uri = None
         return Response(
-            content=to_html(draft, hero_data_uri=hero_data_uri),
+            content=to_html(draft, hero_data_uri=hero_data_uri, author=current.github_login),
             media_type="text/html; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{base}.html"'},
         )
