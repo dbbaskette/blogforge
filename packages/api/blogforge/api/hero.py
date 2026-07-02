@@ -9,6 +9,7 @@ vault regardless of the draft's text provider.
 """
 from __future__ import annotations
 
+import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -17,10 +18,13 @@ from pydantic import BaseModel
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
-from blogforge.generate.hero import build_hero_prompt, generate_hero_image
+from blogforge.generate.hero import build_hero_prompt, build_hero_prompt_ai, generate_hero_image
 from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
+from blogforge.llm.resolve import build_provider_for
 from blogforge.s3.client import get_s3_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["hero"])
 
@@ -50,7 +54,17 @@ async def generate_hero(
     if not api_key:
         raise ProviderMissingKey("google")
 
-    prompt = body.prompt.strip() or build_hero_prompt(draft)
+    prompt = body.prompt.strip()
+    if not prompt:
+        # Distill the draft's actual content into a concrete image concept via
+        # its text provider; fall back to the title-only prompt if that fails
+        # (no key, provider error) so hero generation never blocks on it.
+        try:
+            text_provider = await build_provider_for(current.id, draft.idea.provider)
+            prompt = await build_hero_prompt_ai(draft, text_provider, draft.idea.model)
+        except Exception:
+            logger.warning("hero prompt distill failed; using title-only prompt", exc_info=True)
+            prompt = build_hero_prompt(draft)
     try:
         image_bytes, mime = await generate_hero_image(prompt, api_key)
     except ProviderMissingKey as e:
