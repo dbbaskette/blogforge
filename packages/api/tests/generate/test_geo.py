@@ -3,8 +3,10 @@ from uuid import uuid4
 from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.generate.geo import (
     augment_definitional,
+    augment_factual_density,
     build_report,
     clean_opener,
+    clean_table,
     detect_duplicate_opening,
     parse_faq,
     parse_semantic,
@@ -146,8 +148,10 @@ def test_build_report_weights_and_grades() -> None:
             "answer_first",
             "factual_density",
             "definitional_opener",
+            "brand_explicit",
             "question_headings",
             "skimmability",
+            "comparison_table",
             "faq",
             "chunking",
         )
@@ -155,7 +159,7 @@ def test_build_report_weights_and_grades() -> None:
     report = build_report(perfect)
     assert report["score"] == 100
     assert report["grade"] == "A"
-    assert len(report["levers"]) == 7
+    assert len(report["levers"]) == 9
     # answer_first is displayed first.
     assert report["levers"][0]["key"] == "answer_first"
 
@@ -240,6 +244,92 @@ def test_augment_definitional_noop_when_clean() -> None:
     augment_definitional(levers, d)
     assert levers["definitional_opener"]["score"] == 90
     assert levers["definitional_opener"]["findings"] == []
+
+
+def test_comparison_table_flags_prose_comparison() -> None:
+    body = (
+        "Option A is cheaper than Option B, but Option B is faster. "
+        "Compared to Option C, both scale better under load."
+    )
+    d = _draft([_sec("Pricing tiers", body)])
+    lever = score_structural(d)["comparison_table"]
+    assert lever["fix"] == "comparison_table"
+    assert lever["score"] < 100
+    assert lever["findings"][0]["section_id"] == d.sections[0].id
+
+
+def test_comparison_table_passes_when_a_table_is_present() -> None:
+    body = (
+        "Here's the breakdown:\n\n"
+        "| Option | Cost |\n| --- | --- |\n| A | $1 |\n| B | $2 |\n\n"
+        "Compared to the alternatives, A wins on price."
+    )
+    lever = score_structural(_draft([_sec("Pricing", body)]))["comparison_table"]
+    assert lever["score"] == 100 and lever["fix"] is None
+
+
+def test_comparison_table_neutral_without_comparison_content() -> None:
+    d = _draft([_sec("Intro", "A plain paragraph about one idea, no options at all.")])
+    lever = score_structural(d)["comparison_table"]
+    assert lever["score"] == 100 and lever["fix"] is None and lever["findings"] == []
+
+
+def test_clean_table_keeps_only_the_table() -> None:
+    raw = "Sure! Here's the table:\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\nHope that helps."
+    assert clean_table(raw) == "| A | B |\n| --- | --- |\n| 1 | 2 |"
+    assert clean_table("no table here, just prose.") == ""
+
+
+def test_brand_explicit_lever_parsed() -> None:
+    d = _draft([_sec("Intro", "x")])
+    raw = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 90, "note": "ok", "has_definition": true},'
+        '"factual_density": {"score": 80, "note": "ok"},'
+        '"brand_explicit": {"score": 40, "note": "brand only implied", '
+        '"brand": "Tanzu", "stated_up_top": false}}'
+    )
+    lever = parse_semantic(raw, d)["brand_explicit"]
+    assert lever["key"] == "brand_explicit"
+    assert lever["score"] == 40
+    assert "implied" in lever["detail"]
+
+
+def test_augment_factual_density_flags_fluff_and_caps_score() -> None:
+    fluff = "Our seamless, world-class, cutting-edge platform lets you leverage synergy."
+    d = _draft([_sec("Intro", fluff)])
+    levers = {
+        "factual_density": {
+            "key": "factual_density",
+            "label": "Factual density",
+            "score": 90,
+            "detail": "",
+            "findings": [],
+            "fix": None,
+        }
+    }
+    augment_factual_density(levers, d)
+    lever = levers["factual_density"]
+    assert lever["score"] <= 70
+    assert "leverage synergy" in lever["findings"][0]["target"]
+
+
+def test_augment_factual_density_noop_when_grounded() -> None:
+    # Concrete numbers present → not fluff, even with one buzzword.
+    d = _draft([_sec("Intro", "We cut p95 latency 42% and rotate 3,000 secrets a day.")])
+    levers = {
+        "factual_density": {
+            "key": "factual_density",
+            "label": "Factual density",
+            "score": 88,
+            "detail": "",
+            "findings": [],
+            "fix": None,
+        }
+    }
+    augment_factual_density(levers, d)
+    assert levers["factual_density"]["score"] == 88
+    assert levers["factual_density"]["findings"] == []
 
 
 def test_parse_faq() -> None:

@@ -8,6 +8,7 @@ import {
   analyzeGeo,
   generateFaq,
   generateOpener,
+  generateTable,
 } from "../../api/geo";
 import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
 import { useDialogA11y } from "../ui/useDialogA11y";
@@ -395,6 +396,36 @@ export function GeoPanel({
       );
       setStale(true);
       flashSection(first.id);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyingKey(null);
+    }
+  }
+
+  /** Build a grounded comparison table from a section's prose and append it to
+   * that section. Undoable (a version is snapshotted before the change). */
+  async function addTable(sectionId: string, key: string): Promise<void> {
+    const section = draft.sections.find((s) => s.id === sectionId);
+    if (!section) {
+      showNotice("That section changed — re-analyze and try again.");
+      return;
+    }
+    setApplyingKey(key);
+    setNotice(null);
+    try {
+      const table = await generateTable(draft.id, sectionId);
+      if (!table) {
+        showNotice("No table came back — try again.");
+        return;
+      }
+      const next = `${section.content_md.trim()}\n\n${table}`;
+      await onSectionSave(sectionId, next, true);
+      setUndoable((m) =>
+        new Map(m).set(key, { kind: "content", sectionId, prev: section.content_md }),
+      );
+      setStale(true);
+      flashSection(sectionId);
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
     } finally {
@@ -800,6 +831,30 @@ export function GeoPanel({
                             className="nb-btn nb-btn-ghost nb-btn-sm"
                           >
                             ＋ Add data
+                          </button>
+                        ))}
+
+                      {/* Comparison table: build a grounded table from this
+                          section's prose and append it (undoable). */}
+                      {lever.key === "comparison_table" &&
+                        f.section_id &&
+                        (undone ? (
+                          <button
+                            type="button"
+                            disabled={applying}
+                            onClick={() => undoRewrite(key)}
+                            className="nb-btn nb-btn-ghost nb-btn-sm"
+                          >
+                            {applying ? "Undoing…" : "↩ Undo"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={applying}
+                            onClick={() => addTable(f.section_id as string, key)}
+                            className="nb-btn nb-btn-primary nb-btn-sm"
+                          >
+                            {applying ? "Building…" : "Generate a comparison table"}
                           </button>
                         ))}
                     </div>
