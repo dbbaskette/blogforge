@@ -1,5 +1,6 @@
 """Repurpose composes a voice prompt over the whole article and returns the
 provider's channel-specific rewrite."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -65,6 +66,17 @@ def test_build_prompt_embeds_article_and_channel_directive() -> None:
     assert "The whole article body here." in prompt
     assert "280 characters" in prompt  # x_thread directive
     assert "don't invent facts" in prompt
+
+
+def test_linkedin_feed_and_article_formats_carry_geo_guardrails() -> None:
+    # Feed post: capped short, teaching, brand named.
+    feed = FORMATS["linkedin"]["directive"]
+    assert "50-299 words" in feed
+    assert "brand" in feed.lower()
+    # Pulse article: long-form sweet spot (get cited far more than feed posts).
+    article = FORMATS["linkedin_article"]
+    assert "800-1,200 words" in article["directive"]
+    assert "Pulse" in article["label"]
 
 
 @pytest.mark.asyncio

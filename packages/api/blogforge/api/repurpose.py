@@ -4,13 +4,13 @@ GET /api/repurpose/formats lists the available channels for the UI.
 Synchronous: the outputs are short, so the request blocks on one
 provider.complete() and returns the repurposed text.
 """
+
 from __future__ import annotations
 
 from typing import Literal
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Request
-from blogforge.voice.compose import ComposeError
 from pydantic import BaseModel
 
 from blogforge.auth.dependencies import get_current_user
@@ -19,13 +19,22 @@ from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.repurpose import FORMATS, repurpose
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
+from blogforge.voice.compose import ComposeError
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["repurpose"])
 
 
 class _RepurposeBody(BaseModel):
-    format: Literal["x_thread", "linkedin", "newsletter", "tldr", "meta_description", "email"]
+    format: Literal[
+        "x_thread",
+        "linkedin",
+        "linkedin_article",
+        "newsletter",
+        "tldr",
+        "meta_description",
+        "email",
+    ]
 
 
 @router.get("/api/repurpose/formats")
@@ -70,9 +79,7 @@ async def repurpose_draft(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    manifest = yaml.safe_load(
-        (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
-    ) or {}
+    manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
     provider = await build_provider_for(current.id, draft.idea.provider)
     try:
         result = await repurpose(
