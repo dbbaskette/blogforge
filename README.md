@@ -150,8 +150,16 @@ BLOGFORGE_PUBLIC_URL=http://localhost:7880 \
 ```
 
 Everything lives under `data_dir` (`BLOGFORGE_DATA_DIR`, default `~/.blogforge`). Pair it with the
-Claude CLI below and you need no API keys either. The Docker path (Postgres + MinIO) below stays
-available for a production-like setup.
+Claude CLI below and you need no API keys either.
+
+Prefer Docker? **One container** is enough now — [`docker-compose.local.yml`](docker-compose.local.yml)
+runs just the app (file-SQLite + fs blobs on a mounted volume, no Postgres/MinIO):
+
+```bash
+docker compose -f docker-compose.local.yml up --build   # put GitHub OAuth creds in .env
+```
+
+The full multi-container Docker path (Postgres + MinIO) below stays available for a production-like setup.
 
 ## Using the Claude CLI (subscription, no API key)
 

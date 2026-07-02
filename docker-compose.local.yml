@@ -1,0 +1,40 @@
+# Single-container local run — no Postgres, no MinIO.
+#
+# The app uses file-SQLite + filesystem blobs under one mounted data volume
+# (BLOGFORGE_DATA_DIR=/data), so this is the only container you need:
+#
+#   docker compose -f docker-compose.local.yml up --build
+#
+# Open http://localhost:7880. Data (SQLite DB + blobs) persists in the named
+# `blogforge-data` volume across restarts.
+#
+# Sign-in is GitHub-only, so put your GitHub OAuth App creds in a .env file next
+# to this compose file (docker compose auto-loads it):
+#
+#   BLOGFORGE_GITHUB_CLIENT_ID=...
+#   BLOGFORGE_GITHUB_CLIENT_SECRET=...
+#   BLOGFORGE_GITHUB_ALLOWLIST=your-login
+#   BLOGFORGE_GITHUB_ADMIN_LOGIN=your-login
+#
+# The `claude` CLI isn't inside the container, so pick an API-key provider on a
+# draft (add the key in Settings), or run on the host for `claude -p` instead.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    environment:
+      BLOGFORGE_DATA_DIR: /data
+      BLOGFORGE_PUBLIC_URL: ${BLOGFORGE_PUBLIC_URL:-http://localhost:7880}
+      BLOGFORGE_SESSION_SECRET: ${BLOGFORGE_SESSION_SECRET:-dev-session-secret-change-me}
+      BLOGFORGE_GITHUB_CLIENT_ID: ${BLOGFORGE_GITHUB_CLIENT_ID:-}
+      BLOGFORGE_GITHUB_CLIENT_SECRET: ${BLOGFORGE_GITHUB_CLIENT_SECRET:-}
+      BLOGFORGE_GITHUB_ALLOWLIST: ${BLOGFORGE_GITHUB_ALLOWLIST:-}
+      BLOGFORGE_GITHUB_ADMIN_LOGIN: ${BLOGFORGE_GITHUB_ADMIN_LOGIN:-}
+    volumes:
+      - blogforge-data:/data
+    ports:
+      - "7880:7880"
+
+volumes:
+  blogforge-data:
