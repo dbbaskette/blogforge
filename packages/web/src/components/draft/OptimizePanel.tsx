@@ -12,15 +12,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { Draft } from "../../api/drafts";
+import { type Draft, lintDraft } from "../../api/drafts";
 import { type GeoReport, analyzeGeo, rescoreGeo } from "../../api/geo";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
+import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
 import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
 import { BusyOverlay } from "../ui/BusyOverlay";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { useDialogA11y } from "../ui/useDialogA11y";
 import { computeTotalScore } from "./GeoPanel";
 import { GeoReviewRail } from "./GeoReviewRail";
+import { ProofreadReviewRail } from "./ProofreadReviewRail";
+
+type ReviewView = "seo" | "proofreading" | "all";
 
 function gradeColor(grade: string): { bg: string; fg: string; bd: string } {
   if (grade === "A" || grade === "B") return { bg: "#e3f5ec", fg: "#0e7a50", bd: "#bfe8d3" };
@@ -57,8 +61,23 @@ export function OptimizePanel({
   const [error, setError] = useState<string | null>(null);
   // True while a targeted per-lever re-score is in flight after a fix.
   const [rescoring, setRescoring] = useState(false);
+  // Segmented review view + lazily-loaded Proofreader findings.
+  const [view, setView] = useState<ReviewView>("seo");
+  const [lint, setLint] = useState<LintResult | null>(null);
+  const [lintBusy, setLintBusy] = useState(false);
 
   const contentHash = useMemo(() => hashDraftContent(draft), [draft]);
+
+  // Load the Proofreader findings on demand the first time the view needs them.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once when proofreading first shown
+  useEffect(() => {
+    if (view === "seo" || lint || lintBusy) return;
+    setLintBusy(true);
+    lintDraft(draft.id)
+      .then(setLint)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLintBusy(false));
+  }, [view]);
 
   const run = useCallback(async (): Promise<void> => {
     setBusy(true);
@@ -134,7 +153,10 @@ export function OptimizePanel({
     [draft, onChange],
   );
 
-  const totalIssues = useMemo(() => (report ? geoFindingsToIssues(report).length : 0), [report]);
+  const geoCount = useMemo(() => (report ? geoFindingsToIssues(report).length : 0), [report]);
+  const lintCount = useMemo(() => (lint ? proofreadFindingsToIssues(lint).length : 0), [lint]);
+  const totalIssues =
+    view === "seo" ? geoCount : view === "proofreading" ? lintCount : geoCount + lintCount;
   const grade = report ? gradeColor(report.grade) : gradeColor("F");
   const opening = draft.outline?.opening_hook?.trim() ?? "";
 
@@ -161,10 +183,25 @@ export function OptimizePanel({
             ← Done
           </button>
           <h1 className="text-base font-semibold text-ink">Optimize</h1>
-          <span className="text-xs font-semibold uppercase tracking-wider text-cobalt-600 rounded-nb-sm bg-cobalt-50 px-2 py-0.5">
-            SEO
-          </span>
-          <span className="text-xs text-muted tabular-nums">{`0 of ${totalIssues} resolved`}</span>
+          <div className="flex gap-0.5 rounded-nb-sm bg-canvas p-0.5 text-xs" role="tablist">
+            {(["seo", "proofreading", "all"] as ReviewView[]).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => setView(v)}
+                className={`px-2.5 py-1 rounded-[6px] ${
+                  view === v
+                    ? "bg-card text-ink font-medium shadow-nb"
+                    : "text-muted hover:text-ink"
+                }`}
+              >
+                {v === "seo" ? "SEO" : v === "proofreading" ? "Proofreading" : "All"}
+              </button>
+            ))}
+          </div>
+          <span className="text-xs text-muted tabular-nums">{`${totalIssues} issues`}</span>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -237,22 +274,45 @@ export function OptimizePanel({
 
         {/* Right pane — the GEO issue rail */}
         <aside className="w-full lg:w-[42%] lg:max-w-[560px] shrink-0 border-t lg:border-t-0 lg:border-l border-rule bg-card/40 overflow-y-auto px-4 lg:px-5 py-6">
-          {busy && !report && (
-            <p className="py-10 text-center text-sm text-muted">Scoring your draft…</p>
-          )}
-          {rescoring && !busy && (
-            <div className="mb-4 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
-              Re-scoring the changed lever…
+          {(view === "seo" || view === "all") && (
+            <div className="space-y-3">
+              {view === "all" && (
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">SEO</h2>
+              )}
+              {busy && !report && (
+                <p className="py-10 text-center text-sm text-muted">Scoring your draft…</p>
+              )}
+              {rescoring && !busy && (
+                <div className="mb-4 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
+                  Re-scoring the changed lever…
+                </div>
+              )}
+              {report && (
+                <GeoReviewRail
+                  report={report}
+                  draft={draft}
+                  onSectionSave={onSectionSave}
+                  onOpeningSave={saveOpening}
+                  onRescore={queueRescore}
+                />
+              )}
             </div>
           )}
-          {report && (
-            <GeoReviewRail
-              report={report}
-              draft={draft}
-              onSectionSave={onSectionSave}
-              onOpeningSave={saveOpening}
-              onRescore={queueRescore}
-            />
+
+          {(view === "proofreading" || view === "all") && (
+            <div className={view === "all" ? "mt-6 space-y-3" : "space-y-3"}>
+              {view === "all" && (
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
+                  Proofreading
+                </h2>
+              )}
+              {lintBusy && !lint && (
+                <p className="py-10 text-center text-sm text-muted">Proofreading…</p>
+              )}
+              {lint && (
+                <ProofreadReviewRail lint={lint} draft={draft} onSectionSave={onSectionSave} />
+              )}
+            </div>
           )}
         </aside>
       </div>
