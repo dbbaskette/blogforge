@@ -73,6 +73,8 @@ def json_ld(draft: Draft, author: str | None = None) -> str:
         "datePublished": draft.created_at.date().isoformat(),
         "dateModified": draft.updated_at.date().isoformat(),
     }
+    if draft.outline and draft.outline.opening_hook.strip():
+        article["description"] = " ".join(draft.outline.opening_hook.split())[:160]
     if author:
         article["author"] = {"@type": "Person", "name": author}
     blocks: list[dict[str, object]] = [article]

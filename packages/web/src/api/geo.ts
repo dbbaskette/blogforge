@@ -145,10 +145,10 @@ export async function generateTakeaways(draftId: string): Promise<string[]> {
 
 /** Descriptive alt text for one image, from its surrounding prose. */
 export async function geoAlt(draftId: string, target: string): Promise<string> {
-  const { alt } = await api<{ alt: string }>(
-    `/api/drafts/${encodeURIComponent(draftId)}/geo/alt`,
-    { method: "POST", body: JSON.stringify({ target }) },
-  );
+  const { alt } = await api<{ alt: string }>(`/api/drafts/${encodeURIComponent(draftId)}/geo/alt`, {
+    method: "POST",
+    body: JSON.stringify({ target }),
+  });
   return alt;
 }
 
