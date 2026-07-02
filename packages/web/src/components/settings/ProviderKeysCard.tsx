@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { deleteKey, getKeyStatus, type KeyStatus, setKey } from "../../api/keys";
+import { type KeyStatus, deleteKey, getKeyStatus, setKey } from "../../api/keys";
 import { listModels } from "../../api/providers";
 import { useToast } from "../ui/Toast";
 
@@ -55,13 +55,9 @@ export function ProviderKeysCard(): JSX.Element {
             ))}
           </ul>
         )}
-        <p className="text-xs text-muted leading-snug px-3 py-2 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200">
-          <strong className="text-ink-2 font-medium">No key? Claude CLI (subscription).</strong> When
-          the <code className="font-mono">claude</code> CLI is installed on the host and you have no
-          API key, it's offered as a keyless provider in the draft picker. It uses your Claude Code
-          login — if generation fails with an authentication error, run{" "}
-          <code className="font-mono">claude /login</code> in your terminal, then restart BlogForge
-          from that terminal. Not available on cloud deploys (the CLI isn't in the container).
+        <p className="text-xs text-muted leading-snug">
+          No key? See <span className="text-ink-2 font-medium">Claude CLI (subscription)</span>{" "}
+          below for the keyless option.
         </p>
       </div>
     </section>
@@ -165,12 +161,7 @@ function ProviderRow({ id, label, note, isSet, onChanged }: ProviderRowProps): J
             {saving ? "Saving…" : "Save"}
           </button>
           {isSet && (
-            <button
-              type="button"
-              onClick={onClear}
-              disabled={saving}
-              className="nb-btn nb-btn-sm"
-            >
+            <button type="button" onClick={onClear} disabled={saving} className="nb-btn nb-btn-sm">
               Clear
             </button>
           )}

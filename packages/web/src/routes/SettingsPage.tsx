@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { revokeAllSessions } from "../api/auth";
+import { ClaudeCliCard } from "../components/settings/ClaudeCliCard";
 import { ProviderKeysCard } from "../components/settings/ProviderKeysCard";
 import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useToast } from "../components/ui/Toast";
@@ -47,6 +48,7 @@ export function SettingsPage(): JSX.Element {
       </section>
 
       <ProviderKeysCard />
+      <ClaudeCliCard />
       <SessionsCard />
     </div>
   );
@@ -63,7 +65,15 @@ function SessionsCard(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   const onRevokeAll = async (): Promise<void> => {
-    if (!(await confirm({ title: "Sign out of all sessions?", message: "This signs you out everywhere, including this device.", confirmLabel: "Sign out everywhere", danger: true }))) return;
+    if (
+      !(await confirm({
+        title: "Sign out of all sessions?",
+        message: "This signs you out everywhere, including this device.",
+        confirmLabel: "Sign out everywhere",
+        danger: true,
+      }))
+    )
+      return;
     setSubmitting(true);
     setError(null);
     try {
