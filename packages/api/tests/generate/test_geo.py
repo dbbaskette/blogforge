@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.generate.geo import (
+    augment_citations,
     augment_definitional,
     augment_factual_density,
     build_report,
@@ -12,6 +13,142 @@ from blogforge.generate.geo import (
     parse_semantic,
     score_structural,
 )
+
+
+def _lever_dict(key: str, score: int) -> dict:  # type: ignore[type-arg]
+    return {
+        "key": key,
+        "label": key,
+        "score": score,
+        "weight": 0.1,
+        "detail": "",
+        "findings": [],
+        "fix": None,
+    }
+
+
+def test_build_report_normalizes_by_present_weights() -> None:
+    # Two levers present → weighted mean, not diluted by absent levers.
+    levers = {"answer_first": _lever_dict("answer_first", 100), "faq": _lever_dict("faq", 50)}
+    # (100*.16 + 50*.06) / (.16+.06) = 86.36 → 86
+    assert build_report(levers)["score"] == 86
+
+
+def test_parse_semantic_citations_lever_and_findings() -> None:
+    d = _draft([_sec("Claims", "Our latency dropped 40% last quarter.")])
+    raw = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 80, "note": "ok", "has_definition": true},'
+        '"factual_density": {"score": 80, "note": "ok"},'
+        '"brand_explicit": {"score": 80, "note": "ok"},'
+        '"citations": {"score": 45, "note": "claims lack sources", "uncited_claims": ['
+        '{"target": "Our latency dropped 40% last quarter.", "note": "no source"}]}}'
+    )
+    cit = parse_semantic(raw, d)["citations"]
+    assert cit["score"] == 45
+    assert cit["findings"][0]["target"] == "Our latency dropped 40% last quarter."
+    assert cit["findings"][0]["fix"] == "cite_reference"
+    assert cit["fix"] == "cite_reference"
+
+
+def test_augment_citations_caps_score_when_no_outbound_links() -> None:
+    d = _draft([_sec("Body", "No links here at all.")])
+    levers = {"citations": _lever_dict("citations", 90)}
+    augment_citations(levers, d)
+    assert levers["citations"]["score"] == 40
+    d2 = _draft([_sec("Body", "See [the docs](https://example.com/docs).")])
+    levers2 = {"citations": _lever_dict("citations", 90)}
+    augment_citations(levers2, d2)
+    assert levers2["citations"]["score"] == 90
+
+
+def test_verbatim_quotes_keeps_only_exact_substrings() -> None:
+    from blogforge.generate.geo import verbatim_quotes
+
+    source = "The p95 latency was 40ms. Deploys run every 12 minutes."
+    raw = (
+        '{"quotes": ["The p95 latency was 40ms.", '  # verbatim → kept
+        '"Deploys run about every 15 minutes.", '  # altered number → dropped
+        '"Latency was great."]}'  # fabricated → dropped
+    )
+    assert verbatim_quotes(raw, source) == ["The p95 latency was 40ms."]
+
+
+def test_verbatim_quotes_tolerates_junk() -> None:
+    from blogforge.generate.geo import verbatim_quotes
+
+    assert verbatim_quotes("not json", "some source") == []
+
+
+# ── GEO-2/3/4 structural levers + augments ──────────────────────────
+
+
+def test_takeaways_detected_by_heading_or_bold() -> None:
+    d = _draft([_sec("Intro", "### Key takeaways\n\n- a\n- b")])
+    assert score_structural(d)["takeaways"]["score"] == 100
+    d2 = _draft([_sec("Intro", "**TL;DR**\n\n- a")])
+    assert score_structural(d2)["takeaways"]["score"] == 100
+
+
+def test_takeaways_absent_offers_fix() -> None:
+    lever = score_structural(_draft([_sec("Intro", "Just prose.")]))["takeaways"]
+    assert lever["score"] == 45 and lever["fix"] == "takeaways"
+
+
+def test_freshness_full_partial_absent() -> None:
+    full = _draft([_sec("Intro", "As of March 2026, X holds."), _sec("M", "In 2026-05, Y.")])
+    assert score_structural(full)["freshness"]["score"] == 100
+    partial = _draft([_sec("Intro", "No dates."), _sec("M", "We measured in January 2026.")])
+    assert score_structural(partial)["freshness"]["score"] == 70
+    absent = score_structural(_draft([_sec("Intro", "No dates at all.")]))["freshness"]
+    assert absent["score"] == 40 and absent["fix"] is None  # flag-only: never invent dates
+
+
+def test_skimmability_flags_empty_alt_images() -> None:
+    d = _draft([_sec("Intro", "- a\n- b\n\n![](/img/x.png)")])
+    findings = score_structural(d)["skimmability"]["findings"]
+    alt = [f for f in findings if f["fix"] == "alt_text"]
+    assert len(alt) == 1 and alt[0]["target"] == "![](/img/x.png)"
+    # A described image is NOT flagged.
+    d2 = _draft([_sec("Intro", "- a\n\n![a diagram](/img/x.png)")])
+    assert not [
+        f for f in score_structural(d2)["skimmability"]["findings"] if f["fix"] == "alt_text"
+    ]
+
+
+def test_chunking_flags_thin_sections_advisory() -> None:
+    d = _draft([_sec("Tiny", "Three words only.")])
+    findings = score_structural(d)["chunking"]["findings"]
+    assert any("thin" in f["note"] for f in findings)
+
+
+def test_factual_first_hand_false_adds_advisory_finding() -> None:
+    d = _draft([_sec("Intro", "x")])
+    raw = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 80, "note": "ok", "has_definition": true},'
+        '"factual_density": {"score": 80, "note": "ok", "first_hand": false},'
+        '"brand_explicit": {"score": 80, "note": "ok"},'
+        '"citations": {"score": 80, "note": "ok"}}'
+    )
+    fd = parse_semantic(raw, d)["factual_density"]
+    assert any("first-hand" in f["note"] for f in fd["findings"])
+
+
+def test_coverage_missing_subquestions_parsed() -> None:
+    d = _draft([_sec("Intro", "x")])
+    raw = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 80, "note": "ok", "has_definition": true},'
+        '"factual_density": {"score": 80, "note": "ok"},'
+        '"brand_explicit": {"score": 80, "note": "ok"},'
+        '"citations": {"score": 80, "note": "ok"},'
+        '"coverage": {"missing_subquestions": ["How much does it cost?", "Is it secure?"]}}'
+    )
+    result = parse_semantic(raw, d)
+    assert result["_coverage"] == ["How much does it cost?", "Is it secure?"]
+    # _coverage is not a scored lever.
+    assert build_report({k: v for k, v in result.items() if k != "_coverage"})["score"] > 0
 
 
 def _draft(sections: list[Section], title: str = "My Post") -> Draft:

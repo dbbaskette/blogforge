@@ -16,9 +16,14 @@ from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.geo import (
     analyze_geo,
+    generate_alt_text,
+    generate_citation,
     generate_faq,
     generate_opener,
+    generate_queries,
+    generate_quotes,
     generate_table,
+    generate_takeaways,
     rescore_geo,
 )
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
@@ -76,8 +81,8 @@ async def geo_report(
 
 
 class _RescoreBody(BaseModel):
-    # Which levers to re-score after a targeted fix (1-9). Others are left as-is.
-    levers: list[str] = Field(min_length=1, max_length=9)
+    # Which levers to re-score after a targeted fix. Others are left as-is.
+    levers: list[str] = Field(min_length=1, max_length=12)
 
 
 @router.post("/api/drafts/{draft_id}/geo/rescore")
@@ -99,6 +104,9 @@ async def geo_rescore(
 
 class _FaqBody(BaseModel):
     n: int = Field(default=4, ge=2, le=8)
+    # Specific reader questions to answer (e.g. sub-question coverage gaps). When
+    # set, the generator answers only those the draft supports.
+    questions: list[str] = Field(default_factory=list, max_length=8)
 
 
 @router.post("/api/drafts/{draft_id}/geo/faq")
@@ -111,7 +119,8 @@ async def geo_faq(
     draft, pack_root, manifest, provider = await _load(request, draft_id, current)
     try:
         faqs = await generate_faq(
-            draft, pack_root, manifest, provider, model=draft.idea.model, n=body.n
+            draft, pack_root, manifest, provider, model=draft.idea.model, n=body.n,
+            questions=body.questions or None,
         )
     except (ProviderMissingKey, ProviderError, ComposeError) as e:
         raise _provider_error(e) from e
@@ -144,6 +153,159 @@ async def geo_table(
             detail={"error": {"code": "empty_table", "message": "No table came back — try again."}},
         )
     return {"table": table}
+
+
+class _QuotesBody(BaseModel):
+    reference_id: str = Field(min_length=1)
+
+
+@router.post("/api/drafts/{draft_id}/geo/quotes")
+async def geo_quotes(
+    draft_id: str,
+    body: _QuotesBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, list[str]]:
+    """VERBATIM quote candidates from one attached reference's extracted text —
+    non-verbatim model output is filtered out server-side (the honesty guard)."""
+    draft, _pack_root, _manifest, provider = await _load(request, draft_id, current)
+    ref = next((r for r in draft.references if r.id == body.reference_id), None)
+    if ref is None:
+        raise HTTPException(
+            404,
+            detail={"error": {"code": "reference_not_found", "message": body.reference_id}},
+        )
+    from blogforge.s3 import S3Error, get_s3_client
+
+    try:
+        extracted = (
+            await get_s3_client().get_object(
+                f"drafts/{draft_id}/references/extracted/{ref.id}.md"
+            )
+        ).decode("utf-8")
+    except S3Error as e:
+        raise HTTPException(
+            502, detail={"error": {"code": "reference_unreadable", "message": str(e)}}
+        ) from e
+    try:
+        quotes = await generate_quotes(extracted, provider, model=draft.idea.model)
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    return {"quotes": quotes}
+
+
+class _CiteBody(BaseModel):
+    section_id: str = Field(min_length=1)
+    target: str = Field(min_length=1)
+    reference_id: str = Field(min_length=1)
+    quote: str | None = None
+
+
+@router.post("/api/drafts/{draft_id}/geo/cite")
+async def geo_cite(
+    draft_id: str,
+    body: _CiteBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """Rewrite one passage to attribute (+ link) an attached reference — the
+    cite_reference / quote_reference fix. Client splices `passage` over `target`."""
+    draft, pack_root, _manifest, provider = await _load(request, draft_id, current)
+    if not any(s.id == body.section_id for s in draft.sections):
+        raise HTTPException(
+            404, detail={"error": {"code": "section_not_found", "message": body.section_id}}
+        )
+    ref = next((r for r in draft.references if r.id == body.reference_id), None)
+    if ref is None:
+        raise HTTPException(
+            404,
+            detail={"error": {"code": "reference_not_found", "message": body.reference_id}},
+        )
+    try:
+        passage = await generate_citation(
+            body.target, ref.name, ref.url, pack_root, provider,
+            model=draft.idea.model, quote=body.quote,
+        )
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    if not passage:
+        raise HTTPException(
+            502,
+            detail={
+                "error": {"code": "empty_citation", "message": "Nothing came back — try again."}
+            },
+        )
+    return {"passage": passage}
+
+
+@router.post("/api/drafts/{draft_id}/geo/takeaways")
+async def geo_takeaways(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, list[str]]:
+    """Grounded key-takeaways bullets — the client appends them as a TL;DR block
+    at the top of the draft (tracked for undo/removal)."""
+    draft, pack_root, _manifest, provider = await _load(request, draft_id, current)
+    try:
+        takeaways = await generate_takeaways(draft, pack_root, provider, model=draft.idea.model)
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    if not takeaways:
+        raise HTTPException(
+            502,
+            detail={"error": {"code": "empty_takeaways", "message": "Nothing came back — retry."}},
+        )
+    return {"takeaways": takeaways}
+
+
+class _AltBody(BaseModel):
+    target: str = Field(min_length=1)
+
+
+@router.post("/api/drafts/{draft_id}/geo/alt")
+async def geo_alt(
+    draft_id: str,
+    body: _AltBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """Descriptive alt text for one image, from its section's prose. The client
+    splices it into the image markdown's empty alt slot."""
+    draft, _pack_root, _manifest, provider = await _load(request, draft_id, current)
+    section_text = next(
+        (s.content_md for s in draft.sections if body.target in s.content_md), ""
+    )
+    try:
+        alt = await generate_alt_text(body.target, section_text, provider, model=draft.idea.model)
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    if not alt:
+        raise HTTPException(
+            502, detail={"error": {"code": "empty_alt", "message": "Nothing came back — retry."}}
+        )
+    return {"alt": alt}
+
+
+@router.post("/api/drafts/{draft_id}/geo/queries")
+async def geo_queries(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, list[str]]:
+    """Natural-language queries this post should be the canonical answer for —
+    for the writer's manual weekly citation checks in ChatGPT/Perplexity/AIO."""
+    draft, pack_root, _manifest, provider = await _load(request, draft_id, current)
+    try:
+        queries = await generate_queries(draft, pack_root, provider, model=draft.idea.model)
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    if not queries:
+        raise HTTPException(
+            502,
+            detail={"error": {"code": "empty_queries", "message": "Nothing came back — retry."}},
+        )
+    return {"queries": queries}
 
 
 @router.post("/api/drafts/{draft_id}/geo/opener")

@@ -25,26 +25,34 @@ from blogforge.generate.textutil import strip_inline_emphasis
 from blogforge.llm.base import LLMProvider
 
 # Weights sum to 1.0; the two most-cited levers (answer-first, factual density)
-# carry the most. Deterministic and semantic levers share one scale.
+# carry the most, with citations — the strongest researched lever — right after.
+# build_report normalizes by the weights actually PRESENT, so levers can land
+# across phases without deflating the total.
 _WEIGHTS: dict[str, float] = {
-    "answer_first": 0.20,
-    "factual_density": 0.20,
-    "definitional_opener": 0.10,
-    "question_headings": 0.10,
-    "skimmability": 0.10,
-    "brand_explicit": 0.08,
-    "comparison_table": 0.06,
-    "faq": 0.08,
-    "chunking": 0.08,
+    "answer_first": 0.16,
+    "factual_density": 0.16,
+    "citations": 0.10,
+    "definitional_opener": 0.08,
+    "question_headings": 0.08,
+    "skimmability": 0.08,
+    "brand_explicit": 0.06,
+    "faq": 0.06,
+    "chunking": 0.06,
+    "takeaways": 0.06,
+    "freshness": 0.06,
+    "comparison_table": 0.04,
 }
 # Display order in the panel (roughly by leverage).
 _ORDER = (
     "answer_first",
     "factual_density",
+    "citations",
     "definitional_opener",
+    "takeaways",
     "brand_explicit",
     "question_headings",
     "skimmability",
+    "freshness",
     "comparison_table",
     "chunking",
     "faq",
@@ -52,10 +60,13 @@ _ORDER = (
 _LABELS: dict[str, str] = {
     "answer_first": "Answer-first sections",
     "factual_density": "Factual density",
+    "citations": "Cited sources",
     "definitional_opener": "Definitional opener",
+    "takeaways": "Key-takeaways block",
     "brand_explicit": "Brand named explicitly",
     "question_headings": "Question headings",
     "skimmability": "Skimmability",
+    "freshness": "Freshness signals",
     "comparison_table": "Comparison table",
     "faq": "FAQ section",
     "chunking": "Self-contained passages",
@@ -78,9 +89,17 @@ _QUESTION_WORDS = (
     "will",
 )
 _LIST_RE = re.compile(r"(?m)^\s*(?:[-*+]\s+|\d+\.\s+|\|)")
+# An image with empty alt text — invisible to parsers/screen readers.
+_IMG_NOALT_RE = re.compile(r"!\[\s*\]\([^)]+\)")
+_THIN_SECTION_WORDS = 40
 _BACKREF_RE = re.compile(
     r"(?i)\bas (?:mentioned|noted|discussed|described|explained|shown|we saw) "
     r"(?:above|earlier|previously|below)\b|\bin the (?:previous|next|preceding) section\b"
+)
+# A TL;DR / key-takeaways block near the top: a heading OR a bold lead-in. The
+# most-lifted extraction target for AI answer engines.
+_TAKEAWAYS_RE = re.compile(
+    r"(?im)^(?:#{2,4}\s*|\*\*)(key takeaways?|tl;?dr|at a glance|in short)\b"
 )
 _FAQ_TITLE_RE = re.compile(r"(?i)\b(faqs?|frequently asked|common questions|q ?& ?a|q and a)\b")
 # FAQ appended inside a section (the GEO fix adds "### FAQ" to the last section
@@ -139,6 +158,12 @@ _BUZZWORDS = (
 )
 _BUZZ_RE = re.compile(r"(?i)\b(?:" + "|".join(re.escape(w) for w in _BUZZWORDS) + r")\b")
 _NUMBER_RE = re.compile(r"\d")
+# A markdown link to an external source — the citations lever's structural floor.
+_OUTLINK_RE = re.compile(r"\[[^\]]+\]\(https?://[^)]+\)")
+# Dated evidence for the freshness lever: "March 2026" / "2026-03", or "as of".
+_MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december"
+_DATED_RE = re.compile(rf"(?i)\b(?:{_MONTHS})\.?\s+20\d\d\b|\b20\d\d-[01]\d\b")
+_ASOF_RE = re.compile(r"(?i)\bas of\b|\bupdated:?\b")
 
 _LONG_PARA_CHARS = 700
 _LONG_SECTION_WORDS = 400
@@ -273,6 +298,18 @@ def augment_factual_density(levers: dict[str, dict[str, Any]], draft: Draft) -> 
     lever["score"] = min(lever["score"], 70)
 
 
+def augment_citations(levers: dict[str, dict[str, Any]], draft: Draft) -> None:
+    """Deterministic floor for the citations lever: a draft with zero outbound
+    source links anywhere can't grade above 40, whatever the semantic judge says
+    about named-but-unlinked attributions."""
+    lever = levers.get("citations")
+    if lever is None:
+        return
+    if not _OUTLINK_RE.search(_draft_text(draft)) and lever["score"] > 40:
+        lever["score"] = 40
+        lever["detail"] = (lever["detail"] + " No outbound source links anywhere.").strip()
+
+
 def _longest_paragraph_chars(text: str) -> int:
     return len(_longest_paragraph(text))
 
@@ -324,11 +361,22 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         if not _LIST_RE.search(s.content_md)
         and _longest_paragraph_chars(s.content_md) > _LONG_PARA_CHARS
     ]
+    # Images with empty alt text — invisible to parsers; drop 5 each (floor 50).
+    alt_findings = [
+        {
+            "section_id": s.id,
+            "target": m.group(0),
+            "note": "Image has no alt text — invisible to parsers and screen readers.",
+            "fix": "alt_text",
+        }
+        for s in sections
+        for m in _IMG_NOALT_RE.finditer(s.content_md)
+    ]
     if not has_list:
         sk_score = 40.0
         sk_detail = "No lists or tables — add bullets, numbered steps, or a comparison table."
     else:
-        sk_score = max(50.0, 100 - 15 * len(walls))
+        sk_score = max(50.0, 100 - 15 * len(walls) - 5 * len(alt_findings))
         sk_detail = "Uses lists." + (
             f" {len(walls)} dense block(s) could use bullets." if walls else ""
         )
@@ -347,7 +395,8 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
                 "fix": "bullets",
             }
             for s in walls
-        ],
+        ]
+        + alt_findings,
     )
 
     # FAQ presence — as a section title OR an in-section heading.
@@ -375,20 +424,35 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
                 }
             )
     longsecs = [s for s in sections if s.word_count > _LONG_SECTION_WORDS]
-    ch_findings = backrefs + [
-        {
-            "section_id": s.id,
-            "note": f'"{strip_inline_emphasis(s.title)}" is long ({s.word_count} words) — split it '
-            "into two sections with their own headings so each chunk stands alone.",
-        }
-        for s in longsecs
-    ]
+    # Thin sections are advisory (no deduction): too little to stand alone as a
+    # cited chunk. The citation sweet-spot is ~120-180 words per heading.
+    thinsecs = [s for s in sections if 0 < s.word_count < _THIN_SECTION_WORDS]
+    ch_findings = (
+        backrefs
+        + [
+            {
+                "section_id": s.id,
+                "note": f'"{strip_inline_emphasis(s.title)}" is long ({s.word_count} words) — '
+                "split it into two sections with their own headings so each chunk stands alone.",
+            }
+            for s in longsecs
+        ]
+        + [
+            {
+                "section_id": s.id,
+                "note": f'"{strip_inline_emphasis(s.title)}" is thin ({s.word_count} words) — '
+                "too little to stand alone as a cited chunk.",
+            }
+            for s in thinsecs
+        ]
+    )
     chunk = _lever(
         "chunking",
         max(40, 100 - 10 * len(backrefs) - 10 * len(longsecs)),
-        "Passages stand on their own."
+        "Passages stand on their own; best-cited chunks run ~120-180 words per heading."
         if not ch_findings
-        else f"{len(backrefs)} back-reference(s), {len(longsecs)} over-long section(s).",
+        else f"{len(backrefs)} back-reference(s), {len(longsecs)} over-long section(s). "
+        "Best-cited chunks run ~120-180 words per heading.",
         findings=ch_findings,
     )
 
@@ -427,12 +491,53 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         fix="comparison_table" if table_candidates else None,
     )
 
+    # Key-takeaways / TL;DR block — a heading or bold lead-in in the opening or
+    # any section. The single most-lifted near-top extraction target.
+    opening = draft.outline.opening_hook if draft.outline else ""
+    has_takeaways = bool(_TAKEAWAYS_RE.search(opening)) or any(
+        _TAKEAWAYS_RE.search(s.content_md) for s in sections
+    )
+    takeaways = _lever(
+        "takeaways",
+        100 if has_takeaways else 45,
+        "Has a key-takeaways block."
+        if has_takeaways
+        else "No TL;DR/key-takeaways block — the most-lifted extraction target near the top.",
+        fix=None if has_takeaways else "takeaways",
+    )
+
+    # Freshness — dated, current-looking evidence (engines favor it). Flag-only:
+    # the tool never invents dates.
+    fresh_mentions = sum(len(_DATED_RE.findall(s.content_md)) for s in sections)
+    fresh_mentions += len(_DATED_RE.findall(opening))
+    intro_text = opening or (sections[0].content_md if sections else "")
+    intro_dated = bool(_DATED_RE.search(intro_text) or _ASOF_RE.search(intro_text))
+    if intro_dated and fresh_mentions >= 2:
+        fr_score, fr_detail, fr_findings = 100.0, "Dated evidence, current-looking.", []
+    elif fresh_mentions >= 1:
+        fr_score, fr_detail = 70.0, "Some dated evidence — stamp more key claims with real dates."
+        fr_findings = [
+            {
+                "note": "Only one dated mention — anchor key claims with real dates "
+                "('as of March 2026') so engines see when the facts were true."
+            }
+        ]
+    else:
+        fr_score = 40.0
+        fr_detail = "No dated evidence — add real 'as of' dates (via inline edit) to key claims."
+        fr_findings = [
+            {"note": "No dates anywhere — engines favor content that shows when its facts held."}
+        ]
+    freshness = _lever("freshness", fr_score, fr_detail, findings=fr_findings)
+
     return {
         "question_headings": question,
         "skimmability": skim,
         "faq": faq,
         "chunking": chunk,
         "comparison_table": comparison,
+        "takeaways": takeaways,
+        "freshness": freshness,
     }
 
 
@@ -465,6 +570,7 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                 "has_stats": {"type": "boolean"},
                 "has_named_sources": {"type": "boolean"},
                 "has_quotes": {"type": "boolean"},
+                "first_hand": {"type": "boolean"},
                 "thin_spots": {
                     "type": "array",
                     "items": {
@@ -490,12 +596,43 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
             },
             "required": ["score", "note"],
         },
+        "citations": {
+            "type": "object",
+            "properties": {
+                "score": {"type": "integer"},
+                "note": {"type": "string"},
+                "uncited_claims": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "target": {"type": "string"},
+                            "note": {"type": "string"},
+                        },
+                        "required": ["target"],
+                    },
+                },
+            },
+            "required": ["score", "note"],
+        },
+        "coverage": {
+            "type": "object",
+            "properties": {
+                "missing_subquestions": {"type": "array", "items": {"type": "string"}},
+            },
+        },
     },
-    "required": ["answer_first", "definitional_opener", "factual_density", "brand_explicit"],
+    "required": [
+        "answer_first",
+        "definitional_opener",
+        "factual_density",
+        "brand_explicit",
+        "citations",
+    ],
 }
 
 _SEMANTIC_DIRECTIVE = (
-    "Evaluate this draft on three Generative-Engine-Optimization dimensions. Score "
+    "Evaluate this draft on five Generative-Engine-Optimization dimensions. Score "
     "each 0-100 and explain briefly. Do NOT rewrite anything.\n"
     "1) answer_first: does each section OPEN with a direct, self-contained answer "
     "(40-60 words) before context? List the titles of sections that bury the answer "
@@ -514,13 +651,22 @@ _SEMANTIC_DIRECTIVE = (
     "and in `suggestion` say concretely WHAT KIND of data to add and where they'd find "
     'it (e.g. "Add your actual deployment count or a p95 latency benchmark from your '
     'monitoring"). You CANNOT invent facts — never supply statistics or sources, only '
-    "describe what to add.\n"
+    "describe what to add. Also set `first_hand` true if the author shows first-hand "
+    "experience ('we tested', 'I built', a result they measured) — engines weight "
+    "first-hand experience heavily.\n"
     "4) brand_explicit: does the post name its product/brand/subject EXPLICITLY and "
     "clearly (not just implied), ideally near the top? AI can cite content without "
     "naming the source ('ghost citation'); an explicit brand name travels with the "
     "citation. Put the brand you detect in `brand`, set `stated_up_top` true if it "
     "appears in the first section, and score how clearly/early it's named. Never "
-    "invent a brand — if none is evident, say so in `note` and score low."
+    "invent a brand — if none is evident, say so in `note` and score low.\n"
+    "5) citations: do concrete, checkable claims carry a source — a named origin "
+    "or an outbound link? Score how well claims are attributed. In `uncited_claims` "
+    "quote up to 3 passages that assert something checkable with no source; in each "
+    "`note` say what kind of source would back it. Never invent sources.\n"
+    "Finally, in `coverage.missing_subquestions` list up to 4 natural sub-questions "
+    "of this topic a search engine would decompose the query into that this draft "
+    "does NOT answer — only questions genuinely in-scope for the title."
 )
 
 
@@ -608,6 +754,17 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         for t in thin
         if isinstance(t, dict) and str(t.get("target", "")).strip()
     ]
+    # First-hand experience is advisory (no cap): one tested/measured anecdote
+    # raises the experience signal engines reward.
+    if fd.get("first_hand") is False:
+        fd_findings.append(
+            {
+                "target": "",
+                "note": "No first-hand signal — a tested/measured/built anecdote raises "
+                "the experience weight engines reward.",
+                "suggestion": "Add a result you personally measured or a build decision you made.",
+            }
+        )
     # Deliberately no `fix`: factual density is flag-only, never auto-filled.
     factual = _lever(
         "factual_density",
@@ -626,11 +783,41 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         or "Whether the product/brand is named explicitly so citations travel with it.",
     )
 
+    cit = data.get("citations") if isinstance(data.get("citations"), dict) else {}
+    claims = cit.get("uncited_claims") if isinstance(cit.get("uncited_claims"), list) else []
+    cit_findings = [
+        {
+            "target": str(c.get("target", "")).strip(),
+            "note": str(c.get("note", "")).strip() or "This claim has no source.",
+            "fix": "cite_reference",
+        }
+        for c in claims
+        if isinstance(c, dict) and str(c.get("target", "")).strip()
+    ][:3]
+    citations = _lever(
+        "citations",
+        _clampi(cit.get("score")),
+        str(cit.get("note", "")).strip()
+        or "Whether concrete claims link to or name their sources.",
+        findings=cit_findings,
+        fix="cite_reference" if cit_findings else None,
+    )
+
+    cov = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
+    missing = (
+        cov.get("missing_subquestions") if isinstance(cov.get("missing_subquestions"), list) else []
+    )
+    coverage = [str(q).strip() for q in missing if str(q).strip()][:4]
+
     return {
         "answer_first": answer_first,
         "definitional_opener": definitional,
         "factual_density": factual,
         "brand_explicit": brand,
+        "citations": citations,
+        # Not a lever (build_report/_ORDER ignore unknown keys) — analyze_geo
+        # merges these into the structural faq lever as "not covered" advisories.
+        "_coverage": coverage,  # type: ignore[dict-item]
     }
 
 
@@ -647,9 +834,14 @@ def _grade(score: int) -> str:
 
 
 def build_report(levers: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """Combine lever dicts into a weighted score + grade + ordered lever list."""
-    total = sum(levers[k]["score"] * w for k, w in _WEIGHTS.items() if k in levers)
-    score = round(total)
+    """Combine lever dicts into a weighted score + grade + ordered lever list.
+
+    Normalized by the weights actually PRESENT — so a report missing a lever
+    (e.g. before a later phase lands, or a partial re-score) isn't diluted by
+    that lever's weight; it's the weighted mean of whatever levers are here."""
+    present = [(k, w) for k, w in _WEIGHTS.items() if k in levers]
+    wsum = sum(w for _, w in present) or 1.0
+    score = round(sum(levers[k]["score"] * w for k, w in present) / wsum)
     ordered = [levers[k] for k in _ORDER if k in levers]
     return {"score": score, "grade": _grade(score), "levers": ordered}
 
@@ -657,10 +849,18 @@ def build_report(levers: dict[str, dict[str, Any]]) -> dict[str, Any]:
 # Which levers recompute instantly off the markdown vs. need the LLM pass —
 # drives targeted per-lever re-scoring after a fix.
 _STRUCTURAL_KEYS = frozenset(
-    {"question_headings", "skimmability", "faq", "chunking", "comparison_table"}
+    {
+        "question_headings",
+        "skimmability",
+        "faq",
+        "chunking",
+        "comparison_table",
+        "takeaways",
+        "freshness",
+    }
 )
 _SEMANTIC_KEYS = frozenset(
-    {"answer_first", "definitional_opener", "factual_density", "brand_explicit"}
+    {"answer_first", "definitional_opener", "factual_density", "brand_explicit", "citations"}
 )
 
 
@@ -679,15 +879,19 @@ async def _run_semantic(
         '"weak_sections": []}, "definitional_opener": {"score": 0, "note": "", '
         '"has_definition": false}, '
         '"factual_density": {"score": 0, "note": "", "has_stats": false, '
-        '"has_named_sources": false, "has_quotes": false, "thin_spots": []}, '
+        '"has_named_sources": false, "has_quotes": false, "first_hand": false, '
+        '"thin_spots": []}, '
         '"brand_explicit": {"score": 0, "note": "", "brand": "", '
-        '"stated_up_top": false}}.\n\nDRAFT:\n'
+        '"stated_up_top": false}, '
+        '"citations": {"score": 0, "note": "", "uncited_claims": []}, '
+        '"coverage": {"missing_subquestions": []}}.\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
     semantic = parse_semantic(resp.text, draft)
     augment_definitional(semantic, draft)
     augment_factual_density(semantic, draft)
+    augment_citations(semantic, draft)
     return semantic
 
 
@@ -702,6 +906,14 @@ async def analyze_geo(
     """Full GEO report: deterministic structural levers + one semantic LLM pass."""
     structural = score_structural(draft)
     semantic = await _run_semantic(draft, pack_root, provider, model=model)
+    # Sub-question coverage gaps (from the semantic pass) surface as advisory
+    # "not covered" findings on the structural FAQ lever — the FAQ fix answers them.
+    missing = semantic.pop("_coverage", [])
+    if missing and "faq" in structural:
+        structural["faq"]["findings"] = [
+            *structural["faq"]["findings"],
+            *[{"note": f'Not covered: "{q}"', "fix": "faq"} for q in missing],
+        ]
     return build_report({**structural, **semantic})
 
 
@@ -769,22 +981,35 @@ async def generate_faq(
     *,
     model: str,
     n: int = 4,
+    questions: list[str] | None = None,
 ) -> list[dict[str, str]]:
-    """Generate ``n`` grounded FAQ pairs from the draft, in the author's voice."""
+    """Generate grounded FAQ pairs from the draft, in the author's voice. When
+    `questions` are given (e.g. the sub-question coverage gaps), answer EXACTLY
+    those the draft can support — never guessing at ones it can't."""
     from blogforge.voice import compose_prompt
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    if questions:
+        ask = (
+            "Answer EXACTLY these reader questions from the post's own content — SKIP "
+            "any the draft cannot answer (do not guess): "
+            + "; ".join(q.strip() for q in questions if q.strip())
+        )
+    else:
+        ask = (
+            f"Write {n} FAQ entries a reader of THIS post would ask, answered from the "
+            "post's own content — real questions (the kind from sales calls or 'People "
+            "Also Ask')"
+        )
     prompt = (
-        f"{system}\n\n---\n\nWrite {n} FAQ entries a reader of THIS post would ask, "
-        "answered from the post's own content — real questions (the kind from sales "
-        "calls or 'People Also Ask'), concise answers (2-3 sentences) that stand "
-        "alone. Ground every answer in the draft; invent no facts. Stay in the "
-        'author\'s voice; banished words never appear. Return JSON: {"faqs": '
+        f"{system}\n\n---\n\n{ask}. Concise answers (2-3 sentences) that stand alone. "
+        "Ground every answer in the draft; invent no facts. Stay in the author's "
+        'voice; banished words never appear. Return JSON: {"faqs": '
         '[{"q": "...", "a": "..."}]}.\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_FAQ_SCHEMA)
-    return parse_faq(resp.text, n)
+    return parse_faq(resp.text, len(questions) if questions else n)
 
 
 def clean_opener(raw: str) -> str:
@@ -864,3 +1089,174 @@ async def generate_table(
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return clean_table(resp.text)
+
+
+_QUOTES_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {"quotes": {"type": "array", "items": {"type": "string"}}},
+    "required": ["quotes"],
+}
+
+
+def verbatim_quotes(raw: str, source: str, limit: int = 3) -> list[str]:
+    """Keep only model-returned quotes that appear EXACTLY in the source text —
+    the honesty guard so the citations fix can never fabricate a quotation."""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    items = data.get("quotes", []) if isinstance(data, dict) else []
+    out = [q.strip() for q in items if isinstance(q, str) and q.strip() and q.strip() in source]
+    return out[:limit]
+
+
+async def generate_quotes(
+    reference_text: str,
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> list[str]:
+    """2-3 VERBATIM quote candidates from a reference's extracted text. The model
+    is told to copy exactly; `verbatim_quotes` drops anything it didn't."""
+    prompt = (
+        "From the source text below, select 2-3 short passages (one or two "
+        "sentences each, under 60 words) that would make strong supporting quotes "
+        "for an article. Copy them EXACTLY, character for character — do not "
+        "paraphrase, trim words, or fix punctuation. Return JSON: "
+        '{"quotes": ["..."]}.\n\nSOURCE:\n' + reference_text[:20000]
+    )
+    resp = await provider.complete(model=model, prompt=prompt, json_schema=_QUOTES_SCHEMA)
+    return verbatim_quotes(resp.text, reference_text)
+
+
+_TAKEAWAYS_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {"takeaways": {"type": "array", "items": {"type": "string"}}},
+    "required": ["takeaways"],
+}
+
+
+def parse_takeaways(raw: str, limit: int = 5) -> list[str]:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    items = data.get("takeaways", []) if isinstance(data, dict) else []
+    out = [" ".join(str(t).split()).strip() for t in items if isinstance(t, str) and str(t).strip()]
+    return out[:limit]
+
+
+async def generate_takeaways(
+    draft: Draft,
+    pack_root: Path,
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> list[str]:
+    """3-5 grounded one-line key takeaways (TL;DR) from the draft, in voice."""
+    from blogforge.voice import compose_prompt
+
+    system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    prompt = (
+        f"{system}\n\n---\n\nWrite 3-5 key takeaways for this post — one line each, "
+        "concrete, each standing alone (a reader who sees ONLY the bullet learns "
+        "something true from this post). Ground every bullet strictly in the draft; "
+        "invent nothing. Stay in the author's voice; banished words never appear. "
+        'Return JSON: {"takeaways": ["..."]}.\n\nDRAFT:\n'
+        f"{_draft_text(draft)}"
+    )
+    resp = await provider.complete(model=model, prompt=prompt, json_schema=_TAKEAWAYS_SCHEMA)
+    return parse_takeaways(resp.text)
+
+
+async def generate_alt_text(
+    target: str,
+    section_text: str,
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> str:
+    """One concise descriptive alt text (<120 chars) for an image, from context.
+    The client splices it into the image markdown's empty alt slot."""
+    prompt = (
+        "Write one concise, descriptive alt text (under 120 characters) for an image "
+        "in the section below. Describe what the image most likely shows given the "
+        "surrounding prose. Return ONLY the alt text — no quotes, no 'Image of'.\n\n"
+        f"IMAGE MARKDOWN: {target}\n\nSECTION:\n{section_text[:4000]}"
+    )
+    resp = await provider.complete(model=model, prompt=prompt)
+    return " ".join(resp.text.strip().strip("\"'`").split())[:120]
+
+
+_QUERIES_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
+    "required": ["queries"],
+}
+
+
+def parse_queries(raw: str, limit: int = 10) -> list[str]:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    items = data.get("queries", []) if isinstance(data, dict) else []
+    out = [" ".join(str(q).split()).strip() for q in items if isinstance(q, str) and str(q).strip()]
+    return out[:limit]
+
+
+async def generate_queries(
+    draft: Draft,
+    pack_root: Path,
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> list[str]:
+    """6-10 natural-language queries this post should be the canonical answer for
+    — grounded in its title/headings/FAQ, for the writer's manual citation checks."""
+    from blogforge.voice import compose_prompt
+
+    system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    prompt = (
+        f"{system}\n\n---\n\nList 6-10 natural-language search queries (the kind typed "
+        "into ChatGPT, Perplexity, or Google) for which this post should be the "
+        "definitive answer. Ground them in the post's actual title, headings, and FAQ "
+        "— no aspirational topics it does not cover. Return JSON: "
+        '{"queries": ["..."]}.\n\nDRAFT:\n'
+        f"{_draft_text(draft)}"
+    )
+    resp = await provider.complete(model=model, prompt=prompt, json_schema=_QUERIES_SCHEMA)
+    return parse_queries(resp.text)
+
+
+async def generate_citation(
+    passage: str,
+    ref_name: str,
+    ref_url: str | None,
+    pack_root: Path,
+    provider: LLMProvider,
+    *,
+    model: str,
+    quote: str | None = None,
+) -> str:
+    """Rewrite one passage to attribute (and, when available, link) a reference —
+    the cite_reference / quote_reference fix. Nothing beyond the attribution is
+    invented; the client splices the result over the original passage."""
+    from blogforge.voice import compose_prompt
+
+    system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    link = f", linked as a Markdown link to {ref_url}" if ref_url else ""
+    quote_clause = (
+        f' Weave in this VERBATIM quote from the source, in quotation marks: "{quote}".'
+        if quote
+        else ""
+    )
+    prompt = (
+        f"{system}\n\n---\n\nRewrite the passage below so it attributes its claim to "
+        f'the named source, in the author\'s voice: source name "{ref_name}"{link}.'
+        f"{quote_clause} Do not change the passage's meaning and do not invent "
+        "anything beyond the attribution. Return only the rewritten passage.\n\n"
+        f"PASSAGE:\n{passage}"
+    )
+    resp = await provider.complete(model=model, prompt=prompt)
+    return resp.text.strip()
