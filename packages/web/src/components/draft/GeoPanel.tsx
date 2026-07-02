@@ -9,6 +9,7 @@ import {
   generateFaq,
   generateOpener,
   generateTable,
+  geoQueries,
   rescoreGeo,
 } from "../../api/geo";
 import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
@@ -272,6 +273,7 @@ export function GeoPanel({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
+  const [queriesBusy, setQueriesBusy] = useState(false);
   // Applied rewrites (keyed by finding) → previous content, so Apply ⇄ Undo.
   const [undoable, setUndoable] = useState<Map<string, UndoEntry>>(new Map());
   // Sibling findings invalidated because a rewrite restructured their section —
@@ -705,6 +707,22 @@ export function GeoPanel({
     }
   }
 
+  async function copyQueries(): Promise<void> {
+    setQueriesBusy(true);
+    setError(null);
+    try {
+      const qs = await geoQueries(draft.id);
+      await navigator.clipboard.writeText(qs.join("\n"));
+      setNotice(
+        `Copied ${qs.length} target queries — paste them into ChatGPT/Perplexity weekly and note who gets cited (measurement is manual).`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setQueriesBusy(false);
+    }
+  }
+
   const grade = report ? gradeColor(report.grade) : gradeColor("F");
 
   // A blocking "please wait" modal for the slow (LLM) fixes — labelled by op.
@@ -735,6 +753,15 @@ export function GeoPanel({
             GEO optimizer
           </p>
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={copyQueries}
+              className="nb-btn nb-btn-ghost nb-btn-sm"
+              disabled={queriesBusy || !report}
+              title="Copy the queries this post should rank for — to check citations manually"
+            >
+              {queriesBusy ? "…" : "Copy target queries"}
+            </button>
             <button
               type="button"
               onClick={run}
