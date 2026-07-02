@@ -40,4 +40,14 @@ describe("computeTotalScore", () => {
     // frontend weights table still yields the correct total — this is the bug.
     expect(computeTotalScore(all(80, true))).toBe(80);
   });
+
+  it("normalizes by present weights (partial report isn't diluted)", () => {
+    // Only two levers present → weighted mean of just those two, matching the
+    // backend. (100*.16 + 50*.06) / (.16+.06) = 86.36 → 86.
+    const total = computeTotalScore([
+      { key: "answer_first", score: 100 },
+      { key: "faq", score: 50 },
+    ]);
+    expect(total).toBe(86);
+  });
 });

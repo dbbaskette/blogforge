@@ -25,26 +25,34 @@ from blogforge.generate.textutil import strip_inline_emphasis
 from blogforge.llm.base import LLMProvider
 
 # Weights sum to 1.0; the two most-cited levers (answer-first, factual density)
-# carry the most. Deterministic and semantic levers share one scale.
+# carry the most, with citations — the strongest researched lever — right after.
+# build_report normalizes by the weights actually PRESENT, so levers can land
+# across phases without deflating the total.
 _WEIGHTS: dict[str, float] = {
-    "answer_first": 0.20,
-    "factual_density": 0.20,
-    "definitional_opener": 0.10,
-    "question_headings": 0.10,
-    "skimmability": 0.10,
-    "brand_explicit": 0.08,
-    "comparison_table": 0.06,
-    "faq": 0.08,
-    "chunking": 0.08,
+    "answer_first": 0.16,
+    "factual_density": 0.16,
+    "citations": 0.10,
+    "definitional_opener": 0.08,
+    "question_headings": 0.08,
+    "skimmability": 0.08,
+    "brand_explicit": 0.06,
+    "faq": 0.06,
+    "chunking": 0.06,
+    "takeaways": 0.06,
+    "freshness": 0.06,
+    "comparison_table": 0.04,
 }
 # Display order in the panel (roughly by leverage).
 _ORDER = (
     "answer_first",
     "factual_density",
+    "citations",
     "definitional_opener",
+    "takeaways",
     "brand_explicit",
     "question_headings",
     "skimmability",
+    "freshness",
     "comparison_table",
     "chunking",
     "faq",
@@ -52,10 +60,13 @@ _ORDER = (
 _LABELS: dict[str, str] = {
     "answer_first": "Answer-first sections",
     "factual_density": "Factual density",
+    "citations": "Cited sources",
     "definitional_opener": "Definitional opener",
+    "takeaways": "Key-takeaways block",
     "brand_explicit": "Brand named explicitly",
     "question_headings": "Question headings",
     "skimmability": "Skimmability",
+    "freshness": "Freshness signals",
     "comparison_table": "Comparison table",
     "faq": "FAQ section",
     "chunking": "Self-contained passages",
@@ -139,6 +150,8 @@ _BUZZWORDS = (
 )
 _BUZZ_RE = re.compile(r"(?i)\b(?:" + "|".join(re.escape(w) for w in _BUZZWORDS) + r")\b")
 _NUMBER_RE = re.compile(r"\d")
+# A markdown link to an external source — the citations lever's structural floor.
+_OUTLINK_RE = re.compile(r"\[[^\]]+\]\(https?://[^)]+\)")
 
 _LONG_PARA_CHARS = 700
 _LONG_SECTION_WORDS = 400
@@ -271,6 +284,18 @@ def augment_factual_density(levers: dict[str, dict[str, Any]], draft: Draft) -> 
         return
     lever["findings"] = [*lever["findings"], *flagged[:3]]
     lever["score"] = min(lever["score"], 70)
+
+
+def augment_citations(levers: dict[str, dict[str, Any]], draft: Draft) -> None:
+    """Deterministic floor for the citations lever: a draft with zero outbound
+    source links anywhere can't grade above 40, whatever the semantic judge says
+    about named-but-unlinked attributions."""
+    lever = levers.get("citations")
+    if lever is None:
+        return
+    if not _OUTLINK_RE.search(_draft_text(draft)) and lever["score"] > 40:
+        lever["score"] = 40
+        lever["detail"] = (lever["detail"] + " No outbound source links anywhere.").strip()
 
 
 def _longest_paragraph_chars(text: str) -> int:
@@ -490,12 +515,37 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
             },
             "required": ["score", "note"],
         },
+        "citations": {
+            "type": "object",
+            "properties": {
+                "score": {"type": "integer"},
+                "note": {"type": "string"},
+                "uncited_claims": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "target": {"type": "string"},
+                            "note": {"type": "string"},
+                        },
+                        "required": ["target"],
+                    },
+                },
+            },
+            "required": ["score", "note"],
+        },
     },
-    "required": ["answer_first", "definitional_opener", "factual_density", "brand_explicit"],
+    "required": [
+        "answer_first",
+        "definitional_opener",
+        "factual_density",
+        "brand_explicit",
+        "citations",
+    ],
 }
 
 _SEMANTIC_DIRECTIVE = (
-    "Evaluate this draft on three Generative-Engine-Optimization dimensions. Score "
+    "Evaluate this draft on five Generative-Engine-Optimization dimensions. Score "
     "each 0-100 and explain briefly. Do NOT rewrite anything.\n"
     "1) answer_first: does each section OPEN with a direct, self-contained answer "
     "(40-60 words) before context? List the titles of sections that bury the answer "
@@ -520,7 +570,11 @@ _SEMANTIC_DIRECTIVE = (
     "naming the source ('ghost citation'); an explicit brand name travels with the "
     "citation. Put the brand you detect in `brand`, set `stated_up_top` true if it "
     "appears in the first section, and score how clearly/early it's named. Never "
-    "invent a brand — if none is evident, say so in `note` and score low."
+    "invent a brand — if none is evident, say so in `note` and score low.\n"
+    "5) citations: do concrete, checkable claims carry a source — a named origin "
+    "or an outbound link? Score how well claims are attributed. In `uncited_claims` "
+    "quote up to 3 passages that assert something checkable with no source; in each "
+    "`note` say what kind of source would back it. Never invent sources."
 )
 
 
@@ -626,11 +680,32 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         or "Whether the product/brand is named explicitly so citations travel with it.",
     )
 
+    cit = data.get("citations") if isinstance(data.get("citations"), dict) else {}
+    claims = cit.get("uncited_claims") if isinstance(cit.get("uncited_claims"), list) else []
+    cit_findings = [
+        {
+            "target": str(c.get("target", "")).strip(),
+            "note": str(c.get("note", "")).strip() or "This claim has no source.",
+            "fix": "cite_reference",
+        }
+        for c in claims
+        if isinstance(c, dict) and str(c.get("target", "")).strip()
+    ][:3]
+    citations = _lever(
+        "citations",
+        _clampi(cit.get("score")),
+        str(cit.get("note", "")).strip()
+        or "Whether concrete claims link to or name their sources.",
+        findings=cit_findings,
+        fix="cite_reference" if cit_findings else None,
+    )
+
     return {
         "answer_first": answer_first,
         "definitional_opener": definitional,
         "factual_density": factual,
         "brand_explicit": brand,
+        "citations": citations,
     }
 
 
@@ -647,9 +722,14 @@ def _grade(score: int) -> str:
 
 
 def build_report(levers: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """Combine lever dicts into a weighted score + grade + ordered lever list."""
-    total = sum(levers[k]["score"] * w for k, w in _WEIGHTS.items() if k in levers)
-    score = round(total)
+    """Combine lever dicts into a weighted score + grade + ordered lever list.
+
+    Normalized by the weights actually PRESENT — so a report missing a lever
+    (e.g. before a later phase lands, or a partial re-score) isn't diluted by
+    that lever's weight; it's the weighted mean of whatever levers are here."""
+    present = [(k, w) for k, w in _WEIGHTS.items() if k in levers]
+    wsum = sum(w for _, w in present) or 1.0
+    score = round(sum(levers[k]["score"] * w for k, w in present) / wsum)
     ordered = [levers[k] for k in _ORDER if k in levers]
     return {"score": score, "grade": _grade(score), "levers": ordered}
 
@@ -660,7 +740,7 @@ _STRUCTURAL_KEYS = frozenset(
     {"question_headings", "skimmability", "faq", "chunking", "comparison_table"}
 )
 _SEMANTIC_KEYS = frozenset(
-    {"answer_first", "definitional_opener", "factual_density", "brand_explicit"}
+    {"answer_first", "definitional_opener", "factual_density", "brand_explicit", "citations"}
 )
 
 
@@ -681,13 +761,15 @@ async def _run_semantic(
         '"factual_density": {"score": 0, "note": "", "has_stats": false, '
         '"has_named_sources": false, "has_quotes": false, "thin_spots": []}, '
         '"brand_explicit": {"score": 0, "note": "", "brand": "", '
-        '"stated_up_top": false}}.\n\nDRAFT:\n'
+        '"stated_up_top": false}, '
+        '"citations": {"score": 0, "note": "", "uncited_claims": []}}.\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
     semantic = parse_semantic(resp.text, draft)
     augment_definitional(semantic, draft)
     augment_factual_density(semantic, draft)
+    augment_citations(semantic, draft)
     return semantic
 
 
@@ -864,3 +946,74 @@ async def generate_table(
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return clean_table(resp.text)
+
+
+_QUOTES_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {"quotes": {"type": "array", "items": {"type": "string"}}},
+    "required": ["quotes"],
+}
+
+
+def verbatim_quotes(raw: str, source: str, limit: int = 3) -> list[str]:
+    """Keep only model-returned quotes that appear EXACTLY in the source text —
+    the honesty guard so the citations fix can never fabricate a quotation."""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    items = data.get("quotes", []) if isinstance(data, dict) else []
+    out = [q.strip() for q in items if isinstance(q, str) and q.strip() and q.strip() in source]
+    return out[:limit]
+
+
+async def generate_quotes(
+    reference_text: str,
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> list[str]:
+    """2-3 VERBATIM quote candidates from a reference's extracted text. The model
+    is told to copy exactly; `verbatim_quotes` drops anything it didn't."""
+    prompt = (
+        "From the source text below, select 2-3 short passages (one or two "
+        "sentences each, under 60 words) that would make strong supporting quotes "
+        "for an article. Copy them EXACTLY, character for character — do not "
+        "paraphrase, trim words, or fix punctuation. Return JSON: "
+        '{"quotes": ["..."]}.\n\nSOURCE:\n' + reference_text[:20000]
+    )
+    resp = await provider.complete(model=model, prompt=prompt, json_schema=_QUOTES_SCHEMA)
+    return verbatim_quotes(resp.text, reference_text)
+
+
+async def generate_citation(
+    passage: str,
+    ref_name: str,
+    ref_url: str | None,
+    pack_root: Path,
+    provider: LLMProvider,
+    *,
+    model: str,
+    quote: str | None = None,
+) -> str:
+    """Rewrite one passage to attribute (and, when available, link) a reference —
+    the cite_reference / quote_reference fix. Nothing beyond the attribution is
+    invented; the client splices the result over the original passage."""
+    from blogforge.voice import compose_prompt
+
+    system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    link = f", linked as a Markdown link to {ref_url}" if ref_url else ""
+    quote_clause = (
+        f' Weave in this VERBATIM quote from the source, in quotation marks: "{quote}".'
+        if quote
+        else ""
+    )
+    prompt = (
+        f"{system}\n\n---\n\nRewrite the passage below so it attributes its claim to "
+        f'the named source, in the author\'s voice: source name "{ref_name}"{link}.'
+        f"{quote_clause} Do not change the passage's meaning and do not invent "
+        "anything beyond the attribution. Return only the rewritten passage.\n\n"
+        f"PASSAGE:\n{passage}"
+    )
+    resp = await provider.complete(model=model, prompt=prompt)
+    return resp.text.strip()

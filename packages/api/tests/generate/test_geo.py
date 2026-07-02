@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.generate.geo import (
+    augment_citations,
     augment_definitional,
     augment_factual_density,
     build_report,
@@ -12,6 +13,65 @@ from blogforge.generate.geo import (
     parse_semantic,
     score_structural,
 )
+
+
+def _lever_dict(key: str, score: int) -> dict:  # type: ignore[type-arg]
+    return {"key": key, "label": key, "score": score, "weight": 0.1,
+            "detail": "", "findings": [], "fix": None}
+
+
+def test_build_report_normalizes_by_present_weights() -> None:
+    # Two levers present → weighted mean, not diluted by absent levers.
+    levers = {"answer_first": _lever_dict("answer_first", 100),
+              "faq": _lever_dict("faq", 50)}
+    # (100*.16 + 50*.06) / (.16+.06) = 86.36 → 86
+    assert build_report(levers)["score"] == 86
+
+
+def test_parse_semantic_citations_lever_and_findings() -> None:
+    d = _draft([_sec("Claims", "Our latency dropped 40% last quarter.")])
+    raw = (
+        '{"answer_first": {"score": 80, "note": "ok"},'
+        '"definitional_opener": {"score": 80, "note": "ok", "has_definition": true},'
+        '"factual_density": {"score": 80, "note": "ok"},'
+        '"brand_explicit": {"score": 80, "note": "ok"},'
+        '"citations": {"score": 45, "note": "claims lack sources", "uncited_claims": ['
+        '{"target": "Our latency dropped 40% last quarter.", "note": "no source"}]}}'
+    )
+    cit = parse_semantic(raw, d)["citations"]
+    assert cit["score"] == 45
+    assert cit["findings"][0]["target"] == "Our latency dropped 40% last quarter."
+    assert cit["findings"][0]["fix"] == "cite_reference"
+    assert cit["fix"] == "cite_reference"
+
+
+def test_augment_citations_caps_score_when_no_outbound_links() -> None:
+    d = _draft([_sec("Body", "No links here at all.")])
+    levers = {"citations": _lever_dict("citations", 90)}
+    augment_citations(levers, d)
+    assert levers["citations"]["score"] == 40
+    d2 = _draft([_sec("Body", "See [the docs](https://example.com/docs).")])
+    levers2 = {"citations": _lever_dict("citations", 90)}
+    augment_citations(levers2, d2)
+    assert levers2["citations"]["score"] == 90
+
+
+def test_verbatim_quotes_keeps_only_exact_substrings() -> None:
+    from blogforge.generate.geo import verbatim_quotes
+
+    source = "The p95 latency was 40ms. Deploys run every 12 minutes."
+    raw = (
+        '{"quotes": ["The p95 latency was 40ms.", '  # verbatim → kept
+        '"Deploys run about every 15 minutes.", '  # altered number → dropped
+        '"Latency was great."]}'  # fabricated → dropped
+    )
+    assert verbatim_quotes(raw, source) == ["The p95 latency was 40ms."]
+
+
+def test_verbatim_quotes_tolerates_junk() -> None:
+    from blogforge.generate.geo import verbatim_quotes
+
+    assert verbatim_quotes("not json", "some source") == []
 
 
 def _draft(sections: list[Section], title: str = "My Post") -> Draft:

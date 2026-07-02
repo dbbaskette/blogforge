@@ -7,6 +7,8 @@ export type GeoFix =
   | "definitional_improve"
   | "faq"
   | "comparison_table"
+  | "takeaways"
+  | "cite_reference"
   | null;
 
 /** Per-finding one-click action (server-tagged). */
@@ -16,7 +18,10 @@ export type GeoFindingFix =
   | "bullets"
   | "self_contained"
   | "dedupe_opening"
-  | "comparison_table";
+  | "comparison_table"
+  | "cite_reference"
+  | "quote_reference"
+  | "alt_text";
 
 export interface GeoFinding {
   section_id?: string;
@@ -103,4 +108,56 @@ export async function generateTable(draftId: string, sectionId: string): Promise
     { method: "POST", body: JSON.stringify({ section_id: sectionId }) },
   );
   return table;
+}
+
+/** Verbatim quote candidates lifted from one attached reference (server filters
+ * out anything not an exact substring of the reference — never fabricated). */
+export async function geoQuotes(draftId: string, referenceId: string): Promise<string[]> {
+  const { quotes } = await api<{ quotes: string[] }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/quotes`,
+    { method: "POST", body: JSON.stringify({ reference_id: referenceId }) },
+  );
+  return quotes;
+}
+
+/** Rewrite a passage to attribute (and link) an attached reference. `quote`
+ * (optional, verbatim) is woven in for the quote_reference flow. Returns the
+ * rewritten passage; the client splices it over the original target text. */
+export async function geoCite(
+  draftId: string,
+  body: { section_id: string; target: string; reference_id: string; quote?: string },
+): Promise<string> {
+  const { passage } = await api<{ passage: string }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/cite`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+  return passage;
+}
+
+/** Grounded key-takeaways bullets (TL;DR) generated from the draft. */
+export async function generateTakeaways(draftId: string): Promise<string[]> {
+  const { takeaways } = await api<{ takeaways: string[] }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/takeaways`,
+    { method: "POST" },
+  );
+  return takeaways;
+}
+
+/** Descriptive alt text for one image, from its surrounding prose. */
+export async function geoAlt(draftId: string, target: string): Promise<string> {
+  const { alt } = await api<{ alt: string }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/alt`,
+    { method: "POST", body: JSON.stringify({ target }) },
+  );
+  return alt;
+}
+
+/** Natural-language queries this post should be the canonical answer for — for
+ * the writer's manual weekly citation checks in ChatGPT/Perplexity/AI Overviews. */
+export async function geoQueries(draftId: string): Promise<string[]> {
+  const { queries } = await api<{ queries: string[] }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/queries`,
+    { method: "POST" },
+  );
+  return queries;
 }
