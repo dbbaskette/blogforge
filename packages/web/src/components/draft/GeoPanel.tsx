@@ -160,10 +160,21 @@ export function carveProtectedAdditions(
   return { core, prefix, suffix };
 }
 
-/** A rewrite we can undo: the section's content (or title) before the fix. */
+/** A rewrite we can undo: a section's content/title, or the article's opening. */
 type UndoEntry =
   | { kind: "content"; sectionId: string; prev: string }
-  | { kind: "title"; sectionId: string; prev: string };
+  | { kind: "title"; sectionId: string; prev: string }
+  | { kind: "opening"; prev: string };
+
+/** Scroll the Intro card into view and hold the green highlight — the opening
+ * lives above the sections (outline.opening_hook), not in a section card. */
+function flashOpening(): void {
+  const el = document.getElementById("opening");
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("geo-flash");
+  window.setTimeout(() => el.classList.remove("geo-flash"), 6000);
+}
 
 const REWRITE_INSTRUCTION: Record<string, string> = {
   answer_first:
@@ -309,40 +320,32 @@ export function GeoPanel({
     setStale(true);
   }
 
-  // ── Additive fixes: generate ONLY the new content, insert it into an existing
-  // section (no new section card), highlight it, and offer Remove. ──
+  // ── Additive fixes: generate ONLY the new content, insert it, highlight it. ──
 
+  // The opening/lede is a first-class field (outline.opening_hook), edited in
+  // the Intro card and scored as the article's true opening — so the opener
+  // fixes operate on IT, not on the first section.
+  const saveOpening = useCallback(
+    async (opening_hook: string): Promise<void> => {
+      const outline = draft.outline ?? { opening_hook: "", sections: [], estimated_words: 0 };
+      await onChange({ ...draft, outline: { ...outline, opening_hook } });
+    },
+    [draft, onChange],
+  );
+
+  /** No citable opening yet — generate one and set it as the Intro (prepended
+   * ahead of any existing lede prose). Undoable. */
   async function addOpener(): Promise<void> {
-    const first = draft.sections[0];
-    if (!first) return;
-    setApplyingKey("opener");
+    const key = "opener-fix";
+    setApplyingKey(key);
     setNotice(null);
     try {
       const opener = await generateOpener(draft.id);
-      // The CONTENT is the source of truth, not our tracking record: if an
-      // equivalent definition is already in the section (the generator often
-      // reproduces it verbatim), adding again creates back-to-back duplicates.
-      const presence = openerPresence(opener, first.content_md);
-      if (presence === "exact") {
-        recordAddition("opener", { sectionId: first.id, text: opener });
-        showNotice("An equivalent opener already exists — tracked it; nothing was added.");
-        flashSection(first.id);
-        return;
-      }
-      if (presence === "similar") {
-        showNotice(
-          "A matching definition already opens the piece — nothing added, to avoid a duplicate.",
-        );
-        return;
-      }
-      // If the section body opens with a duplicated title heading, move it out
-      // of the way so the opener is the TRUE first line — not an afterthought
-      // wedged between duplicate headings. Remove restores it.
-      const { rest, removed } = stripDuplicateTitleHeading(draft.title, first.content_md);
-      const next = `${opener}\n\n${rest}`.trim();
-      await onSectionSave(first.id, next);
-      recordAddition("opener", { sectionId: first.id, text: opener, removed });
-      flashSection(first.id);
+      const existing = (draft.outline?.opening_hook ?? "").trim();
+      await saveOpening(existing ? `${opener}\n\n${existing}` : opener);
+      setUndoable((m) => new Map(m).set(key, { kind: "opening", prev: existing }));
+      setStale(true);
+      flashOpening();
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
     } finally {
@@ -375,27 +378,25 @@ export function GeoPanel({
     }
   }
 
-  /** A definition exists but is buried in narrative — rewrite the opening
-   * section so it LEADS with a clean, standalone, citable definition. */
+  /** A definition exists but is buried — rewrite the INTRO so it LEADS with a
+   * clean, standalone, citable definition of the whole subject/thesis. */
   async function improveOpener(): Promise<void> {
-    const first = draft.sections[0];
-    if (!first) return;
-    const key = "improve-opener";
+    const opening = (draft.outline?.opening_hook ?? "").trim();
+    if (!opening) return;
+    const key = "opener-fix";
     setApplyingKey(key);
     setNotice(null);
     try {
       const { text } = await inlineEdit(draft.id, {
-        text: first.content_md,
+        text: opening,
         action: "custom",
         instruction:
-          "This section already defines the subject, but the definition is buried in narrative. Rewrite so it OPENS with a single clean, standalone, citable sentence that defines the subject (what it is + what it does), then keep the rest of the content and its order. Keep the author's voice; invent nothing. Return only the section body, no heading.",
+          "This is the article's OPENING/lede (it sits above the first section). Rewrite it so it OPENS with a single clean, standalone, citable sentence that defines the article's whole subject/thesis — what it is and what it argues — then keep the rest of the opening's substance and order. Keep the author's voice; invent nothing. Return only the opening prose, no heading.",
       });
-      await onSectionSave(first.id, text.trim());
-      setUndoable((m) =>
-        new Map(m).set(key, { kind: "content", sectionId: first.id, prev: first.content_md }),
-      );
+      await saveOpening(text.trim());
+      setUndoable((m) => new Map(m).set(key, { kind: "opening", prev: opening }));
       setStale(true);
-      flashSection(first.id);
+      flashOpening();
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
     } finally {
@@ -614,6 +615,8 @@ export function GeoPanel({
     try {
       if (entry.kind === "title") {
         await applyTitle(entry.sectionId, entry.prev);
+      } else if (entry.kind === "opening") {
+        await saveOpening(entry.prev);
       } else {
         await onSectionSave(entry.sectionId, entry.prev);
       }
@@ -622,7 +625,8 @@ export function GeoPanel({
         next.delete(key);
         return next;
       });
-      flashSection(entry.sectionId);
+      if (entry.kind === "opening") flashOpening();
+      else flashSection(entry.sectionId);
     } catch (e) {
       showNotice(e instanceof Error ? e.message : String(e));
     } finally {
@@ -715,7 +719,6 @@ export function GeoPanel({
           )}
 
           {report?.levers.map((lever) => {
-            const openerAdded = lever.key === "definitional_opener" && !!additions.opener;
             const faqAdded = lever.key === "faq" && !!additions.faq;
             return (
               <section key={lever.key} className="glass-card p-3 space-y-2">
@@ -862,50 +865,36 @@ export function GeoPanel({
                 })}
 
                 {lever.key === "definitional_opener" &&
-                  (openerAdded ? (
-                    <div className="space-y-1">
-                      <p className="text-xs leading-snug text-green-ink bg-green-soft rounded-nb-sm px-2 py-1">
-                        Added: “{additions.opener?.text}”
-                      </p>
-                      <button
-                        type="button"
-                        disabled={applyingKey === "remove-opener"}
-                        onClick={() => removeAddition("opener")}
-                        className="nb-btn nb-btn-ghost nb-btn-sm"
-                      >
-                        {applyingKey === "remove-opener" ? "Removing…" : "✕ Remove opener"}
-                      </button>
-                    </div>
+                  // The opener fixes act on the INTRO (outline.opening_hook),
+                  // shown/edited in the Intro card above the sections.
+                  (undoable.has("opener-fix") ? (
+                    <button
+                      type="button"
+                      disabled={applyingKey === "opener-fix"}
+                      onClick={() => undoRewrite("opener-fix")}
+                      className="nb-btn nb-btn-ghost nb-btn-sm"
+                    >
+                      {applyingKey === "opener-fix" ? "Undoing…" : "↩ Undo"}
+                    </button>
                   ) : lever.fix === "definitional" ? (
                     <button
                       type="button"
-                      disabled={applyingKey === "opener"}
+                      disabled={applyingKey === "opener-fix"}
                       onClick={addOpener}
                       className="nb-btn nb-btn-primary nb-btn-sm"
                     >
-                      {applyingKey === "opener" ? "Writing…" : "Add a definitional opener"}
+                      {applyingKey === "opener-fix" ? "Writing…" : "Add a definitional opener"}
                     </button>
                   ) : lever.fix === "definitional_improve" ? (
-                    undoable.has("improve-opener") ? (
-                      <button
-                        type="button"
-                        disabled={applyingKey === "improve-opener"}
-                        onClick={() => undoRewrite("improve-opener")}
-                        className="nb-btn nb-btn-ghost nb-btn-sm"
-                      >
-                        {applyingKey === "improve-opener" ? "Undoing…" : "↩ Undo"}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={applyingKey === "improve-opener"}
-                        onClick={improveOpener}
-                        className="nb-btn nb-btn-primary nb-btn-sm"
-                        title="Hoist the buried definition into a clean, standalone opening line"
-                      >
-                        {applyingKey === "improve-opener" ? "Rewriting…" : "Improve the opener"}
-                      </button>
-                    )
+                    <button
+                      type="button"
+                      disabled={applyingKey === "opener-fix"}
+                      onClick={improveOpener}
+                      className="nb-btn nb-btn-primary nb-btn-sm"
+                      title="Rewrite the Intro to lead with a clean, standalone opening line"
+                    >
+                      {applyingKey === "opener-fix" ? "Rewriting…" : "Improve the opener"}
+                    </button>
                   ) : null)}
 
                 {lever.key === "faq" &&

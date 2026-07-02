@@ -332,7 +332,24 @@ def test_augment_factual_density_noop_when_grounded() -> None:
     assert levers["factual_density"]["findings"] == []
 
 
+def test_draft_text_leads_with_the_opening_hook() -> None:
+    """The intro (opening_hook) must lead the text the model scores, ABOVE the
+    first section — else definitional-opener/answer-first judge section 1, not
+    the real intro (the reported bug)."""
+    from blogforge.drafts.models import OutlineProposal
+    from blogforge.generate.geo import _draft_text
+
+    d = _draft([_sec("ROTATE", "The 2017 baseline.")])
+    d.outline = OutlineProposal(opening_hook="In January 2017, the team wrote a post.")
+    text = _draft_text(d)
+    assert "In January 2017" in text
+    assert text.index("In January 2017") < text.index("## ROTATE")
+
+
 def test_parse_faq() -> None:
-    raw = '{"faqs": [{"q": "What is it?", "a": "A tool."}, {"q": "", "a": "x"}, {"q": "Why?", "a": ""}]}'
+    raw = (
+        '{"faqs": [{"q": "What is it?", "a": "A tool."}, '
+        '{"q": "", "a": "x"}, {"q": "Why?", "a": ""}]}'
+    )
     assert parse_faq(raw, 4) == [{"q": "What is it?", "a": "A tool."}]
     assert parse_faq("junk", 4) == []

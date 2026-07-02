@@ -419,7 +419,11 @@ export function DraftWorkspace({
         )}
 
         {draft.stage === "sections" && hasOpening && (
-          <OpeningCard value={draft.outline?.opening_hook ?? ""} onSave={handleOpeningChange} />
+          <OpeningCard
+            value={draft.outline?.opening_hook ?? ""}
+            draftId={draft.id}
+            onSave={handleOpeningChange}
+          />
         )}
 
         {draft.stage === "sections" && (
