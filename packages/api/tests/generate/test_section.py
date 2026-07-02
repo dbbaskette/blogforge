@@ -159,3 +159,60 @@ async def test_stream_section_no_instruction_has_no_directive(tmp_path: Path) ->
         )
     ]
     assert "REVISION DIRECTIVE" not in rec.prompt
+
+
+@pytest.mark.asyncio
+async def test_notes_on_existing_section_do_targeted_edit(tmp_path: Path) -> None:
+    """Notes on a section that already has prose trigger a surgical edit: the
+    model is handed the current text and told to change only what's needed,
+    leaving the rest verbatim — not a full rewrite from the brief."""
+    draft = _draft()
+    draft.sections[1].content_md = (
+        "The first paragraph should stay exactly as it is.\n\n"
+        "The second paragraph needs a concrete statistic."
+    )
+    draft.sections[1].status = "ready"
+    rec = _PromptRecorder()
+    [
+        c
+        async for c in stream_section(
+            draft,
+            draft.sections[1],
+            _fake_pack(tmp_path),
+            {"samples": []},
+            rec,
+            model="m",
+            instruction="add a concrete number to the second paragraph",
+        )
+    ]
+    # The current section text is in the prompt, so the edit can be surgical.
+    assert "The first paragraph should stay exactly as it is." in rec.prompt
+    assert "The second paragraph needs a concrete statistic." in rec.prompt
+    # Minimal-edit framing + the author's note are present…
+    assert "SURGICAL" in rec.prompt
+    assert "VERBATIM" in rec.prompt
+    assert "add a concrete number to the second paragraph" in rec.prompt
+    # …and it must NOT fall back to the write-from-scratch directive.
+    assert "REVISION DIRECTIVE" not in rec.prompt
+
+
+@pytest.mark.asyncio
+async def test_notes_on_empty_section_write_from_scratch(tmp_path: Path) -> None:
+    """With no existing prose there's nothing to preserve — the note folds into
+    the from-scratch write via the revision directive, not a surgical edit."""
+    draft = _draft()  # all sections empty
+    rec = _PromptRecorder()
+    [
+        c
+        async for c in stream_section(
+            draft,
+            draft.sections[0],
+            _fake_pack(tmp_path),
+            {"samples": []},
+            rec,
+            model="m",
+            instruction="make it punchier",
+        )
+    ]
+    assert "REVISION DIRECTIVE" in rec.prompt
+    assert "SURGICAL" not in rec.prompt

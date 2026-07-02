@@ -1,0 +1,19 @@
+You are revising ONE section of a SINGLE, continuous blog post titled "{{ title }}" (section {{ position }}). Apply the author's note below as a MINIMAL, SURGICAL edit to the section text that already exists — do not rewrite it.
+
+Full outline (current section marked **bold**):
+{{ outline_md }}
+
+CURRENT SECTION TEXT — this is exactly what you are editing:
+---
+{{ current_content }}
+---
+
+AUTHOR'S NOTE — the change to make:
+{{ instruction }}
+
+How to revise:
+- Change ONLY what the note requires. If the note applies to one sentence, paragraph, or sub-section, edit just that part and reproduce EVERYTHING ELSE VERBATIM — identical wording, order, examples, links, and any `###` sub-headings.
+- Do NOT restructure, re-order, re-phrase, tighten, or "improve" parts the note does not mention. Leave them exactly as written, character for character.
+- Do NOT re-introduce the topic or repeat points made in other sections; keep the section's length and shape unless the note asks otherwise.
+
+Return the COMPLETE revised section as markdown prose — the whole section, with only the necessary changes applied so it can replace the current text directly. Do NOT include the section title as a heading; the renderer adds it. Use the author's voice; banished words/phrases never appear.

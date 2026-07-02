@@ -12,6 +12,7 @@ from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider, StreamChunk
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "section.j2"
+_REVISE_PROMPT_PATH = Path(__file__).parent / "prompts" / "section_revise.j2"
 
 # How many characters of already-written preceding prose to feed a section so
 # it continues the piece instead of restarting it. Closest sections are kept in
@@ -89,6 +90,23 @@ def _render_section_prompt(draft: Draft, section: Section) -> str:
     )
 
 
+def _render_revise_prompt(draft: Draft, section: Section, instruction: str) -> str:
+    """Prompt for a targeted, minimal edit of an already-written section: hand
+    the model the CURRENT prose and the author's note, and tell it to change
+    only what the note requires while reproducing the rest verbatim."""
+    sections = draft.sections or (draft.outline.sections if draft.outline else [])
+    total = max(len(sections), 1)
+    position_idx = next((i for i, s in enumerate(sections) if s.id == section.id), 0)
+    template = Template(_REVISE_PROMPT_PATH.read_text(encoding="utf-8"))
+    return template.render(
+        title=draft.title or draft.idea.topic,
+        outline_md=_render_outline_md(draft, section.id),
+        current_content=section.content_md.strip(),
+        instruction=instruction,
+        position=f"{position_idx + 1} of {total}",
+    )
+
+
 def _auto_pick_samples(manifest: dict[str, Any], n: int = 3) -> list[str]:
     samples = (manifest.get("samples") or [])[:n]
     return [str(s.get("id", "")) for s in samples if s.get("id")]
@@ -121,14 +139,20 @@ async def stream_section(
         samples=sample_ids if sample_ids else None,
         draft=None,
     )
-    user = _render_section_prompt(draft, section)
+    if instruction.strip() and section.content_md.strip():
+        # The section already has prose — apply the note as a surgical edit of
+        # that text (change only what's needed) rather than rewriting from brief.
+        user = _render_revise_prompt(draft, section, instruction.strip())
+    else:
+        user = _render_section_prompt(draft, section)
+        if instruction.strip():
+            # No existing prose to preserve — fold the note into the fresh write.
+            user = (
+                f"{user}\n\n---\n\nREVISION DIRECTIVE — rewrite the section above "
+                f"following this instruction, staying in voice:\n{instruction.strip()}"
+            )
     if reference_context:
         user = f"{reference_context}\n\n---\n\n{user}"
-    if instruction.strip():
-        user = (
-            f"{user}\n\n---\n\nREVISION DIRECTIVE — rewrite the section above "
-            f"following this instruction, staying in voice:\n{instruction.strip()}"
-        )
     full_prompt = f"{system}\n\n---\n\n{user}"
     async for chunk in provider.stream(model=model, prompt=full_prompt):
         yield chunk
