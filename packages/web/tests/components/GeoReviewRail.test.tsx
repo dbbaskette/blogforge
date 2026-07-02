@@ -1,0 +1,84 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../src/api/drafts", () => ({
+  inlineEdit: vi.fn().mockResolvedValue({ text: "A direct answer up front. Then detail." }),
+}));
+vi.mock("../../src/api/geo", () => ({
+  generateFaq: vi.fn(),
+  generateOpener: vi.fn(),
+  generateTable: vi.fn(),
+  generateTakeaways: vi.fn(),
+  geoCite: vi.fn(),
+  geoQuotes: vi.fn(),
+}));
+vi.mock("../../src/api/references", () => ({ listReferences: vi.fn().mockResolvedValue([]) }));
+
+import { inlineEdit } from "../../src/api/drafts";
+import type { GeoReport } from "../../src/api/geo";
+import { GeoReviewRail } from "../../src/components/draft/GeoReviewRail";
+
+const report: GeoReport = {
+  score: 62,
+  grade: "C",
+  levers: [
+    {
+      key: "answer_first",
+      label: "Answer-first sections",
+      score: 55,
+      detail: "Lead with the takeaway.",
+      fix: null,
+      findings: [
+        {
+          section_id: "s1",
+          target: "There are a few things worth considering first.",
+          note: "This section buries its answer",
+          fix: "answer_first",
+        },
+      ],
+    },
+  ],
+};
+
+// biome-ignore lint/suspicious/noExplicitAny: minimal Draft stub for the rail
+const draft: any = {
+  id: "d1",
+  sections: [
+    { id: "s1", content_md: "There are a few things worth considering first. Then the point." },
+  ],
+  outline: { opening_hook: "", sections: [] },
+};
+
+describe("GeoReviewRail", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("renders a card per finding under its lever", () => {
+    render(
+      <GeoReviewRail
+        report={report}
+        draft={draft}
+        onSectionSave={vi.fn().mockResolvedValue(undefined)}
+        onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(screen.getByText("Answer-first sections")).toBeInTheDocument();
+    expect(screen.getByText("This section buries its answer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI fix" })).toBeInTheDocument();
+  });
+
+  it("AI fix drives the api and moves the card to review", async () => {
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <GeoReviewRail
+        report={report}
+        draft={draft}
+        onSectionSave={onSectionSave}
+        onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "AI fix" }));
+    await waitFor(() => expect(inlineEdit).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument());
+    expect(onSectionSave).toHaveBeenCalled();
+  });
+});
