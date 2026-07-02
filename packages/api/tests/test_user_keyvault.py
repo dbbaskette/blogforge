@@ -1,5 +1,7 @@
 import uuid
+
 import pytest
+
 from blogforge.keys import KeyVault
 
 
@@ -19,3 +21,29 @@ async def test_delete_and_status() -> None:
 async def test_unknown_provider_raises() -> None:
     with pytest.raises(ValueError):
         await KeyVault(uuid.uuid4()).get("bogus")
+
+
+async def test_key_encrypted_under_different_secret_reads_as_unset() -> None:
+    """A stored key encrypted under a since-changed session_secret must degrade
+    to "" (and list_status False), not raise InvalidToken and 500 the keys page."""
+    from sqlalchemy import select
+
+    from blogforge.auth.crypto import SecretCipher
+    from blogforge.db.engine import get_sessionmaker
+    from blogforge.db.models import UserProviderKey
+
+    u = uuid.uuid4()
+    foreign = SecretCipher("a-different-old-session-secret").encrypt("sk-google-old")
+    async with get_sessionmaker()() as s:
+        s.add(UserProviderKey(user_id=u, provider="google", encrypted_key=foreign))
+        await s.commit()
+
+    # get() degrades gracefully instead of raising…
+    assert await KeyVault(u).get("google") == ""
+    # …and list_status() (what GET /api/keys calls) doesn't blow up.
+    assert (await KeyVault(u).list_status())["google"] is False
+    # The undecryptable row is left in place (user can overwrite by re-entering).
+    async with get_sessionmaker()() as s:
+        result = await s.execute(select(UserProviderKey).where(UserProviderKey.user_id == u))
+        rows = result.scalars().all()
+    assert len(rows) == 1
