@@ -60,6 +60,85 @@ def claude_available() -> bool:
     return shutil.which("claude") is not None
 
 
+def _cli_auth_failure(blob: str) -> dict[str, object]:
+    """Shape a not-authenticated status from whatever `claude -p` emitted."""
+    low = blob.lower()
+    looks_auth = "401" in blob or "authenticat" in low or "not logged in" in low or "/login" in low
+    return {
+        "installed": True,
+        "authenticated": False,
+        "detail": (
+            "The Claude CLI is installed but not logged in."
+            if looks_auth
+            else (blob[:300].strip() or "The `claude -p` probe failed.")
+        ),
+        "resolve": "Run `claude /login` in the terminal where BlogForge runs, then Refresh.",
+    }
+
+
+async def claude_status(timeout: float = 20.0) -> dict[str, object]:
+    """Live status of the Claude CLI provider: installed AND logged in? Runs a
+    tiny `claude -p` probe (uses the host's Claude Code auth). Never raises —
+    returns {installed, authenticated, detail, resolve}."""
+    binp = shutil.which("claude")
+    if not binp:
+        return {
+            "installed": False,
+            "authenticated": False,
+            "detail": "The `claude` CLI isn't on PATH where BlogForge runs.",
+            "resolve": "Install Claude Code, or run BlogForge on a host where `claude` is on PATH.",
+        }
+    args = [binp, "-p", "--output-format", "json", "--no-session-persistence", "--model", "haiku"]
+    # Throwaway cwd so the probe never inherits BlogForge's own .claude config.
+    workdir = tempfile.mkdtemp(prefix="blogforge-claude-status-")
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=workdir,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(b"Reply with the single word OK."), timeout=timeout
+            )
+        except TimeoutError:
+            proc.kill()
+            return {
+                "installed": True,
+                "authenticated": False,
+                "detail": "The `claude -p` probe timed out.",
+                "resolve": "Try Refresh, or run `printf hi | claude -p` in the server's shell.",
+            }
+    except OSError as e:
+        return {
+            "installed": True,
+            "authenticated": False,
+            "detail": f"Couldn't launch `claude -p` ({e.__class__.__name__}).",
+            "resolve": "Run `claude /login` in the terminal where BlogForge runs, then Refresh.",
+        }
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+    out = stdout.decode("utf-8", "replace")
+    if proc.returncode == 0:
+        # A zero exit can still carry an API-level failure (e.g. 401) in the JSON.
+        try:
+            data = json.loads(out)
+        except json.JSONDecodeError:
+            data = {}
+        if isinstance(data, dict) and data.get("is_error"):
+            return _cli_auth_failure(str(data.get("result", "")))
+        return {
+            "installed": True,
+            "authenticated": True,
+            "detail": "The Claude CLI is installed and logged in.",
+            "resolve": "",
+        }
+    return _cli_auth_failure((out + "\n" + stderr.decode("utf-8", "replace")).strip())
+
+
 def _coerce_json(text: str) -> str:
     """Best-effort: pull a JSON object out of the model's reply (strip fences /
     surrounding prose) so callers can json.loads / model_validate_json it."""
