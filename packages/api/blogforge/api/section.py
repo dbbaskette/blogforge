@@ -10,8 +10,6 @@ from uuid import UUID
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from blogforge.voice.compose import ComposeError
-from blogforge.voice.enforce import enforce_voice_rules
 from pydantic import BaseModel
 
 from blogforge.auth.dependencies import get_current_user
@@ -25,9 +23,23 @@ from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import JobRegistry
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
+from blogforge.voice.compose import ComposeError
+from blogforge.voice.enforce import enforce_voice_rules
+from blogforge.voice.packs.manifest import Manifest
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["section"])
+
+
+async def _enforce_section_voice(text: str, manifest: dict, provider, model: str) -> str:
+    """Backstop the mechanical voice rules on generated section text.
+
+    ``manifest`` is the raw parsed ``stylepack.yaml`` dict; enforcement needs the
+    typed ``Manifest`` (it reads ``manifest.banished`` etc.), so validate here —
+    matching the inline.py / expand.py / voice.py callers. Passing the raw dict
+    straight through raised ``'dict' object has no attribute 'banished'`` and
+    failed the whole regeneration after the model had already produced text."""
+    return await enforce_voice_rules(text, Manifest.model_validate(manifest), provider, model)
 
 
 class _SaveBody(BaseModel):
@@ -312,7 +324,7 @@ async def _run_regenerate(
         if get_settings().enforce_voice_rules:
             # Deterministically detect rule violations the model left in, repair
             # them via the model, then backstop the mechanical tells.
-            cleaned = await enforce_voice_rules(cleaned, manifest, provider, model)
+            cleaned = await _enforce_section_voice(cleaned, manifest, provider, model)
         section.content_md = cleaned + "\n"
         section.word_count = len(cleaned.split())
         section.status = "ready"
