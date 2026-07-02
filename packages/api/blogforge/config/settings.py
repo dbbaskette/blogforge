@@ -1,4 +1,5 @@
 """Application settings, loaded from BLOGFORGE_*-prefixed env vars."""
+
 from functools import lru_cache
 from typing import Annotated
 
@@ -20,7 +21,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = "sqlite+aiosqlite:///:memory:"
+    # Local default is a persistent on-disk SQLite file, so `blogforge serve`
+    # runs with no database container. Tanzu binds Postgres via VCAP; the test
+    # suite pins in-memory SQLite in conftest.
+    database_url: str = "sqlite+aiosqlite:///.data/blogforge.db"
     admin_email: str = "dbbaskette@gmail.com"
     admin_password: str = "VMware0!"
     session_secret: str = "dev-session-secret-change-me-in-prod"
@@ -40,9 +44,13 @@ class Settings(BaseSettings):
 
     tanzu_api_base: str = ""
     tanzu_api_key: str = ""
-    tanzu_models: Annotated[list[str], NoDecode] = Field(default_factory=lambda: [
-        "openai/gpt-oss-120b", "Qwen/Qwen3.5-27B-GPTQ-Int4", "google/gemma-4-31B-it",
-    ])
+    tanzu_models: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: [
+            "openai/gpt-oss-120b",
+            "Qwen/Qwen3.5-27B-GPTQ-Int4",
+            "google/gemma-4-31B-it",
+        ]
+    )
     # Like s3_verify_ssl: the bound GenAI proxy presents a self-signed cert from
     # the foundation's internal CA, so config/tanzu._apply_genai flips this to
     # False for the bound gateway. Default True keeps real OpenAI strict.
