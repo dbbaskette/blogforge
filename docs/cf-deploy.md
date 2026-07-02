@@ -8,7 +8,7 @@ Pure `cf push` with the python_buildpack — no Docker, no external dependency.
    - non-secret: `app_name`, `apps_domain`, `admin_email`, `github_allowlist`, `github_admin_login`
    - secret: `github_client_id`, `github_client_secret`, `session_secret` (`openssl rand -hex 32`)
    `vars.yml` is gitignored — keep real secrets in it and **never commit it**.
-3. Ensure bound services exist: `cf services` should list `blogforge-postgres` and `blogforge-s3` (else `cf create-service …`).
+3. Ensure bound services exist: `cf services` should list `blogforge-postgres` and `blogforge-blobs` (else `cf create-service …`). `blogforge-blobs` is a **Block Storage volume** service (`cf marketplace` for the offering + plan) — it mounts a persistent dir into the container, which the app uses as its blob store (`config/tanzu._apply_volume` → `BLOGFORGE_STORAGE_BACKEND=fs`, `BLOGFORGE_STORAGE_DIR=<mount>/blobs`). Object storage (SeaweedFS `blogforge-s3`) still works as a fallback if you bind it instead.
 4. Ensure a `blogforge-ai` GenAI service instance exists and is bound — create it on the `ai-models` offering's `tanzu-all-models` plan: `cf create-service ai-models tanzu-all-models blogforge-ai` (it auto-populates `BLOGFORGE_TANZU_API_BASE/KEY`). To change the offered models: `cf set-env <app_name> BLOGFORGE_TANZU_MODELS "<comma,separated,model,ids>"`.
 
 ## Each deploy
@@ -27,3 +27,4 @@ Visit `https://<app_name>.<apps_domain>` → **Sign in with GitHub**. The admin 
 - `requirements.txt` is the single pinned-deps file (also used by the Dockerfile). Regenerate after dependency changes with `uv export --frozen --no-emit-project --no-dev --no-hashes -o requirements.txt`.
 - `runtime.txt` pins the Python version; bump it to a python_buildpack-supported 3.11.x as needed.
 - A fresh `blogforge-postgres` starts empty — your local content isn't migrated automatically.
+- A fresh `blogforge-blobs` volume starts empty too — blobs (hero images, voice samples) aren't migrated from a previous SeaweedFS instance automatically.

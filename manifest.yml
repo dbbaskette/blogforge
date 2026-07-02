@@ -14,7 +14,11 @@ applications:
       - route: ((app_name)).((apps_domain))
     services:
       - blogforge-postgres
-      - blogforge-s3
+      # Block Storage volume service — mounts a persistent dir into the container.
+      # config/tanzu._apply_volume reads its volume_mounts[].container_dir and
+      # points the fs blob store at <mount>/blobs. Create it once with:
+      #   cf create-service <block-storage-service> <plan> blogforge-blobs
+      - blogforge-blobs
       - blogforge-ai
     env:
       # ----------------------------------------------------------------------
@@ -25,8 +29,9 @@ applications:
       # commit real values; vars.example.yml ships placeholders only. The keys:
       #   github_client_id, github_client_secret, session_secret
       #
-      # The Tanzu config adapter maps VCAP_SERVICES -> BLOGFORGE_DATABASE_URL
-      # and BLOGFORGE_S3_* at startup (postgres + s3 bindings above).
+      # The Tanzu config adapter maps VCAP_SERVICES at startup: the postgres
+      # binding -> BLOGFORGE_DATABASE_URL, and the Block Storage volume mount ->
+      # BLOGFORGE_STORAGE_BACKEND=fs + BLOGFORGE_STORAGE_DIR=<mount>/blobs.
       # ----------------------------------------------------------------------
       BLOGFORGE_PUBLIC_URL: https://((app_name)).((apps_domain))
       BLOGFORGE_ADMIN_EMAIL: ((admin_email))
@@ -38,10 +43,9 @@ applications:
       BLOGFORGE_SESSION_SECRET: ((session_secret))
       # Production serves over TLS — sign session cookies as Secure.
       BLOGFORGE_COOKIE_SECURE: "true"
-      # S3 endpoint/bucket/region/keys come from the seaweedfs binding
-      # (config/tanzu.py _apply_s3). Skip boot-time bucket creation — the bound
-      # instance already provisions a bucket, and the create call can hang.
-      BLOGFORGE_S3_BOOTSTRAP_ON_BOOT: "false"
+      # Storage bootstrap = mkdir <mount>/blobs on the bound volume at boot
+      # (FsStorage.bootstrap, via s3/lifespan.ensure_bucket). Cheap + idempotent.
+      BLOGFORGE_S3_BOOTSTRAP_ON_BOOT: "true"
       BLOGFORGE_RUN_MIGRATIONS_ON_BOOT: "true"
       # Empty — api and web share an origin, so CORS is unnecessary.
       BLOGFORGE_CORS_ORIGINS: ""

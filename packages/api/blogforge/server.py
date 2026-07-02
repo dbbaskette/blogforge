@@ -118,19 +118,27 @@ def _read_myvoice_pack_paths() -> list[Path]:
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
 
-    # 1) Migrations.
+    # 1) Schema. SQLite (local, no-Docker dev) builds directly from the ORM
+    # models — the Alembic migrations are authored for Postgres. Postgres (Tanzu)
+    # runs the versioned migrations.
     if settings.run_migrations_on_boot:
-        from alembic import command
-        from alembic.config import Config as AlembicConfig
+        if settings.database_url.startswith("sqlite"):
+            from blogforge.db.base import Base
 
-        # __file__ is packages/api/blogforge/server.py → parents[1] is packages/api.
-        api_root = Path(__file__).resolve().parents[1]
-        ini = api_root / "alembic.ini"
-        cfg = AlembicConfig(str(ini))
-        # Force absolute paths so migrations work regardless of CWD.
-        cfg.set_main_option("script_location", str(api_root / "alembic"))
-        cfg.set_main_option("sqlalchemy.url", settings.database_url)
-        command.upgrade(cfg, "head")
+            async with get_engine().begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        else:
+            from alembic import command
+            from alembic.config import Config as AlembicConfig
+
+            # __file__ is packages/api/blogforge/server.py → parents[1] is packages/api.
+            api_root = Path(__file__).resolve().parents[1]
+            ini = api_root / "alembic.ini"
+            cfg = AlembicConfig(str(ini))
+            # Force absolute paths so migrations work regardless of CWD.
+            cfg.set_main_option("script_location", str(api_root / "alembic"))
+            cfg.set_main_option("sqlalchemy.url", settings.database_url)
+            command.upgrade(cfg, "head")
 
     # 2) S3 bucket bootstrap. Idempotent; creates the bucket on first boot.
     if settings.s3_bootstrap_on_boot:
