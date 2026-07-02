@@ -27,6 +27,16 @@ async def list_providers(current: User = Depends(get_current_user)) -> dict[str,
     return out
 
 
+@router.get("/claude-cli/status")
+async def claude_cli_status(current: User = Depends(get_current_user)) -> dict[str, object]:
+    """Live status of the keyless Claude CLI provider: installed + logged in?
+    Runs a tiny `claude -p` probe (uses the host's Claude Code auth). Declared
+    before /{provider}/models so the static path wins."""
+    from blogforge.llm.claude_cli import claude_status
+
+    return await claude_status()
+
+
 @router.get("/{provider}/models")
 async def list_models(provider: str, current: User = Depends(get_current_user)) -> list[dict[str, Any]]:
     """Proxy to the provider's list_models, using the per-user key."""
