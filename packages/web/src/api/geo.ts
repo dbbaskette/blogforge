@@ -6,6 +6,7 @@ export type GeoFix =
   | "definitional"
   | "definitional_improve"
   | "faq"
+  | "comparison_table"
   | null;
 
 /** Per-finding one-click action (server-tagged). */
@@ -14,7 +15,8 @@ export type GeoFindingFix =
   | "question_heading"
   | "bullets"
   | "self_contained"
-  | "dedupe_opening";
+  | "dedupe_opening"
+  | "comparison_table";
 
 export interface GeoFinding {
   section_id?: string;
@@ -69,4 +71,16 @@ export async function generateOpener(draftId: string): Promise<string> {
     { method: "POST" },
   );
   return opener;
+}
+
+/**
+ * A grounded Markdown comparison table built from one section's prose. The
+ * client appends it to that section (with a version snapshot for undo).
+ */
+export async function generateTable(draftId: string, sectionId: string): Promise<string> {
+  const { table } = await api<{ table: string }>(
+    `/api/drafts/${encodeURIComponent(draftId)}/geo/table`,
+    { method: "POST", body: JSON.stringify({ section_id: sectionId }) },
+  );
+  return table;
 }

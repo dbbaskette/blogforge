@@ -27,21 +27,25 @@ from blogforge.llm.base import LLMProvider
 # Weights sum to 1.0; the two most-cited levers (answer-first, factual density)
 # carry the most. Deterministic and semantic levers share one scale.
 _WEIGHTS: dict[str, float] = {
-    "answer_first": 0.22,
-    "factual_density": 0.22,
-    "definitional_opener": 0.12,
-    "question_headings": 0.12,
-    "skimmability": 0.12,
-    "faq": 0.10,
-    "chunking": 0.10,
+    "answer_first": 0.20,
+    "factual_density": 0.20,
+    "definitional_opener": 0.10,
+    "question_headings": 0.10,
+    "skimmability": 0.10,
+    "brand_explicit": 0.08,
+    "comparison_table": 0.06,
+    "faq": 0.08,
+    "chunking": 0.08,
 }
 # Display order in the panel (roughly by leverage).
 _ORDER = (
     "answer_first",
     "factual_density",
     "definitional_opener",
+    "brand_explicit",
     "question_headings",
     "skimmability",
+    "comparison_table",
     "chunking",
     "faq",
 )
@@ -49,8 +53,10 @@ _LABELS: dict[str, str] = {
     "answer_first": "Answer-first sections",
     "factual_density": "Factual density",
     "definitional_opener": "Definitional opener",
+    "brand_explicit": "Brand named explicitly",
     "question_headings": "Question headings",
     "skimmability": "Skimmability",
+    "comparison_table": "Comparison table",
     "faq": "FAQ section",
     "chunking": "Self-contained passages",
 }
@@ -83,8 +89,63 @@ _FAQ_CONTENT_RE = re.compile(
     r"(?im)^#{2,4}\s*(faqs?|frequently asked|common questions|q ?& ?a|q and a)\b"
 )
 
+# A Markdown table is a pipe row followed by a separator row (---|--- with
+# optional colons). Both must be present, so a lone `|` in prose doesn't count.
+_TABLE_ROW_RE = re.compile(r"(?m)^\s*\|.*\|\s*$")
+_TABLE_SEP_RE = re.compile(r"(?m)^\s*\|?[ :|-]*-{3,}[ :|-]*\|.*$")
+# Language that signals a section is comparing options/versions/tradeoffs — the
+# content that earns an AI citation far more often when laid out as a table.
+_COMPARE_RE = re.compile(
+    r"(?i)\b(?:versus|vs\.?|compared? (?:to|with|against)|comparison|"
+    r"trade-?offs?|pros and cons|option [a-z0-9]|tiers?|pricing plans?|"
+    r"(?:cheaper|faster|better|stronger|slower) than|"
+    r"alternatives?|which (?:one|option|approach|tool) (?:is|to))\b"
+)
+# Corporate buzzwords that, when dense and unaccompanied by any concrete number,
+# mark a sentence as fluff — discounted by AI answer engines and Google alike.
+_BUZZWORDS = (
+    "leverage",
+    "synergy",
+    "robust",
+    "cutting-edge",
+    "seamless",
+    "seamlessly",
+    "world-class",
+    "best-in-class",
+    "best of breed",
+    "revolutionary",
+    "game-changing",
+    "game changer",
+    "next-generation",
+    "next generation",
+    "paradigm",
+    "holistic",
+    "turnkey",
+    "mission-critical",
+    "empower",
+    "empowering",
+    "unlock",
+    "supercharge",
+    "frictionless",
+    "bleeding-edge",
+    "state-of-the-art",
+    "industry-leading",
+    "unparalleled",
+    "innovative",
+    "transformative",
+    "disruptive",
+    "streamline",
+    "streamlined",
+)
+_BUZZ_RE = re.compile(r"(?i)\b(?:" + "|".join(re.escape(w) for w in _BUZZWORDS) + r")\b")
+_NUMBER_RE = re.compile(r"\d")
+
 _LONG_PARA_CHARS = 700
 _LONG_SECTION_WORDS = 400
+
+
+def _has_table(text: str) -> bool:
+    return bool(_TABLE_ROW_RE.search(text) and _TABLE_SEP_RE.search(text))
 
 
 def _lever(
@@ -171,6 +232,42 @@ def augment_definitional(levers: dict[str, dict[str, Any]], draft: Draft) -> Non
         *lever["findings"],
     ]
     lever["score"] = min(lever["score"], 45)
+
+
+def _fluff_sentences(text: str, limit: int = 3) -> list[str]:
+    """Sentences piling on buzzwords with no concrete number — the fluff that AI
+    answer engines and Google's quality systems both discount."""
+    out: list[str] = []
+    for raw in _SENT_SPLIT.split(text):
+        s = raw.strip()
+        if s and len(_BUZZ_RE.findall(s)) >= 2 and not _NUMBER_RE.search(s):
+            out.append(s)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def augment_factual_density(levers: dict[str, dict[str, Any]], draft: Draft) -> None:
+    """Deterministic addendum to the semantic factual-density lever: buzzword-
+    dense, number-free sentences are objective fluff. Surface them as thin spots
+    (with a concrete swap suggestion) and cap the score so vague prose can't grade
+    well on the single best-proven citation lever."""
+    lever = levers.get("factual_density")
+    if not lever:
+        return
+    flagged = [
+        {
+            "target": sent,
+            "note": "Buzzword-heavy with no concrete number — AI and Google discount fluff.",
+            "suggestion": "Swap the jargon for one real stat, example, or named source.",
+        }
+        for s in draft.sections
+        for sent in _fluff_sentences(s.content_md)
+    ]
+    if not flagged:
+        return
+    lever["findings"] = [*lever["findings"], *flagged[:3]]
+    lever["score"] = min(lever["score"], 70)
 
 
 def _longest_paragraph_chars(text: str) -> int:
@@ -286,11 +383,47 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         findings=ch_findings,
     )
 
+    # Comparison table — a section that compares options/versions/tradeoffs but
+    # renders them as prose gets cited far less than the same content as a table.
+    # We only flag sections that (a) read as a comparison and (b) have no table;
+    # a post with nothing to compare passes at 100 (no false penalty).
+    table_candidates = [
+        s for s in sections if _COMPARE_RE.search(s.content_md) and not _has_table(s.content_md)
+    ]
+    any_table = any(_has_table(s.content_md) for s in sections)
+    if not table_candidates:
+        ct_score = 100.0
+        ct_detail = (
+            "Has a comparison table." if any_table else "No comparison-worthy content detected."
+        )
+    else:
+        ct_score = 55.0
+        ct_detail = (
+            f"{len(table_candidates)} section(s) compare options in prose — a table gets lifted "
+            "into AI answers far more often."
+        )
+    comparison = _lever(
+        "comparison_table",
+        ct_score,
+        ct_detail,
+        findings=[
+            {
+                "section_id": s.id,
+                "note": f'"{strip_inline_emphasis(s.title)}" compares options in prose — '
+                "a comparison table is more citable.",
+                "fix": "comparison_table",
+            }
+            for s in table_candidates
+        ],
+        fix="comparison_table" if table_candidates else None,
+    )
+
     return {
         "question_headings": question,
         "skimmability": skim,
         "faq": faq,
         "chunking": chunk,
+        "comparison_table": comparison,
     }
 
 
@@ -320,6 +453,9 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
             "properties": {
                 "score": {"type": "integer"},
                 "note": {"type": "string"},
+                "has_stats": {"type": "boolean"},
+                "has_named_sources": {"type": "boolean"},
+                "has_quotes": {"type": "boolean"},
                 "thin_spots": {
                     "type": "array",
                     "items": {
@@ -335,8 +471,18 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
             },
             "required": ["score", "note"],
         },
+        "brand_explicit": {
+            "type": "object",
+            "properties": {
+                "score": {"type": "integer"},
+                "note": {"type": "string"},
+                "brand": {"type": "string"},
+                "stated_up_top": {"type": "boolean"},
+            },
+            "required": ["score", "note"],
+        },
     },
-    "required": ["answer_first", "definitional_opener", "factual_density"],
+    "required": ["answer_first", "definitional_opener", "factual_density", "brand_explicit"],
 }
 
 _SEMANTIC_DIRECTIVE = (
@@ -352,12 +498,20 @@ _SEMANTIC_DIRECTIVE = (
     "This decides whether the tool offers to ADD one: adding on top of an "
     "existing definition creates duplicates.\n"
     "3) factual_density: does it use specific statistics, named sources, and quotes "
-    "rather than vague claims? In `thin_spots`, quote vague passages that WOULD be "
-    "stronger with real data; in `note` name the problem, and in `suggestion` say "
-    "concretely WHAT KIND of data the author should add and where they'd find it "
-    '(e.g. "Add your actual deployment count or a p95 latency benchmark from your '
-    'monitoring"). You CANNOT invent facts — never supply statistics or sources, '
-    "only describe what to add."
+    "rather than vague claims? Set `has_stats`, `has_named_sources`, and `has_quotes` "
+    "to reflect which of the three are present, and in `note` name which are MISSING "
+    "(this is the single best-proven citation lever). In `thin_spots`, quote vague "
+    "passages that WOULD be stronger with real data; in each `note` name the problem, "
+    "and in `suggestion` say concretely WHAT KIND of data to add and where they'd find "
+    'it (e.g. "Add your actual deployment count or a p95 latency benchmark from your '
+    'monitoring"). You CANNOT invent facts — never supply statistics or sources, only '
+    "describe what to add.\n"
+    "4) brand_explicit: does the post name its product/brand/subject EXPLICITLY and "
+    "clearly (not just implied), ideally near the top? AI can cite content without "
+    "naming the source ('ghost citation'); an explicit brand name travels with the "
+    "citation. Put the brand you detect in `brand`, set `stated_up_top` true if it "
+    "appears in the first section, and score how clearly/early it's named. Never "
+    "invent a brand — if none is evident, say so in `note` and score low."
 )
 
 
@@ -454,10 +608,20 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         findings=fd_findings,
     )
 
+    be = data.get("brand_explicit") if isinstance(data.get("brand_explicit"), dict) else {}
+    # Flag-only: naming the brand is the writer's call (and we can't invent one).
+    brand = _lever(
+        "brand_explicit",
+        _clampi(be.get("score")),
+        str(be.get("note", "")).strip()
+        or "Whether the product/brand is named explicitly so citations travel with it.",
+    )
+
     return {
         "answer_first": answer_first,
         "definitional_opener": definitional,
         "factual_density": factual,
+        "brand_explicit": brand,
     }
 
 
@@ -499,13 +663,17 @@ async def analyze_geo(
         'Return JSON matching: {"answer_first": {"score": 0, "note": "", '
         '"weak_sections": []}, "definitional_opener": {"score": 0, "note": "", '
         '"has_definition": false}, '
-        '"factual_density": {"score": 0, "note": "", "thin_spots": []}}.\n\nDRAFT:\n'
+        '"factual_density": {"score": 0, "note": "", "has_stats": false, '
+        '"has_named_sources": false, "has_quotes": false, "thin_spots": []}, '
+        '"brand_explicit": {"score": 0, "note": "", "brand": "", '
+        '"stated_up_top": false}}.\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
     semantic = parse_semantic(resp.text, draft)
     levers = {**structural, **semantic}
     augment_definitional(levers, draft)
+    augment_factual_density(levers, draft)
     return build_report(levers)
 
 
@@ -601,3 +769,47 @@ async def generate_opener(
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return clean_opener(resp.text)
+
+
+def clean_table(raw: str) -> str:
+    """Reduce the model's reply to just the Markdown table: the contiguous run of
+    pipe rows including the ``|---|`` separator. Empty string if no valid table
+    came back (so the caller can surface an error instead of pasting prose)."""
+    block = "\n".join(ln.rstrip() for ln in raw.strip().splitlines() if "|" in ln).strip()
+    if _TABLE_ROW_RE.search(block) and _TABLE_SEP_RE.search(block):
+        return block
+    return ""
+
+
+async def generate_table(
+    draft: Draft,
+    section_id: str,
+    pack_root: Path,
+    manifest: dict[str, Any],
+    provider: LLMProvider,
+    *,
+    model: str,
+) -> str:
+    """Turn one section's prose comparison into a grounded Markdown table.
+
+    Columns are the dimensions compared, rows the options (or vice-versa); every
+    cell is drawn from the section's own text — no invented facts or options.
+    Returns the table markdown for the client to splice in, or "" on failure.
+    """
+    from blogforge.voice import compose_prompt
+
+    section = next((s for s in draft.sections if s.id == section_id), None)
+    if section is None or not section.content_md.strip():
+        return ""
+    system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    prompt = (
+        f"{system}\n\n---\n\nThe section below compares options/versions/tradeoffs in "
+        "prose. Turn that comparison into ONE compact Markdown table: columns are the "
+        "dimensions being compared, rows are the options (or vice-versa if that reads "
+        "better). Use ONLY facts, numbers, and options already in the section — invent "
+        "nothing and keep the author's terms. Return ONLY the Markdown table (a header "
+        "row, a |---| separator row, then the data rows) — no title, no prose.\n\n"
+        f"SECTION: {strip_inline_emphasis(section.title)}\n\n{section.content_md}"
+    )
+    resp = await provider.complete(model=model, prompt=prompt)
+    return clean_table(resp.text)

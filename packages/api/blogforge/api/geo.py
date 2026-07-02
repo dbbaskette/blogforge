@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
-from blogforge.generate.geo import analyze_geo, generate_faq, generate_opener
+from blogforge.generate.geo import analyze_geo, generate_faq, generate_opener, generate_table
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.compose import ComposeError
@@ -88,6 +88,34 @@ async def geo_faq(
     except (ProviderMissingKey, ProviderError, ComposeError) as e:
         raise _provider_error(e) from e
     return {"faqs": faqs}
+
+
+class _TableBody(BaseModel):
+    section_id: str = Field(min_length=1)
+
+
+@router.post("/api/drafts/{draft_id}/geo/table")
+async def geo_table(
+    draft_id: str,
+    body: _TableBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> dict[str, str]:
+    """A grounded Markdown comparison table built from one section's prose — the
+    client splices it into that section."""
+    draft, pack_root, manifest, provider = await _load(request, draft_id, current)
+    try:
+        table = await generate_table(
+            draft, body.section_id, pack_root, manifest, provider, model=draft.idea.model
+        )
+    except (ProviderMissingKey, ProviderError, ComposeError) as e:
+        raise _provider_error(e) from e
+    if not table:
+        raise HTTPException(
+            502,
+            detail={"error": {"code": "empty_table", "message": "No table came back — try again."}},
+        )
+    return {"table": table}
 
 
 @router.post("/api/drafts/{draft_id}/geo/opener")
