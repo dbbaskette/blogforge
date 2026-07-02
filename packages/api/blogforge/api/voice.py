@@ -287,10 +287,17 @@ def _default_model(provider_name: str) -> str:
 async def _auto_select_provider(user_id) -> str | None:
     from blogforge.config import get_settings
     from blogforge.keys import KeyVault
+    from blogforge.llm.claude_cli import claude_available
     vault = KeyVault(user_id)
-    for candidate in ("anthropic", "openai", "google", "claude-cli"):
+    for candidate in ("anthropic", "openai", "google"):
         if await vault.get(candidate):
             return candidate
+    # claude-cli is keyless (subscription auth), so it never lives in the vault —
+    # vault.get("claude-cli") is always falsy. It's available iff the binary is
+    # installed. Prefer it before tanzu so a no-key local user auto-selects
+    # `claude -p` instead of getting a 400.
+    if claude_available():
+        return "claude-cli"
     s = get_settings()
     if s.tanzu_api_base and s.tanzu_api_key:
         return "tanzu"
