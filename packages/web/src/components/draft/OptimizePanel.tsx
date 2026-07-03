@@ -17,12 +17,14 @@ import { type GeoReport, analyzeGeo, rescoreGeo } from "../../api/geo";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
 import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
+import { HighlightedText } from "../review/HighlightedText";
 import { BusyOverlay } from "../ui/BusyOverlay";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { useDialogA11y } from "../ui/useDialogA11y";
 import { computeTotalScore } from "./GeoPanel";
 import { GeoReviewRail } from "./GeoReviewRail";
 import { ProofreadReviewRail } from "./ProofreadReviewRail";
+import type { TrackedChangeKind } from "./trackedChangeDecoration";
 
 type ReviewView = "seo" | "proofreading" | "all";
 
@@ -65,6 +67,38 @@ export function OptimizePanel({
   const [view, setView] = useState<ReviewView>("seo");
   const [lint, setLint] = useState<LintResult | null>(null);
   const [lintBusy, setLintBusy] = useState(false);
+  // Which passage is lit in the read pane: an applied fix awaiting accept
+  // ("under-review"), or a transient "locate" from the Highlight action.
+  const [highlight, setHighlight] = useState<{
+    sectionId: string;
+    text: string;
+    kind: TrackedChangeKind;
+  } | null>(null);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
+  const locateTimer = useRef<number | null>(null);
+
+  const onHighlight = useCallback(
+    (sectionId: string, text: string | null, kind: "under-review" | "locate"): void => {
+      if (locateTimer.current) window.clearTimeout(locateTimer.current);
+      if (!text) {
+        setHighlight(null);
+        return;
+      }
+      setHighlight({ sectionId, text, kind });
+      // Locate is transient; an under-review highlight persists until accept/undo.
+      if (kind === "locate") {
+        locateTimer.current = window.setTimeout(() => setHighlight(null), 2600);
+      }
+    },
+    [],
+  );
+
+  // Scroll the lit passage into view whenever the highlight changes.
+  useEffect(() => {
+    if (highlight) {
+      highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlight]);
 
   const contentHash = useMemo(() => hashDraftContent(draft), [draft]);
 
@@ -248,26 +282,45 @@ export function OptimizePanel({
             </h2>
 
             {opening && (
-              <p className="text-ink leading-relaxed whitespace-pre-wrap mb-8">{opening}</p>
+              <p
+                ref={highlight?.sectionId === "opening" ? highlightRef : undefined}
+                className="text-ink leading-relaxed whitespace-pre-wrap mb-8"
+              >
+                <HighlightedText
+                  text={opening}
+                  mark={highlight?.sectionId === "opening" ? highlight.text : null}
+                  kind={highlight?.kind}
+                />
+              </p>
             )}
 
             <div className="space-y-8">
-              {draft.sections.map((section) => (
-                <section key={section.id}>
-                  {section.title.trim() && (
-                    <h3 className="font-serif text-xl font-medium text-ink mb-3">
-                      {section.title}
-                    </h3>
-                  )}
-                  <div className="prose text-ink leading-relaxed whitespace-pre-wrap">
-                    {section.content_md?.trim() ? (
-                      section.content_md
-                    ) : (
-                      <span className="text-muted-2 not-italic">No content yet.</span>
+              {draft.sections.map((section) => {
+                const lit = highlight?.sectionId === section.id ? highlight : null;
+                return (
+                  <section key={section.id}>
+                    {section.title.trim() && (
+                      <h3 className="font-serif text-xl font-medium text-ink mb-3">
+                        {section.title}
+                      </h3>
                     )}
-                  </div>
-                </section>
-              ))}
+                    <div
+                      ref={lit ? highlightRef : undefined}
+                      className="prose text-ink leading-relaxed whitespace-pre-wrap"
+                    >
+                      {section.content_md?.trim() ? (
+                        <HighlightedText
+                          text={section.content_md}
+                          mark={lit?.text ?? null}
+                          kind={lit?.kind}
+                        />
+                      ) : (
+                        <span className="text-muted-2 not-italic">No content yet.</span>
+                      )}
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -294,6 +347,7 @@ export function OptimizePanel({
                   onSectionSave={onSectionSave}
                   onOpeningSave={saveOpening}
                   onRescore={queueRescore}
+                  onHighlight={onHighlight}
                 />
               )}
             </div>
@@ -310,7 +364,12 @@ export function OptimizePanel({
                 <p className="py-10 text-center text-sm text-muted">Proofreading…</p>
               )}
               {lint && (
-                <ProofreadReviewRail lint={lint} draft={draft} onSectionSave={onSectionSave} />
+                <ProofreadReviewRail
+                  lint={lint}
+                  draft={draft}
+                  onSectionSave={onSectionSave}
+                  onHighlight={onHighlight}
+                />
               )}
             </div>
           )}
