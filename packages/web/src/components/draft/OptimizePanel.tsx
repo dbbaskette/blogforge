@@ -21,9 +21,9 @@ import { HighlightedText } from "../review/HighlightedText";
 import { BusyOverlay } from "../ui/BusyOverlay";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { useDialogA11y } from "../ui/useDialogA11y";
-import { computeTotalScore } from "./GeoPanel";
 import { GeoReviewRail } from "./GeoReviewRail";
 import { ProofreadReviewRail } from "./ProofreadReviewRail";
+import { computeTotalScore } from "./geoScore";
 import type { TrackedChangeKind } from "./trackedChangeDecoration";
 
 type ReviewView = "seo" | "proofreading" | "all";
@@ -191,6 +191,22 @@ export function OptimizePanel({
     [draft, onChange],
   );
 
+  // A section's heading lives on both the section and the outline; keep them in
+  // sync when a question-heading fix rewrites the title.
+  const saveTitle = useCallback(
+    async (sectionId: string, title: string): Promise<void> => {
+      const sections = draft.sections.map((s) => (s.id === sectionId ? { ...s, title } : s));
+      const outline = draft.outline
+        ? {
+            ...draft.outline,
+            sections: draft.outline.sections.map((s) => (s.id === sectionId ? { ...s, title } : s)),
+          }
+        : draft.outline;
+      await onChange({ ...draft, sections, outline });
+    },
+    [draft, onChange],
+  );
+
   const geoCount = useMemo(() => (report ? geoFindingsToIssues(report).length : 0), [report]);
   const lintCount = useMemo(() => (lint ? proofreadFindingsToIssues(lint).length : 0), [lint]);
   const totalIssues =
@@ -354,6 +370,7 @@ export function OptimizePanel({
                   draft={draft}
                   onSectionSave={onSectionSave}
                   onOpeningSave={saveOpening}
+                  onTitleSave={saveTitle}
                   onRescore={queueRescore}
                   onHighlight={onHighlight}
                 />

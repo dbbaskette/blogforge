@@ -58,6 +58,7 @@ describe("GeoReviewRail", () => {
         report={report}
         draft={draft}
         onSectionSave={vi.fn().mockResolvedValue(undefined)}
+        onTitleSave={vi.fn().mockResolvedValue(undefined)}
         onOpeningSave={vi.fn().mockResolvedValue(undefined)}
       />,
     );
@@ -73,6 +74,7 @@ describe("GeoReviewRail", () => {
         report={report}
         draft={draft}
         onSectionSave={onSectionSave}
+        onTitleSave={vi.fn().mockResolvedValue(undefined)}
         onOpeningSave={vi.fn().mockResolvedValue(undefined)}
       />,
     );

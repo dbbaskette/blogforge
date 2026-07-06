@@ -14,8 +14,18 @@ const report: GeoReport = {
       detail: "Lead with the takeaway.",
       fix: null,
       findings: [
-        { section_id: "s1", target: "There are a few things…", note: "Section buries its answer", fix: "answer_first" },
-        { section_id: "s2", target: "Before we begin…", note: "Second weak section", fix: "answer_first" },
+        {
+          section_id: "s1",
+          target: "There are a few things…",
+          note: "Section buries its answer",
+          fix: "answer_first",
+        },
+        {
+          section_id: "s2",
+          target: "Before we begin…",
+          note: "Second weak section",
+          fix: "answer_first",
+        },
       ],
     },
     {
@@ -63,5 +73,26 @@ describe("geoFindingsToIssues", () => {
     const faq = geoFindingsToIssues(report).find((i) => i.lever === "faq");
     expect(faq?.nature).toBe("add");
     expect(faq?.actions).toEqual(["generate", "write_own"]);
+  });
+
+  it("makes factual_density actionable (add a fact) and tags a fixKind", () => {
+    const issues = geoFindingsToIssues({
+      score: 50,
+      grade: "D",
+      levers: [
+        {
+          key: "factual_density",
+          label: "Factual density",
+          score: 55,
+          detail: "Back claims with real data.",
+          fix: null,
+          findings: [{ section_id: "s1", target: "a vague claim", note: "Thin on data" }],
+        },
+      ],
+    });
+    expect(issues).toHaveLength(1);
+    expect(issues[0].nature).toBe("fix");
+    expect(issues[0].actions).toContain("add_fact");
+    expect(issues[0].fixKind).toBe("factual_density");
   });
 });

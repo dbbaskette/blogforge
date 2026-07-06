@@ -43,6 +43,11 @@ function specFor(lever: GeoLever, findingFix: string): ActionSpec {
   if (lever.key === "brand_explicit") {
     return { nature: "fix", actions: ["ai_fix", "manual_fix", "highlight"] };
   }
+  if (lever.key === "factual_density") {
+    // Thin spots: the writer supplies a real stat (add_fact); fluffy prose: the
+    // model tightens it (ai_fix). Both are offered so the lever is actionable.
+    return { nature: "fix", actions: ["add_fact", "ai_fix", "highlight"] };
+  }
   if (ADVISORY_LEVERS.has(lever.key)) {
     return { nature: "advisory", actions: ["add_date", "highlight", "dismiss"] };
   }
@@ -54,7 +59,8 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
   const issues: Issue[] = [];
   for (const lever of report.levers) {
     lever.findings.forEach((finding, i) => {
-      const spec = specFor(lever, finding.fix ?? "");
+      const fix = finding.fix ?? "";
+      const spec = specFor(lever, fix);
       issues.push({
         id: `${lever.key}:${i}`,
         panel: "geo",
@@ -64,6 +70,9 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         nature: spec.nature,
         sectionId: finding.section_id ?? "",
         target: finding.target,
+        // The specific fix the apply layer dispatches on (finding-level, then
+        // lever-level, then the lever key as a last resort).
+        fixKind: fix || lever.fix || lever.key,
         actions: spec.actions,
         status: "open",
       });
