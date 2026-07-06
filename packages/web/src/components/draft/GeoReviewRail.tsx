@@ -13,7 +13,9 @@ import type { Draft } from "../../api/drafts";
 import type { GeoReport } from "../../api/geo";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { IssueCard } from "../review/IssueCard";
+import { reviewBusyLabel } from "../review/reviewBusyLabel";
 import { useIssueLifecycle } from "../review/useIssueLifecycle";
+import { BusyOverlay } from "../ui/BusyOverlay";
 import { makeGeoApply } from "./geoApply";
 
 function barColor(score: number): string {
@@ -44,13 +46,14 @@ export function GeoReviewRail({
     () => makeGeoApply({ draft, onSectionSave, onOpeningSave }),
     [draft, onSectionSave, onOpeningSave],
   );
-  const { statusOf, busyId, run, accept, undo } = useIssueLifecycle({
+  const { statusOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save: onSectionSave,
     onHighlight,
     onRescore,
   });
+  const busyLabel = reviewBusyLabel(busyAction);
 
   const byLever = useMemo(() => {
     const map = new Map<string, typeof issues>();
@@ -64,6 +67,7 @@ export function GeoReviewRail({
 
   return (
     <div className="space-y-4">
+      {busyLabel && <BusyOverlay label={busyLabel} />}
       {report.levers.map((lever) => {
         const leverIssues = byLever.get(lever.key) ?? [];
         if (leverIssues.length === 0) return null;
