@@ -68,6 +68,23 @@ describe("geoApply cite_source", () => {
     });
     expect(await apply(citeIssue, "cite_source")).toBeNull();
   });
+
+  it("locates the section by target when the finding has no section_id", async () => {
+    // The citations lever tags a target but no section_id — apply must find the
+    // section whose body contains the claim instead of no-opping.
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const noSection: Issue = { ...citeIssue, sectionId: "" };
+    const res = await apply(noSection, "cite_source", "https://example.com");
+    expect(res).not.toBeNull();
+    expect(res?.sectionId).toBe("s1");
+    expect(onSectionSave).toHaveBeenCalledWith("s1", expect.stringContaining("Example"));
+  });
 });
 
 describe("geoApply ai_fix", () => {

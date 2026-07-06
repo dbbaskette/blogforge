@@ -70,6 +70,40 @@ function readSource(draft: Draft, sectionId: string): string {
   return draft.sections.find((s) => s.id === sectionId)?.content_md ?? "";
 }
 
+const normalize = (s: string): string => s.replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * Resolve where an issue's fix should land: `{ sectionId, before, target }`.
+ * Some backend findings (citations, factual_density) carry a `target` claim but
+ * NO `section_id`, so a naive `readSource(draft, "")` returns "" and every fix
+ * no-ops. When the id doesn't name a real section, find the section whose body
+ * actually contains the target. `target` is returned only when it's a literal
+ * substring of `before` (so a scoped `before.replace(target, …)` works);
+ * otherwise it's null and the caller edits the whole located section body.
+ */
+function locate(
+  draft: Draft,
+  issue: Issue,
+): { sectionId: string; before: string; target: string | null } {
+  const { sectionId, target } = issue;
+  const known = sectionId === OPENING || draft.sections.some((s) => s.id === sectionId);
+  if (known) {
+    const before = readSource(draft, sectionId);
+    return { sectionId, before, target: target && before.includes(target) ? target : null };
+  }
+  // No usable section id — locate by the target text.
+  if (target) {
+    const exact = draft.sections.find((s) => s.content_md.includes(target));
+    if (exact) return { sectionId: exact.id, before: exact.content_md, target };
+    const nt = normalize(target);
+    if (nt) {
+      const fuzzy = draft.sections.find((s) => normalize(s.content_md).includes(nt));
+      if (fuzzy) return { sectionId: fuzzy.id, before: fuzzy.content_md, target: null };
+    }
+  }
+  return { sectionId, before: readSource(draft, sectionId), target: null };
+}
+
 /** Route a persisted value to the right field (body / title / opening). */
 export function makeGeoSave(
   ctx: GeoApplyContext,
@@ -91,10 +125,9 @@ export function makeGeoApply(
     sectionId === OPENING ? "opening" : "content";
 
   return async (issue: Issue, action: IssueAction, input?: string): Promise<Applied | null> => {
-    const sectionId = issue.sectionId;
+    // Resolve the real section even when the finding tagged a target but no id.
+    const { sectionId, before, target } = locate(draft, issue);
     const field = openingField(sectionId);
-    const before = readSource(draft, sectionId);
-    const target = issue.target && before.includes(issue.target) ? issue.target : null;
 
     // Rewrite an image's empty alt text in place (![](url) → ![alt](url)).
     const applyAlt = async (alt: string): Promise<Applied | null> => {
