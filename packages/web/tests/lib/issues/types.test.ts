@@ -27,6 +27,7 @@ describe("Issue model", () => {
     expect(isInputAction("write_own")).toBe(true);
     expect(isInputAction("add_fact")).toBe(true);
     expect(isInputAction("add_date")).toBe(true);
+    expect(isInputAction("cite_source")).toBe(true);
     expect(isInputAction("ai_fix")).toBe(false);
     expect(isInputAction("generate")).toBe(false);
     expect(isInputAction("highlight")).toBe(false);

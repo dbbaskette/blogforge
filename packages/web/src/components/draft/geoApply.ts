@@ -151,18 +151,33 @@ export function makeGeoApply(
         return applyBlock(draft, issue, input, before, save);
       }
 
-      case "cite_source":
+      case "cite_source": {
+        // The author supplies the citation (a URL or a source name); the model
+        // weaves it into the passage in voice. No attached reference required.
+        if (!input) return null;
+        const source = target ?? before;
+        if (!source.trim()) return null;
+        const { text } = await inlineEdit(draft.id, {
+          text: source,
+          action: "custom",
+          instruction: `Weave a citation to this source into the passage, naturally and in the author's voice. Source: "${input}". If the source is a URL, hyperlink the single most relevant phrase to it in Markdown ([phrase](url)); otherwise attribute the supporting claim to the source inline. Invent nothing and keep all existing substance. Return only the revised passage.`,
+        });
+        const fixed = text.trim();
+        if (!fixed) return null;
+        const after = target ? before.replace(target, fixed) : fixed;
+        await save(sectionId, after);
+        return { sectionId, before, after, highlight: fixed };
+      }
+
       case "quote_source": {
+        // Pull a verbatim quote from an attached reference and cite it.
         if (!target) return null;
         const refs = await listReferences(draft.id);
         const ref = refs[0];
         if (!ref) return null;
-        let quote: string | undefined;
-        if (action === "quote_source") {
-          const quotes = await geoQuotes(draft.id, ref.id);
-          quote = quotes[0];
-          if (!quote) return null;
-        }
+        const quotes = await geoQuotes(draft.id, ref.id);
+        const quote = quotes[0];
+        if (!quote) return null;
         const passage = await geoCite(draft.id, {
           section_id: sectionId,
           target,

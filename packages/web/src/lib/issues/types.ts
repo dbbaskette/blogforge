@@ -49,6 +49,7 @@ export const INPUT_ACTIONS: ReadonlySet<IssueAction> = new Set<IssueAction>([
   "write_own",
   "add_fact",
   "add_date",
+  "cite_source",
 ]);
 
 export function isFixNature(issue: Issue): boolean {

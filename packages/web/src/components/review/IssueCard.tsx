@@ -21,6 +21,7 @@ const INPUT_PLACEHOLDER: Partial<Record<IssueAction, string>> = {
   write_own: "Write it yourself…",
   add_fact: "A real stat or source to weave in…",
   add_date: "A real date or year to cite…",
+  cite_source: "Paste a URL or name the source to cite…",
 };
 
 interface IssueCardProps {
@@ -37,7 +38,13 @@ interface IssueCardProps {
  * and reports intent through callbacks. All apply/accept/undo logic lives in
  * useIssueLifecycle.
  */
-export function IssueCard({ issue, busy, onAction, onAccept, onUndo }: IssueCardProps): JSX.Element {
+export function IssueCard({
+  issue,
+  busy,
+  onAction,
+  onAccept,
+  onUndo,
+}: IssueCardProps): JSX.Element {
   const [openInput, setOpenInput] = useState<IssueAction | null>(null);
   const [text, setText] = useState("");
 
@@ -50,14 +57,8 @@ export function IssueCard({ issue, busy, onAction, onAccept, onUndo }: IssueCard
         : isAdvisory
           ? "border-rule-2"
           : "border-coral";
-  const dot =
-    issue.status === "review"
-      ? "bg-amber"
-      : isAdvisory
-        ? "bg-muted"
-        : "bg-coral";
-  const statusLabel =
-    issue.status === "review" ? "Review" : isAdvisory ? "Advisory" : "Open";
+  const dot = issue.status === "review" ? "bg-amber" : isAdvisory ? "bg-muted" : "bg-coral";
+  const statusLabel = issue.status === "review" ? "Review" : isAdvisory ? "Advisory" : "Open";
   const statusColor =
     issue.status === "review" ? "text-amber-ink" : isAdvisory ? "text-muted" : "text-coral-ink";
 
@@ -101,7 +102,12 @@ export function IssueCard({ issue, busy, onAction, onAccept, onUndo }: IssueCard
           >
             Accept
           </button>
-          <button type="button" className="nb-btn nb-btn-ghost nb-btn-sm" onClick={onUndo} disabled={busy}>
+          <button
+            type="button"
+            className="nb-btn nb-btn-ghost nb-btn-sm"
+            onClick={onUndo}
+            disabled={busy}
+          >
             Undo
           </button>
         </div>
