@@ -20,7 +20,7 @@ const FINDING_FIX: Record<string, ActionSpec> = {
   self_contained: { nature: "fix", actions: ["ai_fix", "manual_fix", "highlight"] },
   dedupe_opening: { nature: "fix", actions: ["dedupe", "highlight"] },
   comparison_table: { nature: "add", actions: ["generate", "write_own"] },
-  cite_reference: { nature: "fix", actions: ["cite_source", "quote_source", "highlight"] },
+  cite_reference: { nature: "fix", actions: ["cite_source", "highlight"] },
   quote_reference: { nature: "fix", actions: ["quote_source", "highlight"] },
   alt_text: { nature: "fix", actions: ["generate", "write_own", "highlight"] },
 };
