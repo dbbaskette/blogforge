@@ -38,6 +38,10 @@ export interface Issue {
   sectionId: string;
   /** The flagged passage (fix issues); absent for add/advisory. */
   target?: string;
+  /** The backend's specific fix tag (e.g. "bullets", "alt_text",
+   *  "question_heading", "faq") — lets apply dispatch precisely where a lever
+   *  hosts more than one kind of fix. Falls back to the lever key. */
+  fixKind?: string;
   /** Which controls this card shows, in order. */
   actions: IssueAction[];
   status: IssueStatus;

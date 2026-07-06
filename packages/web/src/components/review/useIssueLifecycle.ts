@@ -2,6 +2,9 @@ import { useCallback, useState } from "react";
 
 import type { Issue, IssueAction, IssueStatus } from "../../lib/issues/types";
 
+/** Which field an apply wrote — so undo restores the right one. */
+export type AppliedField = "content" | "title" | "opening";
+
 /** What an apply produced — enough to highlight and to undo. */
 export interface Applied {
   sectionId: string;
@@ -9,6 +12,8 @@ export interface Applied {
   after: string;
   /** Text run to highlight as under-review; defaults to `after`. */
   highlight?: string;
+  /** The field written (section body, section title, or the article opening). */
+  field?: AppliedField;
 }
 
 export interface UseIssueLifecycleArgs {
@@ -16,8 +21,8 @@ export interface UseIssueLifecycleArgs {
   /** Perform the content change for an action; return null to no-op (e.g. a
    *  cancelled input). Must persist the change itself; the hook records undo. */
   apply: (issue: Issue, action: IssueAction, input?: string) => Promise<Applied | null>;
-  /** Restore a section's content on undo. */
-  save: (sectionId: string, content: string) => Promise<void> | void;
+  /** Restore a field on undo (routes by `field`: body / title / opening). */
+  save: (sectionId: string, content: string, field?: AppliedField) => Promise<void> | void;
   onHighlight?: (sectionId: string, text: string | null, kind: "under-review" | "locate") => void;
   onRescore?: (lever: string) => void;
 }
@@ -26,6 +31,7 @@ interface LedgerEntry {
   sectionId: string;
   before: string;
   lever: string;
+  field: AppliedField;
 }
 
 const ledgerKey = (draftId: string): string => `bf.review.undo.${draftId}`;
@@ -81,7 +87,12 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
           return;
         }
         const ledger = loadLedger(draftId);
-        ledger[issue.id] = { sectionId: res.sectionId, before: res.before, lever: issue.lever };
+        ledger[issue.id] = {
+          sectionId: res.sectionId,
+          before: res.before,
+          lever: issue.lever,
+          field: res.field ?? "content",
+        };
         saveLedger(draftId, ledger);
         onHighlight?.(res.sectionId, res.highlight ?? res.after, "under-review");
         onRescore?.(issue.lever);
@@ -108,7 +119,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
       setBusy({ id: issue.id, action: "undo" });
       try {
         if (entry) {
-          await save(entry.sectionId, entry.before);
+          await save(entry.sectionId, entry.before, entry.field);
           onHighlight?.(entry.sectionId, null, "under-review");
           onRescore?.(entry.lever);
           delete ledger[issue.id];

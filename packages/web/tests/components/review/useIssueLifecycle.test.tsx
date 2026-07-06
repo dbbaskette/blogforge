@@ -62,7 +62,7 @@ describe("useIssueLifecycle", () => {
     await act(async () => {
       await hook.result.current.undo(issue);
     });
-    expect(save).toHaveBeenCalledWith("s1", "Old text.");
+    expect(save).toHaveBeenCalledWith("s1", "Old text.", "content");
     expect(onRescore).toHaveBeenCalledWith("answer_first");
     expect(hook.result.current.statusOf(issue)).toBe("open");
   });

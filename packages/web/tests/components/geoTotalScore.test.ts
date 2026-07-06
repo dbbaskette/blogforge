@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { computeTotalScore } from "../../src/components/draft/GeoPanel";
+import { computeTotalScore } from "../../src/components/draft/geoScore";
 
 const LEVERS = [
   "answer_first",

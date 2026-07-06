@@ -16,7 +16,7 @@ import { IssueCard } from "../review/IssueCard";
 import { reviewBusyLabel } from "../review/reviewBusyLabel";
 import { useIssueLifecycle } from "../review/useIssueLifecycle";
 import { BusyOverlay } from "../ui/BusyOverlay";
-import { makeGeoApply } from "./geoApply";
+import { makeGeoApply, makeGeoSave } from "./geoApply";
 
 function barColor(score: number): string {
   if (score >= 72) return "#15a06b";
@@ -29,6 +29,7 @@ export interface GeoReviewRailProps {
   draft: Draft;
   onSectionSave: (sectionId: string, content_md: string, createVersion?: boolean) => Promise<void>;
   onOpeningSave: (next: string) => Promise<void>;
+  onTitleSave: (sectionId: string, title: string) => Promise<void>;
   onRescore?: (lever: string) => void;
   onHighlight?: (sectionId: string, text: string | null, kind: "under-review" | "locate") => void;
 }
@@ -38,18 +39,21 @@ export function GeoReviewRail({
   draft,
   onSectionSave,
   onOpeningSave,
+  onTitleSave,
   onRescore,
   onHighlight,
 }: GeoReviewRailProps): JSX.Element {
   const issues = useMemo(() => geoFindingsToIssues(report), [report]);
-  const apply = useMemo(
-    () => makeGeoApply({ draft, onSectionSave, onOpeningSave }),
-    [draft, onSectionSave, onOpeningSave],
+  const ctx = useMemo(
+    () => ({ draft, onSectionSave, onOpeningSave, onTitleSave }),
+    [draft, onSectionSave, onOpeningSave, onTitleSave],
   );
+  const apply = useMemo(() => makeGeoApply(ctx), [ctx]);
+  const save = useMemo(() => makeGeoSave(ctx), [ctx]);
   const { statusOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
     draftId: draft.id,
     apply,
-    save: onSectionSave,
+    save,
     onHighlight,
     onRescore,
   });
