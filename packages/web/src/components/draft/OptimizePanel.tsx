@@ -28,6 +28,10 @@ import type { TrackedChangeKind } from "./trackedChangeDecoration";
 
 type ReviewView = "seo" | "proofreading" | "all";
 
+// A visible box around the section a fix/Highlight targets, so there's always
+// clear feedback even when the exact run can't be located for an inline mark.
+const LIT_BOX = "rounded-nb ring-2 ring-amber/60 bg-amber-soft px-3 -mx-3 py-2";
+
 function gradeColor(grade: string): { bg: string; fg: string; bd: string } {
   if (grade === "A" || grade === "B") return { bg: "#e3f5ec", fg: "#0e7a50", bd: "#bfe8d3" };
   if (grade === "C") return { bg: "#fbf1de", fg: "#92600a", bd: "#f3d89b" };
@@ -284,7 +288,9 @@ export function OptimizePanel({
             {opening && (
               <p
                 ref={highlight?.sectionId === "opening" ? highlightRef : undefined}
-                className="text-ink leading-relaxed whitespace-pre-wrap mb-8"
+                className={`text-ink leading-relaxed whitespace-pre-wrap mb-8 ${
+                  highlight?.sectionId === "opening" ? LIT_BOX : ""
+                }`}
               >
                 <HighlightedText
                   text={opening}
@@ -306,7 +312,9 @@ export function OptimizePanel({
                     )}
                     <div
                       ref={lit ? highlightRef : undefined}
-                      className="prose text-ink leading-relaxed whitespace-pre-wrap"
+                      className={`prose text-ink leading-relaxed whitespace-pre-wrap ${
+                        lit ? LIT_BOX : ""
+                      }`}
                     >
                       {section.content_md?.trim() ? (
                         <HighlightedText

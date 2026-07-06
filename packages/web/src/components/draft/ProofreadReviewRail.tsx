@@ -9,7 +9,9 @@ import { useMemo } from "react";
 import type { Draft } from "../../api/drafts";
 import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
 import { IssueCard } from "../review/IssueCard";
+import { reviewBusyLabel } from "../review/reviewBusyLabel";
 import { useIssueLifecycle } from "../review/useIssueLifecycle";
+import { BusyOverlay } from "../ui/BusyOverlay";
 import { makeProofreadApply } from "./proofreadApply";
 
 export interface ProofreadReviewRailProps {
@@ -27,12 +29,13 @@ export function ProofreadReviewRail({
 }: ProofreadReviewRailProps): JSX.Element {
   const issues = useMemo(() => proofreadFindingsToIssues(lint), [lint]);
   const apply = useMemo(() => makeProofreadApply({ draft, onSectionSave }), [draft, onSectionSave]);
-  const { statusOf, busyId, run, accept, undo } = useIssueLifecycle({
+  const { statusOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save: onSectionSave,
     onHighlight,
   });
+  const busyLabel = reviewBusyLabel(busyAction);
 
   if (issues.length === 0) {
     return (
@@ -42,6 +45,7 @@ export function ProofreadReviewRail({
 
   return (
     <div className="space-y-2">
+      {busyLabel && <BusyOverlay label={busyLabel} />}
       {issues.map((issue) => (
         <IssueCard
           key={issue.id}

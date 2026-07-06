@@ -18,11 +18,7 @@ export interface UseIssueLifecycleArgs {
   apply: (issue: Issue, action: IssueAction, input?: string) => Promise<Applied | null>;
   /** Restore a section's content on undo. */
   save: (sectionId: string, content: string) => Promise<void> | void;
-  onHighlight?: (
-    sectionId: string,
-    text: string | null,
-    kind: "under-review" | "locate",
-  ) => void;
+  onHighlight?: (sectionId: string, text: string | null, kind: "under-review" | "locate") => void;
   onRescore?: (lever: string) => void;
 }
 
@@ -58,7 +54,11 @@ function saveLedger(draftId: string, map: Record<string, LedgerEntry>): void {
 export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
   const { draftId, apply, save, onHighlight, onRescore } = args;
   const [status, setStatus] = useState<Record<string, IssueStatus>>({});
-  const [busyId, setBusyId] = useState<string | null>(null);
+  // The issue + action currently running (drives per-card spinners and the
+  // blocking "applying…" modal for slow model calls).
+  const [busy, setBusy] = useState<{ id: string; action: IssueAction | "undo" } | null>(null);
+  const busyId = busy?.id ?? null;
+  const busyAction = busy?.action ?? null;
 
   const statusOf = useCallback(
     (issue: Issue): IssueStatus => status[issue.id] ?? issue.status,
@@ -71,7 +71,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         onHighlight?.(issue.sectionId, issue.target ?? issue.title, "locate");
         return;
       }
-      setBusyId(issue.id);
+      setBusy({ id: issue.id, action });
       try {
         const res = await apply(issue, action, input);
         if (!res) return;
@@ -87,7 +87,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         onRescore?.(issue.lever);
         setStatus((s) => ({ ...s, [issue.id]: "review" }));
       } finally {
-        setBusyId(null);
+        setBusy(null);
       }
     },
     [draftId, apply, onHighlight, onRescore],
@@ -105,7 +105,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
     async (issue: Issue): Promise<void> => {
       const ledger = loadLedger(draftId);
       const entry = ledger[issue.id];
-      setBusyId(issue.id);
+      setBusy({ id: issue.id, action: "undo" });
       try {
         if (entry) {
           await save(entry.sectionId, entry.before);
@@ -116,11 +116,11 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         }
         setStatus((s) => ({ ...s, [issue.id]: "open" }));
       } finally {
-        setBusyId(null);
+        setBusy(null);
       }
     },
     [draftId, save, onHighlight, onRescore],
   );
 
-  return { statusOf, busyId, run, accept, undo };
+  return { statusOf, busyId, busyAction, run, accept, undo };
 }
