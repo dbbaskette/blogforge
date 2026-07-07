@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 const N = 160;
 function seededNoise(): number[] {
   let s = 1337;
-  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const a = Array.from({ length: N }, () => r() * 2 - 1);
   return a.map((_, i) => (a[(i - 1 + N) % N] + 2 * a[i] + a[(i + 1) % N]) / 4);
 }
@@ -105,16 +105,37 @@ export function HumannessPulse({
         <span style={{ width: 72 }}>anti-robot</span>
         <span
           className="rounded-full"
-          style={{ flex: 1, height: 7, background: "#eef0f3", border: "1px solid #e6e8ed", overflow: "hidden" }}
+          style={{
+            flex: 1,
+            height: 7,
+            background: "#eef0f3",
+            border: "1px solid #e6e8ed",
+            overflow: "hidden",
+          }}
         >
-          <span style={{ display: "block", height: "100%", width: `${antiRobot}%`, background: "#aab1bd" }} />
+          <span
+            style={{
+              display: "block",
+              height: "100%",
+              width: `${antiRobot}%`,
+              background: "#aab1bd",
+            }}
+          />
         </span>
         <span style={{ width: 78 }}>human signal</span>
         <span
           className="rounded-full"
-          style={{ flex: 1, height: 7, background: "#eef0f3", border: "1px solid #e6e8ed", overflow: "hidden" }}
+          style={{
+            flex: 1,
+            height: 7,
+            background: "#eef0f3",
+            border: "1px solid #e6e8ed",
+            overflow: "hidden",
+          }}
         >
-          <span style={{ display: "block", height: "100%", width: `${hs}%`, background: "#15a06b" }} />
+          <span
+            style={{ display: "block", height: "100%", width: `${hs}%`, background: "#15a06b" }}
+          />
         </span>
       </div>
     </div>
