@@ -23,6 +23,7 @@ Source: the 7 techniques in the @AiWithRubab thread (Thought Flow, Pattern Break
 3. **7 tips → 4 curated lenses** (below), each a GEO-style finding group with per-sentence fixes.
 4. **Guardrail:** Humanize rewrites **tone / rhythm / phrasing only**. It must never add, remove, or alter facts, numbers, names, quotes, or citations, and must not rewrite the answer-first opening sentence that GEO scores. Enforced by (a) prompt constraint and (b) a deterministic diff-check.
 5. **One unified "Reads X% human" score**, fed by **both** detectors (anti-tells lint + Humanize lenses) via a **blend of two sub-scores**, with Humanize findings **persisted** to avoid jitter. **Proofread and Humanize remain two separate fix-tools** (they fix genuinely different things at different cost/speed).
+6. **Four signature visualizations** carry the UI (a feature about *aliveness* gets a UI that feels alive): a **humanness pulse** + split meter, a **lens-bloom radar**, a **sentence-rhythm strip**, and an **in-editor humanness heat-map**. Three reuse existing code; all respect `prefers-reduced-motion`.
 
 ## The 4 lenses (7 tips → 4)
 
@@ -94,6 +95,14 @@ humanness = humanSignalSub == null
 - Because Humanize findings are **persisted**, `humanSignalSub` is stable between deliberate re-runs.
 - `CheckupPanel.tsx` fan-out becomes `Promise.allSettled([lint, geo, shape, humanize])`; the "Reads X% human" meter uses `humanness`; the breakdown behind it shows the anti-robot vs human-signal split. Proofread and Humanize appear as the two fix-tools that raise it.
 
+### Visualizations (the UI layer)
+Four components carry the experience. All are pure-render (data in → SVG/DOM out), theme-aware via CSS variables, and gate animation on `prefers-reduced-motion` (a convention already in `index.css`).
+
+1. **Humanness pulse + split meter** — `components/draft/HumannessPulse.tsx`. An animated SVG line whose amplitude/irregularity scales with the human-signal sub-score (flat dashed baseline = the "robot zero"), plus the anti-robot / human-signal split bar. Props `{ antiRobot: number; humanSignal: number | null }`; it renders the blended `humanness` number. **Replaces `HumanityRing`** as the score display in `HumanizePanel` and the `CheckupPanel` meter (LintPanel may keep its ring, or adopt the pulse — decide during build). Animation via `requestAnimationFrame`, disabled (static waveform) under reduced motion.
+2. **Lens-bloom radar** — `components/draft/LensBloom.tsx`. A 4-axis radar (flow / voice / imperfections / soul) whose polygon blooms as the dial engages lenses and per-lens findings resolve. **Modeled on / extracted from `components/voice/VoiceFingerprint.tsx`** (which already draws the voice radar). Props `{ lenses: HumanizeLens[]; engaged: Lens[] }`. Lives in the `HumanizePanel` header.
+3. **Sentence-rhythm strip** — `components/draft/RhythmStrip.tsx`. Bars of per-sentence word counts for a section (uniform = metronomic/robotic, jagged = human burstiness). Deterministic, computed client-side from text. **Reuses the rhythm-bar rendering already in `VoiceFingerprint.tsx`.** Shown in the Flow & Rhythm lens group.
+4. **In-editor humanness heat-map** — `HumanizePanel` adopts a two-pane shell like `OptimizePanel` (read pane + `HumanizeReviewRail`). The read pane renders the draft with every finding's `target` painted as a faint amber "heat" highlight via the existing `components/review/HighlightedText.tsx`; clicking a highlight scrolls the rail to that finding (and vice-versa), reusing the GEO `onHighlight("under-review"|"locate")` channel. Heat opacity can scale by lens count on a sentence.
+
 ## Components & boundaries
 | Unit | Responsibility | Depends on |
 |---|---|---|
@@ -130,3 +139,4 @@ humanness = humanSignalSub == null
 3. No finding auto-applies a change to a number, link, or quote (guardrail); such findings are flagged `needs_review`.
 4. "Reads X% human" is a single score fed by both the anti-tells lint and the persisted Humanize findings, stable between re-runs; Proofread and Humanize both raise it.
 5. New + existing tests pass; no migration.
+6. The panel shows the four visualizations — the pulse/split meter as the score, the lens-bloom radar reflecting engaged lenses, the rhythm strip, and the in-pane heat-map of flagged sentences — all theme-aware and honoring `prefers-reduced-motion`.

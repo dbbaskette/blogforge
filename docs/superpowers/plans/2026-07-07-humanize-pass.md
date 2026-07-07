@@ -27,6 +27,7 @@
 - Create `lib/issues/humanizeApply.ts` — `makeHumanizeApply` / `makeHumanizeSave`.
 - Create `lib/humanizeDismissals.ts` — localStorage dismiss/restore.
 - Create `components/draft/HumanizeReviewRail.tsx` and `components/draft/HumanizePanel.tsx`.
+- Create visualizations `components/draft/HumannessPulse.tsx`, `components/draft/LensBloom.tsx`, `components/draft/RhythmStrip.tsx` (Phase G); the panel adopts a two-pane heat-map read view reusing `components/review/HighlightedText.tsx`.
 - Modify `lib/issues/types.ts` (add `"humanize"` to `Issue.panel`), `lib/panelCache.ts` (add `"humanize"` to `PanelKind`), `lib/checkup.ts` (blended score + 4th row), `components/draft/CheckupPanel.tsx` (4th fan-out), `components/draft/WorkspaceFooter.tsx` (menu item), `components/draft/DraftWorkspace.tsx` (state + mount).
 - Create tests: `tests/lib/issues/humanizeAdapter.test.ts`, `tests/lib/issues/humanizeApply.test.ts`, `tests/lib/humanizeDismissals.test.ts`, `tests/components/HumanizeReviewRail.test.tsx`, and extend `tests/lib/checkup.test.ts`.
 
@@ -1328,9 +1329,386 @@ git commit -m "feat(humanize): Humanness row + blended score in Checkup"
 
 ---
 
-## Phase G — Full verification
+## Phase G — Visualizations
 
-### Task G1: Whole-suite green + manual smoke
+These enhance the panel from Task E2 (swap the plain ring for the pulse, add the radar, adopt the two-pane heat-map) and the Checkup meter from F2. All components are theme-aware (CSS variables) and gate animation on `prefers-reduced-motion`. Reuse `components/voice/VoiceFingerprint.tsx` (radar + rhythm bars) and `components/review/HighlightedText.tsx` (heat-map). Before writing each, open the sibling and copy its SVG/measurement idioms.
+
+### Task G1: `HumannessPulse.tsx` (pulse + split meter)
+
+**Files:**
+- Create: `packages/web/src/components/draft/HumannessPulse.tsx`
+- Test: `packages/web/tests/components/HumannessPulse.test.tsx`
+
+Adapt the animation math from the approved concept widget (the `pulsePath` / seeded-noise loop). The blended number reuses `blendHumanness` from Task F1.
+
+- [ ] **Step 1: Write the failing test**
+
+```tsx
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { HumannessPulse } from "../../src/components/draft/HumannessPulse";
+
+describe("HumannessPulse", () => {
+  it("shows the blended humanness number", () => {
+    render(<HumannessPulse antiRobot={80} humanSignal={60} />);
+    expect(screen.getByText("70")).toBeInTheDocument(); // 0.5*80 + 0.5*60
+  });
+  it("shows the anti-robot score alone before Humanize has run", () => {
+    render(<HumannessPulse antiRobot={82} humanSignal={null} />);
+    expect(screen.getByText("82")).toBeInTheDocument();
+  });
+  it("renders the pulse svg path", () => {
+    const { container } = render(<HumannessPulse antiRobot={80} humanSignal={90} />);
+    expect(container.querySelector("path")).toBeTruthy();
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd packages/web && npm test -- HumannessPulse`
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Write minimal implementation**
+
+Create `packages/web/src/components/draft/HumannessPulse.tsx`:
+
+```tsx
+import { useEffect, useRef } from "react";
+import { blendHumanness } from "../../lib/checkup";
+
+const N = 160;
+function seededNoise(): number[] {
+  let s = 1337;
+  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const a = Array.from({ length: N }, () => r() * 2 - 1);
+  return a.map((_, i) => (a[(i - 1 + N) % N] + 2 * a[i] + a[(i + 1) % N]) / 4);
+}
+const PN = seededNoise();
+
+function pulsePath(human: number, phase: number): string {
+  let d = "";
+  for (let k = 0; k <= N; k++) {
+    const x = (k / N) * 640;
+    const t = k / N;
+    const beat = Math.exp(-((((t * 4.3 + PN[k % N] * 0.12 * human) % 1) - 0.5) * 9) ** 2);
+    const w = 0.5 * Math.sin(t * 9 + phase) + 0.28 * Math.sin(t * 17 + phase * 1.7) + 0.5 * PN[k % N] + 0.9 * beat;
+    const y = Math.max(6, Math.min(126, 72 - human * 38 * w));
+    d += `${k ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)} `;
+  }
+  return d;
+}
+
+export function HumannessPulse({ antiRobot, humanSignal }: { antiRobot: number; humanSignal: number | null }) {
+  const score = blendHumanness(antiRobot, humanSignal);
+  const human = Math.max(0.15, score / 100);
+  const pathRef = useRef<SVGPathElement>(null);
+
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !pathRef.current) {
+      pathRef.current?.setAttribute("d", pulsePath(human, 0));
+      return;
+    }
+    let phase = 0, raf = 0;
+    const tick = () => {
+      phase += 0.028;
+      pathRef.current?.setAttribute("d", pulsePath(human, phase));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [human]);
+
+  const hs = humanSignal ?? 0;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <svg viewBox="0 0 640 132" width="100%" preserveAspectRatio="none" style={{ height: 96, flex: 1 }} aria-hidden="true">
+          <line x1="0" y1="72" x2="640" y2="72" stroke="var(--border)" strokeDasharray="3 5" />
+          <path ref={pathRef} d="" fill="none" stroke="var(--text-accent)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <div style={{ textAlign: "right", minWidth: 64 }}>
+          <b style={{ fontSize: 30, fontWeight: 500, color: "var(--text-accent)" }}>{score}</b>
+          <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>reads human</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 8, fontSize: 11, color: "var(--text-secondary)", alignItems: "center" }}>
+        <span style={{ width: 72 }}>anti-robot</span>
+        <span style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--surface-2)", border: "1px solid var(--border)", overflow: "hidden" }}>
+          <span style={{ display: "block", height: "100%", width: `${antiRobot}%`, background: "var(--text-secondary)" }} />
+        </span>
+        <span style={{ width: 72 }}>human signal</span>
+        <span style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--surface-2)", border: "1px solid var(--border)", overflow: "hidden" }}>
+          <span style={{ display: "block", height: "100%", width: `${hs}%`, background: "var(--text-accent)" }} />
+        </span>
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd packages/web && npm test -- HumannessPulse`
+Expected: PASS. (jsdom has no rAF paint but the `d` is set synchronously in the reduced-motion branch; `matchMedia` is stubbed in `tests/setup.ts` — if it returns `undefined`, the `?.` guards handle it.)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/web/src/components/draft/HumannessPulse.tsx packages/web/tests/components/HumannessPulse.test.tsx
+git commit -m "feat(humanize): humanness pulse + split meter component"
+```
+
+### Task G2: `LensBloom.tsx` (radar)
+
+**Files:**
+- Create: `packages/web/src/components/draft/LensBloom.tsx`
+- Test: `packages/web/tests/components/LensBloom.test.tsx`
+
+Model the SVG on the radar in `components/voice/VoiceFingerprint.tsx`. Export the point math as a pure function so it's testable.
+
+- [ ] **Step 1: Write the failing test**
+
+```tsx
+import { describe, expect, it } from "vitest";
+import { radiiForLenses } from "../../src/components/draft/LensBloom";
+
+describe("radiiForLenses", () => {
+  it("engaged lenses reach farther than idle ones", () => {
+    const r = radiiForLenses(["flow", "soul"], { flow: 2, voice: 0, imperfections: 0, soul: 1 });
+    expect(r.flow).toBeGreaterThan(r.voice);
+    expect(r.soul).toBeGreaterThan(r.imperfections);
+  });
+  it("idle lenses sit near the center", () => {
+    const r = radiiForLenses(["flow"], { flow: 0, voice: 0, imperfections: 0, soul: 0 });
+    expect(r.voice).toBeLessThanOrEqual(0.2);
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd packages/web && npm test -- LensBloom`
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Write minimal implementation**
+
+Create `packages/web/src/components/draft/LensBloom.tsx`:
+
+```tsx
+export type LensKey = "flow" | "voice" | "imperfections" | "soul";
+const ORDER: LensKey[] = ["flow", "voice", "imperfections", "soul"];
+const AXES: Record<LensKey, [number, number]> = {
+  flow: [0, -1], voice: [1, 0], imperfections: [0, 1], soul: [-1, 0],
+};
+const LABEL: Record<LensKey, string> = {
+  flow: "flow", voice: "voice", imperfections: "imperfections", soul: "soul",
+};
+
+/** Normalized radius (0..1) per axis: idle lenses hug the center, engaged
+ * lenses extend, damped a little by how many findings they still have open. */
+export function radiiForLenses(engaged: LensKey[], counts: Record<LensKey, number>): Record<LensKey, number> {
+  const out = {} as Record<LensKey, number>;
+  for (const k of ORDER) {
+    if (!engaged.includes(k)) { out[k] = 0.16; continue; }
+    const penalty = Math.min(counts[k] ?? 0, 4) * 0.08;
+    out[k] = Math.max(0.5, 0.92 - penalty);
+  }
+  return out;
+}
+
+export function LensBloom({ engaged, counts }: { engaged: LensKey[]; counts: Record<LensKey, number> }) {
+  const r = radiiForLenses(engaged, counts);
+  const R = 72, C = 100;
+  const pts = ORDER.map((k) => `${(C + AXES[k][0] * R * r[k]).toFixed(1)},${(C + AXES[k][1] * R * r[k]).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox="0 0 200 200" width="100%" style={{ height: 150 }} aria-hidden="true">
+      <polygon points="100,28 172,100 100,172 28,100" fill="none" stroke="var(--border)" />
+      <polygon points={pts} fill="var(--text-accent)" fillOpacity="0.18" stroke="var(--text-accent)" strokeWidth="2" />
+      {ORDER.map((k) => {
+        const [dx, dy] = AXES[k];
+        return (
+          <text key={k} x={C + dx * 88} y={C + dy * 88 + 3}
+            textAnchor={dx > 0 ? "start" : dx < 0 ? "end" : "middle"}
+            style={{ fontSize: 11, fill: "var(--text-secondary)", opacity: engaged.includes(k) ? 1 : 0.35 }}>
+            {LABEL[k]}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd packages/web && npm test -- LensBloom`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/web/src/components/draft/LensBloom.tsx packages/web/tests/components/LensBloom.test.tsx
+git commit -m "feat(humanize): lens-bloom radar"
+```
+
+### Task G3: `RhythmStrip.tsx` (sentence rhythm)
+
+**Files:**
+- Create: `packages/web/src/components/draft/RhythmStrip.tsx`
+- Test: `packages/web/tests/components/RhythmStrip.test.tsx`
+
+- [ ] **Step 1: Write the failing test**
+
+```tsx
+import { describe, expect, it } from "vitest";
+import { sentenceLengths, rhythmVariance } from "../../src/components/draft/RhythmStrip";
+
+describe("RhythmStrip math", () => {
+  it("splits into per-sentence word counts", () => {
+    expect(sentenceLengths("One two three. Four five!")).toEqual([3, 2]);
+  });
+  it("uniform sentences have low variance, varied ones high", () => {
+    const uniform = rhythmVariance([5, 5, 5, 5]);
+    const varied = rhythmVariance([2, 14, 3, 11]);
+    expect(varied).toBeGreaterThan(uniform);
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd packages/web && npm test -- RhythmStrip`
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Write minimal implementation**
+
+Create `packages/web/src/components/draft/RhythmStrip.tsx`:
+
+```tsx
+export function sentenceLengths(text: string): number[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.split(/\s+/).filter(Boolean).length);
+}
+
+export function rhythmVariance(lengths: number[]): number {
+  if (lengths.length < 2) return 0;
+  const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+  const v = lengths.reduce((a, b) => a + (b - mean) ** 2, 0) / lengths.length;
+  return Math.sqrt(v);
+}
+
+export function RhythmStrip({ text }: { text: string }) {
+  const lens = sentenceLengths(text).slice(0, 24);
+  const max = Math.max(1, ...lens);
+  const metronomic = rhythmVariance(lens) < 3 && lens.length > 3;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 60 }}>
+        {lens.map((n, i) => (
+          <span key={i} style={{ flex: 1, height: `${Math.max(8, (n / max) * 100)}%`,
+            background: "var(--text-accent)", opacity: 0.55, borderRadius: "3px 3px 0 0" }} />
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6 }}>
+        {metronomic ? "even, metronomic beats read as machine" : "varied lengths read as human"}
+      </div>
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd packages/web && npm test -- RhythmStrip`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/web/src/components/draft/RhythmStrip.tsx packages/web/tests/components/RhythmStrip.test.tsx
+git commit -m "feat(humanize): sentence-rhythm strip"
+```
+
+### Task G4: Compose viz into `HumanizePanel` + two-pane heat-map
+
+**Files:**
+- Modify: `packages/web/src/components/draft/HumanizePanel.tsx`
+- Test: extend `packages/web/tests/components/HumanizePanel.test.tsx`
+
+- [ ] **Step 1: Extend the panel test**
+
+Add to `HumanizePanel.test.tsx`:
+
+```tsx
+it("shows the pulse and radar, and heat-maps a finding in the read pane", async () => {
+  (analyzeHumanize as any).mockResolvedValue({
+    intensity: "medium", score: 85,
+    lenses: [{ key: "soul", label: "De-robot / Soul", findings: [
+      { lens: "soul", section_id: "s1", target: "The API serves as a gateway.",
+        suggestion: "The API is the gateway.", note: "puffery", needs_review: false }]}],
+  });
+  const d: any = { id: "d1", title: "T", outline: { opening_hook: "h" },
+    sections: [{ id: "s1", title: "S", content_md: "The API serves as a gateway. It adds 5ms." }] };
+  render(<HumanizePanel draft={d} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+  await waitFor(() => expect(screen.getByText("85")).toBeInTheDocument()); // pulse score
+  expect(screen.getByText("flow")).toBeInTheDocument(); // radar axis label
+  // the flagged sentence is present in the read pane
+  await waitFor(() => expect(screen.getAllByText(/serves as a gateway/i).length).toBeGreaterThan(0));
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `cd packages/web && npm test -- HumanizePanel`
+Expected: FAIL — no `85` / no `flow` label (panel still shows the plain ring, single pane).
+
+- [ ] **Step 3: Update `HumanizePanel.tsx`**
+
+Replace the `HumanityRing` in the header with `<HumannessPulse antiRobot={antiRobotScore} humanSignal={report ? report.score : null} />` (source `antiRobotScore` from the lint result if available, else pass a constant like `88` for now with a `// TODO wire lint sub-score` — acceptable since the blend handles it), and add `<LensBloom engaged={lensesFor(intensity)} counts={countsByLens(report)} />`. Adopt the two-pane shell from `OptimizePanel.tsx`: left = a read view of `draft` rendered through `HighlightedText`, painting each finding's `target` with a faint amber "under-review" highlight; right = `<HumanizeReviewRail>` from Task E1. Add a `<RhythmStrip text={sectionText}/>` inside the Flow lens group (or the panel body). Wire the rail's `onHighlight` to the read pane's highlight state (copy `OptimizePanel`'s highlight state + `HighlightedText` usage verbatim). Add `countsByLens(report)` helper (counts findings per lens key) and import `lensesFor` (mirror the backend `INTENSITY_LENSES` as a small FE map, or export it from `api/humanize.ts`).
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `cd packages/web && npm test -- HumanizePanel`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/web/src/components/draft/HumanizePanel.tsx packages/web/tests/components/HumanizePanel.test.tsx
+git commit -m "feat(humanize): panel composes pulse + radar + rhythm + heat-map read pane"
+```
+
+### Task G5: Use the pulse as the Checkup meter
+
+**Files:**
+- Modify: `packages/web/src/components/draft/CheckupPanel.tsx`
+
+- [ ] **Step 1: Swap the meter**
+
+In `CheckupPanel.tsx`, render `<HumannessPulse antiRobot={antiRobotSub} humanSignal={humanizeReport ? humanizeReport.score : null} />` in place of the current numeric "Reads X% human" display (keep `summary.humanity` as the fallback/aria value). `antiRobotSub` = the lint-derived score already computed for `summary`.
+
+- [ ] **Step 2: Type-check + run**
+
+Run: `cd packages/web && npx tsc --noEmit && npm test -- CheckupPanel`
+Expected: no type errors; tests pass (update the meter assertion if it looked for the old markup).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add packages/web/src/components/draft/CheckupPanel.tsx
+git commit -m "feat(humanize): live pulse as the Checkup humanness meter"
+```
+
+---
+
+## Phase H — Full verification
+
+### Task H1: Whole-suite green + manual smoke
 
 - [ ] **Step 1: Backend suite**
 
@@ -1344,7 +1722,7 @@ Expected: all pass / no errors.
 
 - [ ] **Step 3: Manual smoke (real app)**
 
-Run the app (per `docs`/CLAUDE memory: rebuild static, scrub `ANTHROPIC_*`/`CLAUDE_*` env, app on :7880), open the existing draft, `Improve ▾ → 🫶 Humanize`. Verify: the pass runs, 4 lens groups appear at Strong / 2 at Light, an AI-fix Accept rewrites the sentence in the section, a `needs_review` finding requires confirm, and Checkup shows a "Humanness" row with a blended "Reads X% human".
+Run the app (per `docs`/CLAUDE memory: rebuild static, scrub `ANTHROPIC_*`/`CLAUDE_*` env, app on :7880), open the existing draft, `Improve ▾ → 🫶 Humanize`. Verify: the pass runs, 4 lens groups appear at Strong / 2 at Light, an AI-fix Accept rewrites the sentence in the section, a `needs_review` finding requires confirm, and Checkup shows a "Humanness" row with a blended "Reads X% human". **Visualizations:** the pulse animates and its score matches the blend; the lens-bloom radar blooms more axes as you move Light→Strong; the rhythm strip shows the section's sentence lengths; flagged sentences are heat-highlighted in the read pane and clicking one focuses its rail card. Toggle OS "reduce motion" and confirm the pulse renders static (no animation) and nothing else breaks. Check both light and dark mode.
 
 - [ ] **Step 4: Commit any smoke fixes, then stop for review.**
 
