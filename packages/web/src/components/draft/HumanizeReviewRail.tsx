@@ -16,7 +16,7 @@ import type { Draft } from "../../api/drafts";
 import type { HumanizeReport } from "../../api/humanize";
 import { dismiss as dismissFinding, loadDismissed } from "../../lib/humanizeDismissals";
 import { humanizeFindingsToIssues } from "../../lib/issues/humanizeAdapter";
-import { makeHumanizeApply, makeHumanizeSave } from "../../lib/issues/humanizeApply";
+import { makeHumanizeApply } from "../../lib/issues/humanizeApply";
 import type { Issue, IssueAction } from "../../lib/issues/types";
 import { IssueCard } from "../review/IssueCard";
 import { reviewBusyLabel } from "../review/reviewBusyLabel";
