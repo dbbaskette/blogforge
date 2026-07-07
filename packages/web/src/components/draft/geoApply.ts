@@ -22,6 +22,7 @@ import {
   geoQuotes,
 } from "../../api/geo";
 import { listReferences } from "../../api/references";
+import { sectionForTarget } from "../../lib/issues/locateSection";
 import type { Issue, IssueAction } from "../../lib/issues/types";
 import type { Applied, AppliedField } from "../review/useIssueLifecycle";
 
@@ -70,16 +71,15 @@ function readSource(draft: Draft, sectionId: string): string {
   return draft.sections.find((s) => s.id === sectionId)?.content_md ?? "";
 }
 
-const normalize = (s: string): string => s.replace(/\s+/g, " ").trim().toLowerCase();
-
 /**
  * Resolve where an issue's fix should land: `{ sectionId, before, target }`.
  * Some backend findings (citations, factual_density) carry a `target` claim but
  * NO `section_id`, so a naive `readSource(draft, "")` returns "" and every fix
- * no-ops. When the id doesn't name a real section, find the section whose body
- * actually contains the target. `target` is returned only when it's a literal
- * substring of `before` (so a scoped `before.replace(target, …)` works);
- * otherwise it's null and the caller edits the whole located section body.
+ * no-ops. When the id doesn't name a real section, locate by the target (shared
+ * matcher), falling back to the first section so a fix always lands somewhere
+ * visible. `target` is returned only when it's a literal substring of `before`
+ * (so a scoped `before.replace(target, …)` works); otherwise it's null and the
+ * caller edits the whole resolved section body.
  */
 function locate(
   draft: Draft,
@@ -87,21 +87,13 @@ function locate(
 ): { sectionId: string; before: string; target: string | null } {
   const { sectionId, target } = issue;
   const known = sectionId === OPENING || draft.sections.some((s) => s.id === sectionId);
-  if (known) {
-    const before = readSource(draft, sectionId);
-    return { sectionId, before, target: target && before.includes(target) ? target : null };
-  }
-  // No usable section id — locate by the target text.
-  if (target) {
-    const exact = draft.sections.find((s) => s.content_md.includes(target));
-    if (exact) return { sectionId: exact.id, before: exact.content_md, target };
-    const nt = normalize(target);
-    if (nt) {
-      const fuzzy = draft.sections.find((s) => normalize(s.content_md).includes(nt));
-      if (fuzzy) return { sectionId: fuzzy.id, before: fuzzy.content_md, target: null };
-    }
-  }
-  return { sectionId, before: readSource(draft, sectionId), target: null };
+  const resolved = known
+    ? sectionId
+    : ((target ? sectionForTarget(target, draft.sections) : null) ??
+      draft.sections[0]?.id ??
+      sectionId);
+  const before = readSource(draft, resolved);
+  return { sectionId: resolved, before, target: target && before.includes(target) ? target : null };
 }
 
 /** Route a persisted value to the right field (body / title / opening). */
@@ -210,13 +202,13 @@ export function makeGeoApply(
         if (issue.fixKind === "alt_text") return applyAlt(await geoAlt(draft.id, target ?? ""));
         const block = await generateBlock(draft, issue);
         if (block === null) return null;
-        return applyBlock(draft, issue, block, before, save);
+        return applyBlock(draft, issue, block, save);
       }
 
       case "write_own": {
         if (!input) return null;
         if (issue.fixKind === "alt_text") return applyAlt(input);
-        return applyBlock(draft, issue, input, before, save);
+        return applyBlock(draft, issue, input, save);
       }
 
       case "cite_source": {
@@ -300,7 +292,6 @@ async function applyBlock(
   draft: Draft,
   issue: Issue,
   block: string,
-  before: string,
   save: (sectionId: string, next: string, field?: AppliedField) => Promise<void>,
 ): Promise<Applied | null> {
   const clean = block.trim();
@@ -322,8 +313,17 @@ async function applyBlock(
     return { sectionId: "opening", before: existing, after, highlight: clean, field: "opening" };
   }
 
-  // faq / comparison_table: append to the issue's section.
-  const after = `${before.trim()}\n\n${clean}`;
-  await save(issue.sectionId, after, "content");
-  return { sectionId: issue.sectionId, before, after, highlight: clean, field: "content" };
+  // faq → the end of the article (last section); comparison_table → its own
+  // section. Resolve the host explicitly and append to ITS body, since a faq
+  // coverage finding carries no section_id (issue.sectionId would be empty).
+  const host =
+    issue.fixKind === "faq"
+      ? draft.sections[draft.sections.length - 1]
+      : (draft.sections.find((s) => s.id === issue.sectionId) ??
+        draft.sections[draft.sections.length - 1]);
+  if (!host) return null;
+  const base = host.content_md;
+  const after = `${base.trim()}\n\n${clean}`;
+  await save(host.id, after, "content");
+  return { sectionId: host.id, before: base, after, highlight: clean, field: "content" };
 }
