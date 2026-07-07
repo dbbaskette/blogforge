@@ -12,8 +12,8 @@ import { type HumanizeReport, type Intensity, analyzeHumanize } from "../../api/
 import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
 import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
-import { HumannessPulse } from "./HumannessPulse";
 import { HumanizeReviewRail } from "./HumanizeReviewRail";
+import { HumannessPulse } from "./HumannessPulse";
 
 interface HumanizePanelProps {
   draft: Draft;
@@ -43,7 +43,6 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
 
   // On mount and whenever intensity (or the draft's content) changes: reuse a
   // cached report for this exact content+intensity, or run a fresh pass.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: content changes are captured via the hash inside the effect, not as a dep
   useEffect(() => {
     let cancelled = false;
     const key = `${hashDraftContent(draft)}:${intensity}`;
@@ -91,9 +90,7 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
     >
       <header className="px-6 pt-6 pb-4 border-b border-rule glass-bar sticky top-0 z-10">
         <div className="flex items-baseline justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600">
-            Humanize
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-cobalt-600">Humanize</p>
           <button type="button" onClick={onClose} className="nb-icon-btn" aria-label="Close">
             <Icon name="x" size={16} title="" />
           </button>
@@ -133,7 +130,10 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
         </div>
 
         <div className="mt-4">
-          <HumannessPulse antiRobot={88 /* TODO wire lint sub-score in Phase F */} humanSignal={report ? report.score : null} />
+          <HumannessPulse
+            antiRobot={88 /* TODO wire lint sub-score in Phase F */}
+            humanSignal={report ? report.score : null}
+          />
         </div>
       </header>
 
