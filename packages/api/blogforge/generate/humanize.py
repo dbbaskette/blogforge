@@ -1,5 +1,6 @@
 """On-demand Humanize pass — additive 'sound human' rewrites, complementing
 the subtractive anti-AI-tells Humanizer. Mirrors generate/geo.py."""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from blogforge.drafts.models import Draft
+from blogforge.generate.textutil import strip_inline_emphasis
 from blogforge.llm.base import LLMProvider
 from blogforge.voice import compose_prompt
 
@@ -72,7 +74,9 @@ def needs_review(target: str, suggestion: str) -> bool:
 
 
 def _key(title: str) -> str:
-    return " ".join(title.lower().split())
+    # Strip inline markdown emphasis before matching (mirrors geo.py::parse_semantic)
+    # so a stored "**The Setup**" still resolves when the model returns "The Setup".
+    return " ".join(strip_inline_emphasis(title).lower().split())
 
 
 def _section_text(draft: Draft, sid: str) -> str:
@@ -84,9 +88,7 @@ def _section_text(draft: Draft, sid: str) -> str:
     return ""
 
 
-def parse_humanize(
-    raw: str, draft: Draft, engaged: tuple[Lens, ...]
-) -> dict[str, Any]:
+def parse_humanize(raw: str, draft: Draft, engaged: tuple[Lens, ...]) -> dict[str, Any]:
     """JSON -> lens-grouped report. Locates each target verbatim in its section
     (dropping any that don't match) and flags fact-changing rewrites."""
     try:
@@ -111,14 +113,16 @@ def parse_humanize(
                 continue
             if target not in _section_text(draft, sid):
                 continue  # target must exist verbatim to be applied
-            findings.append({
-                "lens": lens,
-                "section_id": sid,
-                "target": target,
-                "suggestion": suggestion,
-                "note": str(item.get("note", "")).strip(),
-                "needs_review": needs_review(target, suggestion),
-            })
+            findings.append(
+                {
+                    "lens": lens,
+                    "section_id": sid,
+                    "target": target,
+                    "suggestion": suggestion,
+                    "note": str(item.get("note", "")).strip(),
+                    "needs_review": needs_review(target, suggestion),
+                }
+            )
         groups.append({"key": lens, "label": LENS_LABELS[lens], "findings": findings})
     return {"lenses": groups}
 
@@ -130,7 +134,7 @@ _DIRECTIVE = (
     "You are a line editor making prose read as written by a real person, not a "
     "model. Using the lens rubric above, find sentences that read as robotic and "
     "propose a rewrite for each. Only engage these lenses: {lenses}. For each "
-    "finding return the section title (or \"opening\" for the lede), the verbatim "
+    'finding return the section title (or "opening" for the lede), the verbatim '
     "target sentence copied exactly from the draft, a suggestion, and a one-line "
     "note. GUARDRAIL: change wording, rhythm, and stance only — never alter a "
     "number, name, quotation, or link, and never rewrite the opening answer "

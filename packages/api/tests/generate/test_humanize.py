@@ -38,23 +38,27 @@ def test_guard_flags_changed_number():
 
 
 def test_guard_flags_changed_link():
-    assert humanize.needs_review(
-        "see [docs](https://a.com)", "see [docs](https://b.com)"
-    ) is True
+    assert humanize.needs_review("see [docs](https://a.com)", "see [docs](https://b.com)") is True
 
 
 def test_guard_allows_pure_tone_change():
-    assert humanize.needs_review(
-        "The API adds 5ms and serves as a robust gateway.",
-        "The API adds 5ms. That is the whole story.",
-    ) is False
+    assert (
+        humanize.needs_review(
+            "The API adds 5ms and serves as a robust gateway.",
+            "The API adds 5ms. That is the whole story.",
+        )
+        is False
+    )
 
 
 def test_guard_allows_tone_change_no_numbers():
-    assert humanize.needs_review(
-        "This represents a significant improvement to the workflow.",
-        "This just makes the workflow better. Noticeably.",
-    ) is False
+    assert (
+        humanize.needs_review(
+            "This represents a significant improvement to the workflow.",
+            "This just makes the workflow better. Noticeably.",
+        )
+        is False
+    )
 
 
 def _draft() -> Draft:
@@ -107,6 +111,33 @@ def test_parse_maps_opening_section():
     report = humanize.parse_humanize(raw, _draft(), ("flow",))
     f = next(g for g in report["lenses"] if g["key"] == "flow")["findings"][0]
     assert f["section_id"] == "opening"
+
+
+def test_parse_matches_section_with_emphasized_title():
+    # Stored titles can carry markdown emphasis (e.g. a pasted "## **The Setup**").
+    # The model echoes the clean title "The Setup"; both sides must normalize the
+    # same way (strip_inline_emphasis) or the finding is silently dropped.
+    draft = Draft(
+        title="T",
+        idea=IdeaInput(topic="t", provider="claude-cli", model="opus"),
+        outline=OutlineProposal(opening_hook="Opening line."),
+        sections=[
+            Section(
+                id="s1",
+                title="**The Setup**",
+                content_md="The API serves as a gateway. It adds 5ms.",
+            )
+        ],
+        references=[],
+    )
+    raw = (
+        '{"lenses": {"soul": [{"section": "The Setup", '
+        '"target": "The API serves as a gateway.", '
+        '"suggestion": "The API is the gateway.", "note": "puffery"}]}}'
+    )
+    report = humanize.parse_humanize(raw, draft, ("soul",))
+    f = next(g for g in report["lenses"] if g["key"] == "soul")["findings"][0]
+    assert f["section_id"] == "s1"
 
 
 def test_parse_tolerates_junk_json():
