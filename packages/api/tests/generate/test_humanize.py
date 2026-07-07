@@ -101,7 +101,10 @@ def test_parse_drops_finding_whose_target_is_absent():
     assert lens["findings"] == []
 
 
-def test_parse_maps_opening_section():
+def test_parse_drops_opening_target_guardrail():
+    # The opening hook is GEO-scored; Humanize must never rewrite it, so a
+    # finding targeting "opening" is dropped (sid resolves to None) rather than
+    # applied.
     raw = (
         '{"lenses": {"flow": [{"section": "opening", '
         '"target": "This tool cuts deploy time to a minute.", '
@@ -109,8 +112,16 @@ def test_parse_maps_opening_section():
         '"note": "rhythm"}]}}'
     )
     report = humanize.parse_humanize(raw, _draft(), ("flow",))
-    f = next(g for g in report["lenses"] if g["key"] == "flow")["findings"][0]
-    assert f["section_id"] == "opening"
+    flow = next(g for g in report["lenses"] if g["key"] == "flow")
+    assert flow["findings"] == []
+
+
+def test_draft_text_excludes_opening_hook():
+    # The opening hook is never sent to the model — the guardrail keeps Humanize
+    # off the GEO-scored answer-first sentence.
+    text = humanize._draft_text(_draft())
+    assert "This tool cuts deploy time to a minute." not in text
+    assert "The Setup" in text  # body sections are still included
 
 
 def test_parse_matches_section_with_emphasized_title():

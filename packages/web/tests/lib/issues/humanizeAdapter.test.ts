@@ -31,8 +31,15 @@ describe("humanizeFindingsToIssues", () => {
     expect(issues[0].actions).toContain("dismiss");
   });
 
-  it("marks needs_review findings so the UI can require confirm", () => {
+  it("gates needs_review findings: advisory nature AND no one-click ai_fix", () => {
     const issues = humanizeFindingsToIssues(report);
-    expect(issues[1].nature).toBe("advisory"); // fact-changing -> not auto-apply
+    // safe finding keeps the one-click fix
+    expect(issues[0].nature).toBe("fix");
+    expect(issues[0].actions).toContain("ai_fix");
+    // fact-changing finding is advisory and cannot be auto-applied — the writer
+    // must open it via manual_fix (guardrail).
+    expect(issues[1].nature).toBe("advisory");
+    expect(issues[1].actions).not.toContain("ai_fix");
+    expect(issues[1].actions).toContain("manual_fix");
   });
 });

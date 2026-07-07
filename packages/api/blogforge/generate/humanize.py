@@ -97,8 +97,10 @@ def parse_humanize(raw: str, draft: Draft, engaged: tuple[Lens, ...]) -> dict[st
         data = {}
     lenses_in = data.get("lenses", {}) if isinstance(data, dict) else {}
 
+    # No "opening" entry: the opening hook is GEO-scored and off-limits to
+    # Humanize (spec guardrail), so a finding targeting it resolves to sid=None
+    # below and is dropped rather than applied.
     by_title = {_key(s.title): s.id for s in draft.sections}
-    by_title["opening"] = "opening"
 
     groups: list[dict[str, Any]] = []
     for lens in engaged:
@@ -134,7 +136,7 @@ _DIRECTIVE = (
     "You are a line editor making prose read as written by a real person, not a "
     "model. Using the lens rubric above, find sentences that read as robotic and "
     "propose a rewrite for each. Only engage these lenses: {lenses}. For each "
-    'finding return the section title (or "opening" for the lede), the verbatim '
+    "finding return the section title, the verbatim "
     "target sentence copied exactly from the draft, a suggestion, and a one-line "
     "note. GUARDRAIL: change wording, rhythm, and stance only — never alter a "
     "number, name, quotation, or link, and never rewrite the opening answer "
@@ -171,9 +173,10 @@ async def analyze_humanize(
 
 
 def _draft_text(draft: Draft) -> str:
+    # The opening hook is deliberately excluded — GEO scores it, and the
+    # Humanize guardrail must never rewrite the answer-first opening sentence,
+    # so the model never even sees it as a candidate.
     parts: list[str] = []
-    if draft.outline and draft.outline.opening_hook:
-        parts.append(draft.outline.opening_hook)
     for s in draft.sections:
         parts.append(f"## {s.title}\n{s.content_md}")
     return "\n\n".join(parts)

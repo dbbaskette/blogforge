@@ -25,7 +25,12 @@ export function humanizeFindingsToIssues(report: HumanizeReport): Issue[] {
         target: f.target,
         fixKind: "humanize_rewrite",
         suggestion: f.suggestion,
-        actions: ["ai_fix", "manual_fix", "highlight", "dismiss"],
+        // Guardrail: a fact-changing rewrite (needs_review) must NOT be
+        // one-click applied — drop ai_fix so the writer has to open it and
+        // apply by hand, mirroring geoAdapter's advisory convention.
+        actions: f.needs_review
+          ? ["manual_fix", "highlight", "dismiss"]
+          : ["ai_fix", "manual_fix", "highlight", "dismiss"],
         status: "open",
       });
     });
