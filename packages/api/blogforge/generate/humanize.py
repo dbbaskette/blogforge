@@ -2,6 +2,7 @@
 the subtractive anti-AI-tells Humanizer. Mirrors generate/geo.py."""
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from importlib import resources
 from pathlib import Path
@@ -45,3 +46,21 @@ def load_rubric(pack_root: Path | None) -> str:
         if override.is_file():
             return override.read_text(encoding="utf-8")
     return _bundled_rubric()
+
+
+_NUM_RE = re.compile(r"\d[\d,.]*")
+_URL_RE = re.compile(r"https?://\S+|\]\(([^)]+)\)")
+_QUOTE_RE = re.compile(r'"([^"]+)"')
+
+
+def _facts(text: str) -> set[str]:
+    nums = {n.rstrip(".,") for n in _NUM_RE.findall(text)}
+    urls = {m.group(1) or m.group(0) for m in _URL_RE.finditer(text)}
+    quotes = {q.strip() for q in _QUOTE_RE.findall(text)}
+    return nums | urls | quotes
+
+
+def needs_review(target: str, suggestion: str) -> bool:
+    """True when the rewrite changes any number, link, or quoted span — the
+    guardrail: Humanize edits tone/rhythm/phrasing, never facts."""
+    return _facts(target) != _facts(suggestion)
