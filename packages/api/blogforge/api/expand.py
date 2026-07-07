@@ -54,9 +54,15 @@ async def expand_draft(
                 }
             },
         )
-    # Defensive backfill: if the outline exists but the sections list is empty
-    # (e.g. drafts created by an older ideation/accept that didn't seed sections),
-    # synthesize the section shells now from outline.sections and persist.
+    # Entering the drafting stage. Two things happen here, synchronously, BEFORE
+    # the async compose job starts, so the UI can switch to the live composing
+    # view immediately instead of leaving the writer on a frozen outline:
+    #   1. Backfill section shells if the outline exists but sections are empty
+    #      (older ideation/accept flows didn't seed them).
+    #   2. Advance the stage to "sections" now. (_run_expand also sets it at the
+    #      end; moving it up is what lets the frontend show per-section progress
+    #      the moment compose starts.)
+    persist = False
     if not draft.sections:
         from blogforge.drafts.models import Section
 
@@ -64,6 +70,11 @@ async def expand_draft(
             Section(id=s.id, title=s.title, brief=s.brief)
             for s in draft.outline.sections
         ]
+        persist = True
+    if draft.stage != "sections":
+        draft.stage = "sections"
+        persist = True
+    if persist:
         await store.update(draft.id, draft, user_id=current.id)
 
     if not draft.idea.use_voice_profile:

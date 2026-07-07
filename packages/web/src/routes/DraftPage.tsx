@@ -68,6 +68,11 @@ export function DraftPage(): JSX.Element {
     if (!id) return;
     const { job_id } = await expandSections(id);
     setJobId(job_id);
+    // The compose runs as a background job. The draft has already advanced to the
+    // "sections" stage server-side (see /expand), so pull it now to swap the
+    // outline for the live composing view — otherwise the writer sits on a
+    // frozen outline with no feedback until the whole job finishes.
+    setDraft(await getDraft(id));
   }, [id]);
 
   const onExpandUnfilled = useCallback(async () => {
