@@ -51,3 +51,49 @@ def test_guard_allows_tone_change_no_numbers():
         "This represents a significant improvement to the workflow.",
         "This just makes the workflow better. Noticeably.",
     ) is False
+
+
+from blogforge.drafts.models import Draft, IdeaInput, OutlineProposal, Section
+
+
+def _draft() -> Draft:
+    return Draft(
+        title="T",
+        idea=IdeaInput(topic="t", provider="claude-cli", model="opus"),
+        outline=OutlineProposal(opening_hook="This tool cuts deploy time to a minute."),
+        sections=[Section(id="s1", title="The Setup", content_md="The API serves as a gateway. It adds 5ms.")],
+        references=[],
+    )
+
+
+def test_parse_locates_target_and_maps_section():
+    raw = (
+        '{"lenses": {"soul": [{"section": "The Setup", '
+        '"target": "The API serves as a gateway.", '
+        '"suggestion": "The API is the gateway.", "note": "puffery"}]}}'
+    )
+    report = humanize.parse_humanize(raw, _draft(), ("soul",))
+    lens = next(g for g in report["lenses"] if g["key"] == "soul")
+    f = lens["findings"][0]
+    assert f["section_id"] == "s1"
+    assert f["target"] == "The API serves as a gateway."
+    assert f["needs_review"] is False
+
+
+def test_parse_drops_finding_whose_target_is_absent():
+    raw = '{"lenses": {"flow": [{"section": "The Setup", "target": "not in the text", "suggestion": "x", "note": "n"}]}}'
+    report = humanize.parse_humanize(raw, _draft(), ("flow",))
+    lens = next(g for g in report["lenses"] if g["key"] == "flow")
+    assert lens["findings"] == []
+
+
+def test_parse_maps_opening_section():
+    raw = '{"lenses": {"flow": [{"section": "opening", "target": "This tool cuts deploy time to a minute.", "suggestion": "This tool cuts deploys to a minute. Really.", "note": "rhythm"}]}}'
+    report = humanize.parse_humanize(raw, _draft(), ("flow",))
+    f = next(g for g in report["lenses"] if g["key"] == "flow")["findings"][0]
+    assert f["section_id"] == "opening"
+
+
+def test_parse_tolerates_junk_json():
+    report = humanize.parse_humanize("not json", _draft(), ("flow",))
+    assert report["lenses"] == [{"key": "flow", "label": "Flow & Rhythm", "findings": []}]
