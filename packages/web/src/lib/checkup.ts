@@ -23,8 +23,11 @@ export interface CheckupRow {
 
 export interface CheckupSummary {
   headline: string;
-  /** 0-100 "reads human" score from the lint pass. */
+  /** 0-100 blended "reads human" score (anti-robot + human-signal). */
   humanity: number;
+  /** The two sub-scores behind `humanity`, so the meter can show the split. */
+  antiRobot: number;
+  humanSignal: number | null;
   rows: CheckupRow[];
   totalOpen: number;
 }
@@ -94,7 +97,9 @@ export function summarizeCheckup(
 ): CheckupSummary {
   const reviewOpen = lint ? lint.violations.length + lint.repetitions.length : 0;
   const hits = lint ? lint.hits.length : 0;
-  const humanity = blendHumanness(humanityScore(reviewOpen, hits), humanize ? humanize.score : null);
+  const antiRobot = humanityScore(reviewOpen, hits);
+  const humanSignal = humanize ? humanize.score : null;
+  const humanity = blendHumanness(antiRobot, humanSignal);
 
   const geoFixes = geo ? countGeoFixes(geo) : 0;
   const shapeCount = shape ? countShape(shape) : 0;
@@ -147,5 +152,5 @@ export function summarizeCheckup(
     headline = "Almost ready — a few tweaks left";
   }
 
-  return { headline, humanity, rows, totalOpen };
+  return { headline, humanity, antiRobot, humanSignal, rows, totalOpen };
 }

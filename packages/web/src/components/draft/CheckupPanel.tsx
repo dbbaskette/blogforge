@@ -7,6 +7,7 @@ import { type SuggestResult, suggestImprovements } from "../../api/suggest";
 import { type CheckupSummary, type Severity, summarizeCheckup } from "../../lib/checkup";
 import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
 import { useDialogA11y } from "../ui/useDialogA11y";
+import { HumannessPulse } from "./HumannessPulse";
 
 const SEV: Record<Severity, { dot: string; text: string }> = {
   good: { dot: "#15a06b", text: "text-green-ink" },
@@ -140,10 +141,12 @@ export function CheckupPanel({
           {summary ? summary.headline : "Checking your draft…"}
         </h2>
         {summary && (
-          <p className="mt-1 text-xs text-muted">
-            Reads {summary.humanity}% human ·{" "}
-            {summary.totalOpen === 0 ? "nothing open" : `${summary.totalOpen} to address`}
-          </p>
+          <div className="mt-3" aria-label={`Reads ${summary.humanity}% human`}>
+            <HumannessPulse antiRobot={summary.antiRobot} humanSignal={summary.humanSignal} />
+            <p className="mt-1 text-xs text-muted">
+              {summary.totalOpen === 0 ? "nothing open" : `${summary.totalOpen} to address`}
+            </p>
+          </div>
         )}
       </header>
 
