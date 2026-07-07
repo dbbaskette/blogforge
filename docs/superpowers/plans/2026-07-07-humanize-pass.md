@@ -1333,6 +1333,13 @@ git commit -m "feat(humanize): Humanness row + blended score in Checkup"
 
 These enhance the panel from Task E2 (swap the plain ring for the pulse, add the radar, adopt the two-pane heat-map) and the Checkup meter from F2. All components are theme-aware (CSS variables) and gate animation on `prefers-reduced-motion`. Reuse `components/voice/VoiceFingerprint.tsx` (radar + rhythm bars) and `components/review/HighlightedText.tsx` (heat-map). Before writing each, open the sibling and copy its SVG/measurement idioms.
 
+**Approved visuals (locked via the spike — user-approved):**
+- `HumannessPulse.tsx`, `LensBloom.tsx`, `RhythmStrip.tsx` **already exist** in `components/draft/` (built + approved during the spike, in the real notebook theme). Tasks G1–G3 below reduce to **adding the tests** and confirming behavior — the component bodies are done. Do NOT rewrite them with CSS-variable tokens; they intentionally use the app's hex palette (`#2f6bff` cobalt, `#15224a` ink, `#e6e8ed` rule, etc.).
+- **Lens color map (locked)** in `LensBloom.tsx` `LENS_COLOR`: flow `#2f6bff` (cobalt), voice `#16c2b3` (teal), imperfections `#f59e0b` (amber), soul `#e6492d` (coral). Reuse these for pills and finding-card accents.
+- **Icons (locked, generated + cut to transparent):** `public/humanize/mark.png` (split robot/human head — the **header** mark, replaces any emoji) and `public/humanize/{robot,half,human}.png` (the three **dial** heads for Light / Medium / Strong). The `HumanizePanel` header renders `mark.png` (~48px) next to the title; the intensity dial renders the matching head per segment.
+- **Pulse split meter (locked):** anti-robot bar muted `#aab1bd`, human-signal bar green `#15a06b`, score number colored by the existing `scoreColor` thresholds (green/amber/coral).
+- **Cleanup:** delete the throwaway spike (`packages/web/spike.html`, `packages/web/src/spike.tsx`, `packages/web/public/spike/`) as part of Phase H; keep `public/humanize/`.
+
 ### Task G1: `HumannessPulse.tsx` (pulse + split meter)
 
 **Files:**
