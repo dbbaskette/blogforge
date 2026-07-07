@@ -102,6 +102,7 @@ export function HumanizeReviewRail({
                   onAction={(action, inputText) => handleAction(issue, action, inputText)}
                   onAccept={() => accept(issue)}
                   onUndo={() => void undo(issue)}
+                  actionLabels={{ highlight: "Jump to" }}
                 />
               ))}
             </div>

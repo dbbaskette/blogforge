@@ -87,7 +87,13 @@ function markRanges(
   active: { text: string; kind: TrackedChangeKind } | null,
 ): Mark[] {
   const candidates: { needle: string; kind: TrackedChangeKind }[] = [];
-  if (active) candidates.push({ needle: active.text, kind: active.kind });
+  // The heat-map paints every finding amber. "Jump to" (locate) adds NO mark of
+  // its own — the sentence is already in the heat-map, so jumping just scrolls +
+  // rings the section. Only an applied fix ("under-review") paints an extra mark,
+  // since its rewritten text isn't one of the finding targets.
+  if (active && active.kind === "under-review") {
+    candidates.push({ needle: active.text, kind: active.kind });
+  }
   for (const f of findings) candidates.push({ needle: f.target, kind: "under-review" });
 
   const found: Mark[] = [];
@@ -125,10 +131,12 @@ function HeatMapPassage({ text, marks }: { text: string; marks: Mark[] }): JSX.E
   return <>{nodes}</>;
 }
 
-// A visible box around the passage the rail is currently pointing at (an
-// applied fix awaiting accept, or a "Highlight" locate) — same treatment
-// OptimizePanel uses so the two panels feel consistent.
+// Amber box around an APPLIED fix awaiting accept — shows the pending change
+// (its rewritten text isn't part of the heat-map).
 const LIT_BOX = "rounded-nb ring-2 ring-amber/60 bg-amber-soft px-3 -mx-3 py-2";
+// Transient cobalt ring for "Jump to" — briefly frames the sentence you jumped
+// to (the amber heat-map wash is already there); cleared by the locate timeout.
+const LOCATE_RING = "rounded-nb ring-2 ring-cobalt-400/70 px-3 -mx-3 py-2 transition-all";
 
 export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelProps): JSX.Element {
   const panelRef = useDialogA11y(true, onClose);
@@ -157,7 +165,7 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
       setHighlight({ sectionId, text, kind });
       // Locate is transient; an under-review highlight persists until accept/undo.
       if (kind === "locate") {
-        locateTimer.current = window.setTimeout(() => setHighlight(null), 2600);
+        locateTimer.current = window.setTimeout(() => setHighlight(null), 1400);
       }
     },
     [],
@@ -170,8 +178,14 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
     }
   }, [highlight]);
 
-  // On mount and whenever intensity (or the draft's content) changes: reuse a
-  // cached report for this exact content+intensity, or run a fresh pass.
+  // Run the pass on mount and whenever the INTENSITY (dial) changes — but NOT on
+  // every draft-content change. Accepting an AI fix mutates the draft, and if we
+  // re-ran here on that, one accepted fix would re-analyze the whole post and
+  // churn all the other findings under the writer. Accepted findings are already
+  // resolved locally by the rail; a fresh pass is an explicit act (change the
+  // dial, or reopen the panel). The cache key still uses the content hash, so a
+  // reopen after edits does get a fresh read.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally keyed to draft.id + intensity, not draft content — see comment above
   useEffect(() => {
     let cancelled = false;
     const key = `${hashDraftContent(draft)}:${intensity}`;
@@ -199,7 +213,7 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
     return () => {
       cancelled = true;
     };
-  }, [draft, intensity]);
+  }, [draft.id, intensity]);
 
   const selectIntensity = useCallback(
     (next: Intensity): void => {
@@ -236,6 +250,10 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
 
   const opening = draft.outline?.opening_hook?.trim() ?? "";
   const openingLit = highlight?.sectionId === "opening";
+  // An applied fix awaiting accept gets the amber box; a "Jump to" locate gets a
+  // transient cobalt ring (the heat-map amber is already on the sentence).
+  const boxFor = (isLit: boolean): string =>
+    !isLit ? "" : highlight?.kind === "under-review" ? LIT_BOX : LOCATE_RING;
 
   return (
     <div
@@ -324,7 +342,7 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
             {opening && (
               <p
                 ref={openingLit ? highlightRef : undefined}
-                className={`text-ink leading-relaxed whitespace-pre-wrap mb-8 ${openingLit ? LIT_BOX : ""}`}
+                className={`text-ink leading-relaxed whitespace-pre-wrap mb-8 ${boxFor(openingLit)}`}
               >
                 <HeatMapPassage
                   text={opening}
@@ -350,7 +368,7 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
                     )}
                     <div
                       ref={lit ? highlightRef : undefined}
-                      className={`prose text-ink leading-relaxed whitespace-pre-wrap ${lit ? LIT_BOX : ""}`}
+                      className={`prose text-ink leading-relaxed whitespace-pre-wrap ${boxFor(lit)}`}
                     >
                       {section.content_md?.trim() ? (
                         <HeatMapPassage
