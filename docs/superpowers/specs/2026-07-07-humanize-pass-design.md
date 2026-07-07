@@ -47,32 +47,36 @@ Gating is a static map `INTENSITY_LENSES: dict[str, tuple[Lens, ...]]`, triviall
 - `run_humanize(draft: Draft, *, intensity: Intensity) -> HumanizeReport`
   - Selects lenses via `INTENSITY_LENSES[intensity]`.
   - One LLM call (JSON out) using the lens rubrics + dial, returning per-lens findings. (A cheap deterministic pre-filter — e.g. a metronomic-rhythm detector over sentence lengths — MAY seed Flow candidates before the model call; optional, not required for v1.)
-  - Each **finding** is **section-anchored**, matching the lint shape already in the codebase:
+  - Each **finding** follows the **GEO finding model** (not the lint `start/end/match` model): section-relative substring targeting, which the shared `Issue` pipeline already knows how to render and locate.
     ```
     {
-      "id": str,               # stable: f"humanize:{lens}:{section_id}:{start}"
       "lens": "flow" | "voice" | "imperfections" | "soul",
-      "section_id": str,
-      "start": int, "end": int,  # section-local UTF-16 offsets of the sentence
-      "match": str,            # the original sentence
-      "suggestion": str,       # the humanized rewrite
-      "rationale": str,        # one line: why this reads robotic
+      "section_id": str,       # section id; "opening" for the lede (draft.outline.opening_hook)
+      "target": str,           # the verbatim original sentence (located in-section by substring)
+      "suggestion": str,       # the humanized rewrite (precomputed)
+      "note": str,             # one line: why this reads robotic
       "needs_review": bool,    # set by the guardrail diff-check
     }
     ```
-- **Guardrail** `_guard(match, suggestion) -> bool`: extract numbers, URLs/markdown-links, and `"quoted spans"` from both; if the sets differ, set `needs_review=true` (the fix is shown but not auto-applied — the writer must confirm). Prompt also states the constraint explicitly.
+    A lens is a group `{ "key": lens, "label", "findings": [...] }`, mirroring a GEO lever. `analyze_humanize` returns `{ "intensity", "score", "lenses": [ ...lens groups... ] }`.
+- **Guardrail** `_guard(target, suggestion) -> bool`: extract numbers, URLs/markdown-links, and `"quoted spans"` from both; if the sets differ, set `needs_review=true` (the fix is shown but not auto-applied — the writer must confirm). Prompt also states the constraint explicitly.
 - **Rubric asset** `voice/assets/humanize/lenses.md` — the 4 lens rubrics (the curated 7 tips as instructions), loaded via `importlib.resources` like `load_ai_tells()`; per-pack override at `<pack>/humanize/lenses.md` (same override pattern as `ai-patterns.md`).
-- **Persistence:** the `HumanizeReport` (findings + intensity + timestamp) is stored **alongside the GEO report** using the same draft-scoped mechanism GEO uses, so the score reads cached findings and only changes on a deliberate re-run.
+- **Persistence:** there is **no server-side report storage** in this codebase — GEO/Shape reports are cached **client-side** in `panelCache.ts` (`localStorage`, key `bf.panelcache.${kind}.${draftId}`, keyed by a `hashDraftContent(draft)` content hash). Humanize does the same: add `"humanize"` to `PanelKind`. Because the cache is content-hashed, a re-run on unchanged text returns the cached report — so the score is stable between runs without jitter, and only re-computes when the draft actually changes.
 
 ### Backend — API
 - `POST /api/drafts/{id}/humanize` `{ intensity }` → runs `run_humanize`, persists, returns the report. (Mirrors the GEO analyze endpoint.)
 - **Apply is client-side, no second model call.** The pass already computed `suggestion`, so **Accept** replaces the `[start,end)` span in the section's `content_md` with `suggestion` and calls the existing `saveSection` — no `/inline` round-trip (unlike Proofread, which computes its fix on demand). This makes Humanize Accept instant and deterministic. **Manual fix** opens the section editor at that span for hand-editing.
 
 ### Frontend
-- **Entry point:** `DraftWorkspace.tsx` Improve menu gains **🫶 Humanize** (peer of GEO / Proofread / Shape / Headlines).
-- **Panel:** reuse the `OptimizePanel` / `GeoReviewRail` machinery — 4 lens groups instead of GEO levers; per-finding **AI fix / Manual fix / Highlight / Accept / Undo** already exist. `needs_review` findings render an amber "verify — changes a number/link" note and require explicit confirm.
-- **Dial:** a `Light | Medium | Strong` segmented control in the panel header; changing it re-runs `POST …/humanize`. Selected intensity persisted in `localStorage` (`bf.humanize.intensity.<draftId>`), default `medium`.
+The review UI is built on a **shared `Issue` pipeline** (`lib/issues/types.ts` → per-panel adapter → `IssueCard` + `useIssueLifecycle`), which both GEO (`geoAdapter` + `GeoReviewRail`) and Proofread (`proofreadAdapter` + `ProofreadReviewRail`) already use. Humanize plugs into the same machinery rather than reinventing a panel.
+- **Entry point:** add a `🫶 Humanize` item to the data-driven `improveItems` array in `WorkspaceFooter.tsx` (peer of Proofread / Shape / GEO / Headlines); add `humanizeOpen` state + `onHumanize` handler in `DraftWorkspace.tsx` and mount `{humanizeOpen && <HumanizePanel …/>}`.
+- **Adapter:** new `lib/issues/humanizeAdapter.ts` (`humanizeFindingsToIssues(report) → Issue[]`), adding `"humanize"` to `Issue.panel`. Each finding → an `Issue` with `sectionId`, `target`, `nature`, `fixKind`, and actions `ai_fix / manual_fix / highlight / dismiss`.
+- **Apply:** `lib/issues/humanizeApply.ts` (`makeHumanizeApply` / `makeHumanizeSave`) — Accept applies the precomputed `suggestion` by replacing `target` in the section's `content_md` and calling `saveSection` (no model call). `needs_review` issues render an amber "verify — changes a number/link" note and require explicit confirm.
+- **Panel:** `HumanizeReviewRail.tsx` (thin, modeled on `ProofreadReviewRail.tsx`) renders the 4 lens groups via the shared `IssueCard`/`useIssueLifecycle`; a `HumanizePanel.tsx` slide-in hosts it plus the dial. Reuse `HighlightedText`/`HumanityRing` as-is.
+- **Dial:** a `Light | Medium | Strong` segmented control in the panel header; changing it re-runs `POST …/humanize` (and re-caches). Selected intensity persisted in `localStorage` (`bf.humanize.intensity.<draftId>`), default `medium`.
+- **Client:** new `api/humanize.ts` with `analyzeHumanize(draftId, intensity)` (mirrors `api/geo.ts::analyzeGeo`), not stuffed into `drafts.ts`.
 - **Dismissals:** `lib/humanizeDismissals.ts` mirroring `lib/lintDismissals.ts` (localStorage, `bf.humanize.dismissed.<draftId>`).
+- **Cache:** add `"humanize"` to `PanelKind` in `panelCache.ts`; the panel reads/writes the report exactly as `OptimizePanel`/`CheckupPanel` do for `"geo"`.
 
 ### Unified score (`checkup.ts` + `LintPanel.tsx`)
 Replace the single `humanityScore(openCount, hitCount)` with a blend of two 0–100 sub-scores:
