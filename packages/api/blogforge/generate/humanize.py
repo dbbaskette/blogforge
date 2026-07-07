@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from blogforge.drafts.models import Draft
+from blogforge.llm.base import LLMProvider
+from blogforge.voice import compose_prompt
 
 Intensity = Literal["light", "medium", "strong"]
 Lens = Literal["flow", "voice", "imperfections", "soul"]
@@ -119,3 +121,55 @@ def parse_humanize(
             })
         groups.append({"key": lens, "label": LENS_LABELS[lens], "findings": findings})
     return {"lenses": groups}
+
+
+_PER_LENS_CAP = 15  # max points one lens can dock from the human-signal sub-score
+_DOCK_PER = 4
+
+_DIRECTIVE = (
+    "You are a line editor making prose read as written by a real person, not a "
+    "model. Using the lens rubric above, find sentences that read as robotic and "
+    "propose a rewrite for each. Only engage these lenses: {lenses}. For each "
+    "finding return the section title (or \"opening\" for the lede), the verbatim "
+    "target sentence copied exactly from the draft, a suggestion, and a one-line "
+    "note. GUARDRAIL: change wording, rhythm, and stance only — never alter a "
+    "number, name, quotation, or link, and never rewrite the opening answer "
+    'sentence. Return JSON: {{"lenses": {{"<lens>": [{{"section": "", '
+    '"target": "", "suggestion": "", "note": ""}}]}}}} with only the engaged lenses.'
+)
+
+
+def score_report(report: dict[str, Any]) -> int:
+    total_dock = 0
+    for group in report["lenses"]:
+        total_dock += min(len(group["findings"]) * _DOCK_PER, _PER_LENS_CAP)
+    return max(0, 100 - total_dock)
+
+
+async def analyze_humanize(
+    draft: Draft,
+    pack_root: Path,
+    provider: LLMProvider,
+    *,
+    intensity: Intensity,
+    model: str,
+) -> dict[str, Any]:
+    engaged = lenses_for(intensity)
+    system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    rubric = load_rubric(pack_root)
+    directive = _DIRECTIVE.format(lenses=", ".join(engaged))
+    prompt = f"{system}\n\n---\n\n{rubric}\n\n{directive}\n\nDRAFT:\n{_draft_text(draft)}"
+    resp = await provider.complete(model=model, prompt=prompt)
+    report = parse_humanize(resp.text, draft, engaged)
+    report["intensity"] = intensity
+    report["score"] = score_report(report)
+    return report
+
+
+def _draft_text(draft: Draft) -> str:
+    parts: list[str] = []
+    if draft.outline and draft.outline.opening_hook:
+        parts.append(draft.outline.opening_hook)
+    for s in draft.sections:
+        parts.append(f"## {s.title}\n{s.content_md}")
+    return "\n\n".join(parts)

@@ -1,6 +1,10 @@
 from pathlib import Path
 
+import pytest
+
+from blogforge.drafts.models import Draft, IdeaInput, OutlineProposal, Section
 from blogforge.generate import humanize
+from blogforge.llm.base import LLMResponse
 
 
 def test_load_rubric_bundled_has_all_lenses():
@@ -53,15 +57,18 @@ def test_guard_allows_tone_change_no_numbers():
     ) is False
 
 
-from blogforge.drafts.models import Draft, IdeaInput, OutlineProposal, Section
-
-
 def _draft() -> Draft:
     return Draft(
         title="T",
         idea=IdeaInput(topic="t", provider="claude-cli", model="opus"),
         outline=OutlineProposal(opening_hook="This tool cuts deploy time to a minute."),
-        sections=[Section(id="s1", title="The Setup", content_md="The API serves as a gateway. It adds 5ms.")],
+        sections=[
+            Section(
+                id="s1",
+                title="The Setup",
+                content_md="The API serves as a gateway. It adds 5ms.",
+            )
+        ],
         references=[],
     )
 
@@ -81,14 +88,22 @@ def test_parse_locates_target_and_maps_section():
 
 
 def test_parse_drops_finding_whose_target_is_absent():
-    raw = '{"lenses": {"flow": [{"section": "The Setup", "target": "not in the text", "suggestion": "x", "note": "n"}]}}'
+    raw = (
+        '{"lenses": {"flow": [{"section": "The Setup", "target": "not in the text", '
+        '"suggestion": "x", "note": "n"}]}}'
+    )
     report = humanize.parse_humanize(raw, _draft(), ("flow",))
     lens = next(g for g in report["lenses"] if g["key"] == "flow")
     assert lens["findings"] == []
 
 
 def test_parse_maps_opening_section():
-    raw = '{"lenses": {"flow": [{"section": "opening", "target": "This tool cuts deploy time to a minute.", "suggestion": "This tool cuts deploys to a minute. Really.", "note": "rhythm"}]}}'
+    raw = (
+        '{"lenses": {"flow": [{"section": "opening", '
+        '"target": "This tool cuts deploy time to a minute.", '
+        '"suggestion": "This tool cuts deploys to a minute. Really.", '
+        '"note": "rhythm"}]}}'
+    )
     report = humanize.parse_humanize(raw, _draft(), ("flow",))
     f = next(g for g in report["lenses"] if g["key"] == "flow")["findings"][0]
     assert f["section_id"] == "opening"
@@ -97,3 +112,52 @@ def test_parse_maps_opening_section():
 def test_parse_tolerates_junk_json():
     report = humanize.parse_humanize("not json", _draft(), ("flow",))
     assert report["lenses"] == [{"key": "flow", "label": "Flow & Rhythm", "findings": []}]
+
+
+def test_score_full_when_no_findings():
+    report = {"lenses": [{"key": "flow", "label": "Flow & Rhythm", "findings": []}]}
+    assert humanize.score_report(report) == 100
+
+
+def test_score_docks_but_caps_per_lens():
+    many = [{"lens": "flow"} for _ in range(20)]
+    report = {"lenses": [{"key": "flow", "label": "Flow & Rhythm", "findings": many}]}
+    # 20 findings in one lens cannot dock more than the per-lens cap (15).
+    assert humanize.score_report(report) == 85
+
+
+class _JsonLLM:
+    name = "json"
+
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    async def complete(self, **_kw):
+        return LLMResponse(
+            text=self._text, input_tokens=1, output_tokens=1, model="m", finish_reason="stop"
+        )
+
+
+def _fake_pack(tmp_path):
+    # NOTE: the plan's fixture used a schema the real Manifest model rejects
+    # (missing `spec_version`/`pack`, an extra `spec` field). Corrected to match
+    # the working fixture in tests/generate/test_geo.py::_fake_pack.
+    (tmp_path / "stylepack.yaml").write_text(
+        "spec_version: '1.0'\npack:\n  slug: dan\n  name: Dan\n  version: '1.0'\n  author: Dan\n"
+        "persona:\n  identity: A\n  one_line: B\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "style-guide.md").write_text("# guide\n", encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.asyncio
+async def test_analyze_humanize_light_only_runs_flow_and_soul(tmp_path):
+    raw = '{"lenses": {"flow": [], "soul": [], "voice": [], "imperfections": []}}'
+    report = await humanize.analyze_humanize(
+        _draft(), _fake_pack(tmp_path), _JsonLLM(raw), intensity="light", model="m"
+    )
+    keys = [g["key"] for g in report["lenses"]]
+    assert keys == ["flow", "soul"]
+    assert report["intensity"] == "light"
+    assert report["score"] == 100
