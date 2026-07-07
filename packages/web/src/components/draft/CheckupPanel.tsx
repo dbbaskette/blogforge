@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { type Draft, lintDraft } from "../../api/drafts";
 import { type GeoReport, analyzeGeo } from "../../api/geo";
+import { type HumanizeReport, analyzeHumanize } from "../../api/humanize";
 import { type SuggestResult, suggestImprovements } from "../../api/suggest";
 import { type CheckupSummary, type Severity, summarizeCheckup } from "../../lib/checkup";
 import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
@@ -23,12 +24,14 @@ export function CheckupPanel({
   onOpenReview,
   onOpenGeo,
   onOpenShape,
+  onOpenHumanize,
   onClose,
 }: {
   draft: Draft;
   onOpenReview: () => void;
   onOpenGeo: () => void;
   onOpenShape: () => void;
+  onOpenHumanize?: () => void;
   onClose: () => void;
 }): JSX.Element {
   const panelRef = useDialogA11y(true, onClose);
@@ -57,22 +60,37 @@ export function CheckupPanel({
         setCached("shape", draft.id, hash, fresh);
         return fresh;
       };
-      const [lintR, geoR, shapeR] = await Promise.allSettled([
+      // Checkup always runs Humanize at a fixed "medium" intensity — it's the
+      // summary view. The dial (Light/Medium/Strong) lives in HumanizePanel;
+      // the intensity is folded into the cache key so it never collides with
+      // a dial-selected report cached under the same draft content hash.
+      const loadHumanize = async (): Promise<HumanizeReport> => {
+        const key = `${hash}:medium`;
+        const hit = getCached<HumanizeReport>("humanize", draft.id, key);
+        if (hit) return hit.data;
+        const fresh = await analyzeHumanize(draft.id, "medium");
+        setCached("humanize", draft.id, key, fresh);
+        return fresh;
+      };
+      const [lintR, geoR, shapeR, humanizeR] = await Promise.allSettled([
         lintDraft(draft.id),
         loadGeo(),
         loadShape(),
+        loadHumanize(),
       ]);
       setSummary(
         summarizeCheckup(
           lintR.status === "fulfilled" ? lintR.value : null,
           geoR.status === "fulfilled" ? geoR.value : null,
           shapeR.status === "fulfilled" ? shapeR.value : null,
+          humanizeR.status === "fulfilled" ? humanizeR.value : null,
         ),
       );
       if (
         lintR.status === "rejected" &&
         geoR.status === "rejected" &&
-        shapeR.status === "rejected"
+        shapeR.status === "rejected" &&
+        humanizeR.status === "rejected"
       ) {
         setError("Couldn't run the checks — try again.");
       }
@@ -86,10 +104,11 @@ export function CheckupPanel({
     run();
   }, []);
 
-  const open: Record<string, () => void> = {
+  const open: Record<string, (() => void) | undefined> = {
     review: onOpenReview,
     geo: onOpenGeo,
     shape: onOpenShape,
+    humanize: onOpenHumanize,
   };
 
   return (

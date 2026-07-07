@@ -555,6 +555,10 @@ export function DraftWorkspace({
             setCheckupOpen(false);
             setShapeOpen(true);
           }}
+          onOpenHumanize={() => {
+            setCheckupOpen(false);
+            setHumanizeOpen(true);
+          }}
           onClose={() => setCheckupOpen(false)}
         />
       )}
