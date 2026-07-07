@@ -61,6 +61,13 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
     lever.findings.forEach((finding, i) => {
       const fix = finding.fix ?? "";
       const spec = specFor(lever, fix);
+      // Highlight only makes sense when there's something to locate. A finding
+      // with neither a target nor a section (a document-global advisory like
+      // "no dates anywhere") would highlight nothing — drop the dead button.
+      const actions =
+        !finding.target && !finding.section_id
+          ? spec.actions.filter((a) => a !== "highlight")
+          : spec.actions;
       issues.push({
         id: `${lever.key}:${i}`,
         panel: "geo",
@@ -73,10 +80,30 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         // The specific fix the apply layer dispatches on (finding-level, then
         // lever-level, then the lever key as a last resort).
         fixKind: fix || lever.fix || lever.key,
-        actions: spec.actions,
+        actions,
         status: "open",
       });
     });
+
+    // A deficient lever can offer a lever-level fix (e.g. "add a key-takeaways
+    // block") without any per-finding anchor. With no findings it would emit no
+    // card at all, leaving that generative action unreachable — synthesize one.
+    if (lever.findings.length === 0 && lever.fix && LEVER_FIX[lever.fix]) {
+      const spec = LEVER_FIX[lever.fix];
+      issues.push({
+        id: `${lever.key}:lever`,
+        panel: "geo",
+        lever: lever.key,
+        title: lever.detail || lever.label,
+        why: lever.detail || lever.label,
+        nature: spec.nature,
+        sectionId: "",
+        target: undefined,
+        fixKind: lever.fix,
+        actions: spec.actions,
+        status: "open",
+      });
+    }
   }
   return issues;
 }

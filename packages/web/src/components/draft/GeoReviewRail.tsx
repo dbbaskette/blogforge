@@ -12,6 +12,7 @@ import { useMemo } from "react";
 import type { Draft } from "../../api/drafts";
 import type { GeoReport } from "../../api/geo";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
+import { fillSectionIds } from "../../lib/issues/locateSection";
 import { IssueCard } from "../review/IssueCard";
 import { reviewBusyLabel } from "../review/reviewBusyLabel";
 import { useIssueLifecycle } from "../review/useIssueLifecycle";
@@ -43,7 +44,12 @@ export function GeoReviewRail({
   onRescore,
   onHighlight,
 }: GeoReviewRailProps): JSX.Element {
-  const issues = useMemo(() => geoFindingsToIssues(report), [report]);
+  // Resolve each finding's section up front (many backend findings tag a target
+  // but no section_id) so highlight, apply, and undo all act on the same place.
+  const issues = useMemo(
+    () => fillSectionIds(geoFindingsToIssues(report), draft.sections),
+    [report, draft.sections],
+  );
   const ctx = useMemo(
     () => ({ draft, onSectionSave, onOpeningSave, onTitleSave }),
     [draft, onSectionSave, onOpeningSave, onTitleSave],

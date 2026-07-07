@@ -95,4 +95,46 @@ describe("geoFindingsToIssues", () => {
     expect(issues[0].actions).toContain("add_fact");
     expect(issues[0].fixKind).toBe("factual_density");
   });
+
+  it("drops Highlight from a finding with neither a target nor a section", () => {
+    const issues = geoFindingsToIssues({
+      score: 40,
+      grade: "D",
+      levers: [
+        {
+          key: "freshness",
+          label: "Freshness",
+          score: 40,
+          detail: "Dated evidence signals recency.",
+          fix: null,
+          findings: [{ note: "No dates anywhere", fix: "" }],
+        },
+      ],
+    });
+    expect(issues).toHaveLength(1);
+    expect(issues[0].actions).not.toContain("highlight");
+    expect(issues[0].actions).toContain("add_date");
+  });
+
+  it("synthesizes a card for a deficient lever whose fix has no per-finding anchor", () => {
+    const issues = geoFindingsToIssues({
+      score: 45,
+      grade: "D",
+      levers: [
+        {
+          key: "takeaways",
+          label: "Key takeaways",
+          score: 45,
+          detail: "A key-takeaways block is the most-lifted extraction target.",
+          fix: "takeaways",
+          findings: [],
+        },
+      ],
+    });
+    expect(issues).toHaveLength(1);
+    expect(issues[0].id).toBe("takeaways:lever");
+    expect(issues[0].nature).toBe("add");
+    expect(issues[0].actions).toEqual(["generate", "write_own"]);
+    expect(issues[0].fixKind).toBe("takeaways");
+  });
 });

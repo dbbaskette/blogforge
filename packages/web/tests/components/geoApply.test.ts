@@ -137,4 +137,78 @@ describe("geoApply ai_fix", () => {
     expect(arg.instruction).toContain("Some new issue kind");
     expect(onSectionSave).toHaveBeenCalled();
   });
+
+  it("gives a section-less input action a home (first section fallback)", async () => {
+    // A freshness "add a date" finding carries no section and no target.
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const issue: Issue = {
+      id: "freshness:0",
+      panel: "geo",
+      lever: "freshness",
+      title: "No dates anywhere",
+      why: "Recency signals help.",
+      nature: "advisory",
+      sectionId: "",
+      fixKind: "freshness",
+      actions: ["add_date", "dismiss"],
+      status: "open",
+    };
+    const res = await apply(issue, "add_date", "March 2026");
+    expect(res).not.toBeNull();
+    expect(res?.sectionId).toBe("s1");
+    expect(onSectionSave).toHaveBeenCalledWith("s1", expect.any(String));
+  });
+});
+
+describe("geoApply block placement", () => {
+  // biome-ignore lint/suspicious/noExplicitAny: minimal multi-section stub
+  const multi: any = {
+    id: "d1",
+    sections: [
+      { id: "s1", title: "Intro", content_md: "Opening section body." },
+      { id: "s2", title: "Details", content_md: "Second section body." },
+      { id: "s3", title: "Wrap-up", content_md: "Final section body." },
+    ],
+    outline: { opening_hook: "", sections: [] },
+  };
+
+  it("appends a generated FAQ to the LAST section, not the empty finding section", async () => {
+    const { generateFaq } = await import("../../src/api/geo");
+    (generateFaq as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { q: "How much does it cost?", a: "Free." },
+    ]);
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft: multi,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const faqIssue: Issue = {
+      id: "faq:0",
+      panel: "geo",
+      lever: "faq",
+      title: 'Not covered: "cost"',
+      why: "An FAQ helps answer engines.",
+      nature: "add",
+      sectionId: "",
+      fixKind: "faq",
+      actions: ["generate", "write_own"],
+      status: "open",
+    };
+    const res = await apply(faqIssue, "generate");
+    expect(res?.sectionId).toBe("s3");
+    expect(onSectionSave).toHaveBeenCalledWith("s3", expect.stringContaining("FAQ"));
+    // The last section's own body is preserved, not clobbered by another section.
+    expect(onSectionSave).toHaveBeenCalledWith(
+      "s3",
+      expect.stringContaining("Final section body."),
+    );
+  });
 });
