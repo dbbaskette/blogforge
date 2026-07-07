@@ -69,9 +69,47 @@ describe("HumanizePanel", () => {
     setCached("humanize", draft.id, `${hash}:medium`, cached);
 
     render(<HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />);
-    // Cached report renders (its distinct lens label shows up)...
-    await waitFor(() => expect(screen.getByText("De-robot / Soul")).toBeInTheDocument());
+    // Cached report renders — the radar's "soul" axis label shows up, replacing
+    // the old plain-text lens-coverage strip...
+    await waitFor(() => expect(screen.getByText("soul")).toBeInTheDocument());
     // ...without ever calling analyzeHumanize.
     expect(analyzeHumanize).not.toHaveBeenCalled();
+  });
+
+  it("shows the radar and heat-maps a flagged finding in the read pane", async () => {
+    (analyzeHumanize as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      intensity: "medium",
+      score: 85,
+      lenses: [
+        {
+          key: "soul",
+          label: "De-robot / Soul",
+          findings: [
+            {
+              lens: "soul",
+              section_id: "s1",
+              target: "The API serves as a gateway.",
+              suggestion: "The API is the gateway.",
+              note: "puffery",
+              needs_review: false,
+            },
+          ],
+        },
+      ],
+    });
+    // biome-ignore lint/suspicious/noExplicitAny: minimal Draft stub
+    const d: any = {
+      id: "d1",
+      title: "T",
+      outline: { opening_hook: "h" },
+      sections: [{ id: "s1", title: "S", content_md: "The API serves as a gateway. It adds 5ms." }],
+    };
+    render(<HumanizePanel draft={d} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    // radar axis label — always rendered, engaged or not
+    await waitFor(() => expect(screen.getByText("flow")).toBeInTheDocument());
+    // the flagged sentence is heat-mapped in the read pane
+    await waitFor(() =>
+      expect(screen.getAllByText(/serves as a gateway/i).length).toBeGreaterThan(0),
+    );
   });
 });
