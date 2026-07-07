@@ -5,6 +5,28 @@ from __future__ import annotations
 from functools import lru_cache
 from importlib import resources
 from pathlib import Path
+from typing import Literal
+
+Intensity = Literal["light", "medium", "strong"]
+Lens = Literal["flow", "voice", "imperfections", "soul"]
+
+# Dial gate: which lenses engage at each intensity. Order = display order.
+INTENSITY_LENSES: dict[Intensity, tuple[Lens, ...]] = {
+    "light": ("flow", "soul"),
+    "medium": ("flow", "soul", "voice"),
+    "strong": ("flow", "soul", "voice", "imperfections"),
+}
+
+LENS_LABELS: dict[Lens, str] = {
+    "flow": "Flow & Rhythm",
+    "voice": "Voice & POV",
+    "imperfections": "Imperfections",
+    "soul": "De-robot / Soul",
+}
+
+
+def lenses_for(intensity: Intensity) -> tuple[Lens, ...]:
+    return INTENSITY_LENSES[intensity]
 
 
 @lru_cache(maxsize=1)
