@@ -26,7 +26,7 @@ export type IssueAction =
 export interface Issue {
   /** Stable per finding within a report. */
   id: string;
-  panel: "geo" | "proofread";
+  panel: "geo" | "proofread" | "humanize";
   /** Lever/check key, e.g. "answer_first", "citations", "grammar". */
   lever: string;
   /** Short headline, e.g. "This section buries its answer". */
@@ -38,6 +38,9 @@ export interface Issue {
   sectionId: string;
   /** The flagged passage (fix issues); absent for add/advisory. */
   target?: string;
+  /** Precomputed rewrite for the flagged passage (Humanize findings carry the
+   *  suggestion up front, so apply needs no model call). */
+  suggestion?: string;
   /** The backend's specific fix tag (e.g. "bullets", "alt_text",
    *  "question_heading", "faq") — lets apply dispatch precisely where a lever
    *  hosts more than one kind of fix. Falls back to the lever key. */

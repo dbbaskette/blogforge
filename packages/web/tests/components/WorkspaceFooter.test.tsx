@@ -27,6 +27,7 @@ const baseProps = {
   onHeadlines: vi.fn(),
   onShape: vi.fn(),
   onGeo: vi.fn(),
+  onHumanize: vi.fn(),
   onCheckup: vi.fn(),
 };
 
@@ -63,6 +64,10 @@ describe("WorkspaceFooter", () => {
     fireEvent.click(screen.getByRole("button", { name: /improve/i }));
     fireEvent.click(screen.getByRole("button", { name: /headlines & hooks/i }));
     expect(baseProps.onHeadlines).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
+    fireEvent.click(screen.getByRole("button", { name: /humanize/i }));
+    expect(baseProps.onHumanize).toHaveBeenCalled();
   });
 
   it("Export menu lists copy, every format, and repurpose", () => {

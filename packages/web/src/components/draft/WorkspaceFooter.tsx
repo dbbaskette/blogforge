@@ -15,6 +15,7 @@ interface WorkspaceFooterProps {
   onHeadlines: () => void;
   onShape: () => void;
   onGeo: () => void;
+  onHumanize: () => void;
   onCheckup: () => void;
   /**
    * Optional hook fired when the reading preview opens. The footer owns the
@@ -101,6 +102,7 @@ export function WorkspaceFooter({
   onHeadlines,
   onShape,
   onGeo,
+  onHumanize,
   onCheckup,
   onPreview,
 }: WorkspaceFooterProps): JSX.Element {
@@ -173,6 +175,11 @@ export function WorkspaceFooter({
       label: "🌐 GEO optimizer",
       hint: "Score & optimize for AI answer engines",
       onClick: onGeo,
+    },
+    {
+      label: "🫶 Humanize",
+      hint: "Make it read like a person",
+      onClick: onHumanize,
     },
     {
       label: "✒️ Headlines & hooks",

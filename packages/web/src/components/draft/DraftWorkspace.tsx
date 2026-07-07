@@ -10,6 +10,7 @@ import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { CheckupPanel } from "./CheckupPanel";
 import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
+import { HumanizePanel } from "./HumanizePanel";
 import { LintPanel } from "./LintPanel";
 import { OpeningCard } from "./OpeningCard";
 import { OptimizePanel } from "./OptimizePanel";
@@ -66,6 +67,7 @@ export function DraftWorkspace({
   const [headlinesOpen, setHeadlinesOpen] = useState(false);
   const [shapeOpen, setShapeOpen] = useState(false);
   const [geoOpen, setGeoOpen] = useState(false);
+  const [humanizeOpen, setHumanizeOpen] = useState(false);
   const [checkupOpen, setCheckupOpen] = useState(false);
   // Import lands here verbatim — no tool runs and nothing is edited until the
   // writer asks for it (Improve ▾ → Shape/GEO/Proofread). The shaping pass is
@@ -503,6 +505,7 @@ export function DraftWorkspace({
           onHeadlines={() => setHeadlinesOpen(true)}
           onShape={() => setShapeOpen(true)}
           onGeo={() => setGeoOpen(true)}
+          onHumanize={() => setHumanizeOpen(true)}
           onCheckup={() => setCheckupOpen(true)}
         />
       )}
@@ -530,6 +533,13 @@ export function DraftWorkspace({
           onClose={() => setGeoOpen(false)}
         />
       )}
+      {humanizeOpen && (
+        <HumanizePanel
+          draft={draft}
+          onSectionSave={onSectionSave}
+          onClose={() => setHumanizeOpen(false)}
+        />
+      )}
       {checkupOpen && (
         <CheckupPanel
           draft={draft}
@@ -544,6 +554,10 @@ export function DraftWorkspace({
           onOpenShape={() => {
             setCheckupOpen(false);
             setShapeOpen(true);
+          }}
+          onOpenHumanize={() => {
+            setCheckupOpen(false);
+            setHumanizeOpen(true);
           }}
           onClose={() => setCheckupOpen(false)}
         />
