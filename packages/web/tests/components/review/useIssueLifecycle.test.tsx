@@ -137,4 +137,91 @@ describe("useIssueLifecycle", () => {
     const other = setup({ draftId: "d2" });
     expect(other.hook.result.current.statusOf(issue)).toBe("open");
   });
+
+  it("requestPreview computes without saving; confirmPreview saves + accepts", async () => {
+    const apply = vi.fn(
+      async (): Promise<Applied> => ({ sectionId: "s1", before: "Old text.", after: "New text." }),
+    );
+    const save = vi.fn();
+    const onRescore = vi.fn();
+    const hook = renderHook(() =>
+      useIssueLifecycle({ draftId: "d1", apply, save, onRescore }),
+    );
+
+    await act(async () => {
+      await hook.result.current.requestPreview(issue, "ai_fix");
+    });
+    expect(apply).toHaveBeenCalledWith(issue, "ai_fix", undefined, { persist: false });
+    expect(save).not.toHaveBeenCalled();
+    expect(hook.result.current.preview?.res.after).toBe("New text.");
+
+    await act(async () => {
+      await hook.result.current.confirmPreview("New text.");
+    });
+    expect(save).toHaveBeenCalledWith("s1", "New text.", "content");
+    expect(onRescore).toHaveBeenCalledWith("answer_first");
+    expect(hook.result.current.statusOf(issue)).toBe("accepted");
+    expect(hook.result.current.preview).toBeNull();
+  });
+
+  it("confirmPreview persists the user's edited rewrite", async () => {
+    const apply = vi.fn(
+      async (): Promise<Applied> => ({ sectionId: "s1", before: "Old.", after: "Suggested." }),
+    );
+    const save = vi.fn();
+    const hook = renderHook(() => useIssueLifecycle({ draftId: "d1", apply, save }));
+    await act(async () => {
+      await hook.result.current.requestPreview(issue, "ai_fix");
+    });
+    await act(async () => {
+      await hook.result.current.confirmPreview("My edited version.");
+    });
+    expect(save).toHaveBeenCalledWith("s1", "My edited version.", "content");
+  });
+
+  it("cancelPreview discards without saving and leaves the issue open", async () => {
+    const apply = vi.fn(
+      async (): Promise<Applied> => ({ sectionId: "s1", before: "Old.", after: "New." }),
+    );
+    const save = vi.fn();
+    const hook = renderHook(() => useIssueLifecycle({ draftId: "d1", apply, save }));
+    await act(async () => {
+      await hook.result.current.requestPreview(issue, "ai_fix");
+    });
+    act(() => hook.result.current.cancelPreview());
+    expect(save).not.toHaveBeenCalled();
+    expect(hook.result.current.preview).toBeNull();
+    expect(hook.result.current.statusOf(issue)).toBe("open");
+  });
+
+  it("undo still works after a previewed apply (ledger written on confirm)", async () => {
+    const apply = vi.fn(
+      async (): Promise<Applied> => ({ sectionId: "s1", before: "Old text.", after: "New text." }),
+    );
+    const save = vi.fn();
+    const hook = renderHook(() => useIssueLifecycle({ draftId: "d1", apply, save }));
+    await act(async () => {
+      await hook.result.current.requestPreview(issue, "ai_fix");
+    });
+    await act(async () => {
+      await hook.result.current.confirmPreview("New text.");
+    });
+    await act(async () => {
+      await hook.result.current.undo(issue);
+    });
+    expect(save).toHaveBeenLastCalledWith("s1", "Old text.", "content");
+    expect(hook.result.current.statusOf(issue)).toBe("open");
+  });
+
+  it("requestPreview surfaces apply errors via errorOf", async () => {
+    const apply = vi.fn(async () => {
+      throw new Error("This passage has changed since the pass ran.");
+    });
+    const hook = renderHook(() => useIssueLifecycle({ draftId: "d1", apply, save: vi.fn() }));
+    await act(async () => {
+      await hook.result.current.requestPreview(issue, "ai_fix");
+    });
+    expect(hook.result.current.errorOf(issue)).toMatch(/changed since/);
+    expect(hook.result.current.preview).toBeNull();
+  });
 });

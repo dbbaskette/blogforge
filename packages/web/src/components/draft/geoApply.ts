@@ -110,13 +110,24 @@ export function makeGeoSave(
 
 export function makeGeoApply(
   ctx: GeoApplyContext,
-): (issue: Issue, action: IssueAction, input?: string) => Promise<Applied | null> {
+): (
+  issue: Issue,
+  action: IssueAction,
+  input?: string,
+  opts?: { persist?: boolean },
+) => Promise<Applied | null> {
   const { draft } = ctx;
   const save = makeGeoSave(ctx);
   const openingField = (sectionId: string): AppliedField =>
     sectionId === OPENING ? "opening" : "content";
 
-  return async (issue: Issue, action: IssueAction, input?: string): Promise<Applied | null> => {
+  return async (
+    issue: Issue,
+    action: IssueAction,
+    input?: string,
+    opts?: { persist?: boolean },
+  ): Promise<Applied | null> => {
+    const persist = opts?.persist !== false;
     // Resolve the real section even when the finding tagged a target but no id.
     const { sectionId, before, target } = locate(draft, issue);
     const field = openingField(sectionId);
@@ -127,7 +138,7 @@ export function makeGeoApply(
       const withAlt = target.replace(/!\[\s*\]/, `![${alt.trim()}]`);
       if (withAlt === target) return null;
       const after = before.replace(target, withAlt);
-      await save(sectionId, after, field);
+      if (persist) await save(sectionId, after, field);
       return { sectionId, before, after, highlight: withAlt, field };
     };
 
@@ -148,7 +159,7 @@ export function makeGeoApply(
             .replace(/^#+\s*/, "")
             .replace(/^["']|["']$/g, "");
           if (!nextTitle || nextTitle === section.title) return null;
-          await save(sectionId, nextTitle, "title");
+          if (persist) await save(sectionId, nextTitle, "title");
           return {
             sectionId,
             before: section.title,
@@ -170,14 +181,14 @@ export function makeGeoApply(
         const fixed = text.trim();
         if (!fixed) return null;
         const after = target ? before.replace(target, fixed) : fixed;
-        await save(sectionId, after, field);
+        if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: fixed, field };
       }
 
       case "manual_fix": {
         if (!input) return null;
         const after = target ? before.replace(target, input) : input;
-        await save(sectionId, after, field);
+        if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: input, field };
       }
 
@@ -194,7 +205,7 @@ export function makeGeoApply(
         const woven = text.trim();
         if (!woven) return null;
         const after = target ? before.replace(target, woven) : woven;
-        await save(sectionId, after, field);
+        if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: woven, field };
       }
 
@@ -202,13 +213,13 @@ export function makeGeoApply(
         if (issue.fixKind === "alt_text") return applyAlt(await geoAlt(draft.id, target ?? ""));
         const block = await generateBlock(draft, issue);
         if (block === null) return null;
-        return applyBlock(draft, issue, block, save);
+        return applyBlock(draft, issue, block, save, persist);
       }
 
       case "write_own": {
         if (!input) return null;
         if (issue.fixKind === "alt_text") return applyAlt(input);
-        return applyBlock(draft, issue, input, save);
+        return applyBlock(draft, issue, input, save, persist);
       }
 
       case "cite_source": {
@@ -223,7 +234,7 @@ export function makeGeoApply(
         const fixed = text.trim();
         if (!fixed) return null;
         const after = target ? before.replace(target, fixed) : fixed;
-        await save(sectionId, after, field);
+        if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: fixed, field };
       }
 
@@ -243,7 +254,7 @@ export function makeGeoApply(
         });
         const fixed = passage.trim();
         const after = before.replace(target, fixed);
-        await save(sectionId, after, field);
+        if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: fixed, field };
       }
 
@@ -252,7 +263,7 @@ export function makeGeoApply(
         const deduped = dedupeOpeningBlock(target);
         const after = before.replace(target, deduped);
         if (after === before) return null;
-        await save(sectionId, after, field);
+        if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: deduped, field };
       }
 
@@ -293,6 +304,7 @@ async function applyBlock(
   issue: Issue,
   block: string,
   save: (sectionId: string, next: string, field?: AppliedField) => Promise<void>,
+  persist = true,
 ): Promise<Applied | null> {
   const clean = block.trim();
   if (!clean) return null;
@@ -302,14 +314,14 @@ async function applyBlock(
     if (!first) return null;
     const base = first.content_md;
     const after = `${clean}\n\n${base.trim()}`;
-    await save(first.id, after, "content");
+    if (persist) await save(first.id, after, "content");
     return { sectionId: first.id, before: base, after, highlight: clean, field: "content" };
   }
 
   if (issue.fixKind === "definitional") {
     const existing = (draft.outline?.opening_hook ?? "").trim();
     const after = existing ? `${clean}\n\n${existing}` : clean;
-    await save("opening", after, "opening");
+    if (persist) await save("opening", after, "opening");
     return { sectionId: "opening", before: existing, after, highlight: clean, field: "opening" };
   }
 
@@ -324,6 +336,6 @@ async function applyBlock(
   if (!host) return null;
   const base = host.content_md;
   const after = `${base.trim()}\n\n${clean}`;
-  await save(host.id, after, "content");
+  if (persist) await save(host.id, after, "content");
   return { sectionId: host.id, before: base, after, highlight: clean, field: "content" };
 }
