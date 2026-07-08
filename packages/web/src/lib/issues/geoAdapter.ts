@@ -82,6 +82,7 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         fixKind: fix || lever.fix || lever.key,
         actions,
         status: "open",
+        impact: finding.impact || lever.impact,
       });
     });
 
@@ -102,6 +103,7 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         fixKind: lever.fix,
         actions: spec.actions,
         status: "open",
+        impact: lever.impact,
       });
     }
   }

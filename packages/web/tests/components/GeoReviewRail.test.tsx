@@ -26,7 +26,9 @@ const report: GeoReport = {
       key: "answer_first",
       label: "Answer-first sections",
       score: 55,
+      weight: 0.13,
       detail: "Lead with the takeaway.",
+      impact: "Engines lift the first sentence into their answer.",
       fix: null,
       findings: [
         {
@@ -34,6 +36,7 @@ const report: GeoReport = {
           target: "There are a few things worth considering first.",
           note: "This section buries its answer",
           fix: "answer_first",
+          impact: "Engines lift the first sentence into their answer.",
         },
       ],
     },
@@ -94,5 +97,22 @@ describe("GeoReviewRail", () => {
         "A direct answer up front. Then detail. Then the point.",
       ),
     );
+  });
+
+  it("shows the impact line on a finding card and the point stakes on the lever header", () => {
+    // A distinct draft id keeps this render's lifecycle status (persisted to
+    // localStorage, keyed by draftId) isolated from the accept/undo flow the
+    // previous test already ran against "d1".
+    render(
+      <GeoReviewRail
+        report={report}
+        draft={{ ...draft, id: "d-impact" }}
+        onSectionSave={vi.fn().mockResolvedValue(undefined)}
+        onTitleSave={vi.fn().mockResolvedValue(undefined)}
+        onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+    expect(screen.getByText(/up to 13 pts/i)).toBeInTheDocument();
+    expect(screen.getByText(/GEO: Engines lift/)).toBeInTheDocument();
   });
 });

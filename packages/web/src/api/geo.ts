@@ -30,6 +30,9 @@ export interface GeoFinding {
   /** For factual density: WHAT real data to add (never invented values). */
   suggestion?: string;
   fix?: GeoFindingFix | "";
+  /** One-sentence concrete payoff for this specific finding (falls back to the
+   * lever's impact when absent). */
+  impact?: string;
 }
 
 export interface GeoLever {
@@ -42,6 +45,8 @@ export interface GeoLever {
   detail: string;
   findings: GeoFinding[];
   fix: GeoFix;
+  /** One-sentence concrete payoff for fixing this lever — why it moves citations. */
+  impact?: string;
 }
 
 export interface GeoReport {

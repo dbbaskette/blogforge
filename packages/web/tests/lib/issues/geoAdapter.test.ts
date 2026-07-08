@@ -137,4 +137,29 @@ describe("geoFindingsToIssues", () => {
     expect(issues[0].actions).toEqual(["generate", "write_own"]);
     expect(issues[0].fixKind).toBe("takeaways");
   });
+
+  it("maps finding impact, falling back to the lever impact", () => {
+    const report = {
+      score: 50,
+      grade: "C",
+      levers: [
+        {
+          key: "sound_bites",
+          label: "Liftable sound bites",
+          score: 45,
+          weight: 0.03,
+          detail: "few",
+          impact: "Engines lift single sentences verbatim.",
+          fix: null,
+          findings: [
+            { note: "no liftable line", target: "x", impact: "Specific impact." },
+            { note: "another", target: "y" },
+          ],
+        },
+      ],
+    } as unknown as GeoReport;
+    const issues = geoFindingsToIssues(report);
+    expect(issues[0].impact).toBe("Specific impact.");
+    expect(issues[1].impact).toBe("Engines lift single sentences verbatim.");
+  });
 });

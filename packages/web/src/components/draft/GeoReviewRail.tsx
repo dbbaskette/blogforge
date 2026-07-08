@@ -103,7 +103,12 @@ export function GeoReviewRail({
         return (
           <section key={lever.key} className="glass-card p-3 space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-ink">{lever.label}</h3>
+              <h3 className="text-sm font-semibold text-ink">
+                {lever.label}
+                <span className="text-[11px] text-muted-2 font-normal ml-2">
+                  up to {Math.round((lever.weight ?? 0) * 100)} pts
+                </span>
+              </h3>
               <span
                 className="text-xs font-mono tabular-nums"
                 style={{ color: barColor(lever.score) }}
