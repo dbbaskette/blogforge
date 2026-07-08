@@ -8,15 +8,21 @@ import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { HeroImage } from "./HeroImage";
-import { OpeningCard } from "./OpeningCard";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
 import { ResearchPanel } from "./ResearchPanel";
-import { SectionsPanel } from "./SectionsPanel";
 import { SetupDisclosure } from "./SetupDisclosure";
 import { StageNav } from "./StageNav";
 import { WorkspaceFooter } from "./WorkspaceFooter";
+
+// The sections stage carries the TipTap editor stack (the heaviest dependency
+// in the app) — lazy-load it so research/outline sessions and every other page
+// never download it.
+const OpeningCard = lazy(() => import("./OpeningCard").then((m) => ({ default: m.OpeningCard })));
+const SectionsPanel = lazy(() =>
+  import("./SectionsPanel").then((m) => ({ default: m.SectionsPanel })),
+);
 
 // The review/improve overlays are on-demand — lazy-load them so their code
 // (and heavyweight deps) stays out of the initial chunk. Each opens from an
@@ -254,15 +260,22 @@ export function DraftWorkspace({
     600,
   );
 
-  // ── Derived ──
-  const totalWords = draft.sections.reduce((acc, s) => acc + s.word_count, 0);
+  // ── Derived ── (memoized: recomputed on section changes, not on the
+  // per-token liveText re-renders that fire throughout a compose)
+  const { totalWords, draftedCount, unfilledCount } = useMemo(() => {
+    let words = 0;
+    let drafted = 0;
+    for (const s of draft.sections) {
+      words += s.word_count;
+      if (s.status === "ready" || s.status === "edited") drafted += 1;
+    }
+    return {
+      totalWords: words,
+      draftedCount: drafted,
+      unfilledCount: draft.sections.length - drafted,
+    };
+  }, [draft.sections]);
   const targetWords = draft.idea.target_words ?? 1500;
-  const draftedCount = draft.sections.filter(
-    (s) => s.status === "ready" || s.status === "edited",
-  ).length;
-  const unfilledCount = draft.sections.filter(
-    (s) => s.status !== "ready" && s.status !== "edited",
-  ).length;
   const jobRunning = jobActive || generatingIds.size > 0;
 
   const handleGenerate = useCallback(async () => {
@@ -470,7 +483,15 @@ export function DraftWorkspace({
           </div>
         )}
 
-        {draft.stage === "sections" && hasOpening && (
+        {draft.stage === "sections" && (
+        <Suspense
+          fallback={
+            <p className="text-center text-muted text-sm py-16 animate-fade-in">
+              Opening the editor…
+            </p>
+          }
+        >
+        {hasOpening && (
           <OpeningCard
             value={draft.outline?.opening_hook ?? ""}
             draftId={draft.id}
@@ -478,8 +499,6 @@ export function DraftWorkspace({
             onSave={handleOpeningChange}
           />
         )}
-
-        {draft.stage === "sections" && (
           <SectionsPanel
             draft={draft}
             generatingIds={generatingIds}
@@ -501,6 +520,7 @@ export function DraftWorkspace({
             onComposeRemaining={handleExpandUnfilled}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
+        </Suspense>
         )}
       </main>
 

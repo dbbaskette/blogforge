@@ -61,13 +61,38 @@ export function HumannessPulse({
     }
     let phase = 0;
     let raf = 0;
+    let running = false;
     const tick = () => {
       phase += 0.028;
       pathRef.current?.setAttribute("d", pulsePath(humanRef.current, phase));
       raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    const start = (): void => {
+      if (!running) {
+        running = true;
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    const stop = (): void => {
+      running = false;
+      cancelAnimationFrame(raf);
+    };
+    // Only animate while the pulse is actually on screen — a decorative 60fps
+    // loop shouldn't burn frames when it's scrolled out of a panel's view.
+    const el = pathRef.current?.closest("svg");
+    let io: IntersectionObserver | null = null;
+    if (el && typeof IntersectionObserver !== "undefined") {
+      io = new IntersectionObserver(([entry]) => (entry.isIntersecting ? start() : stop()));
+      io.observe(el);
+      // Paint one static frame immediately so there's never a blank line.
+      pathRef.current?.setAttribute("d", pulsePath(humanRef.current, 0));
+    } else {
+      start();
+    }
+    return () => {
+      stop();
+      io?.disconnect();
+    };
   }, []);
 
   const hs = humanSignal ?? 0;

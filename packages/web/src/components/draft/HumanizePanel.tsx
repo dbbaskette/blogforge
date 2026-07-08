@@ -255,6 +255,27 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
   const boxFor = (isLit: boolean): string =>
     !isLit ? "" : highlight?.kind === "under-review" ? LIT_BOX : LOCATE_RING;
 
+  // Passive heat-map marks per section, memoized on content + findings only.
+  // Highlight state changes (Jump to / accept / undo) then re-run the tolerant
+  // substring matcher for just the ACTIVE section instead of the whole draft.
+  const passiveMarks = useMemo(() => {
+    const map = new Map<string, Mark[]>();
+    if (opening) map.set("opening", markRanges(opening, findingsBySection.get("opening") ?? [], null));
+    for (const s of draft.sections) {
+      if (s.content_md?.trim()) {
+        map.set(s.id, markRanges(s.content_md, findingsBySection.get(s.id) ?? [], null));
+      }
+    }
+    return map;
+  }, [draft, findingsBySection, opening]);
+  const marksFor = (sid: string, text: string, lit: boolean): Mark[] =>
+    lit && highlight
+      ? markRanges(text, findingsBySection.get(sid) ?? [], {
+          text: highlight.text,
+          kind: highlight.kind,
+        })
+      : (passiveMarks.get(sid) ?? []);
+
   return (
     <div
       ref={panelRef}
@@ -344,21 +365,13 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
                 ref={openingLit ? highlightRef : undefined}
                 className={`text-ink leading-relaxed whitespace-pre-wrap mb-8 ${boxFor(openingLit)}`}
               >
-                <HeatMapPassage
-                  text={opening}
-                  marks={markRanges(
-                    opening,
-                    findingsBySection.get("opening") ?? [],
-                    openingLit && highlight ? { text: highlight.text, kind: highlight.kind } : null,
-                  )}
-                />
+                <HeatMapPassage text={opening} marks={marksFor("opening", opening, openingLit)} />
               </p>
             )}
 
             <div className="space-y-8">
               {draft.sections.map((section) => {
                 const lit = highlight?.sectionId === section.id;
-                const findings = findingsBySection.get(section.id) ?? [];
                 return (
                   <section key={section.id}>
                     {section.title.trim() && (
@@ -373,13 +386,7 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
                       {section.content_md?.trim() ? (
                         <HeatMapPassage
                           text={section.content_md}
-                          marks={markRanges(
-                            section.content_md,
-                            findings,
-                            lit && highlight
-                              ? { text: highlight.text, kind: highlight.kind }
-                              : null,
-                          )}
+                          marks={marksFor(section.id, section.content_md, lit)}
                         />
                       ) : (
                         <span className="text-muted-2 not-italic">No content yet.</span>

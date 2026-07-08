@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 
 import { type Draft, downloadDraftUrl } from "../../api/drafts";
 import { buildGeoSetup } from "../../lib/geoSetup";
@@ -98,7 +99,11 @@ export function PublishDialog({
     }
   }
 
-  return (
+  // Portal to <body>: mounted in the transformed floating toolbar, this fixed
+  // overlay would resolve `inset-0` against the toolbar's box instead of the
+  // viewport (its `-translate-x-1/2` establishes a containing block for fixed
+  // descendants), collapsing the centered modal into that sliver.
+  return createPortal(
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
       <button
         type="button"
@@ -226,6 +231,7 @@ export function PublishDialog({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
