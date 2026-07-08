@@ -29,24 +29,34 @@ from blogforge.llm.base import LLMProvider
 # build_report normalizes by the weights actually PRESENT, so levers can land
 # across phases without deflating the total.
 _WEIGHTS: dict[str, float] = {
-    "answer_first": 0.16,
-    "factual_density": 0.16,
-    "citations": 0.10,
-    "definitional_opener": 0.08,
-    "question_headings": 0.08,
-    "skimmability": 0.08,
-    "brand_explicit": 0.06,
-    "faq": 0.06,
-    "chunking": 0.06,
-    "takeaways": 0.06,
-    "freshness": 0.06,
-    "comparison_table": 0.04,
+    "answer_first": 0.13,
+    "factual_density": 0.13,
+    "citations": 0.09,
+    "definitional_opener": 0.06,
+    "question_headings": 0.06,
+    "skimmability": 0.06,
+    "brand_explicit": 0.04,
+    "faq": 0.04,
+    "chunking": 0.04,
+    "takeaways": 0.04,
+    "freshness": 0.04,
+    "comparison_table": 0.03,
+    "stat_attribution": 0.04,
+    "query_coverage": 0.04,
+    "sound_bites": 0.03,
+    "entity_consistency": 0.03,
+    "experience_signals": 0.03,
+    "jargon_defined": 0.03,
+    "concrete_examples": 0.02,
+    "title_shape": 0.02,
 }
 # Display order in the panel (roughly by leverage).
 _ORDER = (
     "answer_first",
     "factual_density",
     "citations",
+    "stat_attribution",
+    "query_coverage",
     "definitional_opener",
     "takeaways",
     "brand_explicit",
@@ -56,6 +66,12 @@ _ORDER = (
     "comparison_table",
     "chunking",
     "faq",
+    "sound_bites",
+    "entity_consistency",
+    "experience_signals",
+    "jargon_defined",
+    "concrete_examples",
+    "title_shape",
 )
 _LABELS: dict[str, str] = {
     "answer_first": "Answer-first sections",
@@ -70,6 +86,14 @@ _LABELS: dict[str, str] = {
     "comparison_table": "Comparison table",
     "faq": "FAQ section",
     "chunking": "Self-contained passages",
+    "stat_attribution": "Stats tied to sources",
+    "query_coverage": "Covers follow-up questions",
+    "sound_bites": "Liftable sound bites",
+    "entity_consistency": "Consistent entity names",
+    "experience_signals": "First-hand experience",
+    "jargon_defined": "Jargon defined on first use",
+    "concrete_examples": "Worked examples",
+    "title_shape": "Title shape",
 }
 
 # One concrete sentence of GEO mechanism per lever — WHY the lever moves
@@ -100,6 +124,22 @@ _IMPACTS: dict[str, str] = {
     "place in time.",
     "comparison_table": "Tables answer 'X vs Y' queries directly — engines lift rows "
     "verbatim.",
+    "stat_attribution": "A number tied to a named source is a citable fact; a bare number is "
+    "just a claim.",
+    "query_coverage": "Answering the follow-up questions keeps the engine on your page "
+    "instead of blending in a competitor's.",
+    "sound_bites": "Engines lift single self-contained sentences verbatim — give them one "
+    "worth lifting.",
+    "entity_consistency": "One canonical name per thing is how engines resolve WHO the "
+    "piece is about; aliases dilute the entity.",
+    "experience_signals": "First-hand evidence ('we measured') is the E in E-E-A-T — "
+    "generic AI content can't fake it.",
+    "jargon_defined": "A term defined on first use keeps the passage self-contained when "
+    "extracted alone.",
+    "concrete_examples": "How-to queries surface pages with worked examples; claims "
+    "without one lose to pages that show it.",
+    "title_shape": "A how-to/number/year hook under 60 chars survives SERP truncation and "
+    "matches query templates.",
 }
 
 _QUESTION_WORDS = (
@@ -572,6 +612,39 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     }
 
 
+_GENERIC_LEVER_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer"},
+        "note": {"type": "string"},
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string"},
+                    "note": {"type": "string"},
+                    "suggestion": {"type": "string"},
+                    "impact": {"type": "string"},
+                },
+                "required": ["note"],
+            },
+        },
+    },
+    "required": ["score", "note"],
+}
+
+_NEW_SEMANTIC_KEYS = (
+    "stat_attribution",
+    "query_coverage",
+    "sound_bites",
+    "entity_consistency",
+    "experience_signals",
+    "jargon_defined",
+    "concrete_examples",
+    "title_shape",
+)
+
 _SEMANTIC_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
@@ -663,6 +736,9 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
         "citations",
     ],
 }
+_SEMANTIC_SCHEMA["properties"].update(  # type: ignore[attr-defined]
+    {k: _GENERIC_LEVER_SCHEMA for k in _NEW_SEMANTIC_KEYS}
+)
 
 _SEMANTIC_DIRECTIVE = (
     "Evaluate this draft on five Generative-Engine-Optimization dimensions. Score "
@@ -702,7 +778,30 @@ _SEMANTIC_DIRECTIVE = (
     "does NOT answer — only questions genuinely in-scope for the title.\n"
     "For each thin-spot and each uncited claim, also return `impact`: ONE concrete "
     "sentence of the GEO payoff (what it does for being quoted by an answer engine) "
-    "— never restate the fix."
+    "— never restate the fix.\n"
+    "6) stat_attribution: are numbers tied INLINE to a named source ('per Gartner, 2025')? "
+    "A bare number is a claim; a sourced number is a citable fact. Flag unattributed "
+    "stats in `findings` (quote each in `target`).\n"
+    "7) query_coverage: does the piece answer the adjacent questions a reader asks next "
+    "(cost? limits? alternatives? prerequisites?)? Flag the biggest gaps (note = the "
+    "missing question, suggestion = where it fits).\n"
+    "8) sound_bites: does it contain at least two self-contained one-sentence statements "
+    "under 25 words an engine could quote verbatim? Flag sections whose point never "
+    "lands in one liftable line.\n"
+    "9) entity_consistency: is each product/technology called ONE canonical name "
+    "throughout? Flag alias drift ('TP', 'the platform') with the canonical name in "
+    "`suggestion`.\n"
+    "10) experience_signals: does the author show first-hand experience ('we measured', "
+    "'when I ran this', a real result)? Flag sections that read as secondhand summary.\n"
+    "11) jargon_defined: is every specialist term given a short appositive definition on "
+    "first use? Flag undefined first-uses (term in `target`).\n"
+    "12) concrete_examples: are how-to claims backed by a worked example or code block? "
+    "Flag claims that assert without showing.\n"
+    "13) title_shape: does the H1 carry a how-to/number/year hook and stay under 60 "
+    "characters? Score the title's SERP shape; suggest a sharper title in `suggestion` "
+    "if weak. The draft's title is the first line of the document.\n"
+    "For all findings: `target` must be VERBATIM text from the draft when it refers to "
+    "a passage; omit `target` for document-level findings.\n"
 )
 
 
@@ -847,12 +946,33 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
     )
     coverage = [str(q).strip() for q in missing if str(q).strip()][:4]
 
+    # The eight new levers share one generic shape (score/note/findings) — map
+    # them uniformly instead of five more bespoke blocks above.
+    new_levers: dict[str, dict[str, Any]] = {}
+    for key in _NEW_SEMANTIC_KEYS:
+        obj = data.get(key) if isinstance(data.get(key), dict) else {}
+        finds: list[dict[str, str]] = []
+        for f in (obj.get("findings") or [])[:4]:
+            if not isinstance(f, dict) or not str(f.get("note", "")).strip():
+                continue
+            fd_item = {
+                k: str(f.get(k, "")).strip()
+                for k in ("target", "note", "suggestion", "impact")
+                if str(f.get(k, "")).strip()
+            }
+            fd_item.setdefault("impact", _IMPACTS.get(key, ""))
+            finds.append(fd_item)
+        new_levers[key] = _lever(
+            key, _clampi(obj.get("score")), str(obj.get("note", "")).strip(), finds
+        )
+
     return {
         "answer_first": answer_first,
         "definitional_opener": definitional,
         "factual_density": factual,
         "brand_explicit": brand,
         "citations": citations,
+        **new_levers,
         # Not a lever (build_report/_ORDER ignore unknown keys) — analyze_geo
         # merges these into the structural faq lever as "not covered" advisories.
         "_coverage": coverage,  # type: ignore[dict-item]
@@ -899,6 +1019,7 @@ _STRUCTURAL_KEYS = frozenset(
 )
 _SEMANTIC_KEYS = frozenset(
     {"answer_first", "definitional_opener", "factual_density", "brand_explicit", "citations"}
+    | set(_NEW_SEMANTIC_KEYS)
 )
 
 

@@ -4,6 +4,10 @@ from uuid import uuid4
 from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.generate.geo import (
     _IMPACTS,
+    _LABELS,
+    _ORDER,
+    _SEMANTIC_KEYS,
+    _WEIGHTS,
     augment_citations,
     augment_definitional,
     augment_factual_density,
@@ -32,8 +36,8 @@ def _lever_dict(key: str, score: int) -> dict:  # type: ignore[type-arg]
 def test_build_report_normalizes_by_present_weights() -> None:
     # Two levers present → weighted mean, not diluted by absent levers.
     levers = {"answer_first": _lever_dict("answer_first", 100), "faq": _lever_dict("faq", 50)}
-    # (100*.16 + 50*.06) / (.16+.06) = 86.36 → 86
-    assert build_report(levers)["score"] == 86
+    # (100*.13 + 50*.04) / (.13+.04) = 88.24 → 88
+    assert build_report(levers)["score"] == 88
 
 
 def test_parse_semantic_citations_lever_and_findings() -> None:
@@ -80,6 +84,58 @@ def test_verbatim_quotes_tolerates_junk() -> None:
     from blogforge.generate.geo import verbatim_quotes
 
     assert verbatim_quotes("not json", "some source") == []
+
+
+# ── GEO-7: eight new semantic levers ─────────────────────────────────
+
+
+def test_weights_sum_to_one() -> None:
+    assert abs(sum(_WEIGHTS.values()) - 1.0) < 1e-9
+
+
+def test_new_levers_registered() -> None:
+    new = {
+        "stat_attribution",
+        "query_coverage",
+        "sound_bites",
+        "entity_consistency",
+        "experience_signals",
+        "jargon_defined",
+        "concrete_examples",
+        "title_shape",
+    }
+    assert new <= set(_WEIGHTS) and new <= set(_LABELS) and new <= set(_ORDER)
+    assert new <= _SEMANTIC_KEYS
+
+
+def test_parse_semantic_maps_new_lever_findings() -> None:
+    d = _draft([_sec("Intro", "x")])
+    raw = json.dumps(
+        {
+            "answer_first": {"score": 50, "note": "x", "weak_sections": []},
+            "definitional_opener": {"score": 80, "note": "x", "has_definition": True},
+            "factual_density": {"score": 40, "note": "x"},
+            "brand_explicit": {"score": 70, "note": "x"},
+            "citations": {"score": 30, "note": "x"},
+            "sound_bites": {
+                "score": 45,
+                "note": "few liftable lines",
+                "findings": [
+                    {
+                        "target": "This whole paragraph rambles toward its point.",
+                        "note": "No self-contained quotable line in this section.",
+                        "suggestion": "Distill the point into one sentence under 25 words.",
+                        "impact": "Engines lift single self-contained sentences verbatim.",
+                    }
+                ],
+            },
+        }
+    )
+    levers = parse_semantic(raw, d)
+    sb = levers["sound_bites"]
+    assert sb["score"] == 45
+    assert sb["findings"][0]["suggestion"].startswith("Distill")
+    assert sb["findings"][0]["impact"]
 
 
 # ── GEO-2/3/4 structural levers + augments ──────────────────────────
