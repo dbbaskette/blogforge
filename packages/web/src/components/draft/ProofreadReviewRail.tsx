@@ -29,7 +29,7 @@ export function ProofreadReviewRail({
 }: ProofreadReviewRailProps): JSX.Element {
   const issues = useMemo(() => proofreadFindingsToIssues(lint), [lint]);
   const apply = useMemo(() => makeProofreadApply({ draft, onSectionSave }), [draft, onSectionSave]);
-  const { statusOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
+  const { statusOf, errorOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save: onSectionSave,
@@ -51,6 +51,7 @@ export function ProofreadReviewRail({
           key={issue.id}
           issue={{ ...issue, status: statusOf(issue) }}
           busy={busyId === issue.id}
+          error={errorOf(issue)}
           onAction={(action, inputText) => void run(issue, action, inputText)}
           onAccept={() => accept(issue)}
           onUndo={() => void undo(issue)}

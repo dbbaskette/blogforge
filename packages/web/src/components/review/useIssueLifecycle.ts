@@ -96,11 +96,17 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
   const [busy, setBusy] = useState<{ id: string; action: IssueAction | "undo" } | null>(null);
   const busyId = busy?.id ?? null;
   const busyAction = busy?.action ?? null;
+  // Per-issue apply error (e.g. the target text changed since the pass ran, so
+  // there is nothing to replace). Surfaced on the card so a failed fix is never
+  // a silent no-op.
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const statusOf = useCallback(
     (issue: Issue): IssueStatus => status[issue.id] ?? issue.status,
     [status],
   );
+
+  const errorOf = useCallback((issue: Issue): string | null => errors[issue.id] ?? null, [errors]);
 
   const run = useCallback(
     async (issue: Issue, action: IssueAction, input?: string): Promise<void> => {
@@ -109,6 +115,13 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         return;
       }
       setBusy({ id: issue.id, action });
+      // Clear any prior error for this issue when we retry.
+      setErrors((e) => {
+        if (!e[issue.id]) return e;
+        const next = { ...e };
+        delete next[issue.id];
+        return next;
+      });
       try {
         const res = await apply(issue, action, input);
         if (!res) return;
@@ -130,6 +143,13 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         onRescore?.(issue.lever);
         setStatus((s) => ({ ...s, [issue.id]: "review" }));
         persistStatus(draftId, issue.id, "review");
+      } catch (e) {
+        // A genuine apply failure (stale target, etc.) — surface it on the card
+        // and leave the issue open so the writer can re-analyze or fix manually.
+        setErrors((prev) => ({
+          ...prev,
+          [issue.id]: e instanceof Error ? e.message : "Couldn't apply this fix.",
+        }));
       } finally {
         setBusy(null);
       }
@@ -170,5 +190,5 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
     [draftId, save, onHighlight, onRescore, onUndoRescore],
   );
 
-  return { statusOf, busyId, busyAction, run, accept, undo };
+  return { statusOf, errorOf, busyId, busyAction, run, accept, undo };
 }
