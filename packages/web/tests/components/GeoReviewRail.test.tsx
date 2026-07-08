@@ -85,6 +85,14 @@ describe("GeoReviewRail", () => {
     expect(onSectionSave).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
-    await waitFor(() => expect(onSectionSave).toHaveBeenCalled());
+    // The mocked inlineEdit rewrite ("A direct answer up front. Then detail.")
+    // is spliced in for the target sentence, and makeGeoSave persists the whole
+    // section body via onSectionSave.
+    await waitFor(() =>
+      expect(onSectionSave).toHaveBeenCalledWith(
+        "s1",
+        "A direct answer up front. Then detail. Then the point.",
+      ),
+    );
   });
 });
