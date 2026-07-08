@@ -87,4 +87,54 @@ describe("useIssueLifecycle", () => {
     });
     expect(hook.result.current.statusOf(advisory)).toBe("accepted");
   });
+
+  // Persistence: a fix/dismissal must survive closing and reopening the panel —
+  // the whole point of "corrections should be persistent". A fresh hook (new
+  // mount, same draftId) hydrates the last-known status from localStorage.
+  it("persists a dismissal and rehydrates it on a fresh mount", async () => {
+    const advisory: Issue = { ...issue, nature: "advisory", actions: ["dismiss"] };
+    const first = setup();
+    await act(async () => {
+      await first.hook.result.current.run(advisory, "dismiss");
+    });
+    expect(first.hook.result.current.statusOf(advisory)).toBe("accepted");
+
+    // Reopen: a brand-new hook instance for the same draft.
+    const second = setup();
+    expect(second.hook.result.current.statusOf(advisory)).toBe("accepted");
+  });
+
+  it("persists an accepted fix across a remount", async () => {
+    const first = setup();
+    await act(async () => {
+      await first.hook.result.current.run(issue, "ai_fix");
+    });
+    act(() => first.hook.result.current.accept(issue));
+
+    const second = setup();
+    expect(second.hook.result.current.statusOf(issue)).toBe("accepted");
+  });
+
+  it("undo removes the persisted status so a reopened panel shows it open again", async () => {
+    const first = setup();
+    await act(async () => {
+      await first.hook.result.current.run(issue, "ai_fix");
+    });
+    await act(async () => {
+      await first.hook.result.current.undo(issue);
+    });
+    const second = setup();
+    expect(second.hook.result.current.statusOf(issue)).toBe("open");
+  });
+
+  it("scopes persisted status by draft — another draft is unaffected", async () => {
+    const first = setup();
+    await act(async () => {
+      await first.hook.result.current.run(issue, "ai_fix");
+    });
+    act(() => first.hook.result.current.accept(issue));
+
+    const other = setup({ draftId: "d2" });
+    expect(other.hook.result.current.statusOf(issue)).toBe("open");
+  });
 });

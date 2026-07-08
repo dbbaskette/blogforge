@@ -5,7 +5,7 @@ import { type GeoReport, analyzeGeo } from "../../api/geo";
 import { type HumanizeReport, analyzeHumanize } from "../../api/humanize";
 import { type SuggestResult, suggestImprovements } from "../../api/suggest";
 import { type CheckupSummary, type Severity, summarizeCheckup } from "../../lib/checkup";
-import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
+import { getCached, hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
 import { useDialogA11y } from "../ui/useDialogA11y";
 import { HumannessPulse } from "./HumannessPulse";
 
@@ -38,6 +38,8 @@ export function CheckupPanel({
   const panelRef = useDialogA11y(true, onClose);
   const [summary, setSummary] = useState<CheckupSummary | null>(null);
   const [busy, setBusy] = useState(false);
+  // Saved checkup predates the current content — kept until an explicit Re-run.
+  const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const hash = useMemo(() => hashDraftContent(draft), [draft]);
 
@@ -79,14 +81,17 @@ export function CheckupPanel({
         loadShape(),
         loadHumanize(),
       ]);
-      setSummary(
-        summarizeCheckup(
-          lintR.status === "fulfilled" ? lintR.value : null,
-          geoR.status === "fulfilled" ? geoR.value : null,
-          shapeR.status === "fulfilled" ? shapeR.value : null,
-          humanizeR.status === "fulfilled" ? humanizeR.value : null,
-        ),
+      const next = summarizeCheckup(
+        lintR.status === "fulfilled" ? lintR.value : null,
+        geoR.status === "fulfilled" ? geoR.value : null,
+        shapeR.status === "fulfilled" ? shapeR.value : null,
+        humanizeR.status === "fulfilled" ? humanizeR.value : null,
       );
+      setSummary(next);
+      setStale(false);
+      // Persist the summary so reopening Checkup shows it instantly instead of
+      // re-firing four (paid) scans. Only Re-run refreshes it.
+      setCached("checkup", draft.id, hash, next);
       if (
         lintR.status === "rejected" &&
         geoR.status === "rejected" &&
@@ -100,9 +105,18 @@ export function CheckupPanel({
     }
   }, [draft.id, hash]);
 
+  // On open: show the last saved checkup ALWAYS (even after edits); only run the
+  // four scans automatically the first time, when nothing is saved. `stale`
+  // flags "edited since this checkup" so the header can nudge a Re-run.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
-    run();
+    const saved = peekCached<CheckupSummary>("checkup", draft.id);
+    if (saved) {
+      setSummary(saved.data);
+      setStale(saved.hash !== hash);
+    } else {
+      run();
+    }
   }, []);
 
   const open: Record<string, (() => void) | undefined> = {
@@ -127,7 +141,7 @@ export function CheckupPanel({
             <button
               type="button"
               onClick={run}
-              className="nb-btn nb-btn-ghost nb-btn-sm"
+              className={`nb-btn nb-btn-sm ${stale ? "bg-cobalt-50 text-cobalt-800 border-cobalt-200" : "nb-btn-ghost"}`}
               disabled={busy}
             >
               {busy ? "Running…" : "Re-run"}
@@ -140,6 +154,11 @@ export function CheckupPanel({
         <h2 className="mt-1 font-serif text-2xl font-medium text-ink tracking-tight">
           {summary ? summary.headline : "Checking your draft…"}
         </h2>
+        {stale && !busy && (
+          <p className="mt-1 text-xs text-amber-ink">
+            <span aria-hidden>✎</span> Draft edited since this checkup — Re-run for fresh results.
+          </p>
+        )}
         {summary && (
           <div className="mt-3" aria-label={`Reads ${summary.humanity}% human`}>
             <HumannessPulse antiRobot={summary.antiRobot} humanSignal={summary.humanSignal} />

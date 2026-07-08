@@ -17,7 +17,7 @@ import {
   type Intensity,
   analyzeHumanize,
 } from "../../api/humanize";
-import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
+import { hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
 import { findHighlight } from "../review/HighlightedText";
 import { Icon } from "../ui/Icon";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
@@ -145,6 +145,8 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
   const [report, setReport] = useState<HumanizeReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The saved pass predates the current content — kept until an explicit re-run.
+  const [stale, setStale] = useState(false);
   // The anti-robot sub-score from the (fast, deterministic) lint pass — the
   // same number Checkup blends, so the two meters agree.
   const [antiRobot, setAntiRobot] = useState<number | null>(null);
@@ -205,15 +207,20 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
   useEffect(() => {
     let cancelled = false;
     const key = `${hashDraftContent(draft)}:${intensity}`;
-    const hit = getCached<HumanizeReport>("humanize", draft.id, key);
-    if (hit) {
-      setReport(hit.data);
+    // Restore the saved pass for THIS dial position, regardless of edits since —
+    // reopening never silently re-runs the (paid) model pass. Only an explicit
+    // Re-analyze or a dial change triggers a fresh run. `stale` flags an edit.
+    const saved = peekCached<HumanizeReport>("humanize", draft.id);
+    if (saved && saved.data.intensity === intensity) {
+      setReport(saved.data);
       setError(null);
       setLoading(false);
+      setStale(saved.hash !== key);
       return;
     }
     setLoading(true);
     setError(null);
+    setStale(false);
     analyzeHumanize(draft.id, intensity)
       .then((r) => {
         // ALWAYS cache — even if the panel closed mid-run. The pass costs a
@@ -233,6 +240,22 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
       cancelled = true;
     };
   }, [draft.id, intensity]);
+
+  // Manual re-analyze — the only path that re-pays for a pass at the current
+  // dial position, replacing the saved (now stale) one.
+  const rerun = useCallback((): void => {
+    const key = `${hashDraftContent(draft)}:${intensity}`;
+    setLoading(true);
+    setError(null);
+    analyzeHumanize(draft.id, intensity)
+      .then((r) => {
+        setCached("humanize", draft.id, key, r);
+        setReport(r);
+        setStale(false);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }, [draft, intensity]);
 
   const selectIntensity = useCallback(
     (next: Intensity): void => {
@@ -319,6 +342,19 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
             <img src="/humanize/mark.png" width={44} height={44} alt="humanize" />
             <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">Sound human</h2>
           </div>
+
+          {stale && !loading && (
+            <p className="mt-2 text-xs text-amber-ink">
+              <span aria-hidden>✎</span> Draft edited since this pass ·{" "}
+              <button
+                type="button"
+                onClick={rerun}
+                className="font-medium underline underline-offset-2 hover:text-ink"
+              >
+                Re-analyze
+              </button>
+            </p>
+          )}
 
           <div className="mt-4 grid grid-cols-3 gap-1.5" role="group" aria-label="Intensity">
             {INTENSITIES.map((opt) => {

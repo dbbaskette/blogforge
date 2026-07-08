@@ -56,6 +56,31 @@ function saveLedger(draftId: string, map: Record<string, LedgerEntry>): void {
   }
 }
 
+// Per-issue resolution status, persisted so a fix/dismissal survives closing
+// and reopening the panel (issue ids are deterministic per report, so they line
+// up with the saved findings on reload). Keyed by draft. "open" is never
+// stored — it's the absence of a decision, so undo/reopen just deletes the key.
+const statusKey = (draftId: string): string => `bf.review.status.${draftId}`;
+
+function loadStatuses(draftId: string): Record<string, IssueStatus> {
+  try {
+    return JSON.parse(localStorage.getItem(statusKey(draftId)) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+function persistStatus(draftId: string, issueId: string, next: IssueStatus | null): void {
+  try {
+    const map = loadStatuses(draftId);
+    if (next === null || next === "open") delete map[issueId];
+    else map[issueId] = next;
+    localStorage.setItem(statusKey(draftId), JSON.stringify(map));
+  } catch {
+    /* storage disabled — persistence is a nicety, not required */
+  }
+}
+
 /**
  * The single state machine both review panels run through: apply → review →
  * accept, plus undo. Keeps per-issue status in component state and an undo
@@ -63,7 +88,9 @@ function saveLedger(draftId: string, map: Record<string, LedgerEntry>): void {
  */
 export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
   const { draftId, apply, save, onHighlight, onRescore, onUndoRescore } = args;
-  const [status, setStatus] = useState<Record<string, IssueStatus>>({});
+  // Hydrate the resolution status from the last session for this draft, so
+  // corrections/dismissals are still applied when the panel is reopened.
+  const [status, setStatus] = useState<Record<string, IssueStatus>>(() => loadStatuses(draftId));
   // The issue + action currently running (drives per-card spinners and the
   // blocking "applying…" modal for slow model calls).
   const [busy, setBusy] = useState<{ id: string; action: IssueAction | "undo" } | null>(null);
@@ -88,6 +115,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         // Dismissing an advisory has no content change — go straight to green.
         if (action === "dismiss") {
           setStatus((s) => ({ ...s, [issue.id]: "accepted" }));
+          persistStatus(draftId, issue.id, "accepted");
           return;
         }
         const ledger = loadLedger(draftId);
@@ -101,6 +129,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         onHighlight?.(res.sectionId, res.highlight ?? res.after, "under-review");
         onRescore?.(issue.lever);
         setStatus((s) => ({ ...s, [issue.id]: "review" }));
+        persistStatus(draftId, issue.id, "review");
       } finally {
         setBusy(null);
       }
@@ -112,8 +141,9 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
     (issue: Issue): void => {
       onHighlight?.(issue.sectionId, null, "under-review");
       setStatus((s) => ({ ...s, [issue.id]: "accepted" }));
+      persistStatus(draftId, issue.id, "accepted");
     },
-    [onHighlight],
+    [draftId, onHighlight],
   );
 
   const undo = useCallback(
@@ -130,6 +160,9 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
           saveLedger(draftId, ledger);
         }
         setStatus((s) => ({ ...s, [issue.id]: "open" }));
+        // "open" is the absence of a decision — drop it from the saved ledger
+        // so a reopened panel shows it open again.
+        persistStatus(draftId, issue.id, "open");
       } finally {
         setBusy(null);
       }
