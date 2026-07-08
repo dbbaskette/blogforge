@@ -100,9 +100,17 @@ async def geo_rescore(
     """Re-score only the given levers (after applying one fix) and return just
     those — the client merges them into the report without a full re-analysis."""
     draft, pack_root, _manifest, provider = await _load(request, draft_id, current)
+    from blogforge.generate.geo import _SEMANTIC_KEYS
     from blogforge.voice.sources_context import build_background_context
 
-    bg = await build_background_context(current.id)
+    # Building background context does DB + per-source S3 reads. rescore_geo only
+    # consumes extra_sources for semantic levers; a structural-only rescore (which
+    # fires after every applied fix) must not pay that cost.
+    bg = (
+        await build_background_context(current.id)
+        if set(body.levers) & _SEMANTIC_KEYS
+        else ""
+    )
     try:
         levers = await rescore_geo(
             draft, body.levers, pack_root, provider, model=draft.idea.model, extra_sources=bg or ""

@@ -1088,9 +1088,11 @@ async def _run_semantic(
     # The sources the author has ALREADY collected — the draft's attached
     # references plus the voice profile's background sources. The citations
     # rubric tells the model to match claims against these FIRST, so it stops
-    # nagging "no sources cited" when a source is right there to cite.
-    refs = getattr(draft, "references", None) or []
-    ref_lines = "\n".join(f"- {r.name or r.url}: {r.url or ''}" for r in refs)
+    # nagging "no sources cited" when a source is right there to cite. Only refs
+    # with a URL are listed: the one-click cite splices a markdown link, so a
+    # url-less file/text ref can't be cited this way.
+    refs = [r for r in (getattr(draft, "references", None) or []) if r.url]
+    ref_lines = "\n".join(f"- {r.name or r.url}: {r.url}" for r in refs)
     sources_block = ""
     if ref_lines or extra_sources:
         sources_block = (

@@ -52,6 +52,22 @@ export function dedupeOpeningBlock(block: string): string {
   return block.slice(0, m.index + trailer.length);
 }
 
+/**
+ * Splice `replacement` in for the first occurrence of `target` WITHOUT
+ * String.replace's `$`-pattern substitution. Model-authored citations carry
+ * markdown links/URLs that can contain `$&`, `$$`, `` $` ``, or `$1` — a plain
+ * string replacement would silently mangle them. The function replacer disables
+ * all `$` handling, so the replacement lands verbatim.
+ */
+const spliceReplace = (text: string, target: string, replacement: string): string =>
+  text.replace(target, () => replacement);
+
+/** Shown when a precomputed citation's target can no longer be located verbatim
+ *  — the draft changed after the GEO pass ran (an edit, regenerate, sibling
+ *  fix). Mirrors the Humanize stale-target message. */
+const STALE_CITE_MESSAGE =
+  "This passage has changed since the pass ran — re-analyze to refresh it, or use Manual fix.";
+
 function faqBlock(faqs: { q: string; a: string }[]): string {
   return `### FAQ\n\n${faqs.map((f) => `**${f.q}**\n\n${f.a}`).join("\n\n")}`;
 }
@@ -173,9 +189,13 @@ export function makeGeoApply(
         // link spliced in — so it applies client-side with NO model call (like
         // Humanize). Scoped to cite_reference so a factual_density suggestion
         // (guidance text, not a replacement) never gets spliced in verbatim.
-        // Needs a locatable target; otherwise fall through to the model rewrite.
-        if (issue.fixKind === "cite_reference" && issue.suggestion?.trim() && target) {
-          const after = before.replace(target, issue.suggestion);
+        if (issue.fixKind === "cite_reference" && issue.suggestion?.trim()) {
+          // The precomputed cite must land on its exact claim. When the target
+          // can no longer be located verbatim, the draft changed after the pass
+          // ran — surface it (the lifecycle error path) rather than falling
+          // through to a whole-section rewrite that would drop the citation.
+          if (!target) throw new Error(STALE_CITE_MESSAGE);
+          const after = spliceReplace(before, target, issue.suggestion);
           if (after === before) return null;
           if (persist) await save(sectionId, after, field);
           return { sectionId, before, after, highlight: issue.suggestion, field };
@@ -192,7 +212,7 @@ export function makeGeoApply(
         });
         const fixed = text.trim();
         if (!fixed) return null;
-        const after = target ? before.replace(target, fixed) : fixed;
+        const after = target ? spliceReplace(before, target, fixed) : fixed;
         if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: fixed, field };
       }
@@ -245,7 +265,7 @@ export function makeGeoApply(
         });
         const fixed = text.trim();
         if (!fixed) return null;
-        const after = target ? before.replace(target, fixed) : fixed;
+        const after = target ? spliceReplace(before, target, fixed) : fixed;
         if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: fixed, field };
       }
@@ -265,7 +285,7 @@ export function makeGeoApply(
           quote,
         });
         const fixed = passage.trim();
-        const after = before.replace(target, fixed);
+        const after = spliceReplace(before, target, fixed);
         if (persist) await save(sectionId, after, field);
         return { sectionId, before, after, highlight: fixed, field };
       }

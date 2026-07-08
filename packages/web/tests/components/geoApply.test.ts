@@ -227,6 +227,66 @@ describe("geoApply ai_fix", () => {
     expect(onSectionSave).not.toHaveBeenCalled();
   });
 
+  it("splices a suggestion containing $ sequences verbatim (no String.replace mangling)", async () => {
+    // A model-authored cite with a dollar amount and a URL query string that
+    // holds `$$` and `$&`. A plain String.replace would treat those as
+    // substitution patterns and corrupt the output; the splice must be verbatim.
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const suggestion = "Latency dropped a lot last year, saving $$5M via [Doc](https://x?a=$&b).";
+    const issue: Issue = {
+      id: "citations:2",
+      panel: "geo",
+      lever: "citations",
+      title: "Uncited claim",
+      why: "Cite the source you already attached.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "Latency dropped a lot last year.",
+      suggestion,
+      fixKind: "cite_reference",
+      actions: ["ai_fix", "manual_fix", "highlight"],
+      status: "open",
+    };
+    const res = await apply(issue, "ai_fix");
+    expect(res?.after).toContain(suggestion);
+    expect(onSectionSave).toHaveBeenCalledWith("s1", expect.stringContaining(suggestion));
+  });
+
+  it("rejects a precomputed cite whose target can't be located (no whole-section rewrite)", async () => {
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const calls = (inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    const issue: Issue = {
+      id: "citations:3",
+      panel: "geo",
+      lever: "citations",
+      title: "Uncited claim",
+      why: "Cite the source you already attached.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "A claim that no longer appears anywhere in the section.",
+      suggestion: "A claim…, per [Doc](https://x).",
+      fixKind: "cite_reference",
+      actions: ["ai_fix", "manual_fix", "highlight"],
+      status: "open",
+    };
+    await expect(apply(issue, "ai_fix")).rejects.toThrow(/changed since the pass ran/);
+    // Never falls through to the model rewrite.
+    expect((inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
+    expect(onSectionSave).not.toHaveBeenCalled();
+  });
+
   it("gives a section-less input action a home (first section fallback)", async () => {
     // A freshness "add a date" finding carries no section and no target.
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
