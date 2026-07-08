@@ -32,6 +32,34 @@ def test_compose_prompt_smoke(tmp_path: Path) -> None:
     out = compose_prompt(pack_root=pack, samples=[], draft="Hello world")
     assert "Write plainly" in out and "Hello world" in out
 
+def test_compose_prompt_includes_fingerprint_and_exemplars(tmp_path: Path) -> None:
+    from blogforge.voice import compose_prompt
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    (pack / "stylepack.yaml").write_text(
+        'spec_version: "1.0"\n'
+        "pack:\n"
+        "  slug: test\n"
+        "  name: Test Pack\n"
+        "  version: 0.1.0\n"
+        "  author: Tester\n"
+        "persona:\n"
+        "  identity: A plain writer.\n"
+        "  one_line: Writes plainly and directly.\n",
+        encoding="utf-8",
+    )
+    (pack / "style-guide.md").write_text("Write plainly. Avoid jargon.\n", encoding="utf-8")
+    (pack / "fingerprint.md").write_text(
+        "## Voice fingerprint\nrhythm facts here", encoding="utf-8"
+    )
+    (pack / "exemplars.md").write_text(
+        "## The author's actual writing\n> a real excerpt", encoding="utf-8"
+    )
+    prompt = compose_prompt(pack_root=pack, format=None, samples=None, draft=None)
+    assert "Voice fingerprint" in prompt
+    assert "author's actual writing" in prompt
+
+
 def test_validate_template_pack() -> None:
     from importlib import resources
     from blogforge.voice import validate_pack

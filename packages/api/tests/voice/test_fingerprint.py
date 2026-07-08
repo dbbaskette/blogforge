@@ -1,4 +1,8 @@
-from blogforge.voice.fingerprint import compute_stats
+from blogforge.voice.fingerprint import (
+    compute_stats,
+    render_fingerprint_md,
+    select_exemplars,
+)
 
 
 def test_compute_stats_basic() -> None:
@@ -21,6 +25,27 @@ def test_compute_stats_empty() -> None:
     assert s["rhythm"] == []
     assert s["signature_phrases"] == []
     assert s["top_words"] == []
+
+
+def test_render_fingerprint_md_summarizes_rhythm_and_phrases():
+    texts = [
+        "Short one. Another short one. Here is a much longer sentence that keeps "
+        "going to stretch the average out considerably for the reader. Short again. "
+        "Here's the thing. Here's the thing about rhythm in real writing samples."
+    ]
+    md = render_fingerprint_md(texts)
+    assert "## Voice fingerprint" in md
+    assert "short" in md.lower()
+    assert "here's the thing" in md.lower()
+
+
+def test_select_exemplars_picks_distinct_short_excerpts():
+    a = "First sample sentence here. " * 40
+    b = "Second sample entirely different words in it. " * 40
+    ex = select_exemplars([a, b], k=2, max_chars=300)
+    assert len(ex) == 2
+    assert all(len(e) <= 300 for e in ex)
+    assert ex[0] != ex[1]
 
 
 async def test_fingerprint_endpoint_empty_profile(authed_client) -> None:
