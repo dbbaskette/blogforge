@@ -29,7 +29,7 @@ async def test_materialize_writes_valid_pack(tmp_path, monkeypatch):
     assert z[:2] == b"PK"
 
 
-async def test_materialize_writes_fingerprint_and_exemplars(tmp_path, monkeypatch):
+async def test_materialize_writes_fingerprint(tmp_path, monkeypatch):
     monkeypatch.setenv("BLOGFORGE_VOICE_PACK_CACHE", str(tmp_path / "cache"))
     prof = VoiceProfile(
         id="p1",
@@ -46,7 +46,7 @@ async def test_materialize_writes_fingerprint_and_exemplars(tmp_path, monkeypatc
         {"01": "This is the opener sample. It has two sentences to excerpt from."},
     )
     assert (pack_dir / "fingerprint.md").is_file()
-    assert (pack_dir / "exemplars.md").is_file()
+    assert "Voice fingerprint" in (pack_dir / "fingerprint.md").read_text()
 
 
 async def test_materialize_is_cached_by_version(tmp_path, monkeypatch):

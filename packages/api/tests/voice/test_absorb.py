@@ -32,7 +32,7 @@ def test_compose_prompt_smoke(tmp_path: Path) -> None:
     out = compose_prompt(pack_root=pack, samples=[], draft="Hello world")
     assert "Write plainly" in out and "Hello world" in out
 
-def test_compose_prompt_includes_fingerprint_and_exemplars(tmp_path: Path) -> None:
+def test_compose_prompt_includes_fingerprint_single_voice_block(tmp_path: Path) -> None:
     from blogforge.voice import compose_prompt
     pack = tmp_path / "pack"
     pack.mkdir()
@@ -45,19 +45,33 @@ def test_compose_prompt_includes_fingerprint_and_exemplars(tmp_path: Path) -> No
         "  author: Tester\n"
         "persona:\n"
         "  identity: A plain writer.\n"
-        "  one_line: Writes plainly and directly.\n",
+        "  one_line: Writes plainly and directly.\n"
+        "samples:\n"
+        "  - id: s1\n"
+        "    file: samples/s1.md\n"
+        "    description: opener\n",
         encoding="utf-8",
     )
     (pack / "style-guide.md").write_text("Write plainly. Avoid jargon.\n", encoding="utf-8")
     (pack / "fingerprint.md").write_text(
         "## Voice fingerprint\nrhythm facts here", encoding="utf-8"
     )
+    (pack / "samples").mkdir()
+    (pack / "samples" / "s1.md").write_text("> This is my real voice sample.\n", encoding="utf-8")
+    # A stray exemplars.md must NOT be read into the prompt any more.
     (pack / "exemplars.md").write_text(
         "## The author's actual writing\n> a real excerpt", encoding="utf-8"
     )
-    prompt = compose_prompt(pack_root=pack, format=None, samples=None, draft=None)
+
+    prompt = compose_prompt(pack_root=pack, format=None, samples=["s1"], draft=None)
+
+    # Fingerprint (the genuinely-new deterministic signal) is folded in.
     assert "Voice fingerprint" in prompt
-    assert "author's actual writing" in prompt
+    # Exactly one verbatim-voice block: the manifest-driven "## Voice exemplars"
+    # from _render_samples, and no second overlapping block.
+    assert prompt.count("## Voice exemplars") == 1
+    assert "This is my real voice sample." in prompt
+    assert "author's actual writing" not in prompt
 
 
 def test_validate_template_pack() -> None:

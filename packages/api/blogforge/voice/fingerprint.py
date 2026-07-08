@@ -67,8 +67,8 @@ def render_fingerprint_md(sample_texts: list[str]) -> str:
     short = sum(1 for n in lengths if n < 10)
     longn = sum(1 for n in lengths if n > 25)
     mix = (
-        f"about {round(100 * short / len(lengths))}% of sentences run under 10 words "
-        f"and {round(100 * longn / len(lengths))}% over 25"
+        f"in recent sampled sentences, about {round(100 * short / len(lengths))}% run "
+        f"under 10 words and {round(100 * longn / len(lengths))}% over 25"
         if lengths else "not enough sample text to measure rhythm"
     )
     phrases = "".join(f'\n- "{p}"' for p in s["signature_phrases"]) or "\n- (none found)"
@@ -81,19 +81,3 @@ def render_fingerprint_md(sample_texts: list[str]) -> str:
         f"never force them):{phrases}\n"
         f"- Characteristic vocabulary: {words}.\n"
     )
-
-
-def select_exemplars(sample_texts: list[str], k: int = 3, max_chars: int = 300) -> list[str]:
-    """Short verbatim excerpts from distinct samples — the opening run of each
-    of the k longest samples, cut at a sentence boundary under max_chars."""
-    ranked = sorted(
-        (t.strip() for t in sample_texts if t and t.strip()),
-        key=len,
-        reverse=True,
-    )[:k]
-    out: list[str] = []
-    for t in ranked:
-        cut = t[:max_chars]
-        matches = list(re.finditer(r"[.!?]", cut))
-        out.append(cut[: matches[-1].end()] if matches else cut)
-    return out
