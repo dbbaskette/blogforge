@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/api/humanize", () => ({
@@ -130,6 +130,56 @@ describe("HumanizePanel", () => {
     // the flagged sentence is heat-mapped in the read pane
     await waitFor(() =>
       expect(screen.getAllByText(/serves as a gateway/i).length).toBeGreaterThan(0),
+    );
+  });
+
+  it("AI fix opens the preview modal; Apply saves; nothing saves before Apply", async () => {
+    (analyzeHumanize as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      intensity: "medium",
+      score: 85,
+      lenses: [
+        {
+          key: "soul",
+          label: "De-robot / Soul",
+          findings: [
+            {
+              lens: "soul",
+              section_id: "s1",
+              target: "The API serves as a gateway.",
+              suggestion: "The API is the gateway.",
+              note: "puffery",
+              needs_review: false,
+            },
+          ],
+        },
+      ],
+    });
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    // biome-ignore lint/suspicious/noExplicitAny: minimal Draft stub
+    const d: any = {
+      id: "d1",
+      title: "T",
+      outline: { opening_hook: "h" },
+      sections: [{ id: "s1", title: "S", content_md: "The API serves as a gateway. It adds 5ms." }],
+    };
+    render(<HumanizePanel draft={d} onSectionSave={onSectionSave} onClose={vi.fn()} />);
+
+    const aiFix = await screen.findByRole("button", { name: "AI fix" });
+    fireEvent.click(aiFix);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: /compare fix|comma-spliced|serves as a gateway|puffery/i,
+    });
+    expect(onSectionSave).not.toHaveBeenCalled();
+    expect(within(dialog).getByText("Original")).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+    await waitFor(() =>
+      expect(onSectionSave).toHaveBeenCalledWith(
+        "s1",
+        "The API is the gateway. It adds 5ms.",
+        true,
+      ),
     );
   });
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/api/drafts", () => ({
@@ -41,13 +41,21 @@ describe("ProofreadReviewRail", () => {
     expect(screen.getByRole("button", { name: "AI fix" })).toBeInTheDocument();
   });
 
-  it("AI fix rewrites the enclosing sentence and moves to review", async () => {
+  it("AI fix opens the preview modal; Apply rewrites the enclosing sentence", async () => {
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
     render(<ProofreadReviewRail lint={lint} draft={draft} onSectionSave={onSectionSave} />);
     fireEvent.click(screen.getByRole("button", { name: "AI fix" }));
+    // The rewrite is computed for the preview, but nothing is saved yet.
     await waitFor(() => expect(inlineEdit).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument());
-    expect(onSectionSave).toHaveBeenCalledWith("s1", "A cleaner sentence.");
+    const dialog = await screen.findByRole("dialog");
+    expect(onSectionSave).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+    // confirmPreview routes the applied field ("content") through save, which
+    // for the Proofreader is onSectionSave itself.
+    await waitFor(() =>
+      expect(onSectionSave).toHaveBeenCalledWith("s1", "A cleaner sentence.", "content"),
+    );
   });
 
   it("shows a clean-draft message when there are no findings", () => {

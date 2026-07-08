@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/api/drafts", () => ({
@@ -67,7 +67,7 @@ describe("GeoReviewRail", () => {
     expect(screen.getByRole("button", { name: "AI fix" })).toBeInTheDocument();
   });
 
-  it("AI fix drives the api and moves the card to review", async () => {
+  it("AI fix opens the preview modal; Apply drives the api and saves", async () => {
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
     render(
       <GeoReviewRail
@@ -79,8 +79,12 @@ describe("GeoReviewRail", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "AI fix" }));
+    // The rewrite is computed for the preview, but nothing is saved yet.
     await waitFor(() => expect(inlineEdit).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument());
-    expect(onSectionSave).toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog");
+    expect(onSectionSave).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(onSectionSave).toHaveBeenCalled());
   });
 });

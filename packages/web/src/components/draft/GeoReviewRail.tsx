@@ -13,6 +13,7 @@ import type { Draft } from "../../api/drafts";
 import type { GeoReport } from "../../api/geo";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { fillSectionIds } from "../../lib/issues/locateSection";
+import { FixPreviewModal } from "../review/FixPreviewModal";
 import { IssueCard } from "../review/IssueCard";
 import { reviewBusyLabel } from "../review/reviewBusyLabel";
 import { useIssueLifecycle } from "../review/useIssueLifecycle";
@@ -59,7 +60,19 @@ export function GeoReviewRail({
   );
   const apply = useMemo(() => makeGeoApply(ctx), [ctx]);
   const save = useMemo(() => makeGeoSave(ctx), [ctx]);
-  const { statusOf, errorOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
+  const {
+    statusOf,
+    errorOf,
+    busyId,
+    busyAction,
+    run,
+    accept,
+    undo,
+    preview,
+    requestPreview,
+    confirmPreview,
+    cancelPreview,
+  } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save,
@@ -68,6 +81,8 @@ export function GeoReviewRail({
     onUndoRescore: onRestoreLever,
   });
   const busyLabel = reviewBusyLabel(busyAction);
+  const leverLabelFor = (key: string): string =>
+    report.levers.find((l) => l.key === key)?.label ?? key;
 
   const byLever = useMemo(() => {
     const map = new Map<string, typeof issues>();
@@ -111,7 +126,11 @@ export function GeoReviewRail({
                   issue={{ ...issue, status: statusOf(issue) }}
                   busy={busyId === issue.id}
                   error={errorOf(issue)}
-                  onAction={(action, inputText) => void run(issue, action, inputText)}
+                  onAction={(action, inputText) =>
+                    action === "ai_fix"
+                      ? void requestPreview(issue, action, inputText)
+                      : void run(issue, action, inputText)
+                  }
                   onAccept={() => accept(issue)}
                   onUndo={() => void undo(issue)}
                 />
@@ -120,6 +139,18 @@ export function GeoReviewRail({
           </section>
         );
       })}
+      {preview && (
+        <FixPreviewModal
+          title={preview.issue.title}
+          leverLabel={leverLabelFor(preview.issue.lever)}
+          why={preview.issue.why}
+          before={preview.res.before}
+          after={preview.res.after}
+          busy={busyId === preview.issue.id}
+          onApply={(finalAfter) => void confirmPreview(finalAfter)}
+          onCancel={cancelPreview}
+        />
+      )}
     </div>
   );
 }

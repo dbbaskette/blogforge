@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HumanizeReport } from "../../src/api/humanize";
@@ -51,12 +51,17 @@ describe("HumanizeReviewRail", () => {
     expect(screen.getAllByText(/puffery/i).length).toBeGreaterThan(0);
   });
 
-  it("AI fix applies the precomputed suggestion and moves the card to review", async () => {
+  it("AI fix opens the preview modal; Apply applies the precomputed suggestion", async () => {
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
     render(<HumanizeReviewRail report={report} draft={draft} onSectionSave={onSectionSave} />);
     fireEvent.click(screen.getByRole("button", { name: "AI fix" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument());
-    expect(onSectionSave).toHaveBeenCalledWith("s1", "The API is the gateway.", true);
+    const dialog = await screen.findByRole("dialog");
+    expect(onSectionSave).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply" }));
+    await waitFor(() =>
+      expect(onSectionSave).toHaveBeenCalledWith("s1", "The API is the gateway.", true),
+    );
   });
 
   it("dismissing a finding persists it and removes the card", () => {
