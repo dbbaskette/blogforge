@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.generate.geo import (
+    _IMPACTS,
     augment_citations,
     augment_definitional,
     augment_factual_density,
@@ -347,6 +348,31 @@ def test_structural_levers_carry_static_impact() -> None:
     levers = score_structural(d)
     for key, lever in levers.items():
         assert lever.get("impact"), f"structural lever {key} missing impact copy"
+
+
+def test_finding_impact_falls_back_to_static_lever_sentence() -> None:
+    # Model omits per-finding `impact` → each finding inherits the static lever line.
+    d = _draft([_sec("Intro", "x")])
+    raw = json.dumps(
+        {
+            "answer_first": {"score": 80, "note": "ok"},
+            "definitional_opener": {"score": 80, "note": "ok", "has_definition": True},
+            "factual_density": {
+                "score": 40,
+                "note": "thin",
+                "thin_spots": [{"target": "It is very fast.", "note": "vague"}],
+            },
+            "brand_explicit": {"score": 70, "note": "named"},
+            "citations": {
+                "score": 30,
+                "note": "none",
+                "uncited_claims": [{"target": "Latency dropped 40%.", "note": "no source"}],
+            },
+        }
+    )
+    levers = parse_semantic(raw, d)
+    assert levers["factual_density"]["findings"][0]["impact"] == _IMPACTS["factual_density"]
+    assert levers["citations"]["findings"][0]["impact"] == _IMPACTS["citations"]
 
 
 def test_clean_opener_strips_noise() -> None:

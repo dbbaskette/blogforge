@@ -82,15 +82,16 @@ _IMPACTS: dict[str, str] = {
     "vague claims get skipped.",
     "citations": "Claims with named sources are trusted and cited; unattributed claims get "
     "filtered as unverifiable.",
-    "definitional_opener": "A one-line definition up top is the single most-extracted "
-    "sentence shape for 'what is X' queries.",
+    "definitional_opener": "A one-line definition up top is one of the most reliably "
+    "extracted sentence shapes for 'what is X' queries.",
     "question_headings": "Question headings match how users phrase queries — engines map "
     "query to heading directly.",
     "skimmability": "Engines parse structure; walls of prose fragment poorly into answer "
     "passages.",
     "brand_explicit": "AI can cite content without naming you ('ghost citation') — an "
     "explicit brand travels with the quote.",
-    "faq": "FAQ blocks map one-to-one onto the question formats answer engines serve.",
+    "faq": "FAQ blocks are eligible for People-Also-Ask and schema.org/FAQPage rich "
+    "results, a separate surface from the body.",
     "chunking": "Each passage is extracted alone — a chunk that leans on its neighbors loses "
     "its meaning when lifted.",
     "takeaways": "Key-takeaways blocks are pre-digested summaries engines prefer over "
@@ -580,7 +581,6 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                 "score": {"type": "integer"},
                 "note": {"type": "string"},
                 "weak_sections": {"type": "array", "items": {"type": "string"}},
-                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -590,7 +590,6 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                 "score": {"type": "integer"},
                 "note": {"type": "string"},
                 "has_definition": {"type": "boolean"},
-                "impact": {"type": "string"},
             },
             "required": ["score", "note", "has_definition"],
         },
@@ -616,7 +615,6 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                         "required": ["target"],
                     },
                 },
-                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -627,7 +625,6 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                 "note": {"type": "string"},
                 "brand": {"type": "string"},
                 "stated_up_top": {"type": "boolean"},
-                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -648,7 +645,6 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                         "required": ["target"],
                     },
                 },
-                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -704,9 +700,9 @@ _SEMANTIC_DIRECTIVE = (
     "Finally, in `coverage.missing_subquestions` list up to 4 natural sub-questions "
     "of this topic a search engine would decompose the query into that this draft "
     "does NOT answer — only questions genuinely in-scope for the title.\n"
-    "For every finding and every lever, also return `impact`: ONE concrete sentence "
-    "of GEO mechanism — what this specifically does to the piece's chances of being "
-    "quoted by an answer engine. State the payoff, never restate the fix."
+    "For each thin-spot and each uncited claim, also return `impact`: ONE concrete "
+    "sentence of the GEO payoff (what it does for being quoted by an answer engine) "
+    "— never restate the fix."
 )
 
 
@@ -746,7 +742,6 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
                 "section_id": sid or "",
                 "note": f'"{clean}" buries its answer — lead with a direct one.',
                 "fix": "answer_first" if sid else "",
-                "impact": _IMPACTS.get("answer_first", ""),
             }
         )
     answer_first = _lever(
