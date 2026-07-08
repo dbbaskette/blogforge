@@ -39,7 +39,9 @@ export function FixPreviewModal({
   onApply,
   onCancel,
 }: FixPreviewModalProps): JSX.Element {
-  const ref = useDialogA11y(true, onCancel);
+  const ref = useDialogA11y(true, () => {
+    if (!busy) onCancel();
+  });
   const [editing, setEditing] = useState(false);
   const [edited, setEdited] = useState(after);
 

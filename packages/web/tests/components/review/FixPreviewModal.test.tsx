@@ -56,6 +56,7 @@ describe("FixPreviewModal", () => {
     const onCancel = vi.fn();
     render(<FixPreviewModal {...props} busy onApply={vi.fn()} onCancel={onCancel} />);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(onCancel).not.toHaveBeenCalled();
   });
 
