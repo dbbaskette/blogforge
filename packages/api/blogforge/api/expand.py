@@ -1,6 +1,7 @@
 """POST /api/drafts/{id}/expand — async pipeline expanding all sections."""
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -192,13 +193,29 @@ async def _run_expand(
         now = datetime.now(UTC)
         # Enforce the mechanical voice rules the model may have ignored (em/en
         # dashes, ASCII `--`, banished words): detect → model repair → backstop.
+        # The repairs are independent per section, so run them CONCURRENTLY
+        # (bounded) instead of serially — the repair LLM round-trips were the
+        # longest sequential stretch of the compose job.
         enforce_on = get_settings().enforce_voice_rules
         mf = Manifest.model_validate(manifest) if enforce_on else None
+
+        sem = asyncio.Semaphore(4)
+
+        async def _enforce(body: str) -> str:
+            if mf is None:
+                return body
+            async with sem:
+                return (await enforce_voice_rules(body, mf, provider, model)).strip()
+
+        bodies = {s.id: (by_id.get(s.id) or "").strip() for s in draft.sections}
+        enforced = await asyncio.gather(
+            *(_enforce(bodies[s.id]) for s in draft.sections if bodies[s.id])
+        )
+        enforced_by_id = dict(zip([s.id for s in draft.sections if bodies[s.id]], enforced))
+
         for section in draft.sections:
-            body = (by_id.get(section.id) or "").strip()
+            body = enforced_by_id.get(section.id, "")
             if body:
-                if mf is not None:
-                    body = (await enforce_voice_rules(body, mf, provider, model)).strip()
                 section.content_md = body + "\n"
                 section.word_count = len(body.split())
                 section.status = "ready"

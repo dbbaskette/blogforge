@@ -193,7 +193,8 @@ export function DraftsPage(): JSX.Element {
               {hasFilters && drafts
                 ? `${filtered.length} of ${drafts.length}`
                 : (drafts?.length ?? 0)}{" "}
-              {(hasFilters ? filtered.length : (drafts?.length ?? 0)) === 1 ? "piece" : "pieces"}
+              {/* The noun agrees with the total ("0 of 1 piece"), not the filtered count. */}
+              {(drafts?.length ?? 0) === 1 ? "piece" : "pieces"}
             </span>
             <Link
               to="/trash"
@@ -213,7 +214,7 @@ export function DraftsPage(): JSX.Element {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by title or pack…"
                 aria-label="Search drafts"
-                className="nb-input flex-1"
+                className="nb-input flex-1 min-w-0"
               />
               <div className="inline-flex rounded-nb-sm border border-rule overflow-hidden self-start">
                 {STAGE_FILTERS.map((s) => (
@@ -232,11 +233,14 @@ export function DraftsPage(): JSX.Element {
                   </button>
                 ))}
               </div>
+              {/* width:auto overrides .nb-select's width:100%, which otherwise
+                  claims the whole flex row and crushes the search input. */}
               <select
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
                 aria-label="Sort drafts"
                 className="nb-select self-start"
+                style={{ width: "auto" }}
               >
                 {SORT_OPTIONS.map((s) => (
                   <option key={s.value} value={s.value}>
@@ -284,7 +288,20 @@ export function DraftsPage(): JSX.Element {
         {drafts && drafts.length === 0 && <EmptyState onNew={() => navigate("/compose")} />}
 
         {drafts && drafts.length > 0 && filtered.length === 0 && (
-          <p className="nb-card p-8 text-center italic text-muted">No drafts match your filters.</p>
+          <div className="nb-card p-8 text-center">
+            <p className="italic text-muted mb-4">No drafts match your filters.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setStageFilter("all");
+                setActiveTags(new Set());
+              }}
+              className="nb-btn nb-btn-sm"
+            >
+              Clear filters
+            </button>
+          </div>
         )}
 
         {drafts && sorted.length > 0 && (
@@ -318,7 +335,13 @@ function Hero({ onNew }: { onNew: () => void }): JSX.Element {
           <h1 className="font-serif text-4xl md:text-5xl font-medium text-ink leading-[1.1] tracking-tight">
             A space for long-form
             <br />
-            writing in your voice.
+            writing in{" "}
+            <span className="relative inline-block italic">
+              your voice.
+              <svg className="ink-underline" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M1,5.5 C 22,7.5 38,2.5 58,4 C 76,5.3 90,3.2 99,4.6" pathLength="120" />
+              </svg>
+            </span>
           </h1>
           <p className="text-base text-muted mt-3 max-w-xl leading-relaxed">
             Sketch an idea, shape its outline, then let the pack do the writing in your tongue.
@@ -353,43 +376,54 @@ function DraftRow({
   const updated = formatRelative(draft.updated_at);
 
   return (
-    <article className="group nb-card nb-card-hover">
-      <div className="flex items-start gap-4 p-5">
-        <div className="flex-1 min-w-0">
-          <Link to={`/drafts/${draft.id}`} className="block">
-            <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight group-hover:text-cobalt-600 transition-colors">
-              {draft.title || <span className="italic text-muted-2">untitled draft</span>}
-            </h3>
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className={stage.pillClass}>
-                <span className="dot" />
-                {stage.label}
-              </span>
-              <span className="nb-pill nb-pill-empty">{draft.pack_slug}</span>
-              {draft.word_count > 0 && (
-                <span className="text-xs text-muted font-mono">
-                  {draft.word_count.toLocaleString()} words
-                </span>
-              )}
-              <span className="text-xs text-muted-2">· {updated}</span>
-            </div>
-            <DraftHealthBadges draftId={draft.id} stage={draft.stage} />
-          </Link>
-          <TagEditor tags={draft.tags} onChange={onTagsChange} />
+    <article className="group nb-card nb-card-hover overflow-hidden">
+      <div className="flex items-stretch">
+        {/* Margin gutter — the manuscript signature. Marginalia: word count
+            and freshness, ledger-aligned down the list. */}
+        <div className="ms-gutter pt-5 pl-4 pr-3">
+          <div className="marginalia marginalia-strong">{fmtWords(draft.word_count)}</div>
+          <div className="marginalia mt-0.5">{updated.compact}</div>
         </div>
 
-        <button
-          type="button"
-          onClick={onDelete}
-          aria-label={`Delete ${draft.title || "untitled draft"}`}
-          className="nb-icon-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:!text-rose"
-          title="Move to trash"
-        >
-          <Icon name="trash" size={16} title="" />
-        </button>
+        <div className="flex-1 min-w-0 flex items-start gap-4 p-5">
+          <div className="flex-1 min-w-0">
+            <Link to={`/drafts/${draft.id}`} className="block">
+              <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight group-hover:text-cobalt-600 transition-colors">
+                {draft.title || <span className="italic text-muted-2">untitled draft</span>}
+              </h3>
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <span className={stage.pillClass}>
+                  <span className="dot" />
+                  {stage.label}
+                </span>
+                <span className="nb-pill nb-pill-empty">{draft.pack_slug}</span>
+                <span className="text-xs text-muted-2">{updated.long}</span>
+              </div>
+              <DraftHealthBadges draftId={draft.id} stage={draft.stage} />
+            </Link>
+            <TagEditor tags={draft.tags} onChange={onTagsChange} />
+          </div>
+
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label={`Delete ${draft.title || "untitled draft"}`}
+            className="nb-icon-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:!text-rose"
+            title="Move to trash"
+          >
+            <Icon name="trash" size={16} title="" />
+          </button>
+        </div>
       </div>
     </article>
   );
+}
+
+/** Marginalia word count: 1804 → "1.8k", 0 → "—". */
+function fmtWords(n: number): string {
+  if (n <= 0) return "—";
+  if (n < 1000) return String(n);
+  return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}k`;
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -537,16 +571,19 @@ function ErrorBanner({ message }: { message: string }): JSX.Element {
 // ────────────────────────────────────────────────────────────────
 // Helpers
 
-function formatRelative(iso: string): string {
+/** Relative freshness in two registers: `long` for prose ("5h ago") and
+ * `compact` for the margin gutter ("5h"). */
+function formatRelative(iso: string): { long: string; compact: string } {
   const then = new Date(iso).getTime();
   const now = Date.now();
   const seconds = Math.floor((now - then) / 1000);
-  if (seconds < 60) return "moments ago";
+  if (seconds < 60) return { long: "moments ago", compact: "now" };
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return { long: `${minutes}m ago`, compact: `${minutes}m` };
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return { long: `${hours}h ago`, compact: `${hours}h` };
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (days < 30) return { long: `${days}d ago`, compact: `${days}d` };
+  const date = new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return { long: date, compact: date };
 }

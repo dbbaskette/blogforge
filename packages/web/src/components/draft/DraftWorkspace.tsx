@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/drafts";
@@ -7,23 +7,33 @@ import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
-import { CheckupPanel } from "./CheckupPanel";
-import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
-import { HumanizePanel } from "./HumanizePanel";
-import { LintPanel } from "./LintPanel";
 import { OpeningCard } from "./OpeningCard";
-import { OptimizePanel } from "./OptimizePanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
-import { RepurposePanel } from "./RepurposePanel";
 import { ResearchPanel } from "./ResearchPanel";
 import { SectionsPanel } from "./SectionsPanel";
 import { SetupDisclosure } from "./SetupDisclosure";
-import { ShapePanel } from "./ShapePanel";
 import { StageNav } from "./StageNav";
 import { WorkspaceFooter } from "./WorkspaceFooter";
+
+// The review/improve overlays are on-demand — lazy-load them so their code
+// (and heavyweight deps) stays out of the initial chunk. Each opens from an
+// explicit click, so the fetch hides inside the open animation.
+const CheckupPanel = lazy(() => import("./CheckupPanel").then((m) => ({ default: m.CheckupPanel })));
+const HeadlineLab = lazy(() => import("./HeadlineLab").then((m) => ({ default: m.HeadlineLab })));
+const HumanizePanel = lazy(() =>
+  import("./HumanizePanel").then((m) => ({ default: m.HumanizePanel })),
+);
+const LintPanel = lazy(() => import("./LintPanel").then((m) => ({ default: m.LintPanel })));
+const OptimizePanel = lazy(() =>
+  import("./OptimizePanel").then((m) => ({ default: m.OptimizePanel })),
+);
+const RepurposePanel = lazy(() =>
+  import("./RepurposePanel").then((m) => ({ default: m.RepurposePanel })),
+);
+const ShapePanel = lazy(() => import("./ShapePanel").then((m) => ({ default: m.ShapePanel })));
 
 const INLINE_AI_HINT_KEY = "bf.inlineai.hint.dismissed";
 
@@ -510,6 +520,8 @@ export function DraftWorkspace({
         />
       )}
 
+      {/* Lazy overlay panels: null fallback — each pops in when its chunk lands. */}
+      <Suspense fallback={null}>
       {lintOpen && (
         <LintPanel
           draft={draft}
@@ -579,6 +591,7 @@ export function DraftWorkspace({
           onClose={() => setHeadlinesOpen(false)}
         />
       )}
+      </Suspense>
     </div>
   );
 }
