@@ -32,6 +32,8 @@ export interface GeoReviewRailProps {
   onOpeningSave: (next: string) => Promise<void>;
   onTitleSave: (sectionId: string, title: string) => Promise<void>;
   onRescore?: (lever: string) => void;
+  /** Undo restores the pre-fix lever score instantly (no model re-run). */
+  onRestoreLever?: (lever: string) => void;
   onHighlight?: (sectionId: string, text: string | null, kind: "under-review" | "locate") => void;
 }
 
@@ -42,6 +44,7 @@ export function GeoReviewRail({
   onOpeningSave,
   onTitleSave,
   onRescore,
+  onRestoreLever,
   onHighlight,
 }: GeoReviewRailProps): JSX.Element {
   // Resolve each finding's section up front (many backend findings tag a target
@@ -62,6 +65,7 @@ export function GeoReviewRail({
     save,
     onHighlight,
     onRescore,
+    onUndoRescore: onRestoreLever,
   });
   const busyLabel = reviewBusyLabel(busyAction);
 

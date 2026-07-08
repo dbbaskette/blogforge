@@ -9,7 +9,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { Draft } from "../../api/drafts";
+import { type Draft, lintDraft } from "../../api/drafts";
+import { humanityScore } from "../../lib/checkup";
 import {
   type HumanizeFinding,
   type HumanizeReport,
@@ -144,6 +145,21 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
   const [report, setReport] = useState<HumanizeReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The anti-robot sub-score from the (fast, deterministic) lint pass — the
+  // same number Checkup blends, so the two meters agree.
+  const [antiRobot, setAntiRobot] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    lintDraft(draft.id)
+      .then((l) => {
+        if (cancelled) return;
+        setAntiRobot(humanityScore(l.violations.length + l.repetitions.length, l.hits.length));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.id]);
 
   // Which passage is lit in the read pane: an applied fix awaiting accept
   // ("under-review"), or a transient "locate" from the Highlight action.
@@ -200,9 +216,12 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
     setError(null);
     analyzeHumanize(draft.id, intensity)
       .then((r) => {
+        // ALWAYS cache — even if the panel closed mid-run. The pass costs a
+        // model call; reopening the panel then picks it up instantly instead
+        // of throwing the finished work away.
+        setCached("humanize", draft.id, key, r);
         if (cancelled) return;
         setReport(r);
-        setCached("humanize", draft.id, key, r);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -331,7 +350,7 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
 
           <div className="mt-4">
             <HumannessPulse
-              antiRobot={88 /* TODO wire lint sub-score in Phase F */}
+              antiRobot={antiRobot ?? 88 /* momentary placeholder until the lint pass resolves */}
               humanSignal={report ? report.score : null}
             />
           </div>

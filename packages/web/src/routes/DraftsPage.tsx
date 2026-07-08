@@ -5,6 +5,7 @@ import {
   type DraftStage,
   type DraftSummary,
   deleteDraft,
+  expandSections,
   listDrafts,
   setDraftTags,
 } from "../api/drafts";
@@ -374,9 +375,34 @@ function DraftRow({
 }): JSX.Element {
   const stage = STAGE_LABEL[draft.stage];
   const updated = formatRelative(draft.updated_at);
+  const navigate = useNavigate();
+  const [composing, setComposing] = useState(false);
+
+  // Stage-aware quick action: pick the piece back up without a detour through
+  // the editor chrome. Outline-stage cards can kick off the compose directly.
+  const quickAction =
+    draft.stage === "research"
+      ? { label: "Continue research →", run: () => navigate(`/drafts/${draft.id}`) }
+      : draft.stage === "outline"
+        ? {
+            label: composing ? "Starting…" : "Compose sections →",
+            run: async () => {
+              setComposing(true);
+              try {
+                await expandSections(draft.id);
+              } catch {
+                /* the draft page surfaces compose errors */
+              } finally {
+                navigate(`/drafts/${draft.id}`);
+              }
+            },
+          }
+        : null;
 
   return (
-    <article className="group nb-card nb-card-hover overflow-hidden">
+    // `relative` anchors the title's stretched-link overlay: the WHOLE card
+    // navigates, while tag/delete/quick-action controls sit above it at z-10.
+    <article className="group nb-card nb-card-hover overflow-hidden relative">
       <div className="flex items-stretch">
         {/* Margin gutter — the manuscript signature. Marginalia: word count
             and freshness, ledger-aligned down the list. */}
@@ -387,7 +413,10 @@ function DraftRow({
 
         <div className="flex-1 min-w-0 flex items-start gap-4 p-5">
           <div className="flex-1 min-w-0">
-            <Link to={`/drafts/${draft.id}`} className="block">
+            <Link
+              to={`/drafts/${draft.id}`}
+              className="block after:absolute after:inset-0 after:content-['']"
+            >
               <h3 className="font-serif text-xl font-medium text-ink leading-snug tracking-tight group-hover:text-cobalt-600 transition-colors">
                 {draft.title || <span className="italic text-muted-2">untitled draft</span>}
               </h3>
@@ -401,14 +430,26 @@ function DraftRow({
               </div>
               <DraftHealthBadges draftId={draft.id} stage={draft.stage} />
             </Link>
-            <TagEditor tags={draft.tags} onChange={onTagsChange} />
+            <div className="relative z-10 flex items-center gap-3 flex-wrap">
+              <TagEditor tags={draft.tags} onChange={onTagsChange} />
+              {quickAction && (
+                <button
+                  type="button"
+                  onClick={() => void quickAction.run()}
+                  disabled={composing}
+                  className="mt-2 text-xs font-medium text-cobalt-600 hover:text-cobalt-700 disabled:opacity-60"
+                >
+                  {quickAction.label}
+                </button>
+              )}
+            </div>
           </div>
 
           <button
             type="button"
             onClick={onDelete}
             aria-label={`Delete ${draft.title || "untitled draft"}`}
-            className="nb-icon-btn opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:!text-rose"
+            className="nb-icon-btn relative z-10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:!text-rose"
             title="Move to trash"
           >
             <Icon name="trash" size={16} title="" />

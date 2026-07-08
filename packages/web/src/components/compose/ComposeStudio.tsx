@@ -283,7 +283,7 @@ export function ComposeStudio(): JSX.Element {
     <div className="space-y-6">
       {/* Header row */}
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-bold text-ink">Start a new blog</h1>
+        <h1 className="text-xl font-bold text-ink">Start a new piece</h1>
         <VoiceIndicator />
       </div>
 

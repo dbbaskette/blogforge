@@ -276,6 +276,17 @@ export function DraftWorkspace({
     };
   }, [draft.sections]);
   const targetWords = draft.idea.target_words ?? 1500;
+
+  // Outline ↔ draft drift: the outline says one thing, the drafted sections
+  // another (count or titles). Surfaced as a gentle badge so the writer knows
+  // which one is the source of truth right now.
+  const outlineDrift = useMemo(() => {
+    if (draft.stage !== "sections" || !draft.outline || draft.sections.length === 0) return false;
+    const norm = (t: string): string => t.trim().toLowerCase();
+    const o = draft.outline.sections;
+    if (o.length !== draft.sections.length) return true;
+    return o.some((os, i) => norm(os.title) !== norm(draft.sections[i]?.title ?? ""));
+  }, [draft.stage, draft.outline, draft.sections]);
   const jobRunning = jobActive || generatingIds.size > 0;
 
   const handleGenerate = useCallback(async () => {
@@ -389,6 +400,20 @@ export function DraftWorkspace({
         </div>
 
         <StageNav draft={draft} onJump={onJumpStage} />
+
+        {outlineDrift && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-amber-ink bg-amber-soft border border-amber/30 rounded-nb-sm px-3 py-1.5 w-fit">
+            <span aria-hidden>▵</span>
+            The outline and the drafted sections differ.
+            <button
+              type="button"
+              onClick={() => void onJumpStage("outline")}
+              className="font-medium underline underline-offset-2 hover:text-ink"
+            >
+              Review the outline
+            </button>
+          </div>
+        )}
 
         {/* Hero — title renders its markdown (so a pasted "**Title**" shows
             bold, not literal **) and switches to an input on click to edit. */}
