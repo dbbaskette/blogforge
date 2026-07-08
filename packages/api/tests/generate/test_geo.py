@@ -6,7 +6,9 @@ from blogforge.generate.geo import (
     _IMPACTS,
     _LABELS,
     _ORDER,
+    _SEMANTIC_EXAMPLE,
     _SEMANTIC_KEYS,
+    _SEMANTIC_SCHEMA,
     _WEIGHTS,
     augment_citations,
     augment_definitional,
@@ -106,6 +108,31 @@ def test_new_levers_registered() -> None:
     }
     assert new <= set(_WEIGHTS) and new <= set(_LABELS) and new <= set(_ORDER)
     assert new <= _SEMANTIC_KEYS
+
+
+def test_semantic_example_covers_all_levers() -> None:
+    # The prompt's JSON example is the model's shape anchor: every semantic
+    # lever MUST appear, or the omitted ones come back absent and score 0.
+    for key in _SEMANTIC_KEYS:
+        assert key in _SEMANTIC_EXAMPLE, f"{key} missing from _SEMANTIC_EXAMPLE prompt example"
+
+
+def test_new_semantic_levers_required() -> None:
+    # Required in the schema → structured decoding forces the model to emit them
+    # (belt-and-suspenders against absence→0→weight deflation).
+    new = {
+        "stat_attribution",
+        "query_coverage",
+        "sound_bites",
+        "entity_consistency",
+        "experience_signals",
+        "jargon_defined",
+        "concrete_examples",
+        "title_shape",
+    }
+    required = _SEMANTIC_SCHEMA["required"]
+    assert isinstance(required, list)
+    assert new <= set(required)
 
 
 def test_parse_semantic_maps_new_lever_findings() -> None:

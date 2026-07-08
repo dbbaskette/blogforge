@@ -734,15 +734,51 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
         "factual_density",
         "brand_explicit",
         "citations",
+        # The 8 new levers are REQUIRED so structured decoding forces the model
+        # to emit them. Absent → parse_semantic returns them at 0 → those zeros
+        # deflate the weighted total (the 8 carry 0.24), grading a good draft far
+        # too low. parse_semantic stays tolerant; required is belt-and-suspenders.
+        *_NEW_SEMANTIC_KEYS,
     ],
 }
 _SEMANTIC_SCHEMA["properties"].update(  # type: ignore[attr-defined]
     {k: _GENERIC_LEVER_SCHEMA for k in _NEW_SEMANTIC_KEYS}
 )
 
+# The JSON shape the model is shown in the prompt. A concrete example is the
+# model's dominant anchor for what to emit — it MUST list every semantic lever
+# (all of _SEMANTIC_KEYS) or the omitted ones come back absent and score 0.
+# test_semantic_example_covers_all_levers guards this.
+_SEMANTIC_EXAMPLE = json.dumps(
+    {
+        "answer_first": {"score": 0, "note": "", "weak_sections": []},
+        "definitional_opener": {"score": 0, "note": "", "has_definition": False},
+        "factual_density": {
+            "score": 0,
+            "note": "",
+            "has_stats": False,
+            "has_named_sources": False,
+            "has_quotes": False,
+            "first_hand": False,
+            "thin_spots": [],
+        },
+        "brand_explicit": {"score": 0, "note": "", "brand": "", "stated_up_top": False},
+        "citations": {"score": 0, "note": "", "uncited_claims": []},
+        **{
+            k: {
+                "score": 55,
+                "note": "",
+                "findings": [{"target": "", "note": "", "suggestion": "", "impact": ""}],
+            }
+            for k in _NEW_SEMANTIC_KEYS
+        },
+        "coverage": {"missing_subquestions": []},
+    }
+)
+
 _SEMANTIC_DIRECTIVE = (
-    "Evaluate this draft on five Generative-Engine-Optimization dimensions. Score "
-    "each 0-100 and explain briefly. Do NOT rewrite anything.\n"
+    "Evaluate this draft on the following Generative-Engine-Optimization dimensions. "
+    "Score each 0-100 and explain briefly. Do NOT rewrite anything.\n"
     "1) answer_first: does each section OPEN with a direct, self-contained answer "
     "(40-60 words) before context? List the titles of sections that bury the answer "
     "in `weak_sections`.\n"
@@ -1034,16 +1070,7 @@ async def _run_semantic(
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
     prompt = (
         f"{system}\n\n---\n\n{_SEMANTIC_DIRECTIVE}\n\n"
-        'Return JSON matching: {"answer_first": {"score": 0, "note": "", '
-        '"weak_sections": []}, "definitional_opener": {"score": 0, "note": "", '
-        '"has_definition": false}, '
-        '"factual_density": {"score": 0, "note": "", "has_stats": false, '
-        '"has_named_sources": false, "has_quotes": false, "first_hand": false, '
-        '"thin_spots": []}, '
-        '"brand_explicit": {"score": 0, "note": "", "brand": "", '
-        '"stated_up_top": false}, '
-        '"citations": {"score": 0, "note": "", "uncited_claims": []}, '
-        '"coverage": {"missing_subquestions": []}}.\n\nDRAFT:\n'
+        f"Return JSON matching: {_SEMANTIC_EXAMPLE}.\n\nDRAFT:\n"
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
