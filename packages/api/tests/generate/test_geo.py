@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 
 from blogforge.drafts.models import Draft, IdeaInput, Section
@@ -312,6 +313,40 @@ def test_parse_semantic_carries_thin_spot_suggestion() -> None:
     )
     fd = parse_semantic(raw, d)["factual_density"]
     assert fd["findings"][0]["suggestion"] == "Add your NPS score or a named customer quote."
+
+
+def test_parse_semantic_carries_impact() -> None:
+    d = _draft([_sec("Intro", "x")])
+    raw = json.dumps(
+        {
+            "answer_first": {"score": 50, "note": "buried", "weak_sections": []},
+            "definitional_opener": {"score": 80, "note": "ok", "has_definition": True},
+            "factual_density": {
+                "score": 40,
+                "note": "thin",
+                "thin_spots": [
+                    {
+                        "target": "It is very fast.",
+                        "note": "vague",
+                        "suggestion": "Add a p95 latency number",
+                        "impact": "Engines lift passages with concrete numbers into answers.",
+                    }
+                ],
+            },
+            "brand_explicit": {"score": 70, "note": "named"},
+            "citations": {"score": 30, "note": "none"},
+        }
+    )
+    levers = parse_semantic(raw, d)
+    thin = levers["factual_density"]["findings"][0]
+    assert thin["impact"] == "Engines lift passages with concrete numbers into answers."
+
+
+def test_structural_levers_carry_static_impact() -> None:
+    d = _draft([_sec("Intro", "hi")])
+    levers = score_structural(d)
+    for key, lever in levers.items():
+        assert lever.get("impact"), f"structural lever {key} missing impact copy"
 
 
 def test_clean_opener_strips_noise() -> None:

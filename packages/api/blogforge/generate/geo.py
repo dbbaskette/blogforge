@@ -72,6 +72,35 @@ _LABELS: dict[str, str] = {
     "chunking": "Self-contained passages",
 }
 
+# One concrete sentence of GEO mechanism per lever — WHY the lever moves
+# citations, shown on lever headers and as the fallback for findings whose
+# semantic pass didn't supply a per-finding impact.
+_IMPACTS: dict[str, str] = {
+    "answer_first": "Answer engines quote the first 40-60 words of a section; burying the "
+    "answer means they quote someone else's page.",
+    "factual_density": "Passages with concrete numbers are what engines lift into answers — "
+    "vague claims get skipped.",
+    "citations": "Claims with named sources are trusted and cited; unattributed claims get "
+    "filtered as unverifiable.",
+    "definitional_opener": "A one-line definition up top is the single most-extracted "
+    "sentence shape for 'what is X' queries.",
+    "question_headings": "Question headings match how users phrase queries — engines map "
+    "query to heading directly.",
+    "skimmability": "Engines parse structure; walls of prose fragment poorly into answer "
+    "passages.",
+    "brand_explicit": "AI can cite content without naming you ('ghost citation') — an "
+    "explicit brand travels with the quote.",
+    "faq": "FAQ blocks map one-to-one onto the question formats answer engines serve.",
+    "chunking": "Each passage is extracted alone — a chunk that leans on its neighbors loses "
+    "its meaning when lifted.",
+    "takeaways": "Key-takeaways blocks are pre-digested summaries engines prefer over "
+    "synthesizing their own.",
+    "freshness": "Dated claims signal current content; engines demote pieces they can't "
+    "place in time.",
+    "comparison_table": "Tables answer 'X vs Y' queries directly — engines lift rows "
+    "verbatim.",
+}
+
 _QUESTION_WORDS = (
     "how",
     "what",
@@ -188,6 +217,7 @@ def _lever(
         # re-score can recompute the total on the client without a full re-run.
         "weight": _WEIGHTS.get(key, 0.0),
         "detail": detail,
+        "impact": _IMPACTS.get(key, ""),
         "findings": findings or [],
         "fix": fix,
     }
@@ -550,6 +580,7 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                 "score": {"type": "integer"},
                 "note": {"type": "string"},
                 "weak_sections": {"type": "array", "items": {"type": "string"}},
+                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -559,6 +590,7 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                 "score": {"type": "integer"},
                 "note": {"type": "string"},
                 "has_definition": {"type": "boolean"},
+                "impact": {"type": "string"},
             },
             "required": ["score", "note", "has_definition"],
         },
@@ -579,10 +611,12 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                             "target": {"type": "string"},
                             "note": {"type": "string"},
                             "suggestion": {"type": "string"},
+                            "impact": {"type": "string"},
                         },
                         "required": ["target"],
                     },
                 },
+                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -593,6 +627,7 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                 "note": {"type": "string"},
                 "brand": {"type": "string"},
                 "stated_up_top": {"type": "boolean"},
+                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -608,10 +643,12 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                         "properties": {
                             "target": {"type": "string"},
                             "note": {"type": "string"},
+                            "impact": {"type": "string"},
                         },
                         "required": ["target"],
                     },
                 },
+                "impact": {"type": "string"},
             },
             "required": ["score", "note"],
         },
@@ -666,7 +703,10 @@ _SEMANTIC_DIRECTIVE = (
     "`note` say what kind of source would back it. Never invent sources.\n"
     "Finally, in `coverage.missing_subquestions` list up to 4 natural sub-questions "
     "of this topic a search engine would decompose the query into that this draft "
-    "does NOT answer — only questions genuinely in-scope for the title."
+    "does NOT answer — only questions genuinely in-scope for the title.\n"
+    "For every finding and every lever, also return `impact`: ONE concrete sentence "
+    "of GEO mechanism — what this specifically does to the piece's chances of being "
+    "quoted by an answer engine. State the payoff, never restate the fix."
 )
 
 
@@ -706,6 +746,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
                 "section_id": sid or "",
                 "note": f'"{clean}" buries its answer — lead with a direct one.',
                 "fix": "answer_first" if sid else "",
+                "impact": _IMPACTS.get("answer_first", ""),
             }
         )
     answer_first = _lever(
@@ -750,6 +791,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
             "note": str(t.get("note", "")).strip()
             or "Add a real statistic, source, or quote here.",
             "suggestion": str(t.get("suggestion", "")).strip(),
+            "impact": str(t.get("impact", "")).strip() or _IMPACTS.get("factual_density", ""),
         }
         for t in thin
         if isinstance(t, dict) and str(t.get("target", "")).strip()
@@ -790,6 +832,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
             "target": str(c.get("target", "")).strip(),
             "note": str(c.get("note", "")).strip() or "This claim has no source.",
             "fix": "cite_reference",
+            "impact": str(c.get("impact", "")).strip() or _IMPACTS.get("citations", ""),
         }
         for c in claims
         if isinstance(c, dict) and str(c.get("target", "")).strip()
