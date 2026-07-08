@@ -138,6 +138,33 @@ describe("geoApply ai_fix", () => {
     expect(onSectionSave).toHaveBeenCalled();
   });
 
+  it("persist:false computes the rewrite via the model but does NOT save", async () => {
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const issue: Issue = {
+      id: "mystery:1",
+      panel: "geo",
+      lever: "mystery",
+      title: "Some new issue kind",
+      why: "It still needs fixing.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "Latency dropped a lot last year.",
+      fixKind: "nonexistent",
+      actions: ["ai_fix"],
+      status: "open",
+    };
+    const res = await apply(issue, "ai_fix", undefined, { persist: false });
+    expect(inlineEdit).toHaveBeenCalled();
+    expect(res?.after).toContain("Example");
+    expect(onSectionSave).not.toHaveBeenCalled();
+  });
+
   it("gives a section-less input action a home (first section fallback)", async () => {
     // A freshness "add a date" finding carries no section and no target.
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
@@ -210,5 +237,38 @@ describe("geoApply block placement", () => {
       "s3",
       expect.stringContaining("Final section body."),
     );
+  });
+
+  it("persist:false computes the appended takeaways block but does NOT save", async () => {
+    const { generateTakeaways } = await import("../../src/api/geo");
+    (generateTakeaways as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      "It is free.",
+      "It is fast.",
+    ]);
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft: multi,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const takeawaysIssue: Issue = {
+      id: "takeaways:0",
+      panel: "geo",
+      lever: "takeaways",
+      title: "No key takeaways",
+      why: "A takeaways block helps answer engines.",
+      nature: "add",
+      sectionId: "",
+      fixKind: "takeaways",
+      actions: ["generate", "write_own"],
+      status: "open",
+    };
+    const res = await apply(takeawaysIssue, "generate", undefined, { persist: false });
+    // Takeaways prepend to the first section's body.
+    expect(res?.sectionId).toBe("s1");
+    expect(res?.after).toContain("Key takeaways");
+    expect(res?.after).toContain("Opening section body.");
+    expect(onSectionSave).not.toHaveBeenCalled();
   });
 });

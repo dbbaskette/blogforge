@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { Issue, IssueAction, IssueStatus } from "../../lib/issues/types";
 
@@ -203,9 +203,15 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
     action: IssueAction;
     res: Applied;
   } | null>(null);
+  // Latches while a confirm is in flight so a double-click can't fire the save
+  // (and onRescore) twice. A ref, not state, so the guard is synchronous.
+  const confirming = useRef(false);
 
   const requestPreview = useCallback(
     async (issue: Issue, action: IssueAction, input?: string): Promise<void> => {
+      // A second request while the modal is already open is a no-op — don't
+      // clobber the preview the writer is currently looking at.
+      if (preview) return;
       setBusy({ id: issue.id, action });
       setErrors((e) => {
         if (!e[issue.id]) return e;
@@ -225,14 +231,22 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         setBusy(null);
       }
     },
-    [apply],
+    [apply, preview],
   );
 
+  /**
+   * Commit the previewed fix. `finalAfter` is the COMPLETE replacement value
+   * for the target field — not just the inserted fragment. For append-style
+   * fixes (FAQ/takeaways/definitional block adds) that means the whole merged
+   * field text, so callers must pass the full edited `after`, never a slice of
+   * it. Persisted verbatim; the pre-fix value is recorded for undo.
+   */
   const confirmPreview = useCallback(
     async (finalAfter: string): Promise<void> => {
-      if (!preview) return;
-      const { issue, res } = preview;
-      setBusy({ id: issue.id, action: "ai_fix" });
+      if (!preview || confirming.current) return;
+      confirming.current = true;
+      const { issue, action, res } = preview;
+      setBusy({ id: issue.id, action });
       try {
         const field = res.field ?? "content";
         await save(res.sectionId, finalAfter, field);
@@ -241,8 +255,11 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         saveLedger(draftId, ledger);
         onRescore?.(issue.lever);
         // Preview already showed the compare — applied means done. Flash a
-        // transient locate so the read pane shows where it landed.
-        onHighlight?.(res.sectionId, res.highlight ?? null, "locate");
+        // transient locate so the read pane shows where it landed. But if the
+        // writer edited the rewrite, res.highlight may not be a substring of
+        // what we saved — skip the flash rather than point at nothing.
+        const landed = finalAfter === res.after ? (res.highlight ?? null) : null;
+        onHighlight?.(res.sectionId, landed, "locate");
         setStatus((s) => ({ ...s, [issue.id]: "accepted" }));
         persistStatus(draftId, issue.id, "accepted");
         setPreview(null);
@@ -253,6 +270,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         }));
         setPreview(null);
       } finally {
+        confirming.current = false;
         setBusy(null);
       }
     },
