@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/drafts";
@@ -7,23 +7,39 @@ import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
-import { CheckupPanel } from "./CheckupPanel";
-import { HeadlineLab } from "./HeadlineLab";
 import { HeroImage } from "./HeroImage";
-import { HumanizePanel } from "./HumanizePanel";
-import { LintPanel } from "./LintPanel";
-import { OpeningCard } from "./OpeningCard";
-import { OptimizePanel } from "./OptimizePanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
-import { RepurposePanel } from "./RepurposePanel";
 import { ResearchPanel } from "./ResearchPanel";
-import { SectionsPanel } from "./SectionsPanel";
 import { SetupDisclosure } from "./SetupDisclosure";
-import { ShapePanel } from "./ShapePanel";
 import { StageNav } from "./StageNav";
 import { WorkspaceFooter } from "./WorkspaceFooter";
+
+// The sections stage carries the TipTap editor stack (the heaviest dependency
+// in the app) — lazy-load it so research/outline sessions and every other page
+// never download it.
+const OpeningCard = lazy(() => import("./OpeningCard").then((m) => ({ default: m.OpeningCard })));
+const SectionsPanel = lazy(() =>
+  import("./SectionsPanel").then((m) => ({ default: m.SectionsPanel })),
+);
+
+// The review/improve overlays are on-demand — lazy-load them so their code
+// (and heavyweight deps) stays out of the initial chunk. Each opens from an
+// explicit click, so the fetch hides inside the open animation.
+const CheckupPanel = lazy(() => import("./CheckupPanel").then((m) => ({ default: m.CheckupPanel })));
+const HeadlineLab = lazy(() => import("./HeadlineLab").then((m) => ({ default: m.HeadlineLab })));
+const HumanizePanel = lazy(() =>
+  import("./HumanizePanel").then((m) => ({ default: m.HumanizePanel })),
+);
+const LintPanel = lazy(() => import("./LintPanel").then((m) => ({ default: m.LintPanel })));
+const OptimizePanel = lazy(() =>
+  import("./OptimizePanel").then((m) => ({ default: m.OptimizePanel })),
+);
+const RepurposePanel = lazy(() =>
+  import("./RepurposePanel").then((m) => ({ default: m.RepurposePanel })),
+);
+const ShapePanel = lazy(() => import("./ShapePanel").then((m) => ({ default: m.ShapePanel })));
 
 const INLINE_AI_HINT_KEY = "bf.inlineai.hint.dismissed";
 
@@ -244,15 +260,33 @@ export function DraftWorkspace({
     600,
   );
 
-  // ── Derived ──
-  const totalWords = draft.sections.reduce((acc, s) => acc + s.word_count, 0);
+  // ── Derived ── (memoized: recomputed on section changes, not on the
+  // per-token liveText re-renders that fire throughout a compose)
+  const { totalWords, draftedCount, unfilledCount } = useMemo(() => {
+    let words = 0;
+    let drafted = 0;
+    for (const s of draft.sections) {
+      words += s.word_count;
+      if (s.status === "ready" || s.status === "edited") drafted += 1;
+    }
+    return {
+      totalWords: words,
+      draftedCount: drafted,
+      unfilledCount: draft.sections.length - drafted,
+    };
+  }, [draft.sections]);
   const targetWords = draft.idea.target_words ?? 1500;
-  const draftedCount = draft.sections.filter(
-    (s) => s.status === "ready" || s.status === "edited",
-  ).length;
-  const unfilledCount = draft.sections.filter(
-    (s) => s.status !== "ready" && s.status !== "edited",
-  ).length;
+
+  // Outline ↔ draft drift: the outline says one thing, the drafted sections
+  // another (count or titles). Surfaced as a gentle badge so the writer knows
+  // which one is the source of truth right now.
+  const outlineDrift = useMemo(() => {
+    if (draft.stage !== "sections" || !draft.outline || draft.sections.length === 0) return false;
+    const norm = (t: string): string => t.trim().toLowerCase();
+    const o = draft.outline.sections;
+    if (o.length !== draft.sections.length) return true;
+    return o.some((os, i) => norm(os.title) !== norm(draft.sections[i]?.title ?? ""));
+  }, [draft.stage, draft.outline, draft.sections]);
   const jobRunning = jobActive || generatingIds.size > 0;
 
   const handleGenerate = useCallback(async () => {
@@ -367,6 +401,20 @@ export function DraftWorkspace({
 
         <StageNav draft={draft} onJump={onJumpStage} />
 
+        {outlineDrift && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-amber-ink bg-amber-soft border border-amber/30 rounded-nb-sm px-3 py-1.5 w-fit">
+            <span aria-hidden>▵</span>
+            The outline and the drafted sections differ.
+            <button
+              type="button"
+              onClick={() => void onJumpStage("outline")}
+              className="font-medium underline underline-offset-2 hover:text-ink"
+            >
+              Review the outline
+            </button>
+          </div>
+        )}
+
         {/* Hero — title renders its markdown (so a pasted "**Title**" shows
             bold, not literal **) and switches to an input on click to edit. */}
         <header className="mb-6">
@@ -460,7 +508,15 @@ export function DraftWorkspace({
           </div>
         )}
 
-        {draft.stage === "sections" && hasOpening && (
+        {draft.stage === "sections" && (
+        <Suspense
+          fallback={
+            <p className="text-center text-muted text-sm py-16 animate-fade-in">
+              Opening the editor…
+            </p>
+          }
+        >
+        {hasOpening && (
           <OpeningCard
             value={draft.outline?.opening_hook ?? ""}
             draftId={draft.id}
@@ -468,8 +524,6 @@ export function DraftWorkspace({
             onSave={handleOpeningChange}
           />
         )}
-
-        {draft.stage === "sections" && (
           <SectionsPanel
             draft={draft}
             generatingIds={generatingIds}
@@ -491,6 +545,7 @@ export function DraftWorkspace({
             onComposeRemaining={handleExpandUnfilled}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
+        </Suspense>
         )}
       </main>
 
@@ -510,6 +565,8 @@ export function DraftWorkspace({
         />
       )}
 
+      {/* Lazy overlay panels: null fallback — each pops in when its chunk lands. */}
+      <Suspense fallback={null}>
       {lintOpen && (
         <LintPanel
           draft={draft}
@@ -579,6 +636,7 @@ export function DraftWorkspace({
           onClose={() => setHeadlinesOpen(false)}
         />
       )}
+      </Suspense>
     </div>
   );
 }

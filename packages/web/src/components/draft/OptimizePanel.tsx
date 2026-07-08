@@ -170,14 +170,47 @@ export function OptimizePanel({
     }
   }, [draft.id]);
 
+  // Pre-fix lever snapshots: captured the first time a fix queues a lever's
+  // rescore, so Undo can restore the score instantly instead of paying a model
+  // pass just to land back where it started. (Stacked fixes on one lever undo
+  // to the pre-batch score — close enough, and Re-analyze is always there.)
+  const leverSnapshots = useRef<Map<string, GeoReport["levers"][number]>>(new Map());
+
   const queueRescore = useCallback(
     (leverKey: string): void => {
       if (!leverKey) return;
+      const cur = report?.levers.find((l) => l.key === leverKey);
+      if (cur && !leverSnapshots.current.has(leverKey)) {
+        leverSnapshots.current.set(leverKey, cur);
+      }
       pendingRescore.current.add(leverKey);
       if (rescoreTimer.current) window.clearTimeout(rescoreTimer.current);
       rescoreTimer.current = window.setTimeout(() => void flushRescore(), 900);
     },
-    [flushRescore],
+    [flushRescore, report],
+  );
+
+  // Undo path: cancel any pending rescore for the lever and restore its
+  // snapshot in place. Falls back to a real rescore only when no snapshot
+  // exists (e.g. undo after a reload).
+  const restoreLever = useCallback(
+    (leverKey: string): void => {
+      if (!leverKey) return;
+      pendingRescore.current.delete(leverKey);
+      const snap = leverSnapshots.current.get(leverKey);
+      if (!snap) {
+        queueRescore(leverKey);
+        return;
+      }
+      leverSnapshots.current.delete(leverKey);
+      setReport((prev) => {
+        if (!prev) return prev;
+        const levers = prev.levers.map((l) => (l.key === leverKey ? snap : l));
+        const score = computeTotalScore(levers);
+        return { ...prev, levers, score, grade: localGrade(score) };
+      });
+    },
+    [queueRescore],
   );
 
   // The opening/lede is a first-class field (outline.opening_hook), scored as
@@ -372,6 +405,7 @@ export function OptimizePanel({
                   onOpeningSave={saveOpening}
                   onTitleSave={saveTitle}
                   onRescore={queueRescore}
+                  onRestoreLever={restoreLever}
                   onHighlight={onHighlight}
                 />
               )}

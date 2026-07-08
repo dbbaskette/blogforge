@@ -30,6 +30,9 @@ interface IssueCardProps {
   onAction: (action: IssueAction, input?: string) => void;
   onAccept: () => void;
   onUndo: () => void;
+  /** Per-panel action-label overrides (e.g. Humanize renames "Highlight" to
+   * "Jump to" since its heat-map already highlights every finding). */
+  actionLabels?: Partial<Record<IssueAction, string>>;
 }
 
 /**
@@ -44,6 +47,7 @@ export function IssueCard({
   onAction,
   onAccept,
   onUndo,
+  actionLabels,
 }: IssueCardProps): JSX.Element {
   const [openInput, setOpenInput] = useState<IssueAction | null>(null);
   const [text, setText] = useState("");
@@ -172,7 +176,7 @@ export function IssueCard({
               disabled={busy}
               onClick={() => (isInputAction(action) ? setOpenInput(action) : onAction(action))}
             >
-              {ACTION_LABEL[action]}
+              {actionLabels?.[action] ?? ACTION_LABEL[action]}
             </button>
           ))}
         </div>

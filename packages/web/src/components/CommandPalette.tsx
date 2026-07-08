@@ -16,7 +16,7 @@ interface Command {
 }
 
 const STATIC_COMMANDS: Command[] = [
-  { key: "new", glyph: "✍", label: "New blog", hint: "Compose", to: "/compose" },
+  { key: "new", glyph: "✍", label: "New piece", hint: "Compose", to: "/compose" },
   { key: "drafts", glyph: "📝", label: "Your drafts", hint: "Home", to: "/" },
   { key: "voice", glyph: "🎙", label: "Your Voice", to: "/voice" },
   { key: "settings", glyph: "⚙", label: "Settings", to: "/settings" },
@@ -121,6 +121,11 @@ export function CommandPalette({ onClose }: { onClose: () => void }): JSX.Elemen
             placeholder="Search commands and drafts…"
             aria-label="Search commands and drafts"
             aria-controls="command-palette-list"
+            role="combobox"
+            aria-expanded="true"
+            aria-activedescendant={
+              results.length > 0 ? `command-option-${results[active]?.key}` : undefined
+            }
             className="w-full bg-transparent text-[15px] text-ink placeholder:text-muted outline-none"
           />
         </div>
@@ -139,6 +144,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }): JSX.Elemen
               return (
                 <li
                   key={cmd.key}
+                  id={`command-option-${cmd.key}`}
                   data-index={i}
                   role="option"
                   aria-selected={selected}

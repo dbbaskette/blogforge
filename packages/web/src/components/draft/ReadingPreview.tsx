@@ -1,5 +1,6 @@
 import { marked } from "marked";
 import { useMemo } from "react";
+import { createPortal } from "react-dom";
 
 import { type Draft, heroImageUrl } from "../../api/drafts";
 import { Icon } from "../ui/Icon";
@@ -52,7 +53,11 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
 
   const title = draft.title.trim() || "Untitled draft";
 
-  return (
+  // Portal to <body>: rendered in-tree, the fixed overlay would resolve
+  // `inset-0` against the transformed floating toolbar that hosts it (its
+  // `-translate-x-1/2` creates a containing block for fixed descendants),
+  // collapsing the full-screen preview into the toolbar's box.
+  return createPortal(
     <div
       ref={overlayRef}
       role="dialog"
@@ -115,6 +120,7 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
           </p>
         )}
       </article>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -24,6 +24,37 @@ class ComposeError(Exception):
     """Raised when composition cannot complete (e.g., unknown format)."""
 
 
+# ── mtime-keyed caches ──
+# compose() runs on every analyze/fix/generate request and re-read the same
+# pack files each time. Pack files change rarely (re-distill / manual edit),
+# so cache text and the validated Manifest keyed by (path, mtime). Bounded by
+# the number of pack files on disk — effectively constant.
+_TEXT_CACHE: dict[str, tuple[float, str]] = {}
+_MANIFEST_CACHE: dict[str, tuple[float, Manifest]] = {}
+
+
+def _read_cached(path: Path) -> str:
+    key = str(path)
+    mtime = path.stat().st_mtime
+    hit = _TEXT_CACHE.get(key)
+    if hit is not None and hit[0] == mtime:
+        return hit[1]
+    text = path.read_text(encoding="utf-8")
+    _TEXT_CACHE[key] = (mtime, text)
+    return text
+
+
+def _manifest_cached(manifest_path: Path) -> Manifest:
+    key = str(manifest_path)
+    mtime = manifest_path.stat().st_mtime
+    hit = _MANIFEST_CACHE.get(key)
+    if hit is not None and hit[0] == mtime:
+        return hit[1]
+    manifest = Manifest.model_validate(yaml.safe_load(_read_cached(manifest_path)))
+    _MANIFEST_CACHE[key] = (mtime, manifest)
+    return manifest
+
+
 def compose(
     pack_root: Path,
     *,
@@ -39,10 +70,7 @@ def compose(
       format add-on + optional voice exemplars + optional draft trailer.
     - Bio mode (`bio=` set): emit just the bio body. Other args ignored.
     """
-    manifest_path = pack_root / "stylepack.yaml"
-    manifest = Manifest.model_validate(
-        yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    )
+    manifest = _manifest_cached(pack_root / "stylepack.yaml")
 
     if bio is not None:
         return _render_bio(pack_root, manifest, bio)
@@ -51,7 +79,7 @@ def compose(
     parts.append(_render_header(manifest))
     parts.append(_render_humanizer(manifest, pack_root))
     parts.append(_render_writing_craft(pack_root))
-    parts.append((pack_root / "style-guide.md").read_text(encoding="utf-8"))
+    parts.append(_read_cached(pack_root / "style-guide.md"))
 
     if format is not None:
         parts.append(_render_format(pack_root, manifest, format))
@@ -76,11 +104,7 @@ def _load_default_baseline() -> str:
 
 def _render_writing_craft(pack_root: Path) -> str:
     override = pack_root / "writing-baseline.md"
-    body = (
-        override.read_text(encoding="utf-8")
-        if override.is_file()
-        else _load_default_baseline()
-    )
+    body = _read_cached(override) if override.is_file() else _load_default_baseline()
     return (
         "## Section 2: General Writing Craft\n\n"
         "These are general craft defaults. Where the author's style guide "
@@ -101,7 +125,7 @@ def _render_header(m: Manifest) -> str:
 def _load_ai_patterns(pack_root: Path) -> str:
     override = pack_root / "ai-patterns.md"
     if override.is_file():
-        return override.read_text(encoding="utf-8")
+        return _read_cached(override)
     return load_ai_tells().patterns
 
 

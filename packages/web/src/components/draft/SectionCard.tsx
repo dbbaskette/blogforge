@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 
 import type { Section } from "../../api/drafts";
 import { Icon } from "../ui/Icon";
@@ -67,7 +67,10 @@ function StatusPill({ status }: { status: Section["status"] }): JSX.Element {
   }
 }
 
-export function SectionCard({
+// memo: during compose/streaming only the active card's props change (liveText),
+// so the other cards — each carrying a TipTap editor — skip reconciliation.
+// SectionsPanel supplies referentially-stable handler props to keep this effective.
+export const SectionCard = memo(function SectionCard({
   section,
   index,
   isGenerating,
@@ -318,4 +321,4 @@ export function SectionCard({
       )}
     </article>
   );
-}
+});

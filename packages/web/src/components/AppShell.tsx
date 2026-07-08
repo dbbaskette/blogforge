@@ -89,7 +89,9 @@ function TopBar(): JSX.Element {
             B
           </span>
           <span className="flex flex-col leading-tight">
-            <span className="font-semibold text-[15px] text-ink tracking-tight">BlogForge</span>
+            <span className="font-serif font-semibold text-[16px] text-ink tracking-tight">
+              BlogForge
+            </span>
             <span className="text-[11px] text-muted leading-none mt-0.5">
               a workshop ·{" "}
               <span className="font-mono" title={versionTitle()}>
@@ -105,9 +107,12 @@ function TopBar(): JSX.Element {
               onClick={() => setPaletteOpen(true)}
               aria-label="Open command palette"
               title="Open command palette"
-              className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded-[8px] text-[11px] text-muted hover:text-ink border border-ink/10 hover:border-ink/20 transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-[11px] text-muted hover:text-ink border border-ink/10 hover:border-ink/20 transition-colors"
             >
-              <span aria-hidden="true">⌘K</span>
+              Search
+              <kbd className="font-mono text-[10px] text-muted-2" aria-hidden="true">
+                ⌘K
+              </kbd>
             </button>
             <NavLink to="/" end className="nb-btn-ghost nb-btn nb-btn-sm">
               Drafts

@@ -76,10 +76,24 @@ export const TrackedChangeDecoration = Extension.create({
           },
         },
         props: {
-          decorations(state) {
-            const runs = trackedChangeKey.getState(state) ?? [];
-            return buildDecorations(state.doc, runs);
-          },
+          // Memoized on (doc, runs) identity: ProseMirror calls decorations()
+          // on every state update, but a full-doc descendants walk is only
+          // needed when the doc or the run list actually changed. With no runs
+          // (the overwhelmingly common editing state) this is now free.
+          decorations: (() => {
+            let lastDoc: PMNode | null = null;
+            let lastRuns: TrackedRun[] | null = null;
+            let lastSet: DecorationSet = DecorationSet.empty;
+            return (state: Parameters<NonNullable<Plugin["props"]["decorations"]>>[0]) => {
+              const runs = trackedChangeKey.getState(state) ?? [];
+              if (runs.length === 0) return DecorationSet.empty;
+              if (state.doc === lastDoc && runs === lastRuns) return lastSet;
+              lastDoc = state.doc;
+              lastRuns = runs;
+              lastSet = buildDecorations(state.doc, runs);
+              return lastSet;
+            };
+          })(),
         },
       }),
     ];

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Draft, Section } from "../../api/drafts";
 import { DraftReadView } from "./DraftReadView";
@@ -81,24 +81,50 @@ export function SectionsPanel({
 
   const sections = optimisticSections ?? draft.sections;
 
-  const moveSection = async (idx: number, dir: -1 | 1): Promise<void> => {
-    const swap = idx + dir;
-    if (swap < 0 || swap >= sections.length) return;
-    const next = [...sections];
-    [next[idx], next[swap]] = [next[swap], next[idx]];
-    // Optimistic: reorder locally now so the list responds instantly.
-    setOptimisticSections(next);
-    setReorderError(null);
-    try {
-      await onReorder(next.map((s) => s.id));
-      // Success: drop the override; the parent prop carries the server truth.
-      setOptimisticSections(null);
-    } catch (e) {
-      // Reject: roll back to the server order and surface the failure.
-      setOptimisticSections(null);
-      setReorderError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  // Stable identity (reads the latest order through a ref) so the per-section
+  // handler bundle below survives unrelated re-renders — the point is that
+  // token-streaming state changes don't re-render every memoized SectionCard.
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
+  const moveSection = useCallback(
+    async (idx: number, dir: -1 | 1): Promise<void> => {
+      const cur = sectionsRef.current;
+      const swap = idx + dir;
+      if (swap < 0 || swap >= cur.length) return;
+      const next = [...cur];
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      // Optimistic: reorder locally now so the list responds instantly.
+      setOptimisticSections(next);
+      setReorderError(null);
+      try {
+        await onReorder(next.map((s) => s.id));
+        // Success: drop the override; the parent prop carries the server truth.
+        setOptimisticSections(null);
+      } catch (e) {
+        // Reject: roll back to the server order and surface the failure.
+        setOptimisticSections(null);
+        setReorderError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [onReorder],
+  );
+
+  // Per-section handler bundle, recreated only when the section list itself
+  // (or a parent handler) changes — NOT on every liveText token. Combined with
+  // memo(SectionCard), a streaming token re-renders only the active card.
+  const cardProps = useMemo(
+    () =>
+      sections.map((section, i) => ({
+        pendingTexts: pendingTextsForSection?.(section.id),
+        onSave: (md: string, createVersion?: boolean) =>
+          onSectionSave(section.id, md, createVersion),
+        onRegenerate: (instruction?: string) => onRegenerateSection(section.id, instruction),
+        onRevert: (versionId: string) => onRevertSection(section.id, versionId),
+        onMoveUp: () => moveSection(i, -1),
+        onMoveDown: () => moveSection(i, 1),
+      })),
+    [sections, pendingTextsForSection, onSectionSave, onRegenerateSection, onRevertSection, moveSection],
+  );
 
   const total = sections.length;
   const doneCount = sections.filter((s) => s.status === "ready" || s.status === "edited").length;
@@ -389,12 +415,12 @@ export function SectionsPanel({
                   isGenerating={isComposing}
                   liveText={liveSectionId === section.id ? liveText : undefined}
                   draftId={draft.id}
-                  pendingTexts={pendingTextsForSection?.(section.id)}
-                  onSave={(md, createVersion) => onSectionSave(section.id, md, createVersion)}
-                  onRegenerate={(instruction) => onRegenerateSection(section.id, instruction)}
-                  onRevert={(versionId) => onRevertSection(section.id, versionId)}
-                  onMoveUp={() => moveSection(i, -1)}
-                  onMoveDown={() => moveSection(i, 1)}
+                  pendingTexts={cardProps[i].pendingTexts}
+                  onSave={cardProps[i].onSave}
+                  onRegenerate={cardProps[i].onRegenerate}
+                  onRevert={cardProps[i].onRevert}
+                  onMoveUp={cardProps[i].onMoveUp}
+                  onMoveDown={cardProps[i].onMoveDown}
                   canMoveUp={i > 0}
                   canMoveDown={i < sections.length - 1}
                 />

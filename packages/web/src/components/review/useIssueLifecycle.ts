@@ -25,6 +25,10 @@ export interface UseIssueLifecycleArgs {
   save: (sectionId: string, content: string, field?: AppliedField) => Promise<void> | void;
   onHighlight?: (sectionId: string, text: string | null, kind: "under-review" | "locate") => void;
   onRescore?: (lever: string) => void;
+  /** Called on undo instead of onRescore when provided — lets the panel
+   *  restore a cached pre-fix score instantly instead of re-running a model
+   *  pass just to arrive back where it started. */
+  onUndoRescore?: (lever: string) => void;
 }
 
 interface LedgerEntry {
@@ -58,7 +62,7 @@ function saveLedger(draftId: string, map: Record<string, LedgerEntry>): void {
  * ledger in localStorage (so undo survives a reload within a session).
  */
 export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
-  const { draftId, apply, save, onHighlight, onRescore } = args;
+  const { draftId, apply, save, onHighlight, onRescore, onUndoRescore } = args;
   const [status, setStatus] = useState<Record<string, IssueStatus>>({});
   // The issue + action currently running (drives per-card spinners and the
   // blocking "applying…" modal for slow model calls).
@@ -121,7 +125,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         if (entry) {
           await save(entry.sectionId, entry.before, entry.field);
           onHighlight?.(entry.sectionId, null, "under-review");
-          onRescore?.(entry.lever);
+          (onUndoRescore ?? onRescore)?.(entry.lever);
           delete ledger[issue.id];
           saveLedger(draftId, ledger);
         }
@@ -130,7 +134,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         setBusy(null);
       }
     },
-    [draftId, save, onHighlight, onRescore],
+    [draftId, save, onHighlight, onRescore, onUndoRescore],
   );
 
   return { statusOf, busyId, busyAction, run, accept, undo };

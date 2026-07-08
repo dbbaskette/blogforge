@@ -59,6 +59,26 @@ describe("HumanizePanel", () => {
     expect(localStorage.getItem("bf.humanize.intensity.d1")).toBe("strong");
   });
 
+  it("does NOT re-analyze when the draft content changes (accepting a fix must not churn findings)", async () => {
+    const { rerender } = render(
+      <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />,
+    );
+    await waitFor(() => expect(analyzeHumanize).toHaveBeenCalledTimes(1));
+
+    // An accepted AI fix mutates the draft content (same id, new object). The
+    // panel must NOT run a fresh pass on that — doing so re-shuffles every other
+    // finding under the writer (the reported bug).
+    // biome-ignore lint/suspicious/noExplicitAny: minimal Draft stub
+    const edited: any = {
+      ...draft,
+      sections: [{ id: "s1", title: "S", content_md: "x rewritten by an accepted fix" }],
+    };
+    rerender(<HumanizePanel draft={edited} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(analyzeHumanize).toHaveBeenCalledTimes(1);
+  });
+
   it("skips re-analyzing when a cached report exists for the current content + intensity", async () => {
     const hash = hashDraftContent(draft);
     const cached = {
