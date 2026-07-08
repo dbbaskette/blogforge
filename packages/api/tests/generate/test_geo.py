@@ -1,7 +1,7 @@
 import json
 from uuid import uuid4
 
-from blogforge.drafts.models import Draft, IdeaInput, Section
+from blogforge.drafts.models import Draft, IdeaInput, Reference, Section
 from blogforge.generate.geo import (
     _IMPACTS,
     _LABELS,
@@ -698,3 +698,66 @@ async def test_rescore_returns_only_the_requested_semantic_lever(tmp_path) -> No
     out = await rescore_geo(d, ["answer_first"], _fake_pack(tmp_path), _JsonLLM(raw), model="m")
     assert set(out) == {"answer_first"}
     assert out["answer_first"]["score"] == 55
+
+
+async def test_semantic_prompt_includes_attached_sources(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """The draft's attached references (and the voice profile's background
+    sources) must reach the semantic prompt so the citations lever can match
+    claims against sources the author already collected."""
+    from blogforge.generate.geo import _run_semantic
+
+    captured: dict[str, str] = {}
+
+    class FakeProvider:
+        name = "fake"
+
+        async def complete(self, **kw):  # type: ignore[no-untyped-def]
+            from blogforge.llm.base import LLMResponse
+
+            captured["prompt"] = kw["prompt"]
+            return LLMResponse(
+                text="{}", input_tokens=1, output_tokens=1, model="m", finish_reason="stop"
+            )
+
+    d = _draft([_sec("Intro", "Latency dropped 40 percent after the change.")])
+    d.references = [
+        Reference(
+            id="r1",
+            kind="url",
+            name="Tanzu 10.4 release notes",
+            url="https://docs.example/tanzu",
+        )
+    ]
+    await _run_semantic(d, _fake_pack(tmp_path), FakeProvider(), model="m", extra_sources="")
+    assert "ATTACHED SOURCES" in captured["prompt"]
+    assert "Tanzu 10.4 release notes" in captured["prompt"]
+    assert "https://docs.example/tanzu" in captured["prompt"]
+
+
+def test_parse_semantic_citations_carries_suggestion_and_matched_url() -> None:
+    d = _draft([_sec("Intro", "Latency dropped 40 percent after the change.")])
+    raw = json.dumps(
+        {
+            "answer_first": {"score": 80, "note": "ok"},
+            "definitional_opener": {"score": 80, "note": "ok", "has_definition": True},
+            "factual_density": {"score": 80, "note": "ok"},
+            "brand_explicit": {"score": 80, "note": "ok"},
+            "citations": {
+                "score": 50,
+                "note": "1 source attached; 0 cited in-text",
+                "uncited_claims": [
+                    {
+                        "target": "Latency dropped 40 percent after the change.",
+                        "note": "matches your attached: Tanzu 10.4 release notes",
+                        "suggestion": "Latency dropped 40 percent after the change, per the "
+                        "[Tanzu 10.4 release notes](https://docs.example/tanzu).",
+                        "matched_source_url": "https://docs.example/tanzu",
+                    }
+                ],
+            },
+        }
+    )
+    f = parse_semantic(raw, d)["citations"]["findings"][0]
+    assert f["fix"] == "cite_reference"
+    assert f["suggestion"].startswith("Latency dropped")
+    assert f["matched_source_url"] == "https://docs.example/tanzu"

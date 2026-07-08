@@ -713,6 +713,8 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                         "properties": {
                             "target": {"type": "string"},
                             "note": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                            "matched_source_url": {"type": "string"},
                             "impact": {"type": "string"},
                         },
                         "required": ["target"],
@@ -805,10 +807,16 @@ _SEMANTIC_DIRECTIVE = (
     "citation. Put the brand you detect in `brand`, set `stated_up_top` true if it "
     "appears in the first section, and score how clearly/early it's named. Never "
     "invent a brand — if none is evident, say so in `note` and score low.\n"
-    "5) citations: do concrete, checkable claims carry a source — a named origin "
-    "or an outbound link? Score how well claims are attributed. In `uncited_claims` "
-    "quote up to 3 passages that assert something checkable with no source; in each "
-    "`note` say what kind of source would back it. Never invent sources.\n"
+    "5) citations: do concrete, checkable claims carry a source? FIRST match each "
+    "uncited claim against the ATTACHED SOURCES list when one is provided: when a "
+    "claim matches an attached source, emit a finding whose `note` names it "
+    "('matches your attached: <title>'), whose `matched_source_url` is that URL, and "
+    "whose `suggestion` is the claim sentence rewritten VERBATIM with the markdown "
+    "link inserted at natural anchor text. Only for claims NO attached source covers, "
+    "say the specific KIND of source to find (e.g. 'a dated benchmark for the latency "
+    "claim') — never a generic 'add sources'. When sources are attached, the lever "
+    "`note` should acknowledge them ('N sources attached; M cited in-text'). Never "
+    "invent sources.\n"
     "Finally, in `coverage.missing_subquestions` list up to 4 natural sub-questions "
     "of this topic a search engine would decompose the query into that this draft "
     "does NOT answer — only questions genuinely in-scope for the title.\n"
@@ -962,6 +970,11 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
             "target": str(c.get("target", "")).strip(),
             "note": str(c.get("note", "")).strip() or "This claim has no source.",
             "fix": "cite_reference",
+            # When the claim matches an attached source, the model returns the
+            # rewritten sentence (with the markdown link spliced in) and the
+            # source URL — so the client can apply the cite WITHOUT a model call.
+            "suggestion": str(c.get("suggestion", "")).strip(),
+            "matched_source_url": str(c.get("matched_source_url", "")).strip(),
             "impact": str(c.get("impact", "")).strip() or _IMPACTS.get("citations", ""),
         }
         for c in claims
@@ -1060,17 +1073,33 @@ _SEMANTIC_KEYS = frozenset(
 
 
 async def _run_semantic(
-    draft: Draft, pack_root: Path, provider: LLMProvider, *, model: str
+    draft: Draft, pack_root: Path, provider: LLMProvider, *, model: str, extra_sources: str = ""
 ) -> dict[str, dict[str, Any]]:
     """The single voice-aware LLM pass → the four judgment levers (answer-first,
     definitional opener, factual density, brand), with the deterministic augments
-    applied. Shared by the full report and the targeted re-score."""
+    applied. Shared by the full report and the targeted re-score.
+
+    `extra_sources` carries the voice profile's background-source block so the
+    citations lever can match claims against sources the author already
+    collected (in addition to the draft's own attached references)."""
     from blogforge.voice import compose_prompt
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    # The sources the author has ALREADY collected — the draft's attached
+    # references plus the voice profile's background sources. The citations
+    # rubric tells the model to match claims against these FIRST, so it stops
+    # nagging "no sources cited" when a source is right there to cite.
+    refs = getattr(draft, "references", None) or []
+    ref_lines = "\n".join(f"- {r.name or r.url}: {r.url or ''}" for r in refs)
+    sources_block = ""
+    if ref_lines or extra_sources:
+        sources_block = (
+            "\n\nATTACHED SOURCES (the author already collected these — use them FIRST):\n"
+            f"{ref_lines}\n{extra_sources}\n"
+        )
     prompt = (
         f"{system}\n\n---\n\n{_SEMANTIC_DIRECTIVE}\n\n"
-        f"Return JSON matching: {_SEMANTIC_EXAMPLE}.\n\nDRAFT:\n"
+        f"Return JSON matching: {_SEMANTIC_EXAMPLE}.{sources_block}\n\nDRAFT:\n"
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
@@ -1088,10 +1117,13 @@ async def analyze_geo(
     provider: LLMProvider,
     *,
     model: str,
+    extra_sources: str = "",
 ) -> dict[str, Any]:
     """Full GEO report: deterministic structural levers + one semantic LLM pass."""
     structural = score_structural(draft)
-    semantic = await _run_semantic(draft, pack_root, provider, model=model)
+    semantic = await _run_semantic(
+        draft, pack_root, provider, model=model, extra_sources=extra_sources
+    )
     # Sub-question coverage gaps (from the semantic pass) surface as advisory
     # "not covered" findings on the structural FAQ lever — the FAQ fix answers them.
     missing = semantic.pop("_coverage", [])
@@ -1110,6 +1142,7 @@ async def rescore_geo(
     provider: LLMProvider,
     *,
     model: str,
+    extra_sources: str = "",
 ) -> dict[str, dict[str, Any]]:
     """Re-score ONLY the requested levers after a targeted fix. Structural levers
     recompute instantly (no LLM); semantic levers need one LLM pass. Everything
@@ -1121,7 +1154,9 @@ async def rescore_geo(
         structural = score_structural(draft)
         out.update({k: structural[k] for k in want & _STRUCTURAL_KEYS if k in structural})
     if want & _SEMANTIC_KEYS:
-        semantic = await _run_semantic(draft, pack_root, provider, model=model)
+        semantic = await _run_semantic(
+            draft, pack_root, provider, model=model, extra_sources=extra_sources
+        )
         out.update({k: semantic[k] for k in want & _SEMANTIC_KEYS if k in semantic})
     return out
 

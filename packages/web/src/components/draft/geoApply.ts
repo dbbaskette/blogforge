@@ -168,6 +168,18 @@ export function makeGeoApply(
             field: "title",
           };
         }
+        // Fast path: a citations claim matched to an attached source carries its
+        // rewrite up front — `suggestion` is the claim with the source's markdown
+        // link spliced in — so it applies client-side with NO model call (like
+        // Humanize). Scoped to cite_reference so a factual_density suggestion
+        // (guidance text, not a replacement) never gets spliced in verbatim.
+        // Needs a locatable target; otherwise fall through to the model rewrite.
+        if (issue.fixKind === "cite_reference" && issue.suggestion?.trim() && target) {
+          const after = before.replace(target, issue.suggestion);
+          if (after === before) return null;
+          if (persist) await save(sectionId, after, field);
+          return { sectionId, before, after, highlight: issue.suggestion, field };
+        }
         const source = target ?? before;
         if (!source.trim()) return null;
         const instruction =

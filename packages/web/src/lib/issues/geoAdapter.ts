@@ -61,13 +61,20 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
     lever.findings.forEach((finding, i) => {
       const fix = finding.fix ?? "";
       const spec = specFor(lever, fix);
+      // A citations claim matched to an attached source already carries its
+      // rewrite (the link spliced in): offer a one-click AI fix that applies it
+      // client-side, instead of the manual "supply a source" (cite_source) flow.
+      const specActions =
+        fix === "cite_reference" && finding.suggestion
+          ? (["ai_fix", "manual_fix", "highlight"] as IssueAction[])
+          : spec.actions;
       // Highlight only makes sense when there's something to locate. A finding
       // with neither a target nor a section (a document-global advisory like
       // "no dates anywhere") would highlight nothing — drop the dead button.
       const actions =
         !finding.target && !finding.section_id
-          ? spec.actions.filter((a) => a !== "highlight")
-          : spec.actions;
+          ? specActions.filter((a) => a !== "highlight")
+          : specActions;
       issues.push({
         id: `${lever.key}:${i}`,
         panel: "geo",
@@ -77,6 +84,10 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         nature: spec.nature,
         sectionId: finding.section_id ?? "",
         target: finding.target,
+        // A citations finding that matched an attached source carries the
+        // rewritten sentence (link spliced in) — apply uses it as a client-side
+        // splice, no model call (like Humanize).
+        suggestion: finding.suggestion,
         // The specific fix the apply layer dispatches on (finding-level, then
         // lever-level, then the lever key as a last resort).
         fixKind: fix || lever.fix || lever.key,
