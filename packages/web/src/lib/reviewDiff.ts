@@ -68,6 +68,9 @@ export function reviewDiff(before: string, after: string): DiffSeg[] {
  * kept (contextWords each side) and the elided middle becomes an "…" marker.
  */
 export function trimContext(segs: DiffSeg[], contextWords = 12): DiffSeg[] {
+  // A diff with no changes needs no trimming — and must not grow "…" markers
+  // that would imply an adjacent change.
+  if (segs.length === 1 && segs[0]?.kind === "same") return segs;
   return segs.map((seg, idx) => {
     if (seg.kind !== "same") return seg;
     const words = seg.text.split(" ");
