@@ -25,7 +25,12 @@ command -v claude >/dev/null 2>&1 \
   || echo "⚠ 'claude' not on PATH — the claude-cli provider will be unavailable" >&2
 
 echo "▶ building web bundle into the API static dir…"
-( cd packages/web && pnpm build >/dev/null )
+# Stamp the bundle's version badge from package.json (single source of truth —
+# bump with scripts/version.sh) plus the local commit, so the UI shows e.g.
+# "v0.2.0 · 9e27673" and matches /api/health.
+APP_VERSION="$(node -p "require('./packages/web/package.json').version" 2>/dev/null || echo 0.0.0)"
+GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
+( cd packages/web && VITE_APP_VERSION="$APP_VERSION" VITE_GIT_SHA="$GIT_SHA" pnpm build >/dev/null )
 rm -rf packages/api/blogforge/static
 mkdir -p packages/api/blogforge/static
 cp -R packages/web/dist/. packages/api/blogforge/static/
