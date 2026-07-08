@@ -2,6 +2,7 @@
 - Real thinking is not metronomic. Some thoughts land in three words; others unspool across a long clause before they resolve. Break any run of same-length sentences.
 - Read each sentence as if said aloud. Where a real speaker would pause or change pace, the writing should too. A sentence with nowhere to breathe reads like a document, not a person.
 - Vary how paragraphs open. Do not march.
+- Also flag staccato paired-list runs — consecutive short "X and Y." sentences (or fragments starting "As well as") that chop a list into uniform pieces.
 
 ## voice — Voice & POV
 - The writer has a stance. Say what they actually think, not a balanced survey of what could be thought.

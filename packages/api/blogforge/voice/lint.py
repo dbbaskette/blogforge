@@ -90,6 +90,16 @@ _AI_VAGUE_ATTRIBUTION = re.compile(
     r"claim[s]?|argue[s]?|agree[s]?|point\s+out|have\s+(?:shown|noted|argued|found))\b",
     re.IGNORECASE,
 )
+# Staccato paired-list runs — "Isolation and security. Cost and control. As
+# well as speed and scale." Two+ consecutive short bare-pair sentences (a
+# single "and", no other connective) read as a chopped-up list; humans vary
+# the joinery. Also flags any sentence STARTING "As well as" (a fragment
+# masquerading as a sentence).
+_PAIR_SENTENCE = re.compile(
+    r"^[A-Z][\w'-]*(?:\s+[\w'-]+){0,4}\s+and\s+[\w'-]+(?:\s+[\w'-]+){0,4}[.!?]$"
+)
+_AS_WELL_AS_START = re.compile(r"(?m)(?:^|(?<=[.!?]\s))As well as\b[^.!?]*[.!?]")
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
 def detect_positive_hits(text: str) -> list[LintHit]:
@@ -150,6 +160,47 @@ def detect_ai_patterns(text: str) -> list[LintHit]:
                 rule_id=rule_id,
                 message=message,
             ))
+
+    # Staccato pair runs: walk sentences, flag a run of >=2 consecutive
+    # bare-pair sentences (each <=12 words, single "and").
+    sentences: list[tuple[int, str]] = []
+    pos = 0
+    for part in _SENT_SPLIT.split(text):
+        idx = text.find(part, pos)
+        if idx >= 0:
+            sentences.append((idx, part.strip()))
+            pos = idx + len(part)
+    run_start: int | None = None
+    run_len = 0
+    run_end = 0
+    for idx, sent in [*sentences, (len(text), "")]:
+        words = sent.split()
+        is_pair = bool(sent) and len(words) <= 12 and bool(_PAIR_SENTENCE.match(sent))
+        if is_pair:
+            if run_start is None:
+                run_start = idx
+            run_len += 1
+            run_end = idx + len(sent)
+        else:
+            if run_start is not None and run_len >= 2:
+                hits.append(LintHit(
+                    start=_utf16_offset(text, run_start),
+                    end=_utf16_offset(text, run_end),
+                    kind="rule",
+                    rule_id="ai_pattern:staccato_pairs",
+                    message="Staccato paired-list run — connect the ideas or use a real list.",
+                ))
+            run_start = None
+            run_len = 0
+
+    for m in _AS_WELL_AS_START.finditer(text):
+        hits.append(LintHit(
+            start=_utf16_offset(text, m.start()),
+            end=_utf16_offset(text, m.end()),
+            kind="rule",
+            rule_id="ai_pattern:staccato_pairs",
+            message='Sentence fragment starting "As well as" — fold it into the previous sentence.',
+        ))
     return hits
 
 
