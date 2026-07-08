@@ -59,7 +59,7 @@ export function GeoReviewRail({
   );
   const apply = useMemo(() => makeGeoApply(ctx), [ctx]);
   const save = useMemo(() => makeGeoSave(ctx), [ctx]);
-  const { statusOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
+  const { statusOf, errorOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save,
@@ -110,6 +110,7 @@ export function GeoReviewRail({
                   key={issue.id}
                   issue={{ ...issue, status: statusOf(issue) }}
                   busy={busyId === issue.id}
+                  error={errorOf(issue)}
                   onAction={(action, inputText) => void run(issue, action, inputText)}
                   onAccept={() => accept(issue)}
                   onUndo={() => void undo(issue)}

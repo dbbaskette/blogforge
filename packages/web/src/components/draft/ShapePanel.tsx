@@ -7,9 +7,29 @@ import {
   type Suggestion,
   suggestImprovements,
 } from "../../api/suggest";
-import { formatAgo, getCached, hashDraftContent, setCached } from "../../lib/panelCache";
+import { formatAgo, hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
 import { BusyOverlay } from "../ui/BusyOverlay";
 import { useDialogA11y } from "../ui/useDialogA11y";
+
+// Persist which Shape suggestions the writer dismissed, so a reopened panel
+// keeps them hidden instead of re-showing every card. Keyed by draft.
+const shapeDismissedKey = (draftId: string): string => `bf.shape.dismissed.${draftId}`;
+
+function loadShapeDismissed(draftId: string): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(shapeDismissedKey(draftId)) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistShapeDismissed(draftId: string, keys: Set<string>): void {
+  try {
+    localStorage.setItem(shapeDismissedKey(draftId), JSON.stringify([...keys]));
+  } catch {
+    /* non-fatal */
+  }
+}
 
 const KIND_META: Record<SuggestKind, { icon: string; label: string; hint: string }> = {
   fact_check: {
@@ -51,6 +71,9 @@ export function ShapePanel({
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [cachedAt, setCachedAt] = useState<number | null>(null);
+  // Saved suggestions predate the current content — keep showing them until the
+  // writer chooses to Re-run.
+  const [stale, setStale] = useState(false);
 
   const contentHash = useMemo(() => hashDraftContent(draft), [draft]);
 
@@ -64,6 +87,8 @@ export function ShapePanel({
       setResult(fresh);
       setCached("shape", draft.id, hashDraftContent(draft), fresh);
       setDismissed(new Set());
+      persistShapeDismissed(draft.id, new Set());
+      setStale(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -71,20 +96,28 @@ export function ShapePanel({
     }
   }, [draft]);
 
-  // On open: reuse the last result if the draft is unchanged (even when not
-  // auto-offered); otherwise auto-run only when offered. Re-run bypasses cache.
+  // On open: restore the last saved suggestions and dismissals ALWAYS — even
+  // after edits. A fresh pass only happens on an explicit Re-run, or the first
+  // time (autoRun) when nothing is saved yet. `stale` flags "edited since scan".
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
-    const hit = getCached<SuggestResult>("shape", draft.id, contentHash);
-    if (hit) {
-      setResult(hit.data);
-      setCachedAt(hit.at);
+    const saved = peekCached<SuggestResult>("shape", draft.id);
+    if (saved) {
+      setResult(saved.data);
+      setCachedAt(saved.at);
+      setStale(saved.hash !== contentHash);
+      setDismissed(loadShapeDismissed(draft.id));
     } else if (autoRun) {
       run();
     }
   }, []);
 
-  const dismiss = (key: string): void => setDismissed((p) => new Set(p).add(key));
+  const dismiss = (key: string): void =>
+    setDismissed((p) => {
+      const next = new Set(p).add(key);
+      persistShapeDismissed(draft.id, next);
+      return next;
+    });
 
   /** Splice `replacement` in for the first exact occurrence of `target`. */
   function spliceSection(target: string, replacement: string): { id: string; next: string } | null {
@@ -187,7 +220,18 @@ export function ShapePanel({
         </h2>
         {cachedAt !== null && !busy && (
           <p className="mt-1 text-xs text-muted-2">
-            Suggested {formatAgo(cachedAt)} · draft unchanged since
+            Suggested {formatAgo(cachedAt)} ·{" "}
+            {stale ? (
+              <button
+                type="button"
+                onClick={run}
+                className="font-medium text-amber-ink underline underline-offset-2 hover:text-ink"
+              >
+                draft edited since — Re-run
+              </button>
+            ) : (
+              "draft unchanged since"
+            )}
           </p>
         )}
       </header>

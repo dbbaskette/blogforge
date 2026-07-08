@@ -16,7 +16,7 @@ import { type Draft, lintDraft } from "../../api/drafts";
 import { type GeoReport, analyzeGeo, rescoreGeo } from "../../api/geo";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
-import { getCached, hashDraftContent, setCached } from "../../lib/panelCache";
+import { hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
 import { HighlightedText } from "../review/HighlightedText";
 import { BusyOverlay } from "../ui/BusyOverlay";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
@@ -64,6 +64,9 @@ export function OptimizePanel({
   const panelRef = useDialogA11y(true, onClose);
   const [report, setReport] = useState<GeoReport | null>(null);
   const [busy, setBusy] = useState(false);
+  // The saved scan predates the current draft content — findings may be out of
+  // date, but we keep showing them until the writer chooses to Re-analyze.
+  const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // True while a targeted per-lever re-score is in flight after a fix.
   const [rescoring, setRescoring] = useState(false);
@@ -125,6 +128,7 @@ export function OptimizePanel({
       const fresh = await analyzeGeo(draft.id);
       setReport(fresh);
       setCached("geo", draft.id, h, fresh);
+      setStale(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -132,13 +136,17 @@ export function OptimizePanel({
     }
   }, [draft]);
 
-  // On open: show the last result instantly if the draft hasn't changed since;
-  // otherwise run a fresh scan.
+  // On open: restore the last saved scan and its resolutions — ALWAYS, even if
+  // the draft was edited since. A fresh scan is a deliberate act (Re-analyze),
+  // never a silent side-effect of reopening. Only scan automatically when there
+  // is no saved report at all. `stale` flags "edited since this scan" so the
+  // header can nudge a re-run.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
-    const hit = getCached<GeoReport>("geo", draft.id, contentHash);
-    if (hit) {
-      setReport(hit.data);
+    const saved = peekCached<GeoReport>("geo", draft.id);
+    if (saved) {
+      setReport(saved.data);
+      setStale(saved.hash !== contentHash);
     } else {
       run();
     }
@@ -289,11 +297,19 @@ export function OptimizePanel({
             ))}
           </div>
           <span className="text-xs text-muted tabular-nums">{`${totalIssues} issues`}</span>
+          {stale && !busy && (
+            <span
+              className="flex items-center gap-1 text-[11px] font-medium text-amber-ink bg-amber-soft border border-amber/30 rounded-nb-sm px-2 py-0.5"
+              title="The draft has changed since this scan. Re-analyze for fresh findings."
+            >
+              <span aria-hidden>✎</span> edited since scan
+            </span>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
               onClick={run}
-              className="nb-btn nb-btn-ghost nb-btn-sm"
+              className={`nb-btn nb-btn-sm ${stale ? "bg-cobalt-50 text-cobalt-800 border-cobalt-200" : "nb-btn-ghost"}`}
               disabled={busy}
             >
               {busy ? "Analyzing…" : "Re-analyze"}

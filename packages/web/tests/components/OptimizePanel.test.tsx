@@ -22,6 +22,7 @@ vi.mock("../../src/api/references", () => ({ listReferences: vi.fn().mockResolve
 
 import { type GeoReport, analyzeGeo } from "../../src/api/geo";
 import { OptimizePanel } from "../../src/components/draft/OptimizePanel";
+import { setCached } from "../../src/lib/panelCache";
 
 const report: GeoReport = {
   score: 62,
@@ -92,6 +93,29 @@ describe("OptimizePanel", () => {
     // Right pane rail: the lever heading and its finding card.
     expect(screen.getByText("Answer-first sections")).toBeInTheDocument();
     expect(screen.getByText("This section buries its answer")).toBeInTheDocument();
+  });
+
+  it("restores a saved report without re-analyzing, even after the draft was edited", async () => {
+    // A scan was saved earlier under a DIFFERENT content hash (draft since
+    // edited). Reopening must show the saved findings and NOT re-run analyze —
+    // fresh scans are a deliberate Re-analyze, never a side-effect of reopening.
+    setCached("geo", "d1", "some-old-hash", report);
+
+    render(
+      <OptimizePanel
+        draft={draft}
+        onSectionSave={vi.fn().mockResolvedValue(undefined)}
+        onChange={vi.fn().mockResolvedValue(undefined)}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // Saved score renders...
+    await waitFor(() => expect(screen.getByText("62")).toBeInTheDocument());
+    // ...without ever calling analyzeGeo...
+    expect(analyzeGeo).not.toHaveBeenCalled();
+    // ...and the "edited since scan" nudge appears (hash mismatch).
+    expect(screen.getByText(/edited since scan/i)).toBeInTheDocument();
   });
 
   it("shows a scoring state while analyze is in flight", () => {

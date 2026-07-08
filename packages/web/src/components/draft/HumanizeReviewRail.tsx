@@ -50,7 +50,7 @@ export function HumanizeReviewRail({
     () => (sectionId: string, content: string) => onSectionSave(sectionId, content),
     [onSectionSave],
   );
-  const { statusOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
+  const { statusOf, errorOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save,
@@ -99,6 +99,7 @@ export function HumanizeReviewRail({
                   key={issue.id}
                   issue={{ ...issue, status: statusOf(issue) }}
                   busy={busyId === issue.id}
+                  error={errorOf(issue)}
                   onAction={(action, inputText) => handleAction(issue, action, inputText)}
                   onAccept={() => accept(issue)}
                   onUndo={() => void undo(issue)}

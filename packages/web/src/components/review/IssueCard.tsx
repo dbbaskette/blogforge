@@ -33,6 +33,9 @@ interface IssueCardProps {
   /** Per-panel action-label overrides (e.g. Humanize renames "Highlight" to
    * "Jump to" since its heat-map already highlights every finding). */
   actionLabels?: Partial<Record<IssueAction, string>>;
+  /** An apply failure to show inline (e.g. the target text changed since the
+   * pass ran) — so a fix that couldn't apply is never a silent no-op. */
+  error?: string | null;
 }
 
 /**
@@ -48,6 +51,7 @@ export function IssueCard({
   onAccept,
   onUndo,
   actionLabels,
+  error,
 }: IssueCardProps): JSX.Element {
   const [openInput, setOpenInput] = useState<IssueAction | null>(null);
   const [text, setText] = useState("");
@@ -180,6 +184,12 @@ export function IssueCard({
             </button>
           ))}
         </div>
+      )}
+
+      {error && !openInput && (
+        <p className="mt-2 ml-4 text-[12px] leading-snug text-coral-ink" role="alert">
+          {error}
+        </p>
       )}
     </div>
   );

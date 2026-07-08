@@ -15,6 +15,7 @@ import { ResearchPanel } from "./ResearchPanel";
 import { SetupDisclosure } from "./SetupDisclosure";
 import { StageNav } from "./StageNav";
 import { WorkspaceFooter } from "./WorkspaceFooter";
+import { shouldShowDraftTools } from "./draftTools";
 
 // The sections stage carries the TipTap editor stack (the heaviest dependency
 // in the app) — lazy-load it so research/outline sessions and every other page
@@ -353,7 +354,10 @@ export function DraftWorkspace({
     setTimeout(() => setTemplateMsg(null), 2800);
   }, [draft.id, draft.title]);
 
-  const showFooter = draft.stage === "sections" && draft.sections.length > 0;
+  // Show the review/improve/export bar whenever there's composed prose to work
+  // on — not only on the Draft tab. (Resuming a draft on its outline stage, or
+  // flipping back to Outline, used to make every tool disappear.)
+  const showFooter = shouldShowDraftTools(draft.stage, draft.sections);
 
   return (
     <div className="max-w-6xl mx-auto px-4 lg:px-8 py-8 grid lg:grid-cols-[220px_minmax(0,1fr)] gap-8">
