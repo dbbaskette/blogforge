@@ -25,6 +25,9 @@ interface FixPreviewModalProps {
  * word-level change highlighting. NOTHING is saved until Apply. "Edit rewrite"
  * swaps the right pane for a textarea so a close-but-not-quite suggestion can
  * be adjusted without leaving the modal.
+ *
+ * Display reflow-normalizes whitespace (reviewDiff tokenizes on whitespace);
+ * the applied text is `after` verbatim, so this is presentation-only.
  */
 export function FixPreviewModal({
   title,
@@ -77,21 +80,31 @@ export function FixPreviewModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4"
-      onClick={onCancel}
+      onClick={() => {
+        if (!busy) onCancel();
+      }}
       role="presentation"
     >
       <div
         ref={ref}
         role="dialog"
         aria-modal="true"
-        aria-label="Compare fix"
+        aria-labelledby="fix-preview-title"
         className="nb-card w-[720px] max-w-full p-0 overflow-hidden animate-fade-up"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="px-5 py-3 border-b border-rule flex items-center gap-2.5">
           {leverLabel && <span className="nb-pill nb-pill-empty shrink-0">{leverLabel}</span>}
-          <h2 className="text-sm font-semibold text-ink truncate">{title}</h2>
-          <button type="button" onClick={onCancel} className="nb-icon-btn ml-auto" aria-label="Close">
+          <h2 id="fix-preview-title" className="text-sm font-semibold text-ink truncate">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="nb-icon-btn ml-auto"
+            aria-label="Close"
+            disabled={busy}
+          >
             ✕
           </button>
         </header>
@@ -101,9 +114,7 @@ export function FixPreviewModal({
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-2 mb-2">
               Original
             </p>
-            <p className="font-serif text-[15px] leading-relaxed text-ink whitespace-pre-wrap">
-              {pane("original")}
-            </p>
+            <p className="font-serif text-[15px] leading-relaxed text-ink">{pane("original")}</p>
           </div>
           <div className="px-5 py-4">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-2 mb-2">
@@ -116,9 +127,7 @@ export function FixPreviewModal({
                 onChange={(e) => setEdited(e.target.value)}
               />
             ) : (
-              <p className="font-serif text-[15px] leading-relaxed text-ink whitespace-pre-wrap">
-                {pane("rewrite")}
-              </p>
+              <p className="font-serif text-[15px] leading-relaxed text-ink">{pane("rewrite")}</p>
             )}
           </div>
         </div>
@@ -133,7 +142,16 @@ export function FixPreviewModal({
           <button type="button" className="nb-btn nb-btn-ghost nb-btn-sm" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          {!editing && (
+          {editing ? (
+            <button
+              type="button"
+              className="nb-btn nb-btn-ghost nb-btn-sm"
+              onClick={() => setEditing(false)}
+              disabled={busy}
+            >
+              Back to compare
+            </button>
+          ) : (
             <button
               type="button"
               className="nb-btn nb-btn-ghost nb-btn-sm"
