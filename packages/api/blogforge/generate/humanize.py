@@ -61,15 +61,20 @@ _LENS_HEADER_RE = re.compile(r"^([A-Za-z]+)\s*—\s*(.+)$")
 def parsed_lenses() -> list[dict[str, object]]:
     """Bundled lenses.md `## key — Title` sections -> [{key, title, points}] for
     the help page. The trailing `## GUARDRAIL (all lenses)` section is included
-    too, as key="guardrail" — the help page surfaces it alongside the lenses."""
+    too, as key="guardrail" — the help page surfaces it alongside the lenses.
+
+    Sections written as `- ` bullets contribute their bullet lines as points.
+    Sections written as plain prose (no bullets — e.g. GUARDRAIL) fall back to
+    their non-empty lines as points, so the rule text isn't silently dropped."""
     out: list[dict[str, object]] = []
     key: str | None = None
     title = ""
-    points: list[str] = []
+    bullets: list[str] = []
+    prose: list[str] = []
 
     def _flush() -> None:
         if key is not None:
-            out.append({"key": key, "title": title, "points": points})
+            out.append({"key": key, "title": title, "points": bullets or prose})
 
     for line in _bundled_rubric().splitlines():
         if line.startswith("## "):
@@ -77,9 +82,12 @@ def parsed_lenses() -> list[dict[str, object]]:
             header = line[3:].strip()
             m = _LENS_HEADER_RE.match(header)
             key, title = (m.group(1).lower(), m.group(2).strip()) if m else ("guardrail", header)
-            points = []
+            bullets = []
+            prose = []
         elif line.strip().startswith("- ") and key is not None:
-            points.append(line.strip()[2:].strip())
+            bullets.append(line.strip()[2:].strip())
+        elif line.strip() and key is not None:
+            prose.append(line.strip())
     _flush()
     return out
 
