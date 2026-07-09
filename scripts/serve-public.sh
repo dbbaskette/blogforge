@@ -20,5 +20,8 @@ while IFS= read -r v; do
   unset "$v"
 done < <(env | grep -oE '^(ANTHROPIC|CLAUDE)_[A-Za-z0-9_]+' || true)
 
-echo "▶ serving http://127.0.0.1:7880 (SQLite ~/.blogforge, claude-cli enabled)"
-exec .venv/bin/blogforge serve --host 127.0.0.1 --port 7880 --no-browser
+# Bind 0.0.0.0 so the cloudflared container reaches us via host.docker.internal
+# (Docker Desktop's gateway can't reach a 127.0.0.1-only bind). Access is still
+# gated by GitHub OAuth (allowlist), and the tunnel is the intended entrypoint.
+echo "▶ serving http://0.0.0.0:7880 (SQLite ~/.blogforge, claude-cli enabled)"
+exec .venv/bin/blogforge serve --host 0.0.0.0 --port 7880 --no-browser
