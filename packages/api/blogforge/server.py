@@ -220,6 +220,7 @@ def create_app() -> FastAPI:
     from blogforge.api.formats import router as formats_router
     from blogforge.api.geo import router as geo_router
     from blogforge.api.headlines import router as headlines_router
+    from blogforge.api.help import router as help_router
     from blogforge.api.hero import router as hero_router
     from blogforge.api.humanize import router as humanize_router
     from blogforge.api.ideation import router as ideation_router
@@ -266,6 +267,7 @@ def create_app() -> FastAPI:
     app.include_router(claims_router)
     app.include_router(events_router)
     app.include_router(geo_router)
+    app.include_router(help_router)
     app.include_router(humanize_router)
     app.include_router(suggest_router)
     app.include_router(topics_router)

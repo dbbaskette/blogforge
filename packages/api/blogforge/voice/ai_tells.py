@@ -7,6 +7,7 @@ prose, merged with a pack's own manifest rules. The lists are deduped unions
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib import resources
@@ -71,3 +72,16 @@ def effective_phrases(m: Manifest) -> list[str]:
 
 def effective_sentence_starters(m: Manifest) -> list[str]:
     return _dedup_ci([*load_ai_tells().sentence_starters, *m.rules.no_sentence_starters])
+
+
+_PATTERN_BULLET = re.compile(r"^- \*\*(.+?)\*\*\s*(.*)$")
+
+
+def parsed_patterns() -> list[dict[str, str]]:
+    """patterns.md bullets as {title, body} for the help page."""
+    out = []
+    for line in load_ai_tells().patterns.splitlines():
+        m = _PATTERN_BULLET.match(line.strip())
+        if m:
+            out.append({"title": m.group(1).rstrip("."), "body": m.group(2).strip()})
+    return out

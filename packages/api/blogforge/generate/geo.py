@@ -1621,3 +1621,20 @@ async def generate_citation(
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return resp.text.strip()
+
+
+def lever_catalog() -> list[dict[str, object]]:
+    """All GEO levers, in display order, for the help page — key/label/weight/
+    impact plus how each is detected: "judgment" (LLM semantic pass) vs
+    "structural" (deterministic regex/markdown check)."""
+    semantic = set(_SEMANTIC_KEYS)
+    return [
+        {
+            "key": k,
+            "label": _LABELS[k],
+            "weight": _WEIGHTS[k],
+            "impact": _IMPACTS.get(k, ""),
+            "detection": "judgment" if k in semantic else "structural",
+        }
+        for k in _ORDER
+    ]

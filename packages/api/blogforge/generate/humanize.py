@@ -55,6 +55,35 @@ def load_rubric(pack_root: Path | None) -> str:
     return _bundled_rubric()
 
 
+_LENS_HEADER_RE = re.compile(r"^([A-Za-z]+)\s*—\s*(.+)$")
+
+
+def parsed_lenses() -> list[dict[str, object]]:
+    """Bundled lenses.md `## key — Title` sections -> [{key, title, points}] for
+    the help page. The trailing `## GUARDRAIL (all lenses)` section is included
+    too, as key="guardrail" — the help page surfaces it alongside the lenses."""
+    out: list[dict[str, object]] = []
+    key: str | None = None
+    title = ""
+    points: list[str] = []
+
+    def _flush() -> None:
+        if key is not None:
+            out.append({"key": key, "title": title, "points": points})
+
+    for line in _bundled_rubric().splitlines():
+        if line.startswith("## "):
+            _flush()
+            header = line[3:].strip()
+            m = _LENS_HEADER_RE.match(header)
+            key, title = (m.group(1).lower(), m.group(2).strip()) if m else ("guardrail", header)
+            points = []
+        elif line.strip().startswith("- ") and key is not None:
+            points.append(line.strip()[2:].strip())
+    _flush()
+    return out
+
+
 _NUM_RE = re.compile(r"\d[\d,.]*")
 _URL_RE = re.compile(r"https?://\S+|\]\(([^)]+)\)")
 _QUOTE_RE = re.compile(r'"([^"]+)"')
