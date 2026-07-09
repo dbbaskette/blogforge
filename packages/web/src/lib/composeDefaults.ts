@@ -12,7 +12,9 @@ const KEY = "bf.compose.defaults";
 const FALLBACK: ComposeSettings = {
   pack_slug: "",
   format: null,
-  provider: "anthropic",
+  // Prefer the local Claude CLI (Max subscription) by default; SetupFields
+  // falls back to an available API-key provider when the binary isn't installed.
+  provider: "claude-cli",
   model: "",
   target_words: 1500,
   use_voice_profile: true,

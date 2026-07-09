@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Serve BlogForge on the host for the public deploy (blogforge.baskettecase.com).
-# SQLite + fs blobs in ~/.blogforge; claude-cli provider uses the host login.
+# SQLite + fs blobs in ~/.blogforge; the claude-cli provider authenticates via
+# CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) set in .env.public.
 # Supervised by the launchd agent com.baskettecase.blogforge. No rebuild on
 # start — build the web bundle + `uv sync` at install/update time.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+# Use the Homebrew-installed claude (/usr/local/bin) for the service, pinned
+# explicitly so the resolved binary doesn't depend on login-shell PATH order.
+# (The ~/.local/bin claude is the Desktop app's — left alone.)
+export PATH="/usr/local/bin:$PATH"
 
 [ -f .env.public ] && { set -a; . ./.env.public; set +a; } || { echo "❌ .env.public missing" >&2; exit 1; }
 
