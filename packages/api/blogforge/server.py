@@ -281,9 +281,16 @@ def create_app() -> FastAPI:
     if index.is_file() and not _is_dev_mode():
         static_root = static_dir.resolve()
 
+        # index.html (and any SPA-fallback HTML) must revalidate on every load so
+        # a new deploy is picked up on a normal reload — no hard refresh needed.
+        # The /assets/* bundles are content-hashed (their URL changes when they
+        # change), so they can be cached forever.
+        _HTML_CACHE = "no-cache"
+        _ASSET_CACHE = "public, max-age=31536000, immutable"
+
         @app.get("/", response_class=FileResponse)
         def root() -> FileResponse:
-            return FileResponse(index)
+            return FileResponse(index, headers={"Cache-Control": _HTML_CACHE})
 
         # SPA fallback: serve a real static file when one exists (hashed assets,
         # favicon, …), otherwise return index.html so client-side routes
@@ -295,8 +302,9 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail="Not Found")
             candidate = (static_dir / full_path).resolve()
             if candidate.is_file() and str(candidate).startswith(f"{static_root}/"):
-                return FileResponse(candidate)
-            return FileResponse(index)
+                cache = _ASSET_CACHE if full_path.startswith("assets/") else _HTML_CACHE
+                return FileResponse(candidate, headers={"Cache-Control": cache})
+            return FileResponse(index, headers={"Cache-Control": _HTML_CACHE})
     else:
 
         @app.get("/", response_class=HTMLResponse)
