@@ -7,9 +7,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Prefer the user-local claude (newer) over the Homebrew cask that the launchd
-# login-shell PATH would otherwise resolve first.
-export PATH="$HOME/.local/bin:$PATH"
+# Use the Homebrew-installed claude (/usr/local/bin) for the service, pinned
+# explicitly so the resolved binary doesn't depend on login-shell PATH order.
+# (The ~/.local/bin claude is the Desktop app's — left alone.)
+export PATH="/usr/local/bin:$PATH"
 
 [ -f .env.public ] && { set -a; . ./.env.public; set +a; } || { echo "❌ .env.public missing" >&2; exit 1; }
 
