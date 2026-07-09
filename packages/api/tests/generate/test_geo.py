@@ -38,8 +38,8 @@ def _lever_dict(key: str, score: int) -> dict:  # type: ignore[type-arg]
 def test_build_report_normalizes_by_present_weights() -> None:
     # Two levers present → weighted mean, not diluted by absent levers.
     levers = {"answer_first": _lever_dict("answer_first", 100), "faq": _lever_dict("faq", 50)}
-    # (100*.13 + 50*.04) / (.13+.04) = 88.24 → 88
-    assert build_report(levers)["score"] == 88
+    # (100*.09 + 50*.02) / (.09+.02) = 90.9 → 91
+    assert build_report(levers)["score"] == 91
 
 
 def test_parse_semantic_citations_lever_and_findings() -> None:
