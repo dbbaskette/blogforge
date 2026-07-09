@@ -340,7 +340,7 @@ export function OptimizePanel({
       {/* Two-column body: draft on the left, issue rail on the right. */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
         {/* Left pane — read view of the draft */}
-        <div className="flex-1 min-w-0 overflow-y-auto px-4 lg:px-8 py-6">
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto px-4 lg:px-8 py-6">
           <div className="max-w-2xl mx-auto">
             <h2 className="font-serif text-2xl md:text-3xl font-medium text-ink leading-tight tracking-tight mb-6">
               {draft.title.trim() ? (

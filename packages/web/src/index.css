@@ -37,9 +37,21 @@ html {
 }
 
 body {
-  background: linear-gradient(135deg, var(--wash-1) 0%, var(--wash-2) 55%, var(--wash-3) 100%) fixed;
+  background: var(--wash-1);
   color: #15224a;
   line-height: 1.55;
+}
+
+/* Fixed gradient wash rendered as a pinned layer behind the app, instead of
+   `background-attachment: fixed` on <body> — which janks/locks scrolling inside
+   overlaid scroll containers on iOS Safari (the modals wouldn't scroll). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(135deg, var(--wash-1) 0%, var(--wash-2) 55%, var(--wash-3) 100%);
 }
 
 ::selection {
