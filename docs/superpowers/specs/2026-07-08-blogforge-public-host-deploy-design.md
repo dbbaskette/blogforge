@@ -26,7 +26,7 @@
 | Run mode | **Native on host** (not a container) — required for `claude -p` subscription auth |
 | Data | SQLite + filesystem blobs in `~/.blogforge` (no Postgres/MinIO) |
 | Public exposure | **Existing** `baskettecase` Cloudflare Tunnel; new ingress rule → `host.docker.internal:7880` |
-| Sign-in | GitHub OAuth, **reuse existing OAuth App** (update its callback URL), allowlist = `dbbaskette` |
+| Sign-in | GitHub OAuth, **new OAuth App** dedicated to the public URL (keeps the localhost dev app intact), allowlist = `dbbaskette` |
 | Extra gating | **None** — allowlist only (no Cloudflare Access) |
 | Config home | The **blogforge repo** (`.env.public` + `scripts/serve-public.sh` + LaunchAgent plist), plus a 1-line ingress addition to the home-server repo |
 | Process supervision | macOS **launchd LaunchAgent** (`RunAtLoad` + `KeepAlive`) — the host equivalent of `restart: unless-stopped` |
@@ -127,10 +127,13 @@ exec .venv/bin/blogforge serve --host 127.0.0.1 --port 7880 --no-browser
 
 ## 5. Manual prerequisite (owner action)
 
-Update the **reused GitHub OAuth App**:
-- **Authorization callback URL** → `https://blogforge.baskettecase.com/api/auth/github/callback`
-- Provide **Client ID** + **Client Secret** for `.env.public`.
-- ⚠️ A GitHub OAuth App allows a single callback URL. If this app is the localhost dev app, switching it breaks local GitHub login — registering a **separate** app for the public deploy is cleaner (per `docs/github-oauth-setup.md` §1, which explicitly supports one app per environment). Owner's call.
+Register a **new, dedicated GitHub OAuth App** for the public deploy (leaves the localhost dev app untouched):
+- github.com → **Settings** → **Developer settings** → **OAuth Apps** → **New OAuth App** (direct: https://github.com/settings/applications/new).
+- **Application name:** `BlogForge (baskettecase.com)`
+- **Homepage URL:** `https://blogforge.baskettecase.com`
+- **Authorization callback URL:** `https://blogforge.baskettecase.com/api/auth/github/callback` (exact, no trailing slash)
+- Leave **Enable Device Flow** unchecked. Register, copy the **Client ID**, then **Generate a new client secret** and copy it (shown once).
+- Provide **Client ID** + **Client Secret** for `.env.public`. Scopes (`read:user user:email`) are requested per-authorization, so nothing to configure in the app.
 
 ## 6. Rollout order (with verification gates)
 
