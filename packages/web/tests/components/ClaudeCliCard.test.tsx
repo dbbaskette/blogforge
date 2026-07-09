@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as providers from "../../src/api/providers";
 import { ClaudeCliCard } from "../../src/components/settings/ClaudeCliCard";
-import { loadDefaults } from "../../src/lib/composeDefaults";
+import { loadDefaults, saveDefaults } from "../../src/lib/composeDefaults";
 
 beforeEach(() => localStorage.clear());
 
@@ -38,6 +38,9 @@ describe("ClaudeCliCard", () => {
       detail: "ok",
       resolve: "",
     });
+    // Start from a non-CLI default so the toggle begins unchecked, independent
+    // of the app's out-of-the-box default (which is now claude-cli).
+    saveDefaults({ ...loadDefaults(), provider: "anthropic" });
     render(<ClaudeCliCard />);
     const cb = await screen.findByRole("checkbox");
     fireEvent.click(cb);
