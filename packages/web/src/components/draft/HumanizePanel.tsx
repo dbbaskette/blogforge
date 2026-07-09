@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { type Draft, lintDraft } from "../../api/drafts";
 import { humanityScore } from "../../lib/checkup";
@@ -342,6 +343,12 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
             <img src="/humanize/mark.png" width={44} height={44} alt="humanize" />
             <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">Sound human</h2>
           </div>
+          <Link
+            to="/help#humanize"
+            className="mt-1 inline-block text-xs text-muted underline underline-offset-2 hover:text-ink"
+          >
+            How these rules work →
+          </Link>
 
           {stale && !loading && (
             <p className="mt-2 text-xs text-amber-ink">

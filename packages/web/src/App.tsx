@@ -6,6 +6,7 @@ import { AdminPage } from "./routes/AdminPage";
 import { ComposePage } from "./routes/ComposePage";
 import { DraftPage } from "./routes/DraftPage";
 import { DraftsPage } from "./routes/DraftsPage";
+import { HelpPage } from "./routes/HelpPage";
 import { LoginPage } from "./routes/LoginPage";
 import { SettingsPage } from "./routes/SettingsPage";
 import { TrashPage } from "./routes/TrashPage";
@@ -45,6 +46,14 @@ export function App(): JSX.Element {
           element={
             <RequireAuth>
               <SettingsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/help"
+          element={
+            <RequireAuth>
+              <HelpPage />
             </RequireAuth>
           }
         />

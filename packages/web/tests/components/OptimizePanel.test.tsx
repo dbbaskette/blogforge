@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/api/geo", async () => {
@@ -70,12 +71,14 @@ describe("OptimizePanel", () => {
 
   it("analyzes on mount and renders the score header, a section preview, and the rail", async () => {
     render(
-      <OptimizePanel
-        draft={draft}
-        onSectionSave={vi.fn().mockResolvedValue(undefined)}
-        onChange={vi.fn().mockResolvedValue(undefined)}
-        onClose={vi.fn()}
-      />,
+      <MemoryRouter>
+        <OptimizePanel
+          draft={draft}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onChange={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
     );
 
     // Analyze fires on mount.
@@ -102,12 +105,14 @@ describe("OptimizePanel", () => {
     setCached("geo", "d1", "some-old-hash", report);
 
     render(
-      <OptimizePanel
-        draft={draft}
-        onSectionSave={vi.fn().mockResolvedValue(undefined)}
-        onChange={vi.fn().mockResolvedValue(undefined)}
-        onClose={vi.fn()}
-      />,
+      <MemoryRouter>
+        <OptimizePanel
+          draft={draft}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onChange={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
     );
 
     // Saved score renders...
@@ -121,12 +126,14 @@ describe("OptimizePanel", () => {
   it("shows a scoring state while analyze is in flight", () => {
     vi.mocked(analyzeGeo).mockReturnValue(new Promise(() => {}));
     render(
-      <OptimizePanel
-        draft={draft}
-        onSectionSave={vi.fn().mockResolvedValue(undefined)}
-        onChange={vi.fn().mockResolvedValue(undefined)}
-        onClose={vi.fn()}
-      />,
+      <MemoryRouter>
+        <OptimizePanel
+          draft={draft}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onChange={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByText("Scoring your draft…")).toBeInTheDocument();
   });

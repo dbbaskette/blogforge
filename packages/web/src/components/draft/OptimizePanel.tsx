@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { type Draft, lintDraft } from "../../api/drafts";
 import { type GeoReport, analyzeGeo, rescoreGeo } from "../../api/geo";
@@ -278,6 +279,12 @@ export function OptimizePanel({
             ← Done
           </button>
           <h1 className="text-base font-semibold text-ink">Optimize</h1>
+          <Link
+            to="/help#geo"
+            className="text-xs text-muted underline underline-offset-2 hover:text-ink"
+          >
+            How these rules work →
+          </Link>
           <div className="flex gap-0.5 rounded-nb-sm bg-canvas p-0.5 text-xs" role="tablist">
             {(["seo", "proofreading", "all"] as ReviewView[]).map((v) => (
               <button
