@@ -8,6 +8,7 @@
  */
 
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 
 import type { Draft } from "../../api/drafts";
 import type { GeoReport } from "../../api/geo";
@@ -97,6 +98,14 @@ export function GeoReviewRail({
   return (
     <div className="space-y-4">
       {busyLabel && <BusyOverlay label={busyLabel} />}
+      <div className="flex items-center justify-end">
+        <Link
+          to="/help#geo"
+          className="text-xs text-muted underline underline-offset-2 hover:text-ink"
+        >
+          How these rules work →
+        </Link>
+      </div>
       {report.levers.map((lever) => {
         const leverIssues = byLever.get(lever.key) ?? [];
         if (leverIssues.length === 0) return null;

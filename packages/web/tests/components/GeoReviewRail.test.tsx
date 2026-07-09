@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/api/drafts", () => ({
@@ -57,13 +58,15 @@ describe("GeoReviewRail", () => {
 
   it("renders a card per finding under its lever", () => {
     render(
-      <GeoReviewRail
-        report={report}
-        draft={draft}
-        onSectionSave={vi.fn().mockResolvedValue(undefined)}
-        onTitleSave={vi.fn().mockResolvedValue(undefined)}
-        onOpeningSave={vi.fn().mockResolvedValue(undefined)}
-      />,
+      <MemoryRouter>
+        <GeoReviewRail
+          report={report}
+          draft={draft}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onTitleSave={vi.fn().mockResolvedValue(undefined)}
+          onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByText("Answer-first sections")).toBeInTheDocument();
     expect(screen.getByText("This section buries its answer")).toBeInTheDocument();
@@ -73,13 +76,15 @@ describe("GeoReviewRail", () => {
   it("AI fix opens the preview modal; Apply drives the api and saves", async () => {
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <GeoReviewRail
-        report={report}
-        draft={draft}
-        onSectionSave={onSectionSave}
-        onTitleSave={vi.fn().mockResolvedValue(undefined)}
-        onOpeningSave={vi.fn().mockResolvedValue(undefined)}
-      />,
+      <MemoryRouter>
+        <GeoReviewRail
+          report={report}
+          draft={draft}
+          onSectionSave={onSectionSave}
+          onTitleSave={vi.fn().mockResolvedValue(undefined)}
+          onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+        />
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: "AI fix" }));
     // The rewrite is computed for the preview, but nothing is saved yet.
@@ -104,13 +109,15 @@ describe("GeoReviewRail", () => {
     // localStorage, keyed by draftId) isolated from the accept/undo flow the
     // previous test already ran against "d1".
     render(
-      <GeoReviewRail
-        report={report}
-        draft={{ ...draft, id: "d-impact" }}
-        onSectionSave={vi.fn().mockResolvedValue(undefined)}
-        onTitleSave={vi.fn().mockResolvedValue(undefined)}
-        onOpeningSave={vi.fn().mockResolvedValue(undefined)}
-      />,
+      <MemoryRouter>
+        <GeoReviewRail
+          report={report}
+          draft={{ ...draft, id: "d-impact" }}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onTitleSave={vi.fn().mockResolvedValue(undefined)}
+          onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getByText(/up to 13 pts/i)).toBeInTheDocument();
     expect(screen.getByText(/GEO: Engines lift/)).toBeInTheDocument();

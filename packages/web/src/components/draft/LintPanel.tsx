@@ -1,4 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import {
   type ClaimResult,
@@ -262,6 +263,12 @@ export function LintPanel({
             <HumanityRing openCount={scoreOpen} hitCount={hits.length} />
           )}
         </div>
+        <Link
+          to="/help#humanize"
+          className="mt-1 inline-block text-xs text-muted underline underline-offset-2 hover:text-ink"
+        >
+          How these rules work →
+        </Link>
       </header>
 
       {error && (

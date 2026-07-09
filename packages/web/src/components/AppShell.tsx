@@ -120,6 +120,9 @@ function TopBar(): JSX.Element {
             <NavLink to="/voice" className="nb-btn-ghost nb-btn nb-btn-sm">
               Your Voice
             </NavLink>
+            <NavLink to="/help" className="nb-btn-ghost nb-btn nb-btn-sm">
+              Help
+            </NavLink>
             <NavLink to="/settings" className="nb-btn-ghost nb-btn nb-btn-sm">
               Settings
             </NavLink>

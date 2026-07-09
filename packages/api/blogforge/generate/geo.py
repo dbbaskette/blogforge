@@ -29,48 +29,62 @@ from blogforge.llm.base import LLMProvider
 # build_report normalizes by the weights actually PRESENT, so levers can land
 # across phases without deflating the total.
 _WEIGHTS: dict[str, float] = {
-    "answer_first": 0.13,
-    "factual_density": 0.13,
-    "citations": 0.09,
-    "definitional_opener": 0.06,
-    "question_headings": 0.06,
-    "skimmability": 0.06,
-    "brand_explicit": 0.04,
-    "faq": 0.04,
-    "chunking": 0.04,
-    "takeaways": 0.04,
-    "freshness": 0.04,
-    "comparison_table": 0.03,
-    "stat_attribution": 0.04,
+    "answer_first": 0.09,
+    "factual_density": 0.07,
+    "freshness": 0.06,
+    "citations": 0.06,
+    "information_gain": 0.06,
+    "semantic_triples": 0.05,
+    "expert_quotes": 0.05,
+    "stat_attribution": 0.05,
+    "answer_capsule": 0.04,
+    "page_front_load": 0.04,
+    "intent_format_match": 0.04,
+    "experience_signals": 0.04,
     "query_coverage": 0.04,
-    "sound_bites": 0.03,
-    "entity_consistency": 0.03,
-    "experience_signals": 0.03,
-    "jargon_defined": 0.03,
+    "definitional_opener": 0.03,
+    "question_headings": 0.03,
+    "skimmability": 0.03,
+    "chunking": 0.03,
+    "brand_explicit": 0.03,
+    "takeaways": 0.02,
+    "comparison_table": 0.02,
+    "faq": 0.02,
+    "definitive_language": 0.02,
+    "entity_consistency": 0.02,
+    "jargon_defined": 0.02,
     "concrete_examples": 0.02,
-    "title_shape": 0.02,
+    "sound_bites": 0.01,
+    "title_shape": 0.01,
 }
 # Display order in the panel (roughly by leverage).
 _ORDER = (
     "answer_first",
     "factual_density",
+    "freshness",
     "citations",
+    "information_gain",
+    "semantic_triples",
+    "expert_quotes",
     "stat_attribution",
+    "answer_capsule",
+    "page_front_load",
+    "intent_format_match",
+    "experience_signals",
     "query_coverage",
     "definitional_opener",
-    "takeaways",
-    "brand_explicit",
     "question_headings",
     "skimmability",
-    "freshness",
-    "comparison_table",
     "chunking",
+    "brand_explicit",
+    "takeaways",
+    "comparison_table",
     "faq",
-    "sound_bites",
+    "definitive_language",
     "entity_consistency",
-    "experience_signals",
     "jargon_defined",
     "concrete_examples",
+    "sound_bites",
     "title_shape",
 )
 _LABELS: dict[str, str] = {
@@ -94,6 +108,13 @@ _LABELS: dict[str, str] = {
     "jargon_defined": "Jargon defined on first use",
     "concrete_examples": "Worked examples",
     "title_shape": "Title shape",
+    "information_gain": "Original information",
+    "semantic_triples": "Direct S-V-O claims",
+    "intent_format_match": "Format matches intent",
+    "expert_quotes": "Named expert quotes",
+    "answer_capsule": "Answer capsule up top",
+    "page_front_load": "Facts front-loaded",
+    "definitive_language": "Definitive language",
 }
 
 # One concrete sentence of GEO mechanism per lever — WHY the lever moves
@@ -140,6 +161,20 @@ _IMPACTS: dict[str, str] = {
     "without one lose to pages that show it.",
     "title_shape": "A how-to/number/year hook under 60 chars survives SERP truncation and "
     "matches query templates.",
+    "information_gain": "Engines prefer non-commodity content — pages with first-party data "
+    "are ~4.5x more likely to be cited than re-reported summaries.",
+    "semantic_triples": "A direct subject-verb-object claim is what an engine copies whole; "
+    "a claim buried in a subordinate clause has to be rewritten to be quoted.",
+    "intent_format_match": "Engines map a query archetype straight to a matching structural "
+    "shape — a how-to that isn't numbered steps loses to one that is.",
+    "expert_quotes": "A named, credentialed third-party voice is independent corroboration — "
+    "engines weight it above the author's own unverified claims.",
+    "answer_capsule": "Indig's citation study found 40-75-word self-contained openers get "
+    "lifted verbatim at a 3.1x higher rate than longer or link-heavy ones.",
+    "page_front_load": "44.2% of AI citations draw from the first 30% of a page — facts "
+    "buried below that line are far less likely to be quoted.",
+    "definitive_language": "Definitive 'X is' statements get quoted roughly 2x more than "
+    "hedged ones — engines skip claims qualified with may/might/could.",
 }
 
 _QUESTION_WORDS = (
@@ -237,6 +272,29 @@ _ASOF_RE = re.compile(r"(?i)\bas of\b|\bupdated:?\b")
 
 _LONG_PARA_CHARS = 700
 _LONG_SECTION_WORDS = 400
+
+# Answer-capsule / front-load / definitive-language helpers (2026 batch).
+_MD_LINK_RE = re.compile(r"\[[^\]]+\]\([^)]+\)")
+# "may" is deliberately case-SENSITIVE (lowercase only): the capitalized month
+# ("as of May 2026", "in May, we shipped") must never be flagged as a hedge —
+# that's the exact dated-attribution shape the freshness/stat_attribution
+# levers reward, so miscounting it would have this lever contradict those. The
+# other hedge words stay case-insensitive; none of them collide with a proper
+# noun the way "may" does.
+_HEDGE_RE = re.compile(
+    r"\bmay\b|(?i:\b(?:might|could|perhaps|possibly|somewhat|arguably|it seems|it appears|"
+    r"some believe)\b)"
+)
+_DIGIT_RE = re.compile(r"\d")
+_SENT_SPLIT_GEO = re.compile(r"(?<=[.!?])\s+")
+
+
+def _first_paragraph(text: str) -> str:
+    for block in text.split("\n\n"):
+        b = block.strip()
+        if b and not b.startswith("#"):
+            return b
+    return ""
 
 
 def _has_table(text: str) -> bool:
@@ -601,6 +659,64 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         ]
     freshness = _lever("freshness", fr_score, fr_detail, findings=fr_findings)
 
+    full = _draft_text(draft)
+
+    # Answer capsule — a 40–75-word link-free opener naming the title entity
+    # (Indig: 72.4% citation rate; 40–75-word passages cited 3.1x more).
+    para = _first_paragraph(full)
+    wc = len(para.split())
+    title_tokens = [t for t in re.findall(r"[A-Za-z][\w-]+", draft.title or "") if len(t) > 3]
+    first_sentence = para.split(".")[0].lower()
+    names_entity = any(t.lower() in first_sentence for t in title_tokens) if title_tokens else True
+    capsule_ok = 40 <= wc <= 75 and not _MD_LINK_RE.search(para) and names_entity
+    cap_findings = []
+    if not capsule_ok:
+        why = (
+            f"Opening paragraph is {wc} words (target 40–75)" if not 40 <= wc <= 75
+            else "Opening paragraph contains links" if _MD_LINK_RE.search(para)
+            else "Opening sentence never names the subject"
+        )
+        cap_findings = [{"target": para[:200], "note": f"{why} — answer engines lift "
+                         "self-contained 40–75-word openers verbatim.", "fix": "capsule"}]
+    caps = _lever(
+        "answer_capsule",
+        90 if capsule_ok else (50 if 20 <= wc <= 110 else 30),
+        "Opening paragraph works as a liftable answer capsule." if capsule_ok
+        else "No 40–75-word self-contained, link-free opening capsule.",
+        findings=cap_findings,
+        fix="capsule" if cap_findings else None,
+    )
+
+    # Page front-load — share of digit-bearing (factual) sentences that land in
+    # the first 30% of the document (Indig: 44.2% of citations come from there).
+    sentences = [s for s in _SENT_SPLIT_GEO.split(full) if s.strip()]
+    facts = [i for i, s in enumerate(sentences) if _DIGIT_RE.search(s)]
+    if not facts or len(sentences) < 8:
+        front_load = _lever("page_front_load", 50,
+                            "Too little factual content to judge front-loading.")
+    else:
+        cutoff = max(1, int(len(sentences) * 0.30))
+        share = sum(1 for i in facts if i < cutoff) / len(facts)
+        front_load = _lever(
+            "page_front_load",
+            min(100, max(20, int(share * 200))),
+            f"{int(share * 100)}% of factual sentences sit in the first 30% of the piece.",
+        )
+
+    # Definitive language — hedge-word density (definitive "X is" claims are
+    # quoted ~2x more; hedged sentences get skipped).
+    hedged = [s.strip() for s in sentences if _HEDGE_RE.search(s)]
+    ratio = len(hedged) / max(1, len(sentences))
+    definitive = _lever(
+        "definitive_language",
+        max(0, int(100 - ratio * 400)),
+        f"{len(hedged)} of {len(sentences)} sentences hedge (may/might/could/perhaps).",
+        findings=[{"target": h[:200], "note": "Hedged claim — engines quote statements "
+                   "they can lift without qualification.", "fix": "definitive"}
+                  for h in hedged[:3]],
+        fix="definitive" if hedged else None,
+    )
+
     return {
         "question_headings": question,
         "skimmability": skim,
@@ -609,6 +725,9 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         "comparison_table": comparison,
         "takeaways": takeaways,
         "freshness": freshness,
+        "answer_capsule": caps,
+        "page_front_load": front_load,
+        "definitive_language": definitive,
     }
 
 
@@ -643,6 +762,11 @@ _NEW_SEMANTIC_KEYS = (
     "jargon_defined",
     "concrete_examples",
     "title_shape",
+    # 2026 research batch:
+    "information_gain",
+    "semantic_triples",
+    "intent_format_match",
+    "expert_quotes",
 )
 
 _SEMANTIC_SCHEMA: dict[str, object] = {
@@ -846,6 +970,26 @@ _SEMANTIC_DIRECTIVE = (
     "if weak. The draft's title is the first line of the document.\n"
     "For all findings: `target` must be VERBATIM text from the draft when it refers to "
     "a passage; omit `target` for document-level findings.\n"
+    "14) information_gain: does the draft contain ORIGINAL information — first-party "
+    "data ('we measured', 'our benchmark'), a novel case study, or a distinct point of "
+    "view — beyond what any summary of existing sources would say? Google's guidance "
+    "calls this 'non-commodity content' and it is the top citation driver. Flag "
+    "sections that only re-report common knowledge (suggestion = what first-party "
+    "detail the author could add). Never invent data.\n"
+    "15) semantic_triples: are the key claims stated as standalone subject-verb-object "
+    "assertions with a concrete named subject ('BlogForge strips AI tells "
+    "deterministically'), especially early in paragraphs and bullets? Flag key claims "
+    "buried in subordinate clauses (suggestion = the same claim recast as a direct "
+    "S-V-O sentence, preserving meaning).\n"
+    "16) intent_format_match: infer the query archetype the title targets (best/top → "
+    "comparative list; how-to → numbered steps; what-is → definition + Q&A) and score "
+    "whether the BODY structure matches it. Flag the mismatch (note = expected format, "
+    "suggestion = the structural change).\n"
+    "17) expert_quotes: does the piece quote named third-party experts with stated "
+    "credentials ('said Jane Doe, CTO at Acme')? Distinct from sound_bites (the "
+    "author's own lines). Flag sections that assert expert-level claims with no "
+    "third-party voice (suggestion = what kind of expert/source to quote). Never "
+    "fabricate quotes.\n"
 )
 
 
@@ -1064,6 +1208,9 @@ _STRUCTURAL_KEYS = frozenset(
         "comparison_table",
         "takeaways",
         "freshness",
+        "answer_capsule",
+        "page_front_load",
+        "definitive_language",
     }
 )
 _SEMANTIC_KEYS = frozenset(
@@ -1483,3 +1630,20 @@ async def generate_citation(
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return resp.text.strip()
+
+
+def lever_catalog() -> list[dict[str, object]]:
+    """All GEO levers, in display order, for the help page — key/label/weight/
+    impact plus how each is detected: "judgment" (LLM semantic pass) vs
+    "structural" (deterministic regex/markdown check)."""
+    semantic = set(_SEMANTIC_KEYS)
+    return [
+        {
+            "key": k,
+            "label": _LABELS[k],
+            "weight": _WEIGHTS[k],
+            "impact": _IMPACTS.get(k, ""),
+            "detection": "judgment" if k in semantic else "structural",
+        }
+        for k in _ORDER
+    ]

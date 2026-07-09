@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/api/humanize", () => ({
@@ -28,14 +29,22 @@ describe("HumanizePanel", () => {
   });
 
   it("runs the pass on open and shows the intensity dial", async () => {
-    render(<HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
     await waitFor(() => expect(analyzeHumanize).toHaveBeenCalledWith("d1", "medium"));
     expect(screen.getByRole("button", { name: /light/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /strong/i })).toBeInTheDocument();
   });
 
   it("renders the mark + dial head icons instead of the old ring", async () => {
-    render(<HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
     await waitFor(() => expect(analyzeHumanize).toHaveBeenCalled());
     const images = screen.getAllByRole("img") as HTMLImageElement[];
     const srcs = images.map((img) => img.getAttribute("src"));
@@ -46,12 +55,20 @@ describe("HumanizePanel", () => {
   });
 
   it("shows the HumannessPulse readout once the report loads", async () => {
-    render(<HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
     await waitFor(() => expect(screen.getByText("reads human")).toBeInTheDocument());
   });
 
   it("switching intensity re-runs the pass and persists the choice", async () => {
-    render(<HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
     await waitFor(() => expect(analyzeHumanize).toHaveBeenCalledWith("d1", "medium"));
 
     fireEvent.click(screen.getByRole("button", { name: /strong/i }));
@@ -61,7 +78,9 @@ describe("HumanizePanel", () => {
 
   it("does NOT re-analyze when the draft content changes (accepting a fix must not churn findings)", async () => {
     const { rerender } = render(
-      <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />,
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
     );
     await waitFor(() => expect(analyzeHumanize).toHaveBeenCalledTimes(1));
 
@@ -73,7 +92,11 @@ describe("HumanizePanel", () => {
       ...draft,
       sections: [{ id: "s1", title: "S", content_md: "x rewritten by an accepted fix" }],
     };
-    rerender(<HumanizePanel draft={edited} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    rerender(
+      <MemoryRouter>
+        <HumanizePanel draft={edited} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
 
     await new Promise((r) => setTimeout(r, 20));
     expect(analyzeHumanize).toHaveBeenCalledTimes(1);
@@ -88,7 +111,11 @@ describe("HumanizePanel", () => {
     };
     setCached("humanize", draft.id, `${hash}:medium`, cached);
 
-    render(<HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
     // Cached report renders — the radar's "soul" axis label shows up, replacing
     // the old plain-text lens-coverage strip...
     await waitFor(() => expect(screen.getByText("soul")).toBeInTheDocument());
@@ -124,7 +151,11 @@ describe("HumanizePanel", () => {
       outline: { opening_hook: "h" },
       sections: [{ id: "s1", title: "S", content_md: "The API serves as a gateway. It adds 5ms." }],
     };
-    render(<HumanizePanel draft={d} onSectionSave={vi.fn()} onClose={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={d} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
     // radar axis label — always rendered, engaged or not
     await waitFor(() => expect(screen.getByText("flow")).toBeInTheDocument());
     // the flagged sentence is heat-mapped in the read pane
@@ -162,7 +193,11 @@ describe("HumanizePanel", () => {
       outline: { opening_hook: "h" },
       sections: [{ id: "s1", title: "S", content_md: "The API serves as a gateway. It adds 5ms." }],
     };
-    render(<HumanizePanel draft={d} onSectionSave={onSectionSave} onClose={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={d} onSectionSave={onSectionSave} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
 
     const aiFix = await screen.findByRole("button", { name: "AI fix" });
     fireEvent.click(aiFix);
