@@ -154,7 +154,7 @@ export function SectionsPanel({
   };
 
   return (
-    <section className="space-y-4 animate-fade-up">
+    <section className="space-y-4">
       {references}
 
       {total > 0 && (
