@@ -19,7 +19,6 @@ import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
 import { hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
 import { HighlightedText } from "../review/HighlightedText";
-import { BusyOverlay } from "../ui/BusyOverlay";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { useDialogA11y } from "../ui/useDialogA11y";
 import { GeoReviewRail } from "./GeoReviewRail";
@@ -69,8 +68,10 @@ export function OptimizePanel({
   // date, but we keep showing them until the writer chooses to Re-analyze.
   const [stale, setStale] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // True while a targeted per-lever re-score is in flight after a fix.
-  const [rescoring, setRescoring] = useState(false);
+  // Which levers have a targeted re-score in flight after a fix. Non-blocking:
+  // the affected lever card shows an "updating" pill while the rest of the panel
+  // stays fully interactive; the score updates in place when the result lands.
+  const [inFlight, setInFlight] = useState<Set<string>>(new Set());
   // Segmented review view + lazily-loaded Proofreader findings.
   const [view, setView] = useState<ReviewView>("seo");
   const [lint, setLint] = useState<LintResult | null>(null);
@@ -163,7 +164,10 @@ export function OptimizePanel({
     const keys = [...pendingRescore.current].filter(Boolean);
     pendingRescore.current = new Set();
     if (keys.length === 0) return;
-    setRescoring(true);
+    // Mark just the levers the user acted on as updating (the collateral
+    // structural levers the server also refreshes update silently). Functional
+    // set updates so overlapping flushes don't clobber each other's keys.
+    setInFlight((prev) => new Set([...prev, ...keys]));
     try {
       const fresh = await rescoreGeo(draft.id, keys);
       setReport((prev) => {
@@ -175,7 +179,11 @@ export function OptimizePanel({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setRescoring(false);
+      setInFlight((prev) => {
+        const next = new Set(prev);
+        for (const k of keys) next.delete(k);
+        return next;
+      });
     }
   }, [draft.id]);
 
@@ -265,8 +273,6 @@ export function OptimizePanel({
       aria-label="Optimize"
       className="fixed inset-0 z-40 flex flex-col bg-canvas overflow-hidden"
     >
-      {rescoring && <BusyOverlay label="Re-scoring the changed lever…" />}
-
       {/* Slim header */}
       <header className="shrink-0 glass-bar border-b border-rule px-4 lg:px-6 py-3 sticky top-0 z-10">
         <div className="flex items-center gap-3">
@@ -415,15 +421,11 @@ export function OptimizePanel({
               {busy && !report && (
                 <p className="py-10 text-center text-sm text-muted">Scoring your draft…</p>
               )}
-              {rescoring && !busy && (
-                <div className="mb-4 px-3 py-2 rounded-nb-sm text-sm bg-cobalt-50 text-cobalt-800">
-                  Re-scoring the changed lever…
-                </div>
-              )}
               {report && (
                 <GeoReviewRail
                   report={report}
                   draft={draft}
+                  inFlight={inFlight}
                   onSectionSave={onSectionSave}
                   onOpeningSave={saveOpening}
                   onTitleSave={saveTitle}

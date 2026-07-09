@@ -37,6 +37,9 @@ export interface GeoReviewRailProps {
   /** Undo restores the pre-fix lever score instantly (no model re-run). */
   onRestoreLever?: (lever: string) => void;
   onHighlight?: (sectionId: string, text: string | null, kind: "under-review" | "locate") => void;
+  /** Lever keys whose targeted re-score is in flight — the header shows an
+   * "updating" pill on those while the rest of the card stays interactive. */
+  inFlight?: Set<string>;
 }
 
 export function GeoReviewRail({
@@ -48,6 +51,7 @@ export function GeoReviewRail({
   onRescore,
   onRestoreLever,
   onHighlight,
+  inFlight,
 }: GeoReviewRailProps): JSX.Element {
   // Resolve each finding's section up front (many backend findings tag a target
   // but no section_id) so highlight, apply, and undo all act on the same place.
@@ -118,12 +122,18 @@ export function GeoReviewRail({
                   up to {Math.round((lever.weight ?? 0) * 100)} pts
                 </span>
               </h3>
-              <span
-                className="text-xs font-mono tabular-nums"
-                style={{ color: barColor(lever.score) }}
-              >
-                {lever.score}
-              </span>
+              {inFlight?.has(lever.key) ? (
+                <span className="text-[11px] text-cobalt-700 font-medium animate-pulse tabular-nums">
+                  updating…
+                </span>
+              ) : (
+                <span
+                  className="text-xs font-mono tabular-nums"
+                  style={{ color: barColor(lever.score) }}
+                >
+                  {lever.score}
+                </span>
+              )}
             </div>
             <div className="h-1.5 w-full rounded-full bg-rule/60 overflow-hidden">
               <div
