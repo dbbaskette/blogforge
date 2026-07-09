@@ -33,10 +33,20 @@ export interface ProofreadApplyContext {
 
 export function makeProofreadApply(
   ctx: ProofreadApplyContext,
-): (issue: Issue, action: IssueAction, input?: string) => Promise<Applied | null> {
+): (
+  issue: Issue,
+  action: IssueAction,
+  input?: string,
+  opts?: { persist?: boolean },
+) => Promise<Applied | null> {
   const { draft, onSectionSave } = ctx;
 
-  return async (issue: Issue, action: IssueAction, input?: string): Promise<Applied | null> => {
+  return async (
+    issue: Issue,
+    action: IssueAction,
+    input?: string,
+    opts?: { persist?: boolean },
+  ): Promise<Applied | null> => {
     if (action === "dismiss") return { sectionId: issue.sectionId, before: "", after: "" };
 
     const section = draft.sections.find((s) => s.id === issue.sectionId);
@@ -64,7 +74,7 @@ export function makeProofreadApply(
     }
 
     const after = before.slice(0, span.s) + replacement + before.slice(span.e);
-    await onSectionSave(section.id, after);
+    if (opts?.persist !== false) await onSectionSave(section.id, after);
     return { sectionId: section.id, before, after, highlight: replacement };
   };
 }

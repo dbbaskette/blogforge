@@ -48,6 +48,8 @@ export interface Issue {
   /** Which controls this card shows, in order. */
   actions: IssueAction[];
   status: IssueStatus;
+  /** One-sentence concrete payoff (GEO panel: why this moves citations). */
+  impact?: string;
 }
 
 /** Actions that open an inline editor on the card (user supplies text). */

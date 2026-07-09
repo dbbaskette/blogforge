@@ -18,6 +18,7 @@ import { dismiss as dismissFinding, loadDismissed } from "../../lib/humanizeDism
 import { humanizeFindingsToIssues } from "../../lib/issues/humanizeAdapter";
 import { makeHumanizeApply } from "../../lib/issues/humanizeApply";
 import type { Issue, IssueAction } from "../../lib/issues/types";
+import { FixPreviewModal } from "../review/FixPreviewModal";
 import { IssueCard } from "../review/IssueCard";
 import { reviewBusyLabel } from "../review/reviewBusyLabel";
 import { useIssueLifecycle } from "../review/useIssueLifecycle";
@@ -43,14 +44,29 @@ export function HumanizeReviewRail({
     [report, dismissedIds],
   );
   const apply = useMemo(() => makeHumanizeApply(draft, onSectionSave), [draft, onSectionSave]);
-  // Undo only ever restores section body text (every Humanize finding targets
-  // content, never a title/opening), so a plain passthrough is enough here —
-  // makeHumanizeSave (target->suggestion splice) is for the AI-fix path.
+  // The lifecycle's save persists two things: the confirmed AI fix (from the
+  // preview modal) and an undo restore. Both are body-text writes (every
+  // Humanize finding targets content, never a title/opening), so a plain
+  // passthrough is enough — but it must createVersion, mirroring the old
+  // direct-apply path (makeHumanizeApply saved with createVersion=true) so a
+  // previewed fix is still a versioned edit.
   const save = useMemo(
-    () => (sectionId: string, content: string) => onSectionSave(sectionId, content),
+    () => (sectionId: string, content: string) => onSectionSave(sectionId, content, true),
     [onSectionSave],
   );
-  const { statusOf, errorOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
+  const {
+    statusOf,
+    errorOf,
+    busyId,
+    busyAction,
+    run,
+    accept,
+    undo,
+    preview,
+    requestPreview,
+    confirmPreview,
+    cancelPreview,
+  } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save,
@@ -63,8 +79,15 @@ export function HumanizeReviewRail({
       setDismissedIds(dismissFinding(draft.id, issue.id));
       return;
     }
+    if (action === "ai_fix") {
+      void requestPreview(issue, action, input);
+      return;
+    }
     void run(issue, action, input);
   };
+
+  const leverLabelFor = (key: string): string =>
+    report.lenses.find((l) => l.key === key)?.label ?? key;
 
   const byLens = useMemo(() => {
     const map = new Map<string, Issue[]>();
@@ -110,6 +133,18 @@ export function HumanizeReviewRail({
           </section>
         );
       })}
+      {preview && (
+        <FixPreviewModal
+          title={preview.issue.title}
+          leverLabel={leverLabelFor(preview.issue.lever)}
+          why={preview.issue.why}
+          before={preview.res.before}
+          after={preview.res.after}
+          busy={busyId === preview.issue.id}
+          onApply={(finalAfter) => void confirmPreview(finalAfter)}
+          onCancel={cancelPreview}
+        />
+      )}
     </div>
   );
 }

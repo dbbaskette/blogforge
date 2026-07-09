@@ -8,6 +8,7 @@ import { useMemo } from "react";
 
 import type { Draft } from "../../api/drafts";
 import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
+import { FixPreviewModal } from "../review/FixPreviewModal";
 import { IssueCard } from "../review/IssueCard";
 import { reviewBusyLabel } from "../review/reviewBusyLabel";
 import { useIssueLifecycle } from "../review/useIssueLifecycle";
@@ -29,13 +30,26 @@ export function ProofreadReviewRail({
 }: ProofreadReviewRailProps): JSX.Element {
   const issues = useMemo(() => proofreadFindingsToIssues(lint), [lint]);
   const apply = useMemo(() => makeProofreadApply({ draft, onSectionSave }), [draft, onSectionSave]);
-  const { statusOf, errorOf, busyId, busyAction, run, accept, undo } = useIssueLifecycle({
+  const {
+    statusOf,
+    errorOf,
+    busyId,
+    busyAction,
+    run,
+    accept,
+    undo,
+    preview,
+    requestPreview,
+    confirmPreview,
+    cancelPreview,
+  } = useIssueLifecycle({
     draftId: draft.id,
     apply,
     save: onSectionSave,
     onHighlight,
   });
   const busyLabel = reviewBusyLabel(busyAction);
+  const leverLabelFor = (): string => "Proofread";
 
   if (issues.length === 0) {
     return (
@@ -52,11 +66,27 @@ export function ProofreadReviewRail({
           issue={{ ...issue, status: statusOf(issue) }}
           busy={busyId === issue.id}
           error={errorOf(issue)}
-          onAction={(action, inputText) => void run(issue, action, inputText)}
+          onAction={(action, inputText) =>
+            action === "ai_fix"
+              ? void requestPreview(issue, action, inputText)
+              : void run(issue, action, inputText)
+          }
           onAccept={() => accept(issue)}
           onUndo={() => void undo(issue)}
         />
       ))}
+      {preview && (
+        <FixPreviewModal
+          title={preview.issue.title}
+          leverLabel={leverLabelFor()}
+          why={preview.issue.why}
+          before={preview.res.before}
+          after={preview.res.after}
+          busy={busyId === preview.issue.id}
+          onApply={(finalAfter) => void confirmPreview(finalAfter)}
+          onCancel={cancelPreview}
+        />
+      )}
     </div>
   );
 }

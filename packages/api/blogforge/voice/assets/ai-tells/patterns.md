@@ -16,3 +16,4 @@
 - **Don't disguise a list as prose.** Avoid "The first… The second… The third…" paragraphs that are a bulleted list in a trench coat. Make it a real list or connect the ideas with logic.
 - **No chatbot leftovers.** Cut conversational/reasoning leaks: "Certainly!", "Great question!", "Let's dive in", "Let me break this down", "I hope this helps", "In this article, we will".
 - **Don't end on "challenges and opportunities."** Avoid the closing cliché that lists obstacles then pivots to upbeat potential. End on a concrete point.
+- **Don't chop a list into paired fragments.** Avoid runs like "Isolation and security. Cost and control. As well as speed and scale." — uniform "X and Y." sentences are a list wearing punctuation. Connect the ideas with real logic, vary the sentence shapes, or use an actual list. Never start a sentence with "As well as".
