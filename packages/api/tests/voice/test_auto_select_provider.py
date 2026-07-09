@@ -1,9 +1,9 @@
 """`_auto_select_provider` — server-side provider default for keyless voice ops.
 
-The rule (matches the frontend picker): use a configured API key if the user has
-one; otherwise fall back to the keyless `claude -p` CLI when it's installed; then
-to a bound Tanzu gateway; else nothing. The claude-cli branch is the whole point
-of Docker-free local — a no-key user must still be able to distill.
+The rule: prefer the local `claude -p` CLI (keyless Max-subscription auth) when
+it's installed, over stored API keys — the user's subscription is the default
+writing engine. Fall back to a configured API key (anthropic > openai > google)
+when the CLI isn't installed, then a bound Tanzu gateway, else nothing.
 """
 
 from __future__ import annotations
@@ -16,11 +16,21 @@ from blogforge.api.voice import _auto_select_provider
 from blogforge.keys import KeyVault
 
 
-async def test_prefers_a_configured_api_key_over_claude_cli(
+async def test_prefers_claude_cli_over_a_configured_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Even with the CLI installed, an actual key wins (respect the user's keys).
+    # New rule: the installed CLI (subscription auth) wins over stored keys.
     monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: True)
+    user_id = uuid.uuid4()
+    await KeyVault(user_id).set("openai", "sk-openai")
+    assert await _auto_select_provider(user_id) == "claude-cli"
+
+
+async def test_uses_api_key_when_cli_not_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # No CLI -> fall back to a configured vault key.
+    monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: False)
     user_id = uuid.uuid4()
     await KeyVault(user_id).set("openai", "sk-openai")
     assert await _auto_select_provider(user_id) == "openai"
