@@ -36,6 +36,10 @@ interface IssueCardProps {
   /** An apply failure to show inline (e.g. the target text changed since the
    * pass ran) — so a fix that couldn't apply is never a silent no-op. */
   error?: string | null;
+  /** Hide the per-card `why` line. GEO groups cards under a lever whose detail
+   * is already shown at the group header, so repeating it on every card is
+   * noise; the rail passes false. Defaults to shown. */
+  showWhy?: boolean;
 }
 
 /**
@@ -52,6 +56,7 @@ export function IssueCard({
   onUndo,
   actionLabels,
   error,
+  showWhy = true,
 }: IssueCardProps): JSX.Element {
   const [openInput, setOpenInput] = useState<IssueAction | null>(null);
   const [text, setText] = useState("");
@@ -130,7 +135,9 @@ export function IssueCard({
         <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
         <span className="text-sm font-medium text-ink">{issue.title}</span>
       </div>
-      <p className="text-[13px] text-ink-2 leading-snug ml-4 mb-1.5">{issue.why}</p>
+      {showWhy && issue.why && (
+        <p className="text-[13px] text-ink-2 leading-snug ml-4 mb-1.5">{issue.why}</p>
+      )}
       {issue.impact && (
         <p className="text-[12px] leading-snug ml-4 mb-1.5 text-cobalt-700 italic">
           GEO: {issue.impact}

@@ -299,7 +299,7 @@ export function OptimizePanel({
                     : "text-muted hover:text-ink"
                 }`}
               >
-                {v === "seo" ? "SEO" : v === "proofreading" ? "Proofreading" : "All"}
+                {v === "seo" ? "GEO" : v === "proofreading" ? "Proofreading" : "All"}
               </button>
             ))}
           </div>
@@ -410,7 +410,7 @@ export function OptimizePanel({
           {(view === "seo" || view === "all") && (
             <div className="space-y-3">
               {view === "all" && (
-                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">SEO</h2>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">GEO</h2>
               )}
               {busy && !report && (
                 <p className="py-10 text-center text-sm text-muted">Scoring your draft…</p>

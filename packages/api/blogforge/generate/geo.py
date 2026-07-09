@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from blogforge.drafts.models import Draft
+from blogforge.generate.sanitize import strip_scaffolding
 from blogforge.generate.textutil import strip_inline_emphasis
 from blogforge.llm.base import LLMProvider
 
@@ -448,11 +449,14 @@ def _draft_text(draft: Draft) -> str:
     # The opening/lede lives above the first section (outline.opening_hook), so
     # it must lead the text the model scores — otherwise the definitional-opener
     # and answer-first levers judge the first SECTION instead of the real intro.
-    opening = draft.outline.opening_hook.strip() if draft.outline else ""
+    # Editorial scaffolding (parked material, alt versions, reminders) is stripped
+    # so no lever scores it and no generator (FAQ, opener, etc.) grounds output
+    # on it. This is the single choke point every generator reads through.
+    opening = strip_scaffolding(draft.outline.opening_hook) if draft.outline else ""
     if opening:
         parts.append(opening)
     for s in draft.sections:
-        body = s.content_md.strip()
+        body = strip_scaffolding(s.content_md)
         parts.append(f"## {s.title}\n\n{body}" if body else f"## {s.title}")
     return "\n\n".join(parts)
 
@@ -1018,11 +1022,31 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
 
     by_title = {_key(s.title): s.id for s in draft.sections}
 
+    def _match_section(raw: str) -> str | None:
+        # The model returns section TITLES in weak_sections, but often paraphrases
+        # or truncates them, so an exact-title lookup misses and the fix gets
+        # dropped. Fall back to substring containment, then best word-overlap
+        # (>=2 shared words), so the finding resolves to the right section and
+        # stays actionable.
+        k = _key(raw)
+        if k in by_title:
+            return by_title[k]
+        for sk, sid in by_title.items():
+            if sk and (sk in k or k in sk):
+                return sid
+        kw = set(k.split())
+        best, best_id = 0, None
+        for s in draft.sections:
+            overlap = len(kw & set(_key(s.title).split()))
+            if overlap > best:
+                best, best_id = overlap, s.id
+        return best_id if best >= 2 else None
+
     af = data.get("answer_first") if isinstance(data.get("answer_first"), dict) else {}
     weak = af.get("weak_sections") if isinstance(af.get("weak_sections"), list) else []
     af_findings = []
     for title in weak:
-        sid = by_title.get(_key(str(title)))
+        sid = _match_section(str(title))
         clean = strip_inline_emphasis(str(title))
         af_findings.append(
             {
@@ -1338,8 +1362,14 @@ def parse_faq(raw: str, n: int) -> list[dict[str, str]]:
             continue
         q = str(it.get("q", "")).strip()
         a = str(it.get("a", "")).strip()
-        if q and a:
-            out.append({"q": q, "a": a})
+        if not q or not a:
+            continue
+        # Defensive: the draft text is sanitized before generation, but never let
+        # editorial-marker debris (parked-block brackets or HTML comments) survive
+        # into an FAQ answer if the model echoes any.
+        if "⟦" in q or "⟦" in a or "<!--" in a:
+            continue
+        out.append({"q": q, "a": a})
     return out[:n]
 
 
