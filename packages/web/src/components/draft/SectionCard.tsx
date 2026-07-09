@@ -194,7 +194,7 @@ export const SectionCard = memo(function SectionCard({
       {open && (
         <div
           id={`section-body-${section.id}`}
-          className="px-5 pb-5 pt-1 border-t border-rule animate-fade-in"
+          className="px-5 pb-5 pt-1 border-t border-rule"
         >
           {section.brief && (
             <p className="font-serif italic text-[14px] text-muted px-3 py-2 mt-3 mb-4 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200">

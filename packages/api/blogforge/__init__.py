@@ -1,3 +1,3 @@
 """BlogForge — local-first long-form drafting tool that consumes myvoice style packs."""
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
