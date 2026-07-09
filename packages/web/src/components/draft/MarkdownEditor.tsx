@@ -159,6 +159,18 @@ export function MarkdownEditor({
     if (!loadedRef.current) {
       loadedRef.current = true;
       applyExternal(initialMarkdown);
+      // iOS Safari/WebKit can leave freshly-set ProseMirror content unpainted
+      // when the editor mounts inside the section's opacity fade-in — the text
+      // only appears after a reflow (e.g. collapsing then restoring the
+      // section). Force that reflow once, after the fade-in settles.
+      const dom = editor.view.dom as HTMLElement;
+      window.setTimeout(() => {
+        if (editor.isDestroyed) return;
+        const prev = dom.style.display;
+        dom.style.display = "none";
+        void dom.offsetHeight; // force reflow + repaint
+        dom.style.display = prev;
+      }, 300);
       return;
     }
     if (initialMarkdown === lastSavedRef.current) return; // our own save echoed back

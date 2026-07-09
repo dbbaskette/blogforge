@@ -81,7 +81,7 @@ export function FixPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4 max-sm:p-0"
       onClick={() => {
         if (!busy) onCancel();
       }}
@@ -92,7 +92,7 @@ export function FixPreviewModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="fix-preview-title"
-        className="nb-card w-[720px] max-w-full p-0 overflow-hidden animate-fade-up"
+        className="nb-card flex flex-col w-[720px] max-w-full p-0 overflow-hidden animate-fade-up max-sm:w-full max-sm:h-full max-sm:max-h-full max-sm:rounded-none"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="px-5 py-3 border-b border-rule flex items-center gap-2.5">
@@ -111,7 +111,7 @@ export function FixPreviewModal({
           </button>
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 max-h-[52vh] overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 max-h-[52vh] overflow-y-auto max-sm:max-h-none max-sm:flex-1 max-sm:min-h-0">
           <div className="px-5 py-4 border-b sm:border-b-0 sm:border-r border-rule">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-2 mb-2">
               Original
