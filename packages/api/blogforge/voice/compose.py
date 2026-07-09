@@ -81,6 +81,10 @@ def compose(
     parts.append(_render_writing_craft(pack_root))
     parts.append(_read_cached(pack_root / "style-guide.md"))
 
+    fingerprint = pack_root / "fingerprint.md"
+    if fingerprint.is_file():
+        parts.append(_read_cached(fingerprint))
+
     if format is not None:
         parts.append(_render_format(pack_root, manifest, format))
 

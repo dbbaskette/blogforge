@@ -58,3 +58,26 @@ def compute_stats(sample_texts: list[str]) -> dict:
         "word_count": len(words),
         "avg_sentence_len": round(sum(lengths) / len(lengths), 1) if lengths else 0.0,
     }
+
+
+def render_fingerprint_md(sample_texts: list[str]) -> str:
+    """Render compute_stats() as prompt-ready guidance. Deterministic."""
+    s = compute_stats(sample_texts)
+    lengths = s["rhythm"]
+    short = sum(1 for n in lengths if n < 10)
+    longn = sum(1 for n in lengths if n > 25)
+    mix = (
+        f"in recent sampled sentences, about {round(100 * short / len(lengths))}% run "
+        f"under 10 words and {round(100 * longn / len(lengths))}% over 25"
+        if lengths else "not enough sample text to measure rhythm"
+    )
+    phrases = "".join(f'\n- "{p}"' for p in s["signature_phrases"]) or "\n- (none found)"
+    words = ", ".join(s["top_words"]) or "(none)"
+    return (
+        "## Voice fingerprint (measured from the author's samples)\n\n"
+        f"- Sentence rhythm: average {s['avg_sentence_len']} words; {mix}. "
+        "Match this distribution — do not flatten to uniform mid-length sentences.\n"
+        f"- Signature phrases the author actually uses (reach for these when natural, "
+        f"never force them):{phrases}\n"
+        f"- Characteristic vocabulary: {words}.\n"
+    )

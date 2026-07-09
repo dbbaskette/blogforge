@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { Issue, IssueAction, IssueStatus } from "../../lib/issues/types";
 
@@ -19,8 +19,15 @@ export interface Applied {
 export interface UseIssueLifecycleArgs {
   draftId: string;
   /** Perform the content change for an action; return null to no-op (e.g. a
-   *  cancelled input). Must persist the change itself; the hook records undo. */
-  apply: (issue: Issue, action: IssueAction, input?: string) => Promise<Applied | null>;
+   *  cancelled input). Persists the change itself UNLESS opts.persist is
+   *  false (preview mode) — then it must compute and return the Applied
+   *  without saving. The hook records undo either way. */
+  apply: (
+    issue: Issue,
+    action: IssueAction,
+    input?: string,
+    opts?: { persist?: boolean },
+  ) => Promise<Applied | null>;
   /** Restore a field on undo (routes by `field`: body / title / opening). */
   save: (sectionId: string, content: string, field?: AppliedField) => Promise<void> | void;
   onHighlight?: (sectionId: string, text: string | null, kind: "under-review" | "locate") => void;
@@ -190,5 +197,99 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
     [draftId, save, onHighlight, onRescore, onUndoRescore],
   );
 
-  return { statusOf, errorOf, busyId, busyAction, run, accept, undo };
+  // ── Preview phase (AI fixes): compute → show modal → confirm/cancel ──
+  const [preview, setPreview] = useState<{
+    issue: Issue;
+    action: IssueAction;
+    res: Applied;
+  } | null>(null);
+  // Latches while a confirm is in flight so a double-click can't fire the save
+  // (and onRescore) twice. A ref, not state, so the guard is synchronous.
+  const confirming = useRef(false);
+
+  const requestPreview = useCallback(
+    async (issue: Issue, action: IssueAction, input?: string): Promise<void> => {
+      // A second request while the modal is already open is a no-op — don't
+      // clobber the preview the writer is currently looking at.
+      if (preview) return;
+      setBusy({ id: issue.id, action });
+      setErrors((e) => {
+        if (!e[issue.id]) return e;
+        const next = { ...e };
+        delete next[issue.id];
+        return next;
+      });
+      try {
+        const res = await apply(issue, action, input, { persist: false });
+        if (res) setPreview({ issue, action, res });
+      } catch (e) {
+        setErrors((prev) => ({
+          ...prev,
+          [issue.id]: e instanceof Error ? e.message : "Couldn't compute this fix.",
+        }));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [apply, preview],
+  );
+
+  /**
+   * Commit the previewed fix. `finalAfter` is the COMPLETE replacement value
+   * for the target field — not just the inserted fragment. For append-style
+   * fixes (FAQ/takeaways/definitional block adds) that means the whole merged
+   * field text, so callers must pass the full edited `after`, never a slice of
+   * it. Persisted verbatim; the pre-fix value is recorded for undo.
+   */
+  const confirmPreview = useCallback(
+    async (finalAfter: string): Promise<void> => {
+      if (!preview || confirming.current) return;
+      confirming.current = true;
+      const { issue, action, res } = preview;
+      setBusy({ id: issue.id, action });
+      try {
+        const field = res.field ?? "content";
+        await save(res.sectionId, finalAfter, field);
+        const ledger = loadLedger(draftId);
+        ledger[issue.id] = { sectionId: res.sectionId, before: res.before, lever: issue.lever, field };
+        saveLedger(draftId, ledger);
+        onRescore?.(issue.lever);
+        // Preview already showed the compare — applied means done. Flash a
+        // transient locate so the read pane shows where it landed. But if the
+        // writer edited the rewrite, res.highlight may not be a substring of
+        // what we saved — skip the flash rather than point at nothing.
+        const landed = finalAfter === res.after ? (res.highlight ?? null) : null;
+        onHighlight?.(res.sectionId, landed, "locate");
+        setStatus((s) => ({ ...s, [issue.id]: "accepted" }));
+        persistStatus(draftId, issue.id, "accepted");
+        setPreview(null);
+      } catch (e) {
+        setErrors((prev) => ({
+          ...prev,
+          [issue.id]: e instanceof Error ? e.message : "Couldn't apply this fix.",
+        }));
+        setPreview(null);
+      } finally {
+        confirming.current = false;
+        setBusy(null);
+      }
+    },
+    [preview, draftId, save, onHighlight, onRescore],
+  );
+
+  const cancelPreview = useCallback((): void => setPreview(null), []);
+
+  return {
+    statusOf,
+    errorOf,
+    busyId,
+    busyAction,
+    run,
+    accept,
+    undo,
+    preview,
+    requestPreview,
+    confirmPreview,
+    cancelPreview,
+  };
 }

@@ -13,6 +13,44 @@ bundle and the API in lockstep). Pre-`1.0.0`, the API is still evolving.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-08
+
+Editing, GEO, and voice improvements from real use of v0.2.0.
+
+### Added
+- **Fix-preview modal** — clicking **AI fix** on any GEO, Proofread, or Humanize
+  finding now opens a side-by-side compare (original vs rewrite, word-level
+  change highlighting) *before* anything is saved. Apply, Edit rewrite, or
+  Cancel; nothing touches the draft until you Apply.
+- **Eight new GEO levers** — stat attribution, follow-up-question coverage,
+  liftable sound bites, entity-name consistency, first-hand experience
+  (E-E-A-T), jargon defined on first use, worked examples, and title shape.
+  Weights rebalanced to sum to 1.0.
+- **GEO impact lines** — every finding now shows a concrete "GEO: …" line
+  explaining what the change does for being quoted by an answer engine, and
+  each lever header shows its point stakes ("up to N pts").
+- **Source-aware citations** — the citations lever now sees the draft's
+  attached references (and profile background sources) and, when a claim
+  matches one, offers a one-click cite that splices the real markdown link in;
+  only genuinely uncovered claims prompt for outside sourcing, naming the
+  specific kind needed.
+- **Voice fingerprint feeds composition** — the measured sentence-rhythm mix,
+  signature phrases, and vocabulary now ride into every draft/humanize prompt;
+  the distill pass extracts richer traits (opener style, transitions, opinion
+  strength, anecdote frequency, humor).
+
+### Changed
+- The Humanize AI-fix flow is preview-first: applying from the modal resolves
+  the finding in one step (no separate amber review), with Undo on the card.
+
+### Fixed
+- New "staccato paired-list run" AI tell — flags chopped-up "X and Y." sentence
+  runs (and "As well as …" fragments) in Proofread and the anti-robot score.
+- The citation splice and other model-generated link insertions are now
+  `$`-safe (no `String.replace` substitution artifacts).
+- Only the topmost dialog responds to Escape — the fix-preview modal no longer
+  closes the review panel underneath it.
+
 ## [0.2.0] — 2026-07-08
 
 First release cut under the new versioning workflow.

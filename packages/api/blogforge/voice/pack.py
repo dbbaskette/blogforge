@@ -145,6 +145,15 @@ async def materialize(profile: VoiceProfile, sample_texts: dict[str, str]) -> Pa
     style_md = profile.distilled_style_md or "## Style Guide\n\nContent pending distillation."
     (pack_dir / "style-guide.md").write_text(style_md, encoding="utf-8")
 
+    # --- fingerprint.md (deterministic stylometry fed to compose) ---
+    from blogforge.voice.fingerprint import render_fingerprint_md
+
+    texts = list(sample_texts.values())
+    if texts:
+        (pack_dir / "fingerprint.md").write_text(
+            render_fingerprint_md(texts), encoding="utf-8"
+        )
+
     # --- samples/{id}.md ---
     for sid in exemplar_ids:
         text = sample_texts[sid]

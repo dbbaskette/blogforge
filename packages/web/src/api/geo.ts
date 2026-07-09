@@ -27,9 +27,16 @@ export interface GeoFinding {
   section_id?: string;
   target?: string;
   note: string;
-  /** For factual density: WHAT real data to add (never invented values). */
+  /** For factual density: WHAT real data to add (never invented values). For a
+   * citations claim that matches an attached source: the claim rewritten with
+   * the source's markdown link spliced in, applied client-side without a model. */
   suggestion?: string;
+  /** Citations only: the attached source URL a matched claim should cite. */
+  matched_source_url?: string;
   fix?: GeoFindingFix | "";
+  /** One-sentence concrete payoff for this specific finding (falls back to the
+   * lever's impact when absent). */
+  impact?: string;
 }
 
 export interface GeoLever {
@@ -42,6 +49,8 @@ export interface GeoLever {
   detail: string;
   findings: GeoFinding[];
   fix: GeoFix;
+  /** One-sentence concrete payoff for fixing this lever — why it moves citations. */
+  impact?: string;
 }
 
 export interface GeoReport {

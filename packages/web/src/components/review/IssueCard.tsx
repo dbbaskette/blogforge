@@ -131,6 +131,11 @@ export function IssueCard({
         <span className="text-sm font-medium text-ink">{issue.title}</span>
       </div>
       <p className="text-[13px] text-ink-2 leading-snug ml-4 mb-1.5">{issue.why}</p>
+      {issue.impact && (
+        <p className="text-[12px] leading-snug ml-4 mb-1.5 text-cobalt-700 italic">
+          GEO: {issue.impact}
+        </p>
+      )}
       {issue.target && (
         <p className="text-[13px] text-muted italic leading-snug ml-4 mb-2.5 line-clamp-2">
           “{issue.target}”

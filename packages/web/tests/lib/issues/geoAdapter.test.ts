@@ -137,4 +137,84 @@ describe("geoFindingsToIssues", () => {
     expect(issues[0].actions).toEqual(["generate", "write_own"]);
     expect(issues[0].fixKind).toBe("takeaways");
   });
+
+  it("offers a one-click AI fix for a citations claim matched to an attached source", () => {
+    const issues = geoFindingsToIssues({
+      score: 55,
+      grade: "C",
+      levers: [
+        {
+          key: "citations",
+          label: "Cited sources",
+          score: 60,
+          detail: "1 source attached; 0 cited in-text.",
+          fix: null,
+          findings: [
+            {
+              section_id: "s1",
+              target: "Latency dropped 40 percent.",
+              note: "matches your attached: Tanzu 10.4 release notes",
+              suggestion:
+                "Latency dropped 40 percent, per the [Tanzu 10.4 release notes](https://x).",
+              matched_source_url: "https://x",
+              fix: "cite_reference",
+            },
+          ],
+        },
+      ],
+    } as unknown as GeoReport);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].actions).toContain("ai_fix");
+    expect(issues[0].suggestion).toContain("[Tanzu 10.4 release notes]");
+  });
+
+  it("keeps the manual cite flow for an unmatched claim (no suggestion)", () => {
+    const issues = geoFindingsToIssues({
+      score: 40,
+      grade: "D",
+      levers: [
+        {
+          key: "citations",
+          label: "Cited sources",
+          score: 40,
+          detail: "claims lack sources",
+          fix: null,
+          findings: [
+            {
+              section_id: "s1",
+              target: "It is fast.",
+              note: "add a dated benchmark for the latency claim",
+              fix: "cite_reference",
+            },
+          ],
+        },
+      ],
+    } as unknown as GeoReport);
+    expect(issues[0].actions).toEqual(["cite_source", "highlight"]);
+  });
+
+  it("maps finding impact, falling back to the lever impact", () => {
+    const report = {
+      score: 50,
+      grade: "C",
+      levers: [
+        {
+          key: "sound_bites",
+          label: "Liftable sound bites",
+          score: 45,
+          weight: 0.03,
+          detail: "few",
+          impact: "Engines lift single sentences verbatim.",
+          fix: null,
+          findings: [
+            { note: "no liftable line", target: "x", impact: "Specific impact." },
+            { note: "another", target: "y" },
+          ],
+        },
+      ],
+    } as unknown as GeoReport;
+    const issues = geoFindingsToIssues(report);
+    expect(issues[0].impact).toBe("Specific impact.");
+    expect(issues[1].impact).toBe("Engines lift single sentences verbatim.");
+  });
 });

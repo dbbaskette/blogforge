@@ -70,9 +70,14 @@ export function makeHumanizeSave(draft: Draft, onSectionSave: SectionSave) {
 export function makeHumanizeApply(
   draft: Draft,
   onSectionSave: SectionSave,
-): (issue: Issue, action: IssueAction, input?: string) => Promise<Applied | null> {
+): (
+  issue: Issue,
+  action: IssueAction,
+  input?: string,
+  opts?: { persist?: boolean },
+) => Promise<Applied | null> {
   const field: AppliedField = "content";
-  return async (issue, action, input) => {
+  return async (issue, action, input, opts) => {
     if (action === "dismiss") return { sectionId: issue.sectionId, before: "", after: "", field };
 
     const section = draft.sections.find((s) => s.id === issue.sectionId);
@@ -87,7 +92,7 @@ export function makeHumanizeApply(
     const after = before.slice(0, span[0]) + replacement + before.slice(span[1]);
     if (after === before) throw new Error("The suggestion already matches the current text.");
 
-    await onSectionSave(issue.sectionId, after, true);
+    if (opts?.persist !== false) await onSectionSave(issue.sectionId, after, true);
     return { sectionId: issue.sectionId, before, after, highlight: replacement, field };
   };
 }

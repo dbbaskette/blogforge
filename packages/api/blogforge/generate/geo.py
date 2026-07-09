@@ -29,24 +29,34 @@ from blogforge.llm.base import LLMProvider
 # build_report normalizes by the weights actually PRESENT, so levers can land
 # across phases without deflating the total.
 _WEIGHTS: dict[str, float] = {
-    "answer_first": 0.16,
-    "factual_density": 0.16,
-    "citations": 0.10,
-    "definitional_opener": 0.08,
-    "question_headings": 0.08,
-    "skimmability": 0.08,
-    "brand_explicit": 0.06,
-    "faq": 0.06,
-    "chunking": 0.06,
-    "takeaways": 0.06,
-    "freshness": 0.06,
-    "comparison_table": 0.04,
+    "answer_first": 0.13,
+    "factual_density": 0.13,
+    "citations": 0.09,
+    "definitional_opener": 0.06,
+    "question_headings": 0.06,
+    "skimmability": 0.06,
+    "brand_explicit": 0.04,
+    "faq": 0.04,
+    "chunking": 0.04,
+    "takeaways": 0.04,
+    "freshness": 0.04,
+    "comparison_table": 0.03,
+    "stat_attribution": 0.04,
+    "query_coverage": 0.04,
+    "sound_bites": 0.03,
+    "entity_consistency": 0.03,
+    "experience_signals": 0.03,
+    "jargon_defined": 0.03,
+    "concrete_examples": 0.02,
+    "title_shape": 0.02,
 }
 # Display order in the panel (roughly by leverage).
 _ORDER = (
     "answer_first",
     "factual_density",
     "citations",
+    "stat_attribution",
+    "query_coverage",
     "definitional_opener",
     "takeaways",
     "brand_explicit",
@@ -56,6 +66,12 @@ _ORDER = (
     "comparison_table",
     "chunking",
     "faq",
+    "sound_bites",
+    "entity_consistency",
+    "experience_signals",
+    "jargon_defined",
+    "concrete_examples",
+    "title_shape",
 )
 _LABELS: dict[str, str] = {
     "answer_first": "Answer-first sections",
@@ -70,6 +86,60 @@ _LABELS: dict[str, str] = {
     "comparison_table": "Comparison table",
     "faq": "FAQ section",
     "chunking": "Self-contained passages",
+    "stat_attribution": "Stats tied to sources",
+    "query_coverage": "Covers follow-up questions",
+    "sound_bites": "Liftable sound bites",
+    "entity_consistency": "Consistent entity names",
+    "experience_signals": "First-hand experience",
+    "jargon_defined": "Jargon defined on first use",
+    "concrete_examples": "Worked examples",
+    "title_shape": "Title shape",
+}
+
+# One concrete sentence of GEO mechanism per lever — WHY the lever moves
+# citations, shown on lever headers and as the fallback for findings whose
+# semantic pass didn't supply a per-finding impact.
+_IMPACTS: dict[str, str] = {
+    "answer_first": "Answer engines quote the first 40-60 words of a section; burying the "
+    "answer means they quote someone else's page.",
+    "factual_density": "Passages with concrete numbers are what engines lift into answers — "
+    "vague claims get skipped.",
+    "citations": "Claims with named sources are trusted and cited; unattributed claims get "
+    "filtered as unverifiable.",
+    "definitional_opener": "A one-line definition up top is one of the most reliably "
+    "extracted sentence shapes for 'what is X' queries.",
+    "question_headings": "Question headings match how users phrase queries — engines map "
+    "query to heading directly.",
+    "skimmability": "Engines parse structure; walls of prose fragment poorly into answer "
+    "passages.",
+    "brand_explicit": "AI can cite content without naming you ('ghost citation') — an "
+    "explicit brand travels with the quote.",
+    "faq": "FAQ blocks are eligible for People-Also-Ask and schema.org/FAQPage rich "
+    "results, a separate surface from the body.",
+    "chunking": "Each passage is extracted alone — a chunk that leans on its neighbors loses "
+    "its meaning when lifted.",
+    "takeaways": "Key-takeaways blocks are pre-digested summaries engines prefer over "
+    "synthesizing their own.",
+    "freshness": "Dated claims signal current content; engines demote pieces they can't "
+    "place in time.",
+    "comparison_table": "Tables answer 'X vs Y' queries directly — engines lift rows "
+    "verbatim.",
+    "stat_attribution": "A number tied to a named source is a citable fact; a bare number is "
+    "just a claim.",
+    "query_coverage": "Answering the follow-up questions keeps the engine on your page "
+    "instead of blending in a competitor's.",
+    "sound_bites": "Engines lift single self-contained sentences verbatim — give them one "
+    "worth lifting.",
+    "entity_consistency": "One canonical name per thing is how engines resolve WHO the "
+    "piece is about; aliases dilute the entity.",
+    "experience_signals": "First-hand evidence ('we measured') is the E in E-E-A-T — "
+    "generic AI content can't fake it.",
+    "jargon_defined": "A term defined on first use keeps the passage self-contained when "
+    "extracted alone.",
+    "concrete_examples": "How-to queries surface pages with worked examples; claims "
+    "without one lose to pages that show it.",
+    "title_shape": "A how-to/number/year hook under 60 chars survives SERP truncation and "
+    "matches query templates.",
 }
 
 _QUESTION_WORDS = (
@@ -188,6 +258,7 @@ def _lever(
         # re-score can recompute the total on the client without a full re-run.
         "weight": _WEIGHTS.get(key, 0.0),
         "detail": detail,
+        "impact": _IMPACTS.get(key, ""),
         "findings": findings or [],
         "fix": fix,
     }
@@ -541,6 +612,39 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     }
 
 
+_GENERIC_LEVER_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer"},
+        "note": {"type": "string"},
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string"},
+                    "note": {"type": "string"},
+                    "suggestion": {"type": "string"},
+                    "impact": {"type": "string"},
+                },
+                "required": ["note"],
+            },
+        },
+    },
+    "required": ["score", "note"],
+}
+
+_NEW_SEMANTIC_KEYS = (
+    "stat_attribution",
+    "query_coverage",
+    "sound_bites",
+    "entity_consistency",
+    "experience_signals",
+    "jargon_defined",
+    "concrete_examples",
+    "title_shape",
+)
+
 _SEMANTIC_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
@@ -579,6 +683,7 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                             "target": {"type": "string"},
                             "note": {"type": "string"},
                             "suggestion": {"type": "string"},
+                            "impact": {"type": "string"},
                         },
                         "required": ["target"],
                     },
@@ -608,6 +713,9 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
                         "properties": {
                             "target": {"type": "string"},
                             "note": {"type": "string"},
+                            "suggestion": {"type": "string"},
+                            "matched_source_url": {"type": "string"},
+                            "impact": {"type": "string"},
                         },
                         "required": ["target"],
                     },
@@ -628,12 +736,51 @@ _SEMANTIC_SCHEMA: dict[str, object] = {
         "factual_density",
         "brand_explicit",
         "citations",
+        # The 8 new levers are REQUIRED so structured decoding forces the model
+        # to emit them. Absent → parse_semantic returns them at 0 → those zeros
+        # deflate the weighted total (the 8 carry 0.24), grading a good draft far
+        # too low. parse_semantic stays tolerant; required is belt-and-suspenders.
+        *_NEW_SEMANTIC_KEYS,
     ],
 }
+_SEMANTIC_SCHEMA["properties"].update(  # type: ignore[attr-defined]
+    {k: _GENERIC_LEVER_SCHEMA for k in _NEW_SEMANTIC_KEYS}
+)
+
+# The JSON shape the model is shown in the prompt. A concrete example is the
+# model's dominant anchor for what to emit — it MUST list every semantic lever
+# (all of _SEMANTIC_KEYS) or the omitted ones come back absent and score 0.
+# test_semantic_example_covers_all_levers guards this.
+_SEMANTIC_EXAMPLE = json.dumps(
+    {
+        "answer_first": {"score": 0, "note": "", "weak_sections": []},
+        "definitional_opener": {"score": 0, "note": "", "has_definition": False},
+        "factual_density": {
+            "score": 0,
+            "note": "",
+            "has_stats": False,
+            "has_named_sources": False,
+            "has_quotes": False,
+            "first_hand": False,
+            "thin_spots": [],
+        },
+        "brand_explicit": {"score": 0, "note": "", "brand": "", "stated_up_top": False},
+        "citations": {"score": 0, "note": "", "uncited_claims": []},
+        **{
+            k: {
+                "score": 55,
+                "note": "",
+                "findings": [{"target": "", "note": "", "suggestion": "", "impact": ""}],
+            }
+            for k in _NEW_SEMANTIC_KEYS
+        },
+        "coverage": {"missing_subquestions": []},
+    }
+)
 
 _SEMANTIC_DIRECTIVE = (
-    "Evaluate this draft on five Generative-Engine-Optimization dimensions. Score "
-    "each 0-100 and explain briefly. Do NOT rewrite anything.\n"
+    "Evaluate this draft on the following Generative-Engine-Optimization dimensions. "
+    "Score each 0-100 and explain briefly. Do NOT rewrite anything.\n"
     "1) answer_first: does each section OPEN with a direct, self-contained answer "
     "(40-60 words) before context? List the titles of sections that bury the answer "
     "in `weak_sections`.\n"
@@ -660,13 +807,45 @@ _SEMANTIC_DIRECTIVE = (
     "citation. Put the brand you detect in `brand`, set `stated_up_top` true if it "
     "appears in the first section, and score how clearly/early it's named. Never "
     "invent a brand — if none is evident, say so in `note` and score low.\n"
-    "5) citations: do concrete, checkable claims carry a source — a named origin "
-    "or an outbound link? Score how well claims are attributed. In `uncited_claims` "
-    "quote up to 3 passages that assert something checkable with no source; in each "
-    "`note` say what kind of source would back it. Never invent sources.\n"
+    "5) citations: do concrete, checkable claims carry a source? FIRST match each "
+    "uncited claim against the ATTACHED SOURCES list when one is provided: when a "
+    "claim matches an attached source, emit a finding whose `note` names it "
+    "('matches your attached: <title>'), whose `matched_source_url` is that URL, and "
+    "whose `suggestion` is the claim sentence rewritten VERBATIM with the markdown "
+    "link inserted at natural anchor text. Only for claims NO attached source covers, "
+    "say the specific KIND of source to find (e.g. 'a dated benchmark for the latency "
+    "claim') — never a generic 'add sources'. When sources are attached, the lever "
+    "`note` should acknowledge them ('N sources attached; M cited in-text'). Never "
+    "invent sources.\n"
     "Finally, in `coverage.missing_subquestions` list up to 4 natural sub-questions "
     "of this topic a search engine would decompose the query into that this draft "
-    "does NOT answer — only questions genuinely in-scope for the title."
+    "does NOT answer — only questions genuinely in-scope for the title.\n"
+    "For each thin-spot and each uncited claim, also return `impact`: ONE concrete "
+    "sentence of the GEO payoff (what it does for being quoted by an answer engine) "
+    "— never restate the fix.\n"
+    "6) stat_attribution: are numbers tied INLINE to a named source ('per Gartner, 2025')? "
+    "A bare number is a claim; a sourced number is a citable fact. Flag unattributed "
+    "stats in `findings` (quote each in `target`).\n"
+    "7) query_coverage: does the piece answer the adjacent questions a reader asks next "
+    "(cost? limits? alternatives? prerequisites?)? Flag the biggest gaps (note = the "
+    "missing question, suggestion = where it fits).\n"
+    "8) sound_bites: does it contain at least two self-contained one-sentence statements "
+    "under 25 words an engine could quote verbatim? Flag sections whose point never "
+    "lands in one liftable line.\n"
+    "9) entity_consistency: is each product/technology called ONE canonical name "
+    "throughout? Flag alias drift ('TP', 'the platform') with the canonical name in "
+    "`suggestion`.\n"
+    "10) experience_signals: does the author show first-hand experience ('we measured', "
+    "'when I ran this', a real result)? Flag sections that read as secondhand summary.\n"
+    "11) jargon_defined: is every specialist term given a short appositive definition on "
+    "first use? Flag undefined first-uses (term in `target`).\n"
+    "12) concrete_examples: are how-to claims backed by a worked example or code block? "
+    "Flag claims that assert without showing.\n"
+    "13) title_shape: does the H1 carry a how-to/number/year hook and stay under 60 "
+    "characters? Score the title's SERP shape; suggest a sharper title in `suggestion` "
+    "if weak. The draft's title is the first line of the document.\n"
+    "For all findings: `target` must be VERBATIM text from the draft when it refers to "
+    "a passage; omit `target` for document-level findings.\n"
 )
 
 
@@ -750,6 +929,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
             "note": str(t.get("note", "")).strip()
             or "Add a real statistic, source, or quote here.",
             "suggestion": str(t.get("suggestion", "")).strip(),
+            "impact": str(t.get("impact", "")).strip() or _IMPACTS.get("factual_density", ""),
         }
         for t in thin
         if isinstance(t, dict) and str(t.get("target", "")).strip()
@@ -790,6 +970,12 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
             "target": str(c.get("target", "")).strip(),
             "note": str(c.get("note", "")).strip() or "This claim has no source.",
             "fix": "cite_reference",
+            # When the claim matches an attached source, the model returns the
+            # rewritten sentence (with the markdown link spliced in) and the
+            # source URL — so the client can apply the cite WITHOUT a model call.
+            "suggestion": str(c.get("suggestion", "")).strip(),
+            "matched_source_url": str(c.get("matched_source_url", "")).strip(),
+            "impact": str(c.get("impact", "")).strip() or _IMPACTS.get("citations", ""),
         }
         for c in claims
         if isinstance(c, dict) and str(c.get("target", "")).strip()
@@ -809,12 +995,33 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
     )
     coverage = [str(q).strip() for q in missing if str(q).strip()][:4]
 
+    # The eight new levers share one generic shape (score/note/findings) — map
+    # them uniformly instead of five more bespoke blocks above.
+    new_levers: dict[str, dict[str, Any]] = {}
+    for key in _NEW_SEMANTIC_KEYS:
+        obj = data.get(key) if isinstance(data.get(key), dict) else {}
+        finds: list[dict[str, str]] = []
+        for f in (obj.get("findings") or [])[:4]:
+            if not isinstance(f, dict) or not str(f.get("note", "")).strip():
+                continue
+            fd_item = {
+                k: str(f.get(k, "")).strip()
+                for k in ("target", "note", "suggestion", "impact")
+                if str(f.get(k, "")).strip()
+            }
+            fd_item.setdefault("impact", _IMPACTS.get(key, ""))
+            finds.append(fd_item)
+        new_levers[key] = _lever(
+            key, _clampi(obj.get("score")), str(obj.get("note", "")).strip(), finds
+        )
+
     return {
         "answer_first": answer_first,
         "definitional_opener": definitional,
         "factual_density": factual,
         "brand_explicit": brand,
         "citations": citations,
+        **new_levers,
         # Not a lever (build_report/_ORDER ignore unknown keys) — analyze_geo
         # merges these into the structural faq lever as "not covered" advisories.
         "_coverage": coverage,  # type: ignore[dict-item]
@@ -861,30 +1068,40 @@ _STRUCTURAL_KEYS = frozenset(
 )
 _SEMANTIC_KEYS = frozenset(
     {"answer_first", "definitional_opener", "factual_density", "brand_explicit", "citations"}
+    | set(_NEW_SEMANTIC_KEYS)
 )
 
 
 async def _run_semantic(
-    draft: Draft, pack_root: Path, provider: LLMProvider, *, model: str
+    draft: Draft, pack_root: Path, provider: LLMProvider, *, model: str, extra_sources: str = ""
 ) -> dict[str, dict[str, Any]]:
     """The single voice-aware LLM pass → the four judgment levers (answer-first,
     definitional opener, factual density, brand), with the deterministic augments
-    applied. Shared by the full report and the targeted re-score."""
+    applied. Shared by the full report and the targeted re-score.
+
+    `extra_sources` carries the voice profile's background-source block so the
+    citations lever can match claims against sources the author already
+    collected (in addition to the draft's own attached references)."""
     from blogforge.voice import compose_prompt
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    # The sources the author has ALREADY collected — the draft's attached
+    # references plus the voice profile's background sources. The citations
+    # rubric tells the model to match claims against these FIRST, so it stops
+    # nagging "no sources cited" when a source is right there to cite. Only refs
+    # with a URL are listed: the one-click cite splices a markdown link, so a
+    # url-less file/text ref can't be cited this way.
+    refs = [r for r in (getattr(draft, "references", None) or []) if r.url]
+    ref_lines = "\n".join(f"- {r.name or r.url}: {r.url}" for r in refs)
+    sources_block = ""
+    if ref_lines or extra_sources:
+        sources_block = (
+            "\n\nATTACHED SOURCES (the author already collected these — use them FIRST):\n"
+            f"{ref_lines}\n{extra_sources}\n"
+        )
     prompt = (
         f"{system}\n\n---\n\n{_SEMANTIC_DIRECTIVE}\n\n"
-        'Return JSON matching: {"answer_first": {"score": 0, "note": "", '
-        '"weak_sections": []}, "definitional_opener": {"score": 0, "note": "", '
-        '"has_definition": false}, '
-        '"factual_density": {"score": 0, "note": "", "has_stats": false, '
-        '"has_named_sources": false, "has_quotes": false, "first_hand": false, '
-        '"thin_spots": []}, '
-        '"brand_explicit": {"score": 0, "note": "", "brand": "", '
-        '"stated_up_top": false}, '
-        '"citations": {"score": 0, "note": "", "uncited_claims": []}, '
-        '"coverage": {"missing_subquestions": []}}.\n\nDRAFT:\n'
+        f"Return JSON matching: {_SEMANTIC_EXAMPLE}.{sources_block}\n\nDRAFT:\n"
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
@@ -902,10 +1119,13 @@ async def analyze_geo(
     provider: LLMProvider,
     *,
     model: str,
+    extra_sources: str = "",
 ) -> dict[str, Any]:
     """Full GEO report: deterministic structural levers + one semantic LLM pass."""
     structural = score_structural(draft)
-    semantic = await _run_semantic(draft, pack_root, provider, model=model)
+    semantic = await _run_semantic(
+        draft, pack_root, provider, model=model, extra_sources=extra_sources
+    )
     # Sub-question coverage gaps (from the semantic pass) surface as advisory
     # "not covered" findings on the structural FAQ lever — the FAQ fix answers them.
     missing = semantic.pop("_coverage", [])
@@ -924,6 +1144,7 @@ async def rescore_geo(
     provider: LLMProvider,
     *,
     model: str,
+    extra_sources: str = "",
 ) -> dict[str, dict[str, Any]]:
     """Re-score ONLY the requested levers after a targeted fix. Structural levers
     recompute instantly (no LLM); semantic levers need one LLM pass. Everything
@@ -935,7 +1156,9 @@ async def rescore_geo(
         structural = score_structural(draft)
         out.update({k: structural[k] for k in want & _STRUCTURAL_KEYS if k in structural})
     if want & _SEMANTIC_KEYS:
-        semantic = await _run_semantic(draft, pack_root, provider, model=model)
+        semantic = await _run_semantic(
+            draft, pack_root, provider, model=model, extra_sources=extra_sources
+        )
         out.update({k: semantic[k] for k in want & _SEMANTIC_KEYS if k in semantic})
     return out
 

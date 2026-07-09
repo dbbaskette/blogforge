@@ -138,6 +138,155 @@ describe("geoApply ai_fix", () => {
     expect(onSectionSave).toHaveBeenCalled();
   });
 
+  it("persist:false computes the rewrite via the model but does NOT save", async () => {
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const issue: Issue = {
+      id: "mystery:1",
+      panel: "geo",
+      lever: "mystery",
+      title: "Some new issue kind",
+      why: "It still needs fixing.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "Latency dropped a lot last year.",
+      fixKind: "nonexistent",
+      actions: ["ai_fix"],
+      status: "open",
+    };
+    const res = await apply(issue, "ai_fix", undefined, { persist: false });
+    expect(inlineEdit).toHaveBeenCalled();
+    expect(res?.after).toContain("Example");
+    expect(onSectionSave).not.toHaveBeenCalled();
+  });
+
+  it("ai_fix with a precomputed suggestion splices without a model call", async () => {
+    // A citations claim matched to an attached source: target = the claim,
+    // suggestion = the claim with a [title](url) markdown link inserted.
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const calls = (inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    const issue: Issue = {
+      id: "citations:0",
+      panel: "geo",
+      lever: "citations",
+      title: "Uncited claim (matches your attached: Example)",
+      why: "Cite the source you already attached.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "Latency dropped a lot last year.",
+      suggestion: "Latency dropped a lot last year, per [Example](https://example.com).",
+      fixKind: "cite_reference",
+      actions: ["ai_fix", "manual_fix", "highlight"],
+      status: "open",
+    };
+    const res = await apply(issue, "ai_fix");
+    // No model call: inlineEdit's call count is unchanged.
+    expect((inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
+    expect(res?.after).toContain("[");
+    expect(res?.after).toContain("[Example](https://example.com)");
+    expect(onSectionSave).toHaveBeenCalledWith("s1", expect.stringContaining("[Example]"));
+  });
+
+  it("ai_fix precomputed suggestion with persist:false returns after without saving", async () => {
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const calls = (inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    const issue: Issue = {
+      id: "citations:1",
+      panel: "geo",
+      lever: "citations",
+      title: "Uncited claim",
+      why: "Cite the source you already attached.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "Latency dropped a lot last year.",
+      suggestion: "Latency dropped a lot last year, per [Example](https://example.com).",
+      fixKind: "cite_reference",
+      actions: ["ai_fix", "manual_fix", "highlight"],
+      status: "open",
+    };
+    const res = await apply(issue, "ai_fix", undefined, { persist: false });
+    expect((inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
+    expect(res?.after).toContain("[Example](https://example.com)");
+    expect(onSectionSave).not.toHaveBeenCalled();
+  });
+
+  it("splices a suggestion containing $ sequences verbatim (no String.replace mangling)", async () => {
+    // A model-authored cite with a dollar amount and a URL query string that
+    // holds `$$` and `$&`. A plain String.replace would treat those as
+    // substitution patterns and corrupt the output; the splice must be verbatim.
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const suggestion = "Latency dropped a lot last year, saving $$5M via [Doc](https://x?a=$&b).";
+    const issue: Issue = {
+      id: "citations:2",
+      panel: "geo",
+      lever: "citations",
+      title: "Uncited claim",
+      why: "Cite the source you already attached.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "Latency dropped a lot last year.",
+      suggestion,
+      fixKind: "cite_reference",
+      actions: ["ai_fix", "manual_fix", "highlight"],
+      status: "open",
+    };
+    const res = await apply(issue, "ai_fix");
+    expect(res?.after).toContain(suggestion);
+    expect(onSectionSave).toHaveBeenCalledWith("s1", expect.stringContaining(suggestion));
+  });
+
+  it("rejects a precomputed cite whose target can't be located (no whole-section rewrite)", async () => {
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const calls = (inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    const issue: Issue = {
+      id: "citations:3",
+      panel: "geo",
+      lever: "citations",
+      title: "Uncited claim",
+      why: "Cite the source you already attached.",
+      nature: "fix",
+      sectionId: "s1",
+      target: "A claim that no longer appears anywhere in the section.",
+      suggestion: "A claim…, per [Doc](https://x).",
+      fixKind: "cite_reference",
+      actions: ["ai_fix", "manual_fix", "highlight"],
+      status: "open",
+    };
+    await expect(apply(issue, "ai_fix")).rejects.toThrow(/changed since the pass ran/);
+    // Never falls through to the model rewrite.
+    expect((inlineEdit as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(calls);
+    expect(onSectionSave).not.toHaveBeenCalled();
+  });
+
   it("gives a section-less input action a home (first section fallback)", async () => {
     // A freshness "add a date" finding carries no section and no target.
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
@@ -210,5 +359,38 @@ describe("geoApply block placement", () => {
       "s3",
       expect.stringContaining("Final section body."),
     );
+  });
+
+  it("persist:false computes the appended takeaways block but does NOT save", async () => {
+    const { generateTakeaways } = await import("../../src/api/geo");
+    (generateTakeaways as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      "It is free.",
+      "It is fast.",
+    ]);
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const apply = makeGeoApply({
+      draft: multi,
+      onSectionSave,
+      onOpeningSave: vi.fn(),
+      onTitleSave: vi.fn(),
+    });
+    const takeawaysIssue: Issue = {
+      id: "takeaways:0",
+      panel: "geo",
+      lever: "takeaways",
+      title: "No key takeaways",
+      why: "A takeaways block helps answer engines.",
+      nature: "add",
+      sectionId: "",
+      fixKind: "takeaways",
+      actions: ["generate", "write_own"],
+      status: "open",
+    };
+    const res = await apply(takeawaysIssue, "generate", undefined, { persist: false });
+    // Takeaways prepend to the first section's body.
+    expect(res?.sectionId).toBe("s1");
+    expect(res?.after).toContain("Key takeaways");
+    expect(res?.after).toContain("Opening section body.");
+    expect(onSectionSave).not.toHaveBeenCalled();
   });
 });

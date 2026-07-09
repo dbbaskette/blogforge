@@ -17,10 +17,19 @@ def _build_prompt(sample_texts: list[str]) -> str:
         used += len(t)
     body = "\n\n--- SAMPLE ---\n\n".join(joined)
     return (
-        "Analyze the writing samples below and produce a concise markdown style guide that "
-        "captures how this author writes: tone, sentence rhythm and length, vocabulary "
-        "tendencies, formatting habits, and explicit do's & don'ts. Write it as guidance an "
-        "AI could follow to imitate the voice. Output ONLY the markdown style guide.\n\n"
+        "Analyze the writing samples below and produce a concise markdown style guide "
+        "that captures how this author writes. Cover, each with concrete do's & don'ts "
+        "an imitator can follow:\n"
+        "- Tone and register\n"
+        "- Sentence rhythm and length (short/long mix, fragments)\n"
+        "- How the author opens pieces (question? scene? claim? story?)\n"
+        "- Transition habits between ideas and sections\n"
+        "- Opinion strength — hedged or declarative, and when\n"
+        "- Anecdote and aside frequency — how often the author steps out of the argument\n"
+        "- Humor style, if any (dry, self-deprecating, none)\n"
+        "- Vocabulary tendencies and formatting habits\n"
+        "Write it as guidance an AI could follow to imitate the voice. Output ONLY the "
+        "markdown style guide.\n\n"
         f"SAMPLES:\n\n{body}"
     )
 

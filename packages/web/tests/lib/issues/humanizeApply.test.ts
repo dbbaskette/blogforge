@@ -58,6 +58,22 @@ describe("makeHumanizeApply", () => {
     expect(onSectionSave).not.toHaveBeenCalled();
   });
 
+  it("persist:false computes the spliced text but does NOT save", async () => {
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    const draft: any = {
+      sections: [{ id: "s1", content_md: "The API serves as a gateway. It adds 5ms." }],
+    };
+    const apply = makeHumanizeApply(draft, onSectionSave);
+    const res = await apply(
+      issue({ target: "The API serves as a gateway.", suggestion: "The API is the gateway." }),
+      "ai_fix",
+      undefined,
+      { persist: false },
+    );
+    expect(onSectionSave).not.toHaveBeenCalled();
+    expect(res?.after).toBe("The API is the gateway. It adds 5ms.");
+  });
+
   it("dismiss remains a no-op that does not throw", async () => {
     const draft: any = { sections: [{ id: "s1", content_md: "anything" }] };
     const apply = makeHumanizeApply(draft, vi.fn());
