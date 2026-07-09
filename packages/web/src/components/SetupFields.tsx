@@ -153,7 +153,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
     if (providerAutoPicked.current || Object.keys(providers).length === 0) return;
     providerAutoPicked.current = true;
     if (!providers[valueRef.current.provider]) {
-      const order: Provider[] = ["anthropic", "openai", "google", "claude-cli", "tanzu"];
+      const order: Provider[] = ["claude-cli", "anthropic", "openai", "google", "tanzu"];
       const next = order.find((p) => providers[p]);
       if (next) onChange({ ...valueRef.current, provider: next });
     }

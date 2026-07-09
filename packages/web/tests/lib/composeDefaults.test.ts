@@ -24,7 +24,7 @@ describe("composeDefaults", () => {
     expect(loadDefaults()).toEqual({
       pack_slug: "",
       format: null,
-      provider: "anthropic",
+      provider: "claude-cli",
       model: "",
       target_words: 1500,
       use_voice_profile: true,
