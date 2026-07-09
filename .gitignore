@@ -44,6 +44,7 @@ e2e/test-results/
 ~/.blogforge/
 .env
 .env.local
+.env.public
 
 # Stale artifacts from before this repo existed
 myvoice-centered-check.png
