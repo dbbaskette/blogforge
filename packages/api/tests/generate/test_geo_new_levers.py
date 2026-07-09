@@ -47,6 +47,28 @@ def test_definitive_language_penalizes_hedges() -> None:
     assert res["definitive_language"]["findings"]
 
 
+def test_definitive_language_ignores_dated_attribution_month_may() -> None:
+    # "May" the month (capitalized, in a dated attribution) is exactly the
+    # GOOD form the freshness/stat_attribution levers reward — it must NOT be
+    # mistaken for the hedge word "may". A genuinely hedged paragraph should
+    # still score low right alongside it.
+    dated = (
+        "Costs fell 31% as of May 2026, per Ahrefs. In May, we shipped the fix "
+        "and adoption grew 12% by June 2026, per our own dashboard."
+    )
+    d = make_draft(body=dated)
+    res = score_structural(d)["definitive_language"]
+    assert res["score"] >= 80
+    assert not res["findings"]
+
+    hedgy = ("It might be possible that this could perhaps work. Some believe it "
+             "may help. It seems the results could arguably vary somewhat.")
+    d2 = make_draft(body=hedgy)
+    res2 = score_structural(d2)["definitive_language"]
+    assert res2["score"] <= 40
+    assert res2["findings"]
+
+
 def test_page_front_load_rewards_facts_up_top() -> None:
     front = "We measured 42ms p95. Costs fell 31% in 2026. " * 3
     back = "This is narrative filler with no numbers at all. " * 20

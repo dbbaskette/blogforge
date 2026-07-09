@@ -275,9 +275,15 @@ _LONG_SECTION_WORDS = 400
 
 # Answer-capsule / front-load / definitive-language helpers (2026 batch).
 _MD_LINK_RE = re.compile(r"\[[^\]]+\]\([^)]+\)")
+# "may" is deliberately case-SENSITIVE (lowercase only): the capitalized month
+# ("as of May 2026", "in May, we shipped") must never be flagged as a hedge —
+# that's the exact dated-attribution shape the freshness/stat_attribution
+# levers reward, so miscounting it would have this lever contradict those. The
+# other hedge words stay case-insensitive; none of them collide with a proper
+# noun the way "may" does.
 _HEDGE_RE = re.compile(
-    r"\b(may|might|could|perhaps|possibly|somewhat|arguably|it seems|it appears|some believe)\b",
-    re.IGNORECASE,
+    r"\bmay\b|(?i:\b(?:might|could|perhaps|possibly|somewhat|arguably|it seems|it appears|"
+    r"some believe)\b)"
 )
 _DIGIT_RE = re.compile(r"\d")
 _SENT_SPLIT_GEO = re.compile(r"(?<=[.!?])\s+")
@@ -1202,6 +1208,9 @@ _STRUCTURAL_KEYS = frozenset(
         "comparison_table",
         "takeaways",
         "freshness",
+        "answer_capsule",
+        "page_front_load",
+        "definitive_language",
     }
 )
 _SEMANTIC_KEYS = frozenset(
