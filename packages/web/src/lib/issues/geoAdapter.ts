@@ -32,6 +32,9 @@ const LEVER_FIX: Record<string, ActionSpec> = {
   definitional: { nature: "add", actions: ["generate", "write_own"] },
   definitional_improve: { nature: "fix", actions: ["ai_fix", "manual_fix"] },
   comparison_table: { nature: "add", actions: ["generate", "write_own"] },
+  // Rescues answer_first findings whose section title the model paraphrased, so
+  // the per-finding fix key came back empty. No highlight — there's no anchor.
+  answer_first: { nature: "fix", actions: ["ai_fix", "manual_fix"] },
 };
 
 /** Levers whose findings are guidance you can't auto-fix without fabricating. */

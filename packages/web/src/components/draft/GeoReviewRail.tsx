@@ -140,6 +140,7 @@ export function GeoReviewRail({
                   issue={{ ...issue, status: statusOf(issue) }}
                   busy={busyId === issue.id}
                   error={errorOf(issue)}
+                  showWhy={false}
                   onAction={(action, inputText) =>
                     action === "ai_fix"
                       ? void requestPreview(issue, action, inputText)

@@ -74,4 +74,19 @@ describe("IssueCard", () => {
     expect(screen.getByText("Advisory")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
   });
+
+  it("hides the why line when showWhy is false (the lever header already shows it)", () => {
+    const { rerender } = renderCard(fixIssue);
+    expect(screen.getByText("Lead with the takeaway.")).toBeInTheDocument();
+    rerender(
+      <IssueCard
+        issue={fixIssue}
+        onAction={onAction}
+        onAccept={onAccept}
+        onUndo={onUndo}
+        showWhy={false}
+      />,
+    );
+    expect(screen.queryByText("Lead with the takeaway.")).not.toBeInTheDocument();
+  });
 });

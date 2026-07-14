@@ -321,6 +321,45 @@ def test_parse_semantic_maps_weak_sections_to_ids() -> None:
     assert levers["factual_density"]["findings"][0]["target"] == "It is fast."
 
 
+def test_answer_first_resolves_paraphrased_section_title() -> None:
+    # The model returns a truncated/paraphrased title; substring matching must
+    # still resolve it to the real section so the finding stays actionable.
+    sec = _sec("Security That Keeps Pace: Maintaining Spring Apps", "Body.")
+    d = _draft([sec])
+    raw = (
+        '{"answer_first": {"score": 50, "note": "x", '
+        '"weak_sections": ["Security That Keeps Pace"]}}'
+    )
+    findings = parse_semantic(raw, d)["answer_first"]["findings"]
+    assert len(findings) == 1
+    assert findings[0]["section_id"] == sec.id
+    assert findings[0]["fix"] == "answer_first"
+
+
+def test_draft_text_strips_parked_scaffolding() -> None:
+    from blogforge.generate.geo import _draft_text
+
+    body = "Real body sentence.\n\n**⟦PARKED MATERIAL⟧**\n\nheld note\n\n**⟦end PARKED MATERIAL⟧**"
+    text = _draft_text(_draft([_sec("Intro", body)]))
+    assert "PARKED MATERIAL" not in text
+    assert "held note" not in text
+    assert "Real body sentence." in text
+
+
+def test_parse_faq_drops_scaffolding_laden_answers() -> None:
+    raw = json.dumps(
+        {
+            "faqs": [
+                {"q": "Clean?", "a": "A grounded answer."},
+                {"q": "Bracket?", "a": "Answer with ⟦PARKED MATERIAL⟧ debris."},
+                {"q": "Comment?", "a": "<!-- editor note --> leaked."},
+            ]
+        }
+    )
+    out = parse_faq(raw, 4)
+    assert [f["q"] for f in out] == ["Clean?"]
+
+
 def test_low_definitional_score_with_existing_definition_offers_improve() -> None:
     """The 40/45-score live case: a definition EXISTS but is buried. We don't
     ADD (that made duplicates) — we offer to IMPROVE (hoist it up), so the

@@ -62,6 +62,29 @@ describe("geoFindingsToIssues", () => {
     expect(first.panel).toBe("geo");
   });
 
+  it("keeps answer_first actionable when the per-finding fix came back empty", () => {
+    // When the backend can't match a paraphrased section title it drops the
+    // per-finding fix, but the lever still tags fix:'answer_first' — LEVER_FIX
+    // must rescue it into an AI-fixable card rather than an advisory Dismiss.
+    const issues = geoFindingsToIssues({
+      score: 50,
+      grade: "D",
+      levers: [
+        {
+          key: "answer_first",
+          label: "Answer-first sections",
+          score: 58,
+          detail: "Lead with the takeaway.",
+          fix: "answer_first",
+          findings: [{ note: "A section buries its answer", fix: "" }],
+        },
+      ],
+    });
+    expect(issues).toHaveLength(1);
+    expect(issues[0].nature).toBe("fix");
+    expect(issues[0].actions).toContain("ai_fix");
+  });
+
   it("maps freshness to an advisory with Add a date / Dismiss", () => {
     const freshness = geoFindingsToIssues(report).find((i) => i.lever === "freshness");
     expect(freshness?.nature).toBe("advisory");
