@@ -7,6 +7,7 @@ import { type Editor, EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { marked } from "marked";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import TurndownService from "turndown";
 import { tables as gfmTables } from "turndown-plugin-gfm";
 
@@ -351,9 +352,21 @@ const AI_ACTIONS: { action: InlineAction; label: string }[] = [
 /** Floating voice-aware AI bar shown above the current selection. Dependency-
  * free (no @tiptap BubbleMenu); positioned with viewport coords from the
  * editor. `onMouseDown` is suppressed so clicking a button keeps the
- * selection alive. */
-function AiSelectionToolbar({ anchor, busy, onAction }: AiSelectionToolbarProps): JSX.Element {
-  return (
+ * selection alive.
+ *
+ * Rendered through a portal at `document.body`: the bar is `position: fixed`
+ * with viewport coordinates, but the editor lives inside a section whose
+ * entrance animation (`animate-fade-up`) leaves a persistent `transform`. Any
+ * transform ≠ `none` turns that ancestor into the containing block for fixed
+ * descendants, so an in-tree bar would resolve its `top`/`left` against the
+ * scrolled section instead of the viewport and render off-screen. The portal
+ * hoists it out of every transformed ancestor so `fixed` means the viewport. */
+export function AiSelectionToolbar({
+  anchor,
+  busy,
+  onAction,
+}: AiSelectionToolbarProps): JSX.Element {
+  return createPortal(
     <div
       className="fixed z-50 -translate-x-1/2 -translate-y-full flex items-center gap-0.5 bg-ink text-white rounded-nb-sm shadow-nb-pop px-1 py-1 animate-fade-in"
       style={{ top: anchor.top - 8, left: anchor.left }}
@@ -375,7 +388,8 @@ function AiSelectionToolbar({ anchor, busy, onAction }: AiSelectionToolbarProps)
           {label}
         </button>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
