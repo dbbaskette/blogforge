@@ -4,6 +4,12 @@
  * it changes every deploy, unlike the semver. Locally these env vars are unset,
  * so the badge reads "dev".
  */
+// Default the version from package.json so EVERY build path shows the right
+// number — a plain `pnpm build` that doesn't export VITE_APP_VERSION no longer
+// falls back to a stale hardcoded string. The build scripts still override
+// VITE_APP_VERSION / VITE_GIT_SHA for an exact tag + sha.
+import { version as pkgVersion } from "../../package.json";
+
 export interface BuildInfo {
   version: string;
   sha: string;
@@ -11,7 +17,7 @@ export interface BuildInfo {
 }
 
 export const BUILD: BuildInfo = {
-  version: import.meta.env.VITE_APP_VERSION || "0.1.0",
+  version: import.meta.env.VITE_APP_VERSION || pkgVersion,
   sha: import.meta.env.VITE_GIT_SHA || "dev",
   builtAt: import.meta.env.VITE_BUILD_TIME || "",
 };
