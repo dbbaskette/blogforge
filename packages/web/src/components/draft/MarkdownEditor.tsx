@@ -159,7 +159,31 @@ export function MarkdownEditor({
     if (!loadedRef.current) {
       loadedRef.current = true;
       applyExternal(initialMarkdown);
-      return;
+      // LOAD-BEARING — do not remove without testing a COLD first load in Safari.
+      // WebKit (Safari macOS/iOS) leaves freshly-setContent ProseMirror text
+      // unpainted when the editor first mounts via a deferred/Suspense reveal
+      // (SectionsPanel is lazy-loaded, so the very first visit mounts async) —
+      // the text only appears after a reflow (collapse/restore, or navigate away
+      // and back). Force one repaint on the frame AFTER the mount's paint has
+      // committed. Frame-aligned (double rAF) not a fixed timeout, so it lands
+      // regardless of mount timing. An earlier setTimeout(300) version (56c40d4,
+      // removed in b894b62) was "not strong enough" because the opacity entrance
+      // animations — since removed — were fighting it.
+      const dom = editor.view.dom as HTMLElement;
+      let raf2 = 0;
+      const raf1 = window.requestAnimationFrame(() => {
+        raf2 = window.requestAnimationFrame(() => {
+          if (editor.isDestroyed) return;
+          const prev = dom.style.display;
+          dom.style.display = "none";
+          void dom.offsetHeight; // force reflow + repaint
+          dom.style.display = prev;
+        });
+      });
+      return () => {
+        window.cancelAnimationFrame(raf1);
+        window.cancelAnimationFrame(raf2);
+      };
     }
     if (initialMarkdown === lastSavedRef.current) return; // our own save echoed back
     if (dirtyRef.current) return; // protect unsaved local edits

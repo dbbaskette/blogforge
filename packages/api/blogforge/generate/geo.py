@@ -1317,15 +1317,22 @@ async def rescore_geo(
     model: str,
     extra_sources: str = "",
 ) -> dict[str, dict[str, Any]]:
-    """Re-score ONLY the requested levers after a targeted fix. Structural levers
-    recompute instantly (no LLM); semantic levers need one LLM pass. Everything
-    else is left untouched — so applying a fix refreshes just that part, not the
-    whole document."""
+    """Re-score after a targeted fix. Because a single edit moves collateral
+    levers too (adding a citation link shifts factual_density; an answer_first
+    rewrite shifts skimmability/chunking/page_front_load), always refresh the
+    deterministic structural levers — they're a cheap regex pass with no I/O —
+    so the merged total captures that drift for free. Semantic levers still cost
+    one LLM pass, so only the explicitly requested ones are re-run.
+
+    faq is the exception: its findings carry semantic sub-question *coverage*
+    advisories that only the full analyze_geo pass produces (rescore has no
+    coverage data), so it's refreshed only when a FAQ fix explicitly targets it —
+    otherwise those advisories would be clobbered until the next Re-analyze."""
     want = {k for k in keys if k in _ORDER}
     out: dict[str, dict[str, Any]] = {}
-    if want & _STRUCTURAL_KEYS:
-        structural = score_structural(draft)
-        out.update({k: structural[k] for k in want & _STRUCTURAL_KEYS if k in structural})
+    structural = score_structural(draft)
+    auto_structural = (_STRUCTURAL_KEYS - {"faq"}) | (want & {"faq"})
+    out.update({k: structural[k] for k in auto_structural if k in structural})
     if want & _SEMANTIC_KEYS:
         semantic = await _run_semantic(
             draft, pack_root, provider, model=model, extra_sources=extra_sources

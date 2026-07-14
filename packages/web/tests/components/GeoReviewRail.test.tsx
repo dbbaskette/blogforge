@@ -104,6 +104,39 @@ describe("GeoReviewRail", () => {
     );
   });
 
+  it("shows an 'updating' pill instead of the score for a lever whose rescore is in flight", () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <GeoReviewRail
+          report={report}
+          draft={{ ...draft, id: "d-inflight" }}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onTitleSave={vi.fn().mockResolvedValue(undefined)}
+          onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+        />
+      </MemoryRouter>,
+    );
+    // Idle: the numeric score shows, no pill.
+    expect(screen.getByText("55")).toBeInTheDocument();
+    expect(screen.queryByText(/updating/i)).not.toBeInTheDocument();
+
+    // In flight: the pill replaces the score for that lever.
+    rerender(
+      <MemoryRouter>
+        <GeoReviewRail
+          report={report}
+          draft={{ ...draft, id: "d-inflight" }}
+          inFlight={new Set(["answer_first"])}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onTitleSave={vi.fn().mockResolvedValue(undefined)}
+          onOpeningSave={vi.fn().mockResolvedValue(undefined)}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/updating/i)).toBeInTheDocument();
+    expect(screen.queryByText("55")).not.toBeInTheDocument();
+  });
+
   it("shows the impact line on a finding card and the point stakes on the lever header", () => {
     // A distinct draft id keeps this render's lifecycle status (persisted to
     // localStorage, keyed by draftId) isolated from the accept/undo flow the
