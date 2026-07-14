@@ -9,6 +9,7 @@ from blogforge.generate.geo import (
     _SEMANTIC_EXAMPLE,
     _SEMANTIC_KEYS,
     _SEMANTIC_SCHEMA,
+    _STRUCTURAL_KEYS,
     _WEIGHTS,
     augment_citations,
     augment_definitional,
@@ -319,6 +320,45 @@ def test_parse_semantic_maps_weak_sections_to_ids() -> None:
     # Factual density is flag-only — never a fix.
     assert levers["factual_density"]["fix"] is None
     assert levers["factual_density"]["findings"][0]["target"] == "It is fast."
+
+
+def test_answer_first_resolves_paraphrased_section_title() -> None:
+    # The model returns a truncated/paraphrased title; substring matching must
+    # still resolve it to the real section so the finding stays actionable.
+    sec = _sec("Security That Keeps Pace: Maintaining Spring Apps", "Body.")
+    d = _draft([sec])
+    raw = (
+        '{"answer_first": {"score": 50, "note": "x", '
+        '"weak_sections": ["Security That Keeps Pace"]}}'
+    )
+    findings = parse_semantic(raw, d)["answer_first"]["findings"]
+    assert len(findings) == 1
+    assert findings[0]["section_id"] == sec.id
+    assert findings[0]["fix"] == "answer_first"
+
+
+def test_draft_text_strips_parked_scaffolding() -> None:
+    from blogforge.generate.geo import _draft_text
+
+    body = "Real body sentence.\n\n**⟦PARKED MATERIAL⟧**\n\nheld note\n\n**⟦end PARKED MATERIAL⟧**"
+    text = _draft_text(_draft([_sec("Intro", body)]))
+    assert "PARKED MATERIAL" not in text
+    assert "held note" not in text
+    assert "Real body sentence." in text
+
+
+def test_parse_faq_drops_scaffolding_laden_answers() -> None:
+    raw = json.dumps(
+        {
+            "faqs": [
+                {"q": "Clean?", "a": "A grounded answer."},
+                {"q": "Bracket?", "a": "Answer with ⟦PARKED MATERIAL⟧ debris."},
+                {"q": "Comment?", "a": "<!-- editor note --> leaked."},
+            ]
+        }
+    )
+    out = parse_faq(raw, 4)
+    assert [f["q"] for f in out] == ["Clean?"]
 
 
 def test_low_definitional_score_with_existing_definition_offers_improve() -> None:
@@ -675,17 +715,31 @@ def _fake_pack(tmp_path):  # type: ignore[no-untyped-def]
     return root
 
 
-async def test_rescore_structural_only_skips_the_llm(tmp_path) -> None:  # type: ignore[no-untyped-def]
+async def test_rescore_structural_refreshes_all_non_faq_levers_without_llm(tmp_path) -> None:  # type: ignore[no-untyped-def]
     from blogforge.generate.geo import rescore_geo
 
     d = _draft([_sec("Intro", "Plain prose with no lists at all.")])
     out = await rescore_geo(d, ["skimmability"], tmp_path, _NoLLM(), model="m")
-    # Only the requested lever comes back, computed with no LLM call.
-    assert set(out) == {"skimmability"}
+    # A structural fix moves other structural levers too, so all deterministic
+    # levers come back (except faq — it carries semantic coverage advisories).
+    # Computed with no LLM call.
+    assert set(out) == _STRUCTURAL_KEYS - {"faq"}
     assert out["skimmability"]["key"] == "skimmability"
 
 
-async def test_rescore_returns_only_the_requested_semantic_lever(tmp_path) -> None:  # type: ignore[no-untyped-def]
+async def test_rescore_excludes_faq_unless_requested(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from blogforge.generate.geo import rescore_geo
+
+    d = _draft([_sec("FAQ", "Q&A")])
+    # faq is auto-excluded (preserving coverage advisories) when not asked for…
+    out = await rescore_geo(d, ["skimmability"], tmp_path, _NoLLM(), model="m")
+    assert "faq" not in out
+    # …but a FAQ fix that explicitly targets it still refreshes it.
+    out2 = await rescore_geo(d, ["faq"], tmp_path, _NoLLM(), model="m")
+    assert "faq" in out2
+
+
+async def test_rescore_semantic_also_refreshes_collateral_structural(tmp_path) -> None:  # type: ignore[no-untyped-def]
     from blogforge.generate.geo import rescore_geo
 
     raw = (
@@ -696,7 +750,9 @@ async def test_rescore_returns_only_the_requested_semantic_lever(tmp_path) -> No
     )
     d = _draft([_sec("Intro", "x")])
     out = await rescore_geo(d, ["answer_first"], _fake_pack(tmp_path), _JsonLLM(raw), model="m")
-    assert set(out) == {"answer_first"}
+    # The requested semantic lever comes back alongside the deterministic
+    # structural levers a rewrite may have moved.
+    assert set(out) == {"answer_first"} | (_STRUCTURAL_KEYS - {"faq"})
     assert out["answer_first"]["score"] == 55
 
 
