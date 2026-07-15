@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run the BlogForge API on the HOST so it can shell out to the logged-in
-# `claude` CLI (the claude-cli provider / Claude subscription auth). The slim
-# container can't reach the authenticated CLI, so generation moves to the host.
+# Run the BlogForge API on the HOST so it can shell out to a logged-in local
+# CLI provider (`claude` or `codex`). The slim container can't reach the
+# authenticated host CLIs, so generation moves to the host.
 #
 # Postgres + MinIO stay in Docker; the containerized `api` is stopped to free
 # port 7880. The web bundle is built into the API's static dir so the full app
@@ -9,11 +9,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-command -v claude >/dev/null 2>&1 || {
-  echo "❌ 'claude' is not on PATH. Install Claude Code and run 'claude' once to log in."
+if ! command -v claude >/dev/null 2>&1 && ! command -v codex >/dev/null 2>&1; then
+  echo "❌ No supported local CLI is on PATH. Install and authenticate Claude CLI or Codex CLI." >&2
   exit 1
-}
-echo "✓ claude CLI: $(command -v claude) ($(claude --version 2>/dev/null | head -1))"
+fi
+
+command -v claude >/dev/null 2>&1 && echo "✓ claude CLI: $(command -v claude) ($(claude --version 2>/dev/null | head -1))"
+command -v codex >/dev/null 2>&1 && echo "✓ codex CLI: $(command -v codex) ($(codex --version 2>/dev/null | head -1))"
 
 echo "▶ ensuring Postgres + MinIO are up…"
 docker compose up -d postgres minio >/dev/null
@@ -45,5 +47,5 @@ export BLOGFORGE_PUBLIC_URL="${BLOGFORGE_PUBLIC_URL:-http://localhost:7880}"
 RUN="uv run blogforge"
 [ -x ".venv/bin/blogforge" ] && RUN=".venv/bin/blogforge"
 
-echo "▶ serving on http://localhost:7880 — claude-cli provider is available."
+echo "▶ serving on http://localhost:7880 — detected local CLI providers are available."
 exec $RUN serve --host 0.0.0.0 --port 7880 --browser
