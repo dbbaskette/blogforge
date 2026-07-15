@@ -124,9 +124,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.run_migrations_on_boot:
         if settings.database_url.startswith("sqlite"):
             from blogforge.db.base import Base
+            from blogforge.db.sqlite_sync import add_missing_columns
 
             async with get_engine().begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                # create_all only CREATES tables - it cannot add a column to one
+                # that already exists, so a model that gained a column would
+                # leave this database behind and take the app down at boot on
+                # the first query for it. Reconcile the nullable additions.
+                await conn.run_sync(add_missing_columns, Base.metadata)
         else:
             from alembic import command
             from alembic.config import Config as AlembicConfig
