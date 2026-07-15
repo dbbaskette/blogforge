@@ -65,10 +65,13 @@ describe("makeShapeApply — expand", () => {
       "choose_option",
       "Add a stat",
     );
+    // MUST be action "custom": the backend only honors `instruction` for custom
+    // (generate/inline.py _build_user_prompt). With the "expand" preset the
+    // chosen idea is silently ignored and every chip does the same thing.
     expect(inlineEdit).toHaveBeenCalledWith("d1", {
       text: "The wordy bit stays.",
-      action: "expand",
-      instruction: "Add a stat",
+      action: "custom",
+      instruction: expect.stringContaining("Add a stat"),
     });
     expect(res?.after).toContain("with a stat");
   });

@@ -160,6 +160,10 @@ export function LintPanel({
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimsError, setClaimsError] = useState<string | null>(null);
   const [hasRefs, setHasRefs] = useState(true);
+  // Findings whose text we just rewrote — the fix has landed but this lint run
+  // predates it, so they'd otherwise keep counting against the score until a
+  // manual re-lint. Cleared whenever a fresh lint replaces the truth.
+  const [fixed, setFixed] = useState<Set<string>>(new Set());
 
   const runLint = useCallback(() => {
     setLoading(true);
@@ -168,6 +172,7 @@ export function LintPanel({
         setViolations(r.violations);
         setRepetitions(r.repetitions ?? []);
         setHits(r.hits);
+        setFixed(new Set());
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -185,13 +190,12 @@ export function LintPanel({
     return keys.map((k) => ({ key: k, label: k }));
   }, [issues]);
   // The Humanity Score reflects what's still WRONG IN THE TEXT — only fixing a
-  // finding (or editing it away, so a re-lint drops it) improves it. Dismissal
-  // is now owned by ReviewRail, which doesn't expose its dismissed set here —
-  // but that's the same semantic as before: dismissing just declutters the
-  // list, it never counted toward the score either. So the raw actionable
-  // count (every violation + repetition, regardless of dismissal or in-review
-  // status) is the open count, unchanged until a re-lint drops a fixed one.
-  const scoreOpen = issues.length;
+  // finding improves it. Dismissing an item just declutters the list; leaving
+  // an em-dash in place doesn't make the writing more human, so a dismissed-
+  // but-unfixed finding still counts. That's why this subtracts `fixed` (set
+  // from the rail's onApplied, which fires only when an apply actually rewrote
+  // the text) and NOT the rail's dismissed set — which it deliberately can't see.
+  const scoreOpen = useMemo(() => issues.filter((i) => !fixed.has(i.id)).length, [issues, fixed]);
 
   const runClaims = async (): Promise<void> => {
     setClaimsLoading(true);
@@ -273,9 +277,10 @@ export function LintPanel({
               apply={apply}
               save={onSectionSave}
               onHighlight={jumpToSection}
-              onApplied={(_issue, applied) =>
-                onTrackChange?.(applied.sectionId, applied.before, applied.after, "proofread")
-              }
+              onApplied={(issue, applied) => {
+                onTrackChange?.(applied.sectionId, applied.before, applied.after, "proofread");
+                setFixed((prev) => new Set(prev).add(issue.id));
+              }}
               emptyState={
                 <p className="text-sm text-muted italic font-serif py-6 text-center">
                   Nothing flagged — clean copy.

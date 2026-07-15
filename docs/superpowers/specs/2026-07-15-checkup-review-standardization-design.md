@@ -147,6 +147,11 @@ panel-namespaced (`geo:*`, `humanize:*`, `pf:*`, `shape:*`), so one store is una
 This preserves the intent behind the hide-style stores (a dismissed finding stays gone
 across re-analysis) while giving every panel the reversibility LintPanel already has.
 
+**Universal means every adapter must offer it.** A rail that supports dismiss is not
+enough: GEO's action tables historically omitted `dismiss` from every fix-type finding,
+so most GEO cards could never be hidden — only fixed or endured. Every action set in
+every adapter now ends in `dismiss`.
+
 ### 5. The `why` rule
 
 `IssueCard`'s `showWhy` prop is deleted. `ReviewRail` computes the display value:
@@ -171,14 +176,25 @@ Suggestion[]>>`, `Suggestion { target, note, options }`) → `Issue[]`, grouped 
 
 | Kind | nature | actions | options |
 |---|---|---|---|
-| `reword` | `fix` | `choose_option`, `manual_fix`, `highlight`, `dismiss` | the alternatives |
+| `reword` | `fix` | `choose_option`, `manual_fix`, `dismiss` | the alternatives |
 | `expand` | `add` | `choose_option`, `write_own`, `dismiss` | the ideas |
-| `fact_check` | `advisory` | `highlight`, `dismiss` | — |
+| `fact_check` | `advisory` | `dismiss` | — |
+
+No `highlight` for Shape: its suggestions carry no `section_id` (apply resolves the
+section by searching for the target), and ShapePanel is a standalone overlay with no
+read-pane to jump to. A Highlight button would render and silently no-op.
+
+A suggestion that arrives with no alternatives drops `choose_option` — a "Pick one"
+button with nothing to pick is a dead control.
 
 **`lib/issues/shapeApply.ts`** — an `apply` matching the lifecycle contract:
 - `choose_option` on `reword`: splice the chosen option over `target` client-side, no
   model call.
-- `choose_option` on `expand`: `inlineEdit` with the chosen idea, then splice.
+- `choose_option` on `expand`: `inlineEdit` with the chosen idea, then splice. This MUST
+  use `action: "custom"`, not the `expand` preset — the backend only reads `instruction`
+  for `custom` (`generate/inline.py:_build_user_prompt`); a preset uses its own hardcoded
+  directive and silently ignores the instruction, which would discard the very idea the
+  writer picked and make all N chips do the same thing.
 - Honors `opts.persist === false` so the preview modal can show before/after without
   saving.
 
