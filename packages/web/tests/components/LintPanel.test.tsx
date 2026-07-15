@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -97,5 +97,43 @@ describe("LintPanel on the shared rail", () => {
 
     expect(screen.getByText("88")).toBeInTheDocument();
     expect(screen.queryByText("94")).not.toBeInTheDocument();
+  });
+
+  it("DOES improve the Humanity Score once a fix is actually applied, and unwinds on Undo", async () => {
+    // The other half of the semantic: fixing the text must move the score, and
+    // Undo — which puts the flagged text back — must move it back.
+    vi.mocked(lintDraft).mockResolvedValue({
+      violations: [
+        finding(),
+        finding({ id: "f2", match: "leverage", message: "Avoid “leverage”" }),
+      ],
+      repetitions: [],
+      hits: [],
+    } as never);
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <LintPanel draft={draft} onSectionSave={onSectionSave} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
+    await screen.findByText("Avoid “very unique”");
+    expect(screen.getByText("88")).toBeInTheDocument(); // 2 open
+
+    // Apply a manual fix (no model call, no preview) → one finding resolved.
+    await act(async () => {
+      screen.getAllByRole("button", { name: "Manual fix" })[0].click();
+    });
+    const box = await screen.findByRole("textbox");
+    await act(async () => {
+      fireEvent.change(box, { target: { value: "unusual" } });
+      screen.getByRole("button", { name: "Apply" }).click();
+    });
+    await waitFor(() => expect(screen.getByText("94")).toBeInTheDocument()); // 1 open
+
+    // Undo restores the flagged text — the score must go back.
+    await act(async () => {
+      screen.getByRole("button", { name: "Undo" }).click();
+    });
+    await waitFor(() => expect(screen.getByText("88")).toBeInTheDocument());
   });
 });

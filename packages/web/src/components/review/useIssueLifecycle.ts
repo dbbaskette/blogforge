@@ -39,6 +39,10 @@ export interface UseIssueLifecycleArgs {
   /** Fired after an apply lands (direct or confirmed preview). LintPanel uses it
    *  to record a tracked change so the editor colors the edit until approved. */
   onApplied?: (issue: Issue, applied: Applied) => void;
+  /** Fired after an undo restores the pre-fix text. The mirror of `onApplied`:
+   *  any panel state derived from "this got fixed" must be able to unwind, or
+   *  undoing leaves that state falsely reporting a fix that no longer exists. */
+  onUndone?: (issue: Issue) => void;
 }
 
 interface LedgerEntry {
@@ -97,7 +101,7 @@ function persistStatus(draftId: string, issueId: string, next: IssueStatus | nul
  * ledger in localStorage (so undo survives a reload within a session).
  */
 export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
-  const { draftId, apply, save, onHighlight, onRescore, onUndoRescore, onApplied } = args;
+  const { draftId, apply, save, onHighlight, onRescore, onUndoRescore, onApplied, onUndone } = args;
   // Hydrate the resolution status from the last session for this draft, so
   // corrections/dismissals are still applied when the panel is reopened.
   const [status, setStatus] = useState<Record<string, IssueStatus>>(() => loadStatuses(draftId));
@@ -184,6 +188,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
           delete ledger[issue.id];
           saveLedger(draftId, ledger);
         }
+        onUndone?.(issue);
         setStatus((s) => ({ ...s, [issue.id]: "open" }));
         // "open" is the absence of a decision — drop it from the saved ledger
         // so a reopened panel shows it open again.
@@ -192,7 +197,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         setBusy(null);
       }
     },
-    [draftId, save, onHighlight, onRescore, onUndoRescore],
+    [draftId, save, onHighlight, onRescore, onUndoRescore, onUndone],
   );
 
   // ── Preview phase (AI fixes): compute → show modal → confirm/cancel ──
@@ -249,7 +254,12 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         const field = res.field ?? "content";
         await save(res.sectionId, finalAfter, field);
         const ledger = loadLedger(draftId);
-        ledger[issue.id] = { sectionId: res.sectionId, before: res.before, lever: issue.lever, field };
+        ledger[issue.id] = {
+          sectionId: res.sectionId,
+          before: res.before,
+          lever: issue.lever,
+          field,
+        };
         saveLedger(draftId, ledger);
         onApplied?.(issue, { ...res, after: finalAfter });
         onRescore?.(issue.lever);

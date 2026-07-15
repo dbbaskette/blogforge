@@ -281,6 +281,16 @@ export function LintPanel({
                 onTrackChange?.(applied.sectionId, applied.before, applied.after, "proofread");
                 setFixed((prev) => new Set(prev).add(issue.id));
               }}
+              // Undo puts the flagged text back, so the finding is open again —
+              // without this the score would keep crediting a fix that no
+              // longer exists.
+              onUndone={(issue) =>
+                setFixed((prev) => {
+                  const next = new Set(prev);
+                  next.delete(issue.id);
+                  return next;
+                })
+              }
               emptyState={
                 <p className="text-sm text-muted italic font-serif py-6 text-center">
                   Nothing flagged — clean copy.

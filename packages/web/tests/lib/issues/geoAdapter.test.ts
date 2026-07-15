@@ -271,4 +271,32 @@ describe("geoAdapter — universal dismiss", () => {
     expect(issues.length).toBeGreaterThan(0);
     expect(issues.every((i) => i.actions.includes("dismiss"))).toBe(true);
   });
+
+  it("offers dismiss on the matched-citation shortcut too", () => {
+    // This path bypasses the action tables with a hardcoded override, so it can
+    // (and did) silently miss dismiss even when every table entry has it.
+    const report = {
+      grade: "C",
+      levers: [
+        {
+          key: "citations",
+          label: "Citations",
+          score: 30,
+          weight: 0.2,
+          detail: "No sources",
+          findings: [
+            {
+              note: "Uncited",
+              fix: "cite_reference",
+              target: "c",
+              section_id: "s1",
+              suggestion: "c [src](http://x)",
+            },
+          ],
+        },
+      ],
+    } as never;
+    const [i] = geoFindingsToIssues(report);
+    expect(i.actions).toEqual(["ai_fix", "manual_fix", "highlight", "dismiss"]);
+  });
 });
