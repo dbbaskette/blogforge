@@ -1,5 +1,5 @@
 /**
- * The GEO panel's findings list, rendered on the unified issue-card model.
+ * The GEO panel's findings list, rendered through the shared ReviewRail.
  * Every finding becomes an Issue (geoFindingsToIssues) and flows through the
  * shared IssueCard + useIssueLifecycle state machine (open → review → accepted,
  * with per-issue undo) — the same components the Proofreader uses, so the two
@@ -14,11 +14,7 @@ import type { Draft } from "../../api/drafts";
 import type { GeoReport } from "../../api/geo";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { fillSectionIds } from "../../lib/issues/locateSection";
-import { FixPreviewModal } from "../review/FixPreviewModal";
-import { IssueCard } from "../review/IssueCard";
-import { reviewBusyLabel } from "../review/reviewBusyLabel";
-import { useIssueLifecycle } from "../review/useIssueLifecycle";
-import { BusyOverlay } from "../ui/BusyOverlay";
+import { type ReviewGroup, ReviewRail } from "../review/ReviewRail";
 import { makeGeoApply, makeGeoSave } from "./geoApply";
 
 function barColor(score: number): string {
@@ -65,56 +61,15 @@ export function GeoReviewRail({
   );
   const apply = useMemo(() => makeGeoApply(ctx), [ctx]);
   const save = useMemo(() => makeGeoSave(ctx), [ctx]);
-  const {
-    statusOf,
-    errorOf,
-    busyId,
-    busyAction,
-    run,
-    accept,
-    undo,
-    preview,
-    requestPreview,
-    confirmPreview,
-    cancelPreview,
-  } = useIssueLifecycle({
-    draftId: draft.id,
-    apply,
-    save,
-    onHighlight,
-    onRescore,
-    onUndoRescore: onRestoreLever,
-  });
-  const busyLabel = reviewBusyLabel(busyAction);
-  const leverLabelFor = (key: string): string =>
-    report.levers.find((l) => l.key === key)?.label ?? key;
 
-  const byLever = useMemo(() => {
-    const map = new Map<string, typeof issues>();
-    for (const issue of issues) {
-      const list = map.get(issue.lever) ?? [];
-      list.push(issue);
-      map.set(issue.lever, list);
-    }
-    return map;
-  }, [issues]);
-
-  return (
-    <div className="space-y-4">
-      {busyLabel && <BusyOverlay label={busyLabel} />}
-      <div className="flex items-center justify-end">
-        <Link
-          to="/help#geo"
-          className="text-xs text-muted underline underline-offset-2 hover:text-ink"
-        >
-          How these rules work →
-        </Link>
-      </div>
-      {report.levers.map((lever) => {
-        const leverIssues = byLever.get(lever.key) ?? [];
-        if (leverIssues.length === 0) return null;
-        return (
-          <section key={lever.key} className="glass-card p-3 space-y-2">
+  const groups = useMemo<ReviewGroup[]>(
+    () =>
+      report.levers.map((lever) => ({
+        key: lever.key,
+        label: lever.label,
+        detail: lever.detail,
+        header: (
+          <>
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-ink">
                 {lever.label}
@@ -141,40 +96,38 @@ export function GeoReviewRail({
                 style={{ width: `${lever.score}%`, background: barColor(lever.score) }}
               />
             </div>
-            <p className="text-xs text-muted leading-snug">{lever.detail}</p>
+          </>
+        ),
+      })),
+    [report.levers, inFlight],
+  );
 
-            <div className="space-y-2">
-              {leverIssues.map((issue) => (
-                <IssueCard
-                  key={issue.id}
-                  issue={{ ...issue, status: statusOf(issue) }}
-                  busy={busyId === issue.id}
-                  error={errorOf(issue)}
-                  onAction={(action, inputText) =>
-                    action === "ai_fix"
-                      ? void requestPreview(issue, action, inputText)
-                      : void run(issue, action, inputText)
-                  }
-                  onAccept={() => accept(issue)}
-                  onUndo={() => void undo(issue)}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
-      {preview && (
-        <FixPreviewModal
-          title={preview.issue.title}
-          leverLabel={leverLabelFor(preview.issue.lever)}
-          why={preview.issue.why}
-          before={preview.res.before}
-          after={preview.res.after}
-          busy={busyId === preview.issue.id}
-          onApply={(finalAfter) => void confirmPreview(finalAfter)}
-          onCancel={cancelPreview}
-        />
-      )}
-    </div>
+  return (
+    <ReviewRail
+      issues={issues}
+      groups={groups}
+      draftId={draft.id}
+      apply={apply}
+      save={save}
+      onHighlight={onHighlight}
+      onRescore={onRescore}
+      onRestoreLever={onRestoreLever}
+      groupLabelFor={(key) => report.levers.find((l) => l.key === key)?.label ?? key}
+      emptyState={
+        <p className="py-8 text-center text-sm text-muted">
+          Nothing flagged — this reads GEO-ready.
+        </p>
+      }
+      headerSlot={
+        <div className="flex items-center justify-end">
+          <Link
+            to="/help#geo"
+            className="text-xs text-muted underline underline-offset-2 hover:text-ink"
+          >
+            How these rules work →
+          </Link>
+        </div>
+      }
+    />
   );
 }
