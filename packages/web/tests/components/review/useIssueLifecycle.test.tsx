@@ -128,9 +128,7 @@ describe("useIssueLifecycle", () => {
     );
     const save = vi.fn();
     const onRescore = vi.fn();
-    const hook = renderHook(() =>
-      useIssueLifecycle({ draftId: "d1", apply, save, onRescore }),
-    );
+    const hook = renderHook(() => useIssueLifecycle({ draftId: "d1", apply, save, onRescore }));
 
     await act(async () => {
       await hook.result.current.requestPreview(issue, "ai_fix");
