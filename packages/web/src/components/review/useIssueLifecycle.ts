@@ -36,6 +36,9 @@ export interface UseIssueLifecycleArgs {
    *  restore a cached pre-fix score instantly instead of re-running a model
    *  pass just to arrive back where it started. */
   onUndoRescore?: (lever: string) => void;
+  /** Fired after an apply lands (direct or confirmed preview). LintPanel uses it
+   *  to record a tracked change so the editor colors the edit until approved. */
+  onApplied?: (issue: Issue, applied: Applied) => void;
 }
 
 interface LedgerEntry {
@@ -94,7 +97,7 @@ function persistStatus(draftId: string, issueId: string, next: IssueStatus | nul
  * ledger in localStorage (so undo survives a reload within a session).
  */
 export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
-  const { draftId, apply, save, onHighlight, onRescore, onUndoRescore } = args;
+  const { draftId, apply, save, onHighlight, onRescore, onUndoRescore, onApplied } = args;
   // Hydrate the resolution status from the last session for this draft, so
   // corrections/dismissals are still applied when the panel is reopened.
   const [status, setStatus] = useState<Record<string, IssueStatus>>(() => loadStatuses(draftId));
@@ -132,12 +135,6 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
       try {
         const res = await apply(issue, action, input);
         if (!res) return;
-        // Dismissing an advisory has no content change — go straight to green.
-        if (action === "dismiss") {
-          setStatus((s) => ({ ...s, [issue.id]: "accepted" }));
-          persistStatus(draftId, issue.id, "accepted");
-          return;
-        }
         const ledger = loadLedger(draftId);
         ledger[issue.id] = {
           sectionId: res.sectionId,
@@ -146,6 +143,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
           field: res.field ?? "content",
         };
         saveLedger(draftId, ledger);
+        onApplied?.(issue, res);
         onHighlight?.(res.sectionId, res.highlight ?? res.after, "under-review");
         onRescore?.(issue.lever);
         setStatus((s) => ({ ...s, [issue.id]: "review" }));
@@ -161,7 +159,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         setBusy(null);
       }
     },
-    [draftId, apply, onHighlight, onRescore],
+    [draftId, apply, onHighlight, onRescore, onApplied],
   );
 
   const accept = useCallback(
@@ -253,6 +251,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         const ledger = loadLedger(draftId);
         ledger[issue.id] = { sectionId: res.sectionId, before: res.before, lever: issue.lever, field };
         saveLedger(draftId, ledger);
+        onApplied?.(issue, { ...res, after: finalAfter });
         onRescore?.(issue.lever);
         // Preview already showed the compare — applied means done. Flash a
         // transient locate so the read pane shows where it landed. But if the
@@ -274,7 +273,7 @@ export function useIssueLifecycle(args: UseIssueLifecycleArgs) {
         setBusy(null);
       }
     },
-    [preview, draftId, save, onHighlight, onRescore],
+    [preview, draftId, save, onHighlight, onRescore, onApplied],
   );
 
   const cancelPreview = useCallback((): void => setPreview(null), []);
