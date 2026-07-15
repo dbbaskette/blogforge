@@ -83,6 +83,14 @@ async def test_rejects_unknown_provider(setup):
         await vault.get("notreal")
 
 
+async def test_codex_cli_sentinel_tracks_binary(setup, monkeypatch):
+    monkeypatch.setattr("blogforge.llm.codex_cli.codex_available", lambda: True)
+    assert await KeyVault(setup).get("codex-cli") == "cli"
+
+    monkeypatch.setattr("blogforge.llm.codex_cli.codex_available", lambda: False)
+    assert await KeyVault(setup).get("codex-cli") == ""
+
+
 async def test_keys_are_user_scoped(setup):
     """Keys set for one user must not be visible to another."""
     async with get_sessionmaker()() as session:

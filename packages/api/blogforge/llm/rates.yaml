@@ -98,3 +98,12 @@ claude-cli:
     output_per_million_usd: 0
     context_window: 200000
     supports_streaming: false
+# Local Codex CLI. No API key — uses the logged-in subscription, so
+# per-token prices are represented as zero.
+codex-cli:
+  codex-default:
+    label: "Codex default"
+    input_per_million_usd: 0
+    output_per_million_usd: 0
+    context_window: 200000
+    supports_streaming: false

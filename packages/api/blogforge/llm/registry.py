@@ -7,6 +7,7 @@ from collections.abc import Callable
 from blogforge.llm.anthropic import AnthropicProvider
 from blogforge.llm.base import LLMProvider
 from blogforge.llm.claude_cli import ClaudeCliProvider
+from blogforge.llm.codex_cli import CodexCliProvider
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey  # noqa: F401
 from blogforge.llm.google import GoogleProvider
 from blogforge.llm.openai import OpenAIProvider
@@ -18,6 +19,7 @@ _FACTORIES: dict[str, Callable[[str], LLMProvider]] = {
     "google": lambda api_key: GoogleProvider(api_key=api_key),
     # Uses the local logged-in Claude Code CLI; api_key is ignored.
     "claude-cli": lambda api_key: ClaudeCliProvider(api_key=api_key),
+    "codex-cli": lambda api_key: CodexCliProvider(api_key=api_key),
     # Tanzu GenAI binding — keyless to the user; reads creds from settings.
     "tanzu": lambda _api_key: TanzuProvider.from_settings(),
 }
