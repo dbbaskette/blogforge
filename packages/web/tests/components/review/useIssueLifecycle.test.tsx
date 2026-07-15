@@ -77,33 +77,17 @@ describe("useIssueLifecycle", () => {
     expect(hook.result.current.statusOf(issue)).toBe("open");
   });
 
-  it("dismiss goes straight to accepted", async () => {
-    const advisory: Issue = { ...issue, nature: "advisory", actions: ["dismiss"] };
-    const { hook } = setup({
-      apply: async () => ({ sectionId: "s1", before: "x", after: "x" }),
-    });
-    await act(async () => {
-      await hook.result.current.run(advisory, "dismiss");
-    });
-    expect(hook.result.current.statusOf(advisory)).toBe("accepted");
-  });
+  // Dismiss no longer gets special-cased by the lifecycle — it moved out to the
+  // rail (a dismissed issue hides behind a "Show dismissed (N)" toggle backed by
+  // dismissals.ts instead of turning the card green). The two tests that used to
+  // live here ("dismiss goes straight to accepted" / "persists a dismissal and
+  // rehydrates it on a fresh mount") asserted that removed behavior and were
+  // deleted rather than updated to match, since the hook has no dismiss-specific
+  // path left to test.
 
-  // Persistence: a fix/dismissal must survive closing and reopening the panel —
-  // the whole point of "corrections should be persistent". A fresh hook (new
-  // mount, same draftId) hydrates the last-known status from localStorage.
-  it("persists a dismissal and rehydrates it on a fresh mount", async () => {
-    const advisory: Issue = { ...issue, nature: "advisory", actions: ["dismiss"] };
-    const first = setup();
-    await act(async () => {
-      await first.hook.result.current.run(advisory, "dismiss");
-    });
-    expect(first.hook.result.current.statusOf(advisory)).toBe("accepted");
-
-    // Reopen: a brand-new hook instance for the same draft.
-    const second = setup();
-    expect(second.hook.result.current.statusOf(advisory)).toBe("accepted");
-  });
-
+  // Persistence: a fix must survive closing and reopening the panel — the whole
+  // point of "corrections should be persistent". A fresh hook (new mount, same
+  // draftId) hydrates the last-known status from localStorage.
   it("persists an accepted fix across a remount", async () => {
     const first = setup();
     await act(async () => {
