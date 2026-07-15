@@ -214,7 +214,11 @@ async def test_status_probe_timeout_has_retry_diagnostics(
     assert status["authenticated"] is False
     assert "timed out" in str(status["detail"]).lower()
     assert "refresh" in str(status["resolve"]).lower()
-    assert "codex exec" in str(status["resolve"]).lower()
+    resolution = str(status["resolve"]).lower()
+    assert "cd /tmp" in resolution
+    assert "codex exec --ephemeral" in resolution
+    assert "--sandbox read-only" in resolution
+    assert "--skip-git-repo-check" in resolution
 
 
 @pytest.mark.asyncio

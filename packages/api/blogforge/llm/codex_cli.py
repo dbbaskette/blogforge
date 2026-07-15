@@ -179,7 +179,9 @@ async def codex_status(timeout: float = 20.0) -> dict[str, object]:
             if "timed out" in low or "timeout" in low:
                 return _status_failure(
                     "The Codex CLI generation probe timed out.",
-                    "Try Refresh, or run `printf 'OK' | codex exec -` in the server's shell.",
+                    "Try Refresh, or run `cd /tmp && printf 'OK' | codex exec "
+                    "--ephemeral --sandbox read-only --skip-git-repo-check -` "
+                    "in the server's shell.",
                 )
             if "rate" in low or "usage limit" in low or "quota" in low:
                 return _status_failure(
