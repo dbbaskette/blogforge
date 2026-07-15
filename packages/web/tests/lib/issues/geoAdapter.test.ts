@@ -155,7 +155,9 @@ describe("geoFindingsToIssues", () => {
       ],
     });
     expect(issues).toHaveLength(1);
-    expect(issues[0].id).toBe("takeaways:lever");
+    // Id is now content-hashed, not position/suffix-based — assert the shape
+    // (stable, namespaced under panel:lever) rather than a literal string.
+    expect(issues[0].id).toMatch(/^geo:takeaways:/);
     expect(issues[0].nature).toBe("add");
     expect(issues[0].actions).toEqual(["generate", "write_own"]);
     expect(issues[0].fixKind).toBe("takeaways");

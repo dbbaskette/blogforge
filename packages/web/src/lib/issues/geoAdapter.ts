@@ -5,6 +5,7 @@
  */
 
 import type { GeoLever, GeoReport } from "../../api/geo";
+import { makeIdFactory } from "./issueIds";
 import type { Issue, IssueAction, IssueNature } from "./types";
 
 interface ActionSpec {
@@ -59,9 +60,10 @@ function specFor(lever: GeoLever, findingFix: string): ActionSpec {
 }
 
 export function geoFindingsToIssues(report: GeoReport): Issue[] {
+  const nextId = makeIdFactory();
   const issues: Issue[] = [];
   for (const lever of report.levers) {
-    lever.findings.forEach((finding, i) => {
+    for (const finding of lever.findings) {
       const fix = finding.fix ?? "";
       const spec = specFor(lever, fix);
       // A citations claim matched to an attached source already carries its
@@ -79,7 +81,11 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
           ? specActions.filter((a) => a !== "highlight")
           : specActions;
       issues.push({
-        id: `${lever.key}:${i}`,
+        id: nextId("geo", lever.key, {
+          sectionId: finding.section_id ?? "",
+          target: finding.target,
+          title: finding.note || lever.label,
+        }),
         panel: "geo",
         lever: lever.key,
         title: finding.note || lever.label,
@@ -101,7 +107,7 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         // longer hardcodes it.
         impactLabel: "GEO",
       });
-    });
+    }
 
     // A deficient lever can offer a lever-level fix (e.g. "add a key-takeaways
     // block") without any per-finding anchor. With no findings it would emit no
@@ -109,7 +115,7 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
     if (lever.findings.length === 0 && lever.fix && LEVER_FIX[lever.fix]) {
       const spec = LEVER_FIX[lever.fix];
       issues.push({
-        id: `${lever.key}:lever`,
+        id: nextId("geo", lever.key, { title: lever.detail || lever.label }),
         panel: "geo",
         lever: lever.key,
         title: lever.detail || lever.label,
