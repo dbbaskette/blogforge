@@ -101,6 +101,9 @@ Pick a provider per draft:
 - **Claude CLI (subscription)** — generate through your locally logged-in
   [Claude Code](https://docs.claude.com/en/docs/claude-code) CLI (`claude -p`) instead of an API key,
   with web search on. Requires running the API on the host where `claude` is installed — see below.
+- **Codex CLI (subscription)** — generate through your locally logged-in
+  [Codex CLI](https://developers.openai.com/codex/cli/) (`codex exec`) instead of an API key, with
+  web search and fetch available. Requires running the API on the host where `codex` is installed.
 
 ## Quickstart (Docker)
 
@@ -150,7 +153,7 @@ BLOGFORGE_PUBLIC_URL=http://localhost:7880 \
 ```
 
 Everything lives under `data_dir` (`BLOGFORGE_DATA_DIR`, default `~/.blogforge`). Pair it with the
-Claude CLI below and you need no API keys either.
+Claude CLI or Codex CLI below and you need no API keys either.
 
 Prefer Docker? **One container** is enough now — [`docker-compose.local.yml`](docker-compose.local.yml)
 runs just the app (file-SQLite + fs blobs on a mounted volume, no Postgres/MinIO):
@@ -161,18 +164,21 @@ docker compose -f docker-compose.local.yml up --build   # put GitHub OAuth creds
 
 The full multi-container Docker path (Postgres + MinIO) below stays available for a production-like setup.
 
-## Using the Claude CLI (subscription, no API key)
+## Using the Claude CLI or Codex CLI (subscription, no API key)
 
-The `claude` binary isn't in the slim container, so run the API on your host (where Claude Code is
-installed and logged in) while Postgres/MinIO stay in Docker:
+The `claude` and `codex` binaries aren't in the slim container, so run the API on your host (where
+the CLI you want is installed and logged in) while Postgres/MinIO stay in Docker:
 
 ```bash
 ./scripts/serve-host.sh
 ```
 
 This stops the containerized API, builds the web bundle into the API's static dir, and serves on
-http://localhost:7880. Confirm the CLI is authenticated first (`claude auth status`), then pick
-**claude (CLI · subscription)** as the provider on a draft.
+http://localhost:7880. Confirm Claude is authenticated first (`claude auth status`). Run `codex login status` as the same host account that runs BlogForge.
+Then pick the matching CLI provider on a draft.
+
+BlogForge invokes `codex exec` ephemerally and uses the model configured as the Codex CLI default.
+Codex CLI generation can search and fetch the web.
 
 ## Local dev (without Docker)
 
@@ -228,8 +234,8 @@ cf push --vars-file vars.yml
 model wiring: `blogforge-postgres` → `BLOGFORGE_DATABASE_URL`, `blogforge-blobs` (Block Storage volume)
 → `BLOGFORGE_STORAGE_BACKEND=fs` + `BLOGFORGE_STORAGE_DIR=<mount>/blobs`, `blogforge-ai` →
 `BLOGFORGE_TANZU_*` (the keyless **Tanzu** provider). Migrations run on first boot.
-Sign in with GitHub; `github_admin_login` lands as admin. (The Claude CLI provider isn't available in
-a cloud deploy — use the Tanzu model or API-key providers there.)
+Sign in with GitHub; `github_admin_login` lands as admin. Local CLI providers are unavailable in ordinary cloud/container deployments unless deliberately installed and authenticated there.
+Use the Tanzu model or API-key providers for a standard cloud deployment.
 
 ## Architecture
 
@@ -250,7 +256,7 @@ packages/
 ## Requires
 
 - At least one model: an **API key** for Anthropic / OpenAI / Google (in Settings), a bound **Tanzu**
-  model (on Tanzu Platform, no key), **or** the **Claude Code CLI** installed and logged in.
+  model (on Tanzu Platform, no key), **or** the **Claude Code CLI / Codex CLI** installed and logged in.
 - A **GitHub OAuth App** for sign-in (GitHub is the only login method) —
   see [`docs/github-oauth-setup.md`](docs/github-oauth-setup.md).
 
@@ -258,7 +264,7 @@ packages/
 
 ```bash
 ./scripts/dev.sh             # backend :7880, Vite dev :7881
-./scripts/serve-host.sh      # host API + web bundle on :7880 (enables the Claude CLI provider)
+./scripts/serve-host.sh      # host API + web bundle on :7880 (enables local CLI providers)
 ./scripts/install-local.sh   # build wheel + install into local-venv/
 make test                    # backend pytest + web vitest
 ```
