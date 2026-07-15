@@ -10,7 +10,7 @@ import {
   importDraft,
   updateDraft,
 } from "../../api/drafts";
-import { listProviderAvailability } from "../../api/providers";
+import { getDefaultProvider, listProviderAvailability } from "../../api/providers";
 import { type Template, deleteTemplate, listTemplates } from "../../api/templates";
 import { loadDefaults, loadLastMode, saveDefaults, saveLastMode } from "../../lib/composeDefaults";
 import { parseOutline } from "../../lib/parseOutline";
@@ -33,6 +33,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   google: "Google",
   "claude-cli": "Claude CLI",
+  "codex-cli": "Codex CLI",
   tanzu: "Tanzu",
 };
 
@@ -85,6 +86,20 @@ export function ComposeStudio(): JSX.Element {
     listTemplates()
       .then(setTemplates)
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getDefaultProvider()
+      .then(({ default_provider }) => {
+        if (!cancelled && default_provider) {
+          setSettings((current) => ({ ...current, provider: default_provider, model: "" }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function refreshProviders(): void {

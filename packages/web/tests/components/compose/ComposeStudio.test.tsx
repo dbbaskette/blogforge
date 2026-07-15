@@ -36,6 +36,7 @@ vi.mock("../../../src/api/packs", () => ({
 vi.mock("../../../src/api/providers", () => ({
   listProviderAvailability: vi.fn().mockResolvedValue({ anthropic: true }),
   listModels: vi.fn().mockResolvedValue([{ id: "m1", label: "Model One" }]),
+  getDefaultProvider: vi.fn().mockResolvedValue({ default_provider: null }),
 }));
 
 import {
@@ -45,6 +46,7 @@ import {
   importDraft,
   updateDraft,
 } from "../../../src/api/drafts";
+import { getDefaultProvider, listProviderAvailability } from "../../../src/api/providers";
 import { ComposeStudio } from "../../../src/components/compose/ComposeStudio";
 
 const renderStudio = () =>
@@ -58,6 +60,50 @@ describe("ComposeStudio", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    vi.mocked(getDefaultProvider).mockResolvedValue({ default_provider: null });
+    vi.mocked(listProviderAvailability).mockResolvedValue({ anthropic: true });
+  });
+
+  it("uses the server preference instead of a stale browser provider", async () => {
+    localStorage.setItem(
+      "bf.compose.defaults",
+      JSON.stringify({ provider: "claude-cli", model: "stale-model" }),
+    );
+    vi.mocked(getDefaultProvider).mockResolvedValue({ default_provider: "codex-cli" });
+    vi.mocked(listProviderAvailability).mockResolvedValue({
+      anthropic: true,
+      "claude-cli": true,
+      "codex-cli": true,
+    });
+
+    renderStudio();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("codex-cli"));
+  });
+
+  it("keeps availability auto-pick when the server has no preference", async () => {
+    vi.mocked(listProviderAvailability).mockResolvedValue({ anthropic: true });
+    renderStudio();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("anthropic"));
+  });
+
+  it("allows a provider change within the new draft session and submits it", async () => {
+    vi.mocked(listProviderAvailability).mockResolvedValue({ anthropic: true, openai: true });
+    renderStudio();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("anthropic"));
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "openai" } });
+    fireEvent.click(screen.getByText(/Blank page/));
+    const btn = screen.getByRole("button", { name: /open editor/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+
+    await waitFor(() =>
+      expect(createDraft).toHaveBeenCalledWith(expect.objectContaining({ provider: "openai" })),
+    );
   });
 
   it("shows the four modes", () => {

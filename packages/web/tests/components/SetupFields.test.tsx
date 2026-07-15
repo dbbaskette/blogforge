@@ -10,7 +10,7 @@ vi.mock("../../src/api/packs", () => ({
   ]),
 }));
 vi.mock("../../src/api/providers", () => ({
-  listProviderAvailability: vi.fn().mockResolvedValue({ anthropic: true }),
+  listProviderAvailability: vi.fn().mockResolvedValue({ anthropic: true, "codex-cli": false }),
   listModels: vi.fn().mockResolvedValue([{ id: "m1", label: "Model One" }]),
 }));
 
@@ -55,5 +55,12 @@ describe("SetupFields", () => {
     expect(select.disabled).toBe(false);
     fireEvent.change(select, { target: { value: "product-release" } });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ format: "product-release" }));
+  });
+
+  it("offers Codex CLI with subscription and installation status copy", async () => {
+    render(<SetupFields value={base} onChange={vi.fn()} />);
+    expect(
+      await screen.findByRole("option", { name: "Codex CLI (subscription) (not installed)" }),
+    ).toBeDisabled();
   });
 });

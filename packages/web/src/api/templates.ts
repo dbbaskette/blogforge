@@ -1,11 +1,12 @@
 import { api } from "./client";
+import type { Provider } from "./providers";
 
 export interface Template {
   id: string;
   name: string;
   topic: string;
   pack_slug: string;
-  provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
+  provider: Provider;
   model: string;
   target_words: number;
   format: string | null;
