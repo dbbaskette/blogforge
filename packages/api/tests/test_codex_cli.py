@@ -61,6 +61,15 @@ def cli(monkeypatch: pytest.MonkeyPatch):
                 args[args.index("--sandbox") + 1],
             )
             assert "--skip-git-repo-check" in args
+            output_index = args.index("--output-last-message")
+            output_path = args[output_index + 1]
+            assert args[output_index : output_index + 2] == (
+                "--output-last-message",
+                output_path,
+            )
+            assert output_path.startswith(kwargs["cwd"])
+            config_index = args.index("-c")
+            assert args[config_index : config_index + 2] == ("-c", 'web_search="live"')
             assert "--model" not in args
             assert "-" == args[-1]
             assert kwargs["cwd"].startswith(tempfile.gettempdir())
@@ -183,3 +192,62 @@ async def test_status_login_and_probe_succeed(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(asyncio, "create_subprocess_exec", create)
     status = await codex_status()
     assert status["installed"] is True and status["authenticated"] is True
+
+
+@pytest.mark.asyncio
+async def test_status_probe_timeout_has_retry_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/codex")
+    login = FakeProcess(stdout=b"Logged in")
+
+    async def create(*args, **kwargs):
+        login.args = args
+        return login
+
+    async def timed_out(*args, **kwargs):
+        raise ProviderError("codex exec timed out.")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", create)
+    monkeypatch.setattr(CodexCliProvider, "_run", timed_out)
+    status = await codex_status(timeout=0.1)
+    assert status["authenticated"] is False
+    assert "timed out" in str(status["detail"]).lower()
+    assert "refresh" in str(status["resolve"]).lower()
+    assert "codex exec" in str(status["resolve"]).lower()
+
+
+@pytest.mark.asyncio
+async def test_status_probe_usage_limit_is_actionable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/codex")
+    login = FakeProcess(stdout=b"Logged in")
+
+    async def create(*args, **kwargs):
+        login.args = args
+        return login
+
+    async def rate_limited(*args, **kwargs):
+        raise ProviderError("Usage limit reached")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", create)
+    monkeypatch.setattr(CodexCliProvider, "_run", rate_limited)
+    status = await codex_status()
+    assert status["authenticated"] is False
+    assert "usage limit" in str(status["detail"]).lower()
+    assert "reset" in str(status["resolve"]).lower()
+
+
+@pytest.mark.asyncio
+async def test_status_oserror_is_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/codex")
+
+    async def create(*args, **kwargs):
+        raise OSError("cannot execute")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", create)
+    status = await codex_status()
+    assert status["installed"] is True and status["authenticated"] is False
+    assert "couldn't launch" in str(status["detail"]).lower()
+    assert "codex login status" in str(status["resolve"]).lower()

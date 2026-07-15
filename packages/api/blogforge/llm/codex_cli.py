@@ -176,6 +176,11 @@ async def codex_status(timeout: float = 20.0) -> dict[str, object]:
             await provider._run("Reply with the single word OK.", timeout=timeout)
         except ProviderError as exc:
             low = str(exc).lower()
+            if "timed out" in low or "timeout" in low:
+                return _status_failure(
+                    "The Codex CLI generation probe timed out.",
+                    "Try Refresh, or run `printf 'OK' | codex exec -` in the server's shell.",
+                )
             if "rate" in low or "usage limit" in low or "quota" in low:
                 return _status_failure(
                     "The Codex CLI is authenticated, but its usage limit was reached.",
