@@ -25,8 +25,10 @@ import re
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from blogforge.auth.dependencies import get_current_user
+from blogforge.db.engine import get_sessionmaker
 from blogforge.db.models import User
 from blogforge.voice.ingest import add_file_sample, add_text_sample, add_url_sample, add_url_source
 from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample, VoiceSource
@@ -268,6 +270,7 @@ _PROVIDER_DEFAULTS: dict[str, str] = {
     "openai": "gpt-5",
     "google": "gemini-2.5-flash",
     "claude-cli": "sonnet",
+    "codex-cli": "codex-default",
 }
 
 
@@ -288,6 +291,13 @@ async def _auto_select_provider(user_id) -> str | None:
     from blogforge.config import get_settings
     from blogforge.keys import KeyVault
     from blogforge.llm.claude_cli import claude_available
+
+    async with get_sessionmaker()() as session:
+        preferred = await session.scalar(
+            select(User.default_provider).where(User.id == user_id)
+        )
+    if preferred:
+        return preferred
 
     # Prefer the local Claude CLI (keyless Max-subscription auth) as the default
     # writing engine when it's installed — the subscription over pay-per-token
@@ -328,8 +338,8 @@ async def distill(
             detail={
                 "error": {
                     "code": "provider_missing_key",
-                    "message": "No API key configured for any provider.",
-                    "hint": "Add your key in Settings → Provider API keys.",
+                    "message": "No API key or CLI subscription provider is configured.",
+                    "hint": "Configure a CLI subscription or add an API key in Settings → Providers.",
                 }
             },
         )

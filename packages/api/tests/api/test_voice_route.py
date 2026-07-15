@@ -94,6 +94,22 @@ def test_add_text_sample_and_distill(voice_client, monkeypatch) -> None:
     assert "## Style" in r.json()["distilled_style_md"]
 
 
+def test_provider_missing_error_mentions_keys_and_cli_subscriptions(
+    voice_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: False)
+    monkeypatch.delenv("BLOGFORGE_TANZU_API_BASE", raising=False)
+    monkeypatch.delenv("BLOGFORGE_TANZU_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+    response = voice_client.post("/api/voice/distill", json={})
+
+    assert response.status_code == 400
+    error = response.json()["detail"]["error"]
+    assert "API key" in error["message"]
+    assert "CLI subscription" in error["message"]
+
+
 # ---------------------------------------------------------------------------
 # Rules update
 # ---------------------------------------------------------------------------
