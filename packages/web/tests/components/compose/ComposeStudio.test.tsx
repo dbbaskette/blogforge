@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -104,7 +104,74 @@ describe("ComposeStudio", () => {
     renderStudio();
     fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
 
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("claude-cli"));
+  });
+
+  it("gates draft submission until the server preference resolves", async () => {
+    let resolvePreference!: (value: { default_provider: "codex-cli" }) => void;
+    vi.mocked(getDefaultProvider).mockReturnValue(
+      new Promise((resolve) => {
+        resolvePreference = resolve;
+      }),
+    );
+    vi.mocked(listProviderAvailability).mockResolvedValue({
+      anthropic: true,
+      "codex-cli": true,
+    });
+
+    renderStudio();
+    fireEvent.click(screen.getByText(/Blank page/));
+    const button = screen.getByRole("button", { name: /open editor/i });
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("claude-cli"));
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(createDraft).not.toHaveBeenCalled();
+
+    await act(async () => resolvePreference({ default_provider: "codex-cli" }));
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("codex-cli"));
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it("does not overwrite a manual provider selection when preference resolution is late", async () => {
+    let resolvePreference!: (value: { default_provider: "codex-cli" }) => void;
+    vi.mocked(getDefaultProvider).mockReturnValue(
+      new Promise((resolve) => {
+        resolvePreference = resolve;
+      }),
+    );
+    vi.mocked(listProviderAvailability).mockResolvedValue({
+      anthropic: true,
+      openai: true,
+      "codex-cli": true,
+    });
+
+    renderStudio();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("claude-cli"));
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "openai" } });
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("openai"));
+
+    await act(async () => resolvePreference({ default_provider: "codex-cli" }));
+    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("m1"));
+    expect(screen.getByLabelText("Provider")).toHaveValue("openai");
+  });
+
+  it("falls back to an available provider when preference loading fails", async () => {
+    localStorage.setItem(
+      "bf.compose.defaults",
+      JSON.stringify({ provider: "claude-cli", model: "stale-model" }),
+    );
+    vi.mocked(getDefaultProvider).mockRejectedValue(new Error("preference unavailable"));
+    vi.mocked(listProviderAvailability).mockResolvedValue({
+      anthropic: true,
+      "claude-cli": false,
+    });
+
+    renderStudio();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+
     await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("anthropic"));
+    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("m1"));
   });
 
   it("allows a provider change within the new draft session and submits it", async () => {

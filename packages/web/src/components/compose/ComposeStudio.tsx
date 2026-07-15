@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -82,6 +82,10 @@ export function ComposeStudio(): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [providers, setProviders] = useState<Record<string, boolean>>({});
   const [allowProviderAutoPick, setAllowProviderAutoPick] = useState(false);
+  const [providerPreferenceReady, setProviderPreferenceReady] = useState(false);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const providerWasSelected = useRef(false);
 
   useEffect(() => {
     listTemplates()
@@ -94,13 +98,21 @@ export function ComposeStudio(): JSX.Element {
     getDefaultProvider()
       .then(({ default_provider }) => {
         if (cancelled) return;
-        if (default_provider) {
+        if (default_provider && !providerWasSelected.current) {
           setSettings((current) => ({ ...current, provider: default_provider, model: "" }));
-        } else {
+        } else if (!default_provider) {
           setAllowProviderAutoPick(true);
         }
+        setProviderPreferenceReady(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        // Preference availability is non-critical. Fall back to the legacy
+        // availability-based selection so a stale unavailable local choice
+        // cannot strand the compose screen.
+        setAllowProviderAutoPick(true);
+        setProviderPreferenceReady(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -117,7 +129,8 @@ export function ComposeStudio(): JSX.Element {
     refreshProviders();
   }, []);
 
-  const canRun = !!settings.model && providers[settings.provider] === true;
+  const canRun =
+    providerPreferenceReady && !!settings.model && providers[settings.provider] === true;
   const providersLoaded = Object.keys(providers).length > 0;
   const hasAnyProvider = Object.values(providers).some(Boolean);
   const providerLabel = PROVIDER_LABELS[settings.provider] ?? settings.provider;
@@ -143,6 +156,13 @@ export function ComposeStudio(): JSX.Element {
       target_words: t.target_words,
       format: t.format,
     }));
+  }
+
+  function updateSettings(next: ComposeSettings): void {
+    if (next.provider !== settingsRef.current.provider) {
+      providerWasSelected.current = true;
+    }
+    setSettings(next);
   }
 
   async function removeTemplate(t: Template): Promise<void> {
@@ -467,7 +487,7 @@ export function ComposeStudio(): JSX.Element {
         <div className={advancedOpen ? "glass-card p-4 mt-3" : "hidden"}>
           <SetupFields
             value={settings}
-            onChange={setSettings}
+            onChange={updateSettings}
             autoPickProvider={allowProviderAutoPick}
           />
         </div>

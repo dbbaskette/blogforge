@@ -22,6 +22,46 @@ _ENGINE_DIRECTIVE = (
     "planning, process notes, or commentary."
 )
 
+# Codex authenticates subscriptions from HOME/CODEX_HOME. Keep only variables
+# needed for executable lookup, its config/auth files, locale/temp behavior,
+# and common platform network/certificate plumbing. In particular, provider
+# API keys and unrelated BlogForge secrets must not cross this boundary.
+_ENV_ALLOWLIST = (
+    "PATH",
+    "HOME",
+    "CODEX_HOME",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "SYSTEMROOT",
+    "PATHEXT",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "REQUESTS_CA_BUNDLE",
+    "CURL_CA_BUNDLE",
+    "NODE_EXTRA_CA_CERTS",
+)
+
+
+def _codex_environment() -> dict[str, str]:
+    return {name: os.environ[name] for name in _ENV_ALLOWLIST if name in os.environ}
+
 
 def codex_available() -> bool:
     return shutil.which("codex") is not None
@@ -38,7 +78,10 @@ def _coerce_json(text: str) -> str:
 
 
 async def _terminate(proc: object) -> None:
-    proc.kill()  # type: ignore[attr-defined]
+    try:
+        proc.kill()  # type: ignore[attr-defined]
+    except ProcessLookupError:
+        pass
     await proc.wait()  # type: ignore[attr-defined]
 
 
@@ -85,6 +128,7 @@ class CodexCliProvider:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=workdir,
+                env=_codex_environment(),
             )
             try:
                 stdout, stderr = await asyncio.wait_for(
@@ -156,6 +200,7 @@ async def codex_status(timeout: float = 20.0) -> dict[str, object]:
             "status",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=_codex_environment(),
         )
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)

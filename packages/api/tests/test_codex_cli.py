@@ -6,7 +6,7 @@ import tempfile
 
 import pytest
 
-from blogforge.llm.codex_cli import CodexCliProvider, codex_available, codex_status
+from blogforge.llm.codex_cli import CodexCliProvider, _terminate, codex_available, codex_status
 from blogforge.llm.exceptions import ProviderError
 
 
@@ -151,6 +151,46 @@ async def test_timeout_kills_and_reaps(cli, monkeypatch: pytest.MonkeyPatch) -> 
     with pytest.raises(ProviderError, match="codex exec timed out"):
         await CodexCliProvider().complete(model="x", prompt="Write")
     assert proc.killed and proc.waited
+
+
+@pytest.mark.asyncio
+async def test_terminate_reaps_when_process_exits_at_kill_boundary() -> None:
+    proc = FakeProcess()
+
+    def exited_before_kill() -> None:
+        raise ProcessLookupError
+
+    proc.kill = exited_before_kill  # type: ignore[method-assign]
+    await _terminate(proc)
+    assert proc.waited
+
+
+@pytest.mark.asyncio
+async def test_spawn_uses_minimal_environment(cli, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BLOGFORGE_PROVIDER_SECRET", "must-not-leak")
+    monkeypatch.setenv("PATH", "/custom/bin")
+    monkeypatch.setenv("HOME", "/home/writer")
+    monkeypatch.setenv("CODEX_HOME", "/home/writer/.custom-codex")
+    monkeypatch.setenv("HTTPS_PROXY", "https://proxy.example")
+    monkeypatch.setenv("SSL_CERT_FILE", "/etc/custom-ca.pem")
+    monkeypatch.setenv("LANG", "en_US.UTF-8")
+    proc = FakeProcess()
+
+    async def create(*args, **kwargs):
+        env = kwargs["env"]
+        assert env["PATH"] == "/custom/bin"
+        assert env["HOME"] == "/home/writer"
+        assert env["CODEX_HOME"] == "/home/writer/.custom-codex"
+        assert env["HTTPS_PROXY"] == "https://proxy.example"
+        assert env["SSL_CERT_FILE"] == "/etc/custom-ca.pem"
+        assert env["LANG"] == "en_US.UTF-8"
+        assert "BLOGFORGE_PROVIDER_SECRET" not in env
+        proc.args = args
+        return proc
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", create)
+    response = await CodexCliProvider().complete(model="ignored", prompt="Write it")
+    assert response.text == "Finished article"
 
 
 @pytest.mark.asyncio
