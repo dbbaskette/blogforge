@@ -35,6 +35,7 @@ export interface ReviewRailProps {
   save: UseIssueLifecycleArgs["save"];
   onHighlight?: UseIssueLifecycleArgs["onHighlight"];
   onApplied?: UseIssueLifecycleArgs["onApplied"];
+  onUndone?: UseIssueLifecycleArgs["onUndone"];
   onRescore?: (lever: string) => void;
   onRestoreLever?: (lever: string) => void;
   emptyState: ReactNode;
@@ -55,6 +56,7 @@ export function ReviewRail({
   save,
   onHighlight,
   onApplied,
+  onUndone,
   onRescore,
   onRestoreLever,
   emptyState,
@@ -83,6 +85,7 @@ export function ReviewRail({
     save,
     onHighlight,
     onApplied,
+    onUndone,
     onRescore,
     onUndoRescore: onRestoreLever,
   });

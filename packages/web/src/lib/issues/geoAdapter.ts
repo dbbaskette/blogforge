@@ -75,7 +75,7 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
       // client-side, instead of the manual "supply a source" (cite_source) flow.
       const specActions =
         fix === "cite_reference" && finding.suggestion
-          ? (["ai_fix", "manual_fix", "highlight"] as IssueAction[])
+          ? (["ai_fix", "manual_fix", "highlight", "dismiss"] as IssueAction[])
           : spec.actions;
       // Highlight only makes sense when there's something to locate. A finding
       // with neither a target nor a section (a document-global advisory like
