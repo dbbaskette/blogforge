@@ -19,18 +19,22 @@ interface KindSpec {
   actions: IssueAction[];
 }
 
+// No `highlight` anywhere: Shape's suggestions carry no section_id (apply
+// resolves the section by searching for the target), and ShapePanel is a
+// standalone overlay with no read-pane to jump to — so a Highlight button would
+// render, no-op silently, and lie about what it does.
 const SPEC: Record<SuggestKind, KindSpec> = {
   fact_check: {
     label: "Claims to verify",
     detail: "Statements a reader (or an AI) would want a source for.",
     nature: "advisory",
-    actions: ["highlight", "dismiss"],
+    actions: ["dismiss"],
   },
   reword: {
     label: "Sharper phrasing",
     detail: "Alternatives kept in your voice. Pick one to apply it.",
     nature: "fix",
-    actions: ["choose_option", "manual_fix", "highlight", "dismiss"],
+    actions: ["choose_option", "manual_fix", "dismiss"],
   },
   expand: {
     label: "Places to add substance",
@@ -51,6 +55,13 @@ export function shapeSuggestionsToIssues(result: SuggestResult): Issue[] {
   for (const { key } of SHAPE_GROUPS) {
     const spec = SPEC[key];
     for (const s of result[key] ?? []) {
+      // A pass can come back with a suggestion but no alternatives. Without
+      // options there is nothing to choose, so drop `choose_option` rather than
+      // render a "Pick one" button that opens nothing.
+      const options = spec.actions.includes("choose_option") ? (s.options ?? []) : [];
+      const actions = options.length
+        ? spec.actions
+        : spec.actions.filter((a) => a !== "choose_option");
       issues.push({
         id: nextId("shape", key, { target: s.target, title: s.note }),
         panel: "shape",
@@ -63,8 +74,8 @@ export function shapeSuggestionsToIssues(result: SuggestResult): Issue[] {
         sectionId: "",
         target: s.target,
         fixKind: key,
-        options: spec.actions.includes("choose_option") ? s.options : undefined,
-        actions: spec.actions,
+        options: options.length ? options : undefined,
+        actions,
         status: "open",
       });
     }

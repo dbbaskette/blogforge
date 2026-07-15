@@ -57,7 +57,7 @@ describe("geoFindingsToIssues", () => {
   it("maps a fix finding to fix nature with AI/Manual/Highlight", () => {
     const [first] = geoFindingsToIssues(report);
     expect(first.nature).toBe("fix");
-    expect(first.actions).toEqual(["ai_fix", "manual_fix", "highlight"]);
+    expect(first.actions).toEqual(["ai_fix", "manual_fix", "highlight", "dismiss"]);
     expect(first.target).toBe("There are a few things…");
     expect(first.panel).toBe("geo");
   });
@@ -95,7 +95,7 @@ describe("geoFindingsToIssues", () => {
   it("maps a missing-FAQ lever to an add issue with Generate / Write my own", () => {
     const faq = geoFindingsToIssues(report).find((i) => i.lever === "faq");
     expect(faq?.nature).toBe("add");
-    expect(faq?.actions).toEqual(["generate", "write_own"]);
+    expect(faq?.actions).toEqual(["generate", "write_own", "dismiss"]);
   });
 
   it("makes factual_density actionable (add a fact) and tags a fixKind", () => {
@@ -159,7 +159,7 @@ describe("geoFindingsToIssues", () => {
     // (stable, namespaced under panel:lever) rather than a literal string.
     expect(issues[0].id).toMatch(/^geo:takeaways:/);
     expect(issues[0].nature).toBe("add");
-    expect(issues[0].actions).toEqual(["generate", "write_own"]);
+    expect(issues[0].actions).toEqual(["generate", "write_own", "dismiss"]);
     expect(issues[0].fixKind).toBe("takeaways");
   });
 
@@ -215,7 +215,7 @@ describe("geoFindingsToIssues", () => {
         },
       ],
     } as unknown as GeoReport);
-    expect(issues[0].actions).toEqual(["cite_source", "highlight"]);
+    expect(issues[0].actions).toEqual(["cite_source", "highlight", "dismiss"]);
   });
 
   it("maps finding impact, falling back to the lever impact", () => {
@@ -241,5 +241,34 @@ describe("geoFindingsToIssues", () => {
     const issues = geoFindingsToIssues(report);
     expect(issues[0].impact).toBe("Specific impact.");
     expect(issues[1].impact).toBe("Engines lift single sentences verbatim.");
+  });
+});
+
+describe("geoAdapter — universal dismiss", () => {
+  it("offers dismiss on every finding, so nothing can nag forever", () => {
+    const report = {
+      grade: "C",
+      levers: [
+        {
+          key: "answer_first",
+          label: "Answer first",
+          score: 40,
+          weight: 0.2,
+          detail: "Buried answers",
+          findings: [{ note: "Buried", fix: "answer_first", target: "t", section_id: "s1" }],
+        },
+        {
+          key: "citations",
+          label: "Citations",
+          score: 30,
+          weight: 0.2,
+          detail: "No sources",
+          findings: [{ note: "Uncited", fix: "cite_reference", target: "c", section_id: "s1" }],
+        },
+      ],
+    } as never;
+    const issues = geoFindingsToIssues(report);
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues.every((i) => i.actions.includes("dismiss"))).toBe(true);
   });
 });

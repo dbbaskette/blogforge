@@ -89,7 +89,7 @@ function markRanges(
   active: { text: string; kind: TrackedChangeKind } | null,
 ): Mark[] {
   const candidates: { needle: string; kind: TrackedChangeKind }[] = [];
-  // The heat-map paints every finding amber. "Jump to" (locate) adds NO mark of
+  // The heat-map paints every finding amber. Highlight (locate) adds NO mark of
   // its own — the sentence is already in the heat-map, so jumping just scrolls +
   // rings the section. Only an applied fix ("under-review") paints an extra mark,
   // since its rewritten text isn't one of the finding targets.
@@ -136,7 +136,7 @@ function HeatMapPassage({ text, marks }: { text: string; marks: Mark[] }): JSX.E
 // Amber box around an APPLIED fix awaiting accept — shows the pending change
 // (its rewritten text isn't part of the heat-map).
 const LIT_BOX = "rounded-nb ring-2 ring-amber/60 bg-amber-soft px-3 -mx-3 py-2";
-// Transient cobalt ring for "Jump to" — briefly frames the sentence you jumped
+// Transient cobalt ring for Highlight — briefly frames the sentence you jumped
 // to (the amber heat-map wash is already there); cleared by the locate timeout.
 const LOCATE_RING = "rounded-nb ring-2 ring-cobalt-400/70 px-3 -mx-3 py-2 transition-all";
 
@@ -293,13 +293,13 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
 
   const opening = draft.outline?.opening_hook?.trim() ?? "";
   const openingLit = highlight?.sectionId === "opening";
-  // An applied fix awaiting accept gets the amber box; a "Jump to" locate gets a
+  // An applied fix awaiting accept gets the amber box; a Highlight locate gets a
   // transient cobalt ring (the heat-map amber is already on the sentence).
   const boxFor = (isLit: boolean): string =>
     !isLit ? "" : highlight?.kind === "under-review" ? LIT_BOX : LOCATE_RING;
 
   // Passive heat-map marks per section, memoized on content + findings only.
-  // Highlight state changes (Jump to / accept / undo) then re-run the tolerant
+  // Highlight state changes (locate / accept / undo) then re-run the tolerant
   // substring matcher for just the ACTIVE section instead of the whole draft.
   const passiveMarks = useMemo(() => {
     const map = new Map<string, Mark[]>();

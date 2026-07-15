@@ -39,15 +39,21 @@ export function makeShapeApply(ctx: ShapeApplyCtx) {
     }
 
     // reword/manual_fix replace the passage outright; expand/write_own grow it.
+    //
+    // Expand MUST go through `custom`, not the `expand` preset: the backend only
+    // reads `instruction` when action is "custom" (see generate/inline.py
+    // _build_user_prompt) — a preset action uses its own hardcoded directive and
+    // silently ignores the instruction, which would discard the very idea the
+    // writer picked and make all N chips do the same thing.
     const replacement =
       issue.lever === "expand" && action === "choose_option"
         ? (
             await inlineEdit(ctx.draft.id, {
               text: issue.target,
-              action: "expand",
-              instruction: chosen,
+              action: "custom",
+              instruction: `Expand this passage with more substance. ${chosen} Keep the author's voice; return only the rewritten passage.`,
             })
-          ).text
+          ).text.trim()
         : chosen;
 
     const before = section.content_md;
