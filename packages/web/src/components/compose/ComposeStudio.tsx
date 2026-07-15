@@ -145,6 +145,7 @@ export function ComposeStudio(): JSX.Element {
   }
 
   function applyTemplate(t: Template): void {
+    providerWasSelected.current = true;
     setTopic(t.topic);
     setBullets(t.bullets);
     setNotes(t.notes);

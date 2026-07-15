@@ -49,3 +49,31 @@ Backend tests were added first for the kill-boundary race and environment filter
 ## Concerns
 
 None blocking. The frontend suite continues to emit pre-existing React `act(...)`, React Router future-flag, and jsdom navigation warnings while passing. The build continues to emit the pre-existing HeadlineLab chunking warning.
+
+## Follow-up final-review fixes
+
+### Scope
+
+- Template application now marks its provider/model choice as explicit, so a delayed server preference cannot replace the selected template configuration.
+- The null-preference regression now waits for the eventual available `anthropic` selection rather than accepting the transient local `claude-cli` fallback.
+
+### TDD evidence
+
+- RED: `cd packages/web && pnpm exec vitest run tests/components/compose/ComposeStudio.test.tsx` — exit 1 after adding the delayed-template regression. The template provider/model were overwritten by the late preference. Additional failures in that first run came from the new per-test model mock not yet being reset; the fixture was corrected before evaluating green behavior.
+- GREEN: `cd packages/web && pnpm exec vitest run tests/components/compose/ComposeStudio.test.tsx` — exit 0; 16 tests passed.
+
+### Final verification
+
+- `cd packages/web && pnpm test` — exit 0; 76 files passed, 333 tests passed.
+- `cd packages/web && pnpm build` — exit 0; TypeScript and Vite production build succeeded. An intermediate build correctly caught incomplete typed `ModelInfo` fixtures; after completing those fixtures, the fresh build passed.
+- `cd packages/web && pnpm exec biome check src/components/compose/ComposeStudio.tsx tests/components/compose/ComposeStudio.test.tsx` — exit 0; 2 files checked, no fixes.
+
+### Self-review
+
+- `applyTemplate` is a direct user action and now sets the same dirty ref checked by delayed preference resolution before atomically applying all template settings.
+- The template regression uses a provider/model distinct from the delayed server preference and asserts both values before and after resolution.
+- The no-preference test's `waitFor` requires `anthropic`, proving the availability effect completed rather than observing initial `claude-cli` state.
+
+### Follow-up concerns
+
+None blocking. The same pre-existing frontend test warnings and Vite chunk warning remain.
