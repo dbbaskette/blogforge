@@ -97,6 +97,9 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         actions,
         status: "open",
         impact: finding.impact || lever.impact,
+        // GEO is the only panel that prefixes its impact line; IssueCard no
+        // longer hardcodes it.
+        impactLabel: "GEO",
       });
     });
 
@@ -118,6 +121,7 @@ export function geoFindingsToIssues(report: GeoReport): Issue[] {
         actions: spec.actions,
         status: "open",
         impact: lever.impact,
+        impactLabel: "GEO",
       });
     }
   }
