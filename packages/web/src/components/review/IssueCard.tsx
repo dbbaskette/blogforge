@@ -14,6 +14,7 @@ const ACTION_LABEL: Record<IssueAction, string> = {
   add_date: "Add a date",
   dedupe: "Remove duplicate",
   dismiss: "Dismiss",
+  choose_option: "Pick one",
 };
 
 const INPUT_PLACEHOLDER: Partial<Record<IssueAction, string>> = {
@@ -30,16 +31,12 @@ interface IssueCardProps {
   onAction: (action: IssueAction, input?: string) => void;
   onAccept: () => void;
   onUndo: () => void;
-  /** Per-panel action-label overrides (e.g. Humanize renames "Highlight" to
-   * "Jump to" since its heat-map already highlights every finding). */
+  /** Per-panel action-label overrides (e.g. renaming "Highlight" to a
+   * panel-specific verb). */
   actionLabels?: Partial<Record<IssueAction, string>>;
   /** An apply failure to show inline (e.g. the target text changed since the
    * pass ran) — so a fix that couldn't apply is never a silent no-op. */
   error?: string | null;
-  /** Hide the per-card `why` line. GEO groups cards under a lever whose detail
-   * is already shown at the group header, so repeating it on every card is
-   * noise; the rail passes false. Defaults to shown. */
-  showWhy?: boolean;
 }
 
 /**
@@ -56,7 +53,6 @@ export function IssueCard({
   onUndo,
   actionLabels,
   error,
-  showWhy = true,
 }: IssueCardProps): JSX.Element {
   const [openInput, setOpenInput] = useState<IssueAction | null>(null);
   const [text, setText] = useState("");
@@ -135,12 +131,10 @@ export function IssueCard({
         <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
         <span className="text-sm font-medium text-ink">{issue.title}</span>
       </div>
-      {showWhy && issue.why && (
-        <p className="text-[13px] text-ink-2 leading-snug ml-4 mb-1.5">{issue.why}</p>
-      )}
+      {issue.why && <p className="text-[13px] text-ink-2 leading-snug ml-4 mb-1.5">{issue.why}</p>}
       {issue.impact && (
         <p className="text-[12px] leading-snug ml-4 mb-1.5 text-cobalt-700 italic">
-          GEO: {issue.impact}
+          {issue.impactLabel ? `${issue.impactLabel}: ${issue.impact}` : issue.impact}
         </p>
       )}
       {issue.target && (
@@ -183,18 +177,38 @@ export function IssueCard({
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2 ml-4">
-          {issue.actions.map((action) => (
-            <button
-              key={action}
-              type="button"
-              className="nb-btn nb-btn-ghost nb-btn-sm"
-              disabled={busy}
-              onClick={() => (isInputAction(action) ? setOpenInput(action) : onAction(action))}
-            >
-              {actionLabels?.[action] ?? ACTION_LABEL[action]}
-            </button>
-          ))}
+        <div className="ml-4 space-y-2">
+          {issue.options && issue.options.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              {issue.options.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  className="nb-btn nb-btn-ghost nb-btn-sm text-left justify-start whitespace-normal"
+                  disabled={busy}
+                  onClick={() => onAction("choose_option", opt)}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {issue.actions
+              // Options render as their own chips above — the generic button would be a dead end.
+              .filter((a) => !(a === "choose_option" && issue.options?.length))
+              .map((action) => (
+                <button
+                  key={action}
+                  type="button"
+                  className="nb-btn nb-btn-ghost nb-btn-sm"
+                  disabled={busy}
+                  onClick={() => (isInputAction(action) ? setOpenInput(action) : onAction(action))}
+                >
+                  {actionLabels?.[action] ?? ACTION_LABEL[action]}
+                </button>
+              ))}
+          </div>
         </div>
       )}
 
