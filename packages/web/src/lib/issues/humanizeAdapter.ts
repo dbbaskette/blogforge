@@ -8,18 +8,25 @@
  */
 
 import type { HumanizeReport } from "../../api/humanize";
+import { makeIdFactory } from "./issueIds";
 import type { Issue } from "./types";
 
 export function humanizeFindingsToIssues(report: HumanizeReport): Issue[] {
+  const nextId = makeIdFactory();
   const issues: Issue[] = [];
   for (const lens of report.lenses) {
-    lens.findings.forEach((f, i) => {
+    for (const f of lens.findings) {
       issues.push({
-        id: `humanize:${f.lens}:${f.section_id}:${i}`,
+        id: nextId("humanize", f.lens, {
+          sectionId: f.section_id,
+          target: f.target,
+          title: f.note || "Reads robotic",
+        }),
         panel: "humanize",
         lever: f.lens,
         title: f.note || "Reads robotic",
-        why: f.note,
+        // The note IS the title — a why would print the same sentence twice.
+        why: "",
         nature: f.needs_review ? "advisory" : "fix",
         sectionId: f.section_id,
         target: f.target,
@@ -33,7 +40,7 @@ export function humanizeFindingsToIssues(report: HumanizeReport): Issue[] {
           : ["ai_fix", "manual_fix", "highlight", "dismiss"],
         status: "open",
       });
-    });
+    }
   }
   return issues;
 }

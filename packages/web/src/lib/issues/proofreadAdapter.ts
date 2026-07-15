@@ -8,12 +8,6 @@
 import type { LintFinding } from "../../api/drafts";
 import type { Issue } from "./types";
 
-function whyFor(kind: LintFinding["kind"]): string {
-  return kind === "repetition"
-    ? "Repeated phrasing worth varying."
-    : "A voice-rule violation to clean up.";
-}
-
 export interface LintResult {
   violations: LintFinding[];
   repetitions: LintFinding[];
@@ -29,7 +23,9 @@ export function proofreadFindingsToIssues(lint: LintResult): Issue[] {
       panel: "proofread" as const,
       lever: f.rule || f.kind,
       title: f.message,
-      why: whyFor(f.kind),
+      // The message says what's wrong; a generic "a voice-rule violation to
+      // clean up" on every card is noise, not rationale.
+      why: "",
       nature: "fix" as const,
       sectionId: f.section_id ?? "",
       target: f.match || undefined,
