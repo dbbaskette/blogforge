@@ -33,7 +33,19 @@ describe("composeDefaults", () => {
 
   it("round-trips saved settings", () => {
     saveDefaults(sample);
-    expect(loadDefaults()).toEqual(sample);
+    expect(loadDefaults()).toEqual({ ...sample, provider: "claude-cli" });
+  });
+
+  it("does not persist provider ownership in browser defaults", () => {
+    saveDefaults(sample);
+    expect(JSON.parse(localStorage.getItem("bf.compose.defaults") ?? "{}")).not.toHaveProperty(
+      "provider",
+    );
+  });
+
+  it("ignores a provider left behind by an older browser payload", () => {
+    localStorage.setItem("bf.compose.defaults", JSON.stringify(sample));
+    expect(loadDefaults()).toEqual({ ...sample, provider: "claude-cli" });
   });
 
   it("returns the fallback when stored JSON is corrupt", () => {

@@ -1,11 +1,15 @@
+import type { Provider } from "../api/providers";
+
 export interface ComposeSettings {
   pack_slug: string;
   format: string | null;
-  provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
+  provider: Provider;
   model: string;
   target_words: number;
   use_voice_profile: boolean;
 }
+
+type PersistedComposeDefaults = Omit<ComposeSettings, "provider">;
 
 const KEY = "bf.compose.defaults";
 
@@ -26,16 +30,16 @@ export function loadDefaults(): ComposeSettings {
     if (!raw) return { ...FALLBACK };
     // Trusting the stored shape: only our own saveDefaults writes this key.
     // If that ever changes, add a runtime validator here.
-    const parsed = JSON.parse(raw) as Partial<ComposeSettings>;
-    return { ...FALLBACK, ...parsed };
+    const { provider: _legacyProvider, ...parsed } = JSON.parse(raw) as Partial<ComposeSettings>;
+    return { ...FALLBACK, ...(parsed as Partial<PersistedComposeDefaults>) };
   } catch {
     return { ...FALLBACK };
   }
 }
 
-export function saveDefaults(s: ComposeSettings): void {
+export function saveDefaults({ provider: _provider, ...persisted }: ComposeSettings): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(KEY, JSON.stringify(persisted));
   } catch {
     /* storage disabled — non-fatal */
   }

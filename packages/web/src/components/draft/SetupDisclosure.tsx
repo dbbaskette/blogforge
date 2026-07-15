@@ -20,9 +20,7 @@ export function SetupDisclosure({
   const useVoiceProfile = idea.use_voice_profile ?? true;
   const [open, setOpen] = useState(forceOpen);
 
-  const voiceLabel = useVoiceProfile
-    ? "voice: my profile"
-    : `pack ${idea.pack_slug || "—"}`;
+  const voiceLabel = useVoiceProfile ? "voice: my profile" : `pack ${idea.pack_slug || "—"}`;
 
   const summary = `${voiceLabel} · ${idea.format || "no format"} · ${
     idea.provider
@@ -66,6 +64,7 @@ export function SetupDisclosure({
           <SetupFields
             value={settings}
             onChange={(next) => onChange({ ...idea, ...next })}
+            autoPickProvider={false}
           />
         </div>
       )}

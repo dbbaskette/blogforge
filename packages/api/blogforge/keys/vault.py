@@ -48,6 +48,10 @@ class KeyVault:
             from blogforge.llm.claude_cli import claude_available
 
             return "cli" if claude_available() else ""
+        if provider == "codex-cli":
+            from blogforge.llm.codex_cli import codex_available
+
+            return "cli" if codex_available() else ""
         self._check_provider(provider)
         async with get_sessionmaker()() as session:
             row = await self._load(session, provider)

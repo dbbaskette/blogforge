@@ -7,7 +7,12 @@ import {
   listFormats,
   listPacks,
 } from "../api/packs";
-import { type ModelInfo, listModels, listProviderAvailability } from "../api/providers";
+import {
+  type ModelInfo,
+  type Provider,
+  listModels,
+  listProviderAvailability,
+} from "../api/providers";
 import type { ComposeSettings } from "../lib/composeDefaults";
 
 export type { ComposeSettings };
@@ -15,15 +20,15 @@ export type { ComposeSettings };
 interface SetupFieldsProps {
   value: ComposeSettings;
   onChange: (next: ComposeSettings) => void;
+  autoPickProvider?: boolean;
 }
-
-type Provider = "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
 
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
   google: "Google",
   "claude-cli": "Claude CLI",
+  "codex-cli": "Codex CLI",
   tanzu: "Tanzu",
 };
 
@@ -34,8 +39,7 @@ const ASSUMED_INPUT_TOKENS = 2000;
 
 function formatRateSuffix(m: ModelInfo): string {
   if (m.input_per_million_usd == null || m.output_per_million_usd == null) return "";
-  const fmt = (n: number): string =>
-    n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(2)}`;
+  const fmt = (n: number): string => (n >= 1 ? `$${n.toFixed(2)}` : `$${n.toFixed(2)}`);
   return ` — ${fmt(m.input_per_million_usd)} in / ${fmt(m.output_per_million_usd)} out per 1M`;
 }
 
@@ -115,7 +119,11 @@ function Field({
   );
 }
 
-export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element {
+export function SetupFields({
+  value,
+  onChange,
+  autoPickProvider = true,
+}: SetupFieldsProps): JSX.Element {
   const [packs, setPacks] = useState<PackSummary[]>([]);
   const [providers, setProviders] = useState<Record<string, boolean>>({});
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -148,16 +156,24 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
   // Once, after availability loads: if the saved/default provider has no
   // key/service (e.g. the "anthropic" default on a Tanzu-only deploy), switch
   // to the first available one. Guarded so it never fights a later manual pick.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: one-shot on providers load; reads valueRef + stable onChange
   useEffect(() => {
-    if (providerAutoPicked.current || Object.keys(providers).length === 0) return;
+    if (!autoPickProvider || providerAutoPicked.current || Object.keys(providers).length === 0) {
+      return;
+    }
     providerAutoPicked.current = true;
     if (!providers[valueRef.current.provider]) {
-      const order: Provider[] = ["claude-cli", "anthropic", "openai", "google", "tanzu"];
+      const order: Provider[] = [
+        "claude-cli",
+        "codex-cli",
+        "anthropic",
+        "openai",
+        "google",
+        "tanzu",
+      ];
       const next = order.find((p) => providers[p]);
       if (next) onChange({ ...valueRef.current, provider: next });
     }
-  }, [providers, onChange]);
+  }, [autoPickProvider, providers, onChange]);
 
   // Load formats when pack_slug changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when pack_slug changes; reading value.format inside is intentional
@@ -347,12 +363,17 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
             onChange={(e) => onChange({ ...value, provider: e.target.value as Provider })}
             className="nb-select"
           >
-            {(["anthropic", "openai", "google", "claude-cli", "tanzu"] as Provider[]).map((p) => (
+            {(
+              ["anthropic", "openai", "google", "claude-cli", "codex-cli", "tanzu"] as Provider[]
+            ).map((p) => (
               <option key={p} value={p} disabled={!providers[p]}>
-                {p === "claude-cli"
-                  ? "Claude CLI (subscription)"
+                {p === "claude-cli" || p === "codex-cli"
+                  ? `${PROVIDER_LABELS[p]} (subscription)`
                   : (PROVIDER_LABELS[p] ?? p)}
-                {!providers[p] && (p === "claude-cli" ? " (not installed)" : " (no key/service)")}
+                {!providers[p] &&
+                  (p === "claude-cli" || p === "codex-cli"
+                    ? " (not installed)"
+                    : " (no key/service)")}
               </option>
             ))}
           </select>
@@ -375,7 +396,10 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
         </Field>
       </div>
 
-      <ModelCostHint model={models.find((m) => m.id === value.model)} targetWords={value.target_words} />
+      <ModelCostHint
+        model={models.find((m) => m.id === value.model)}
+        targetWords={value.target_words}
+      />
 
       {modelsError && (
         <p
@@ -391,7 +415,9 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
           className="text-xs px-3 py-2 rounded-nb-sm"
           style={{ background: "#fbf1de", color: "#92600a", border: "1px solid #f3d89b" }}
         >
-          No API key for {value.provider}. Add your key in Settings → Provider API keys.
+          {value.provider === "claude-cli" || value.provider === "codex-cli"
+            ? `${PROVIDER_LABELS[value.provider]} is not installed.`
+            : `No API key for ${value.provider}. Add your key in Settings → Provider API keys.`}
         </p>
       )}
 
@@ -405,7 +431,9 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
             max={3500}
             step={100}
             value={value.target_words}
-            onChange={(e) => onChange({ ...value, target_words: Number.parseInt(e.target.value, 10) })}
+            onChange={(e) =>
+              onChange({ ...value, target_words: Number.parseInt(e.target.value, 10) })
+            }
             className="flex-1"
             aria-label="Target length"
           />

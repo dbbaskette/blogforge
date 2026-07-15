@@ -1,4 +1,5 @@
 import { api } from "./client";
+import type { Provider } from "./providers";
 
 export interface IdeaInput {
   topic: string;
@@ -7,7 +8,7 @@ export interface IdeaInput {
   source_urls?: string[];
   pack_slug: string;
   format?: string | null;
-  provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
+  provider: Provider;
   model: string;
   target_words?: number;
   notes?: string;
@@ -77,7 +78,7 @@ export interface ImportDraftInput {
   text: string;
   pack_slug: string;
   format?: string | null;
-  provider: "anthropic" | "openai" | "google" | "claude-cli" | "tanzu";
+  provider: Provider;
   model: string;
   target_words?: number;
   use_voice_profile?: boolean;

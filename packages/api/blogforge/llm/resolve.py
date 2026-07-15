@@ -13,7 +13,7 @@ from blogforge.llm.registry import get_provider
 async def build_provider_for(user_id: UUID, provider: str) -> LLMProvider:
     if os.environ.get("BLOGFORGE_TEST_PROVIDER") == "mock":
         return get_provider(provider, "mock")
-    if provider in ("claude-cli", "tanzu"):
+    if provider in ("claude-cli", "codex-cli", "tanzu"):
         return get_provider(provider, "")
     api_key = await KeyVault(user_id).get(provider)
     if not api_key:

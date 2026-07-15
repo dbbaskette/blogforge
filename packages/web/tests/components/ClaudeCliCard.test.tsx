@@ -1,11 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import * as providers from "../../src/api/providers";
 import { ClaudeCliCard } from "../../src/components/settings/ClaudeCliCard";
-import { loadDefaults, saveDefaults } from "../../src/lib/composeDefaults";
-
-beforeEach(() => localStorage.clear());
 
 describe("ClaudeCliCard", () => {
   it("reports logged-in status from the probe", async () => {
@@ -31,21 +28,16 @@ describe("ClaudeCliCard", () => {
     expect(screen.getByText(/claude \/login/)).toBeInTheDocument();
   });
 
-  it("toggling the default writes the compose default provider", async () => {
-    vi.spyOn(providers, "getClaudeCliStatus").mockResolvedValue({
+  it("contains status refresh but no browser-local default checkbox", async () => {
+    const probe = vi.spyOn(providers, "getClaudeCliStatus").mockResolvedValue({
       installed: true,
       authenticated: true,
       detail: "ok",
       resolve: "",
     });
-    // Start from a non-CLI default so the toggle begins unchecked, independent
-    // of the app's out-of-the-box default (which is now claude-cli).
-    saveDefaults({ ...loadDefaults(), provider: "anthropic" });
     render(<ClaudeCliCard />);
-    const cb = await screen.findByRole("checkbox");
-    fireEvent.click(cb);
-    expect(loadDefaults().provider).toBe("claude-cli");
-    fireEvent.click(cb);
-    expect(loadDefaults().provider).toBe("anthropic");
+    fireEvent.click(await screen.findByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(probe).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 });

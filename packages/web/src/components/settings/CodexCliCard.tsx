@@ -1,24 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { type ClaudeCliStatus, getClaudeCliStatus } from "../../api/providers";
+import { type CliStatus, getCodexCliStatus } from "../../api/providers";
 
-/**
- * Settings card for the keyless Claude CLI provider: a live login-status check
- * (installed + logged in?, with recovery guidance supplied by the API).
- */
-export function ClaudeCliCard(): JSX.Element {
-  const [status, setStatus] = useState<ClaudeCliStatus | null>(null);
+export function CodexCliCard(): JSX.Element {
+  const [status, setStatus] = useState<CliStatus | null>(null);
   const [checking, setChecking] = useState(true);
 
   const check = useCallback(() => {
     setChecking(true);
-    getClaudeCliStatus()
+    getCodexCliStatus()
       .then(setStatus)
-      .catch((e: Error) =>
+      .catch((error: Error) =>
         setStatus({
           installed: false,
           authenticated: false,
-          detail: e.message,
+          detail: error.message,
           resolve: "",
         }),
       )
@@ -38,10 +34,10 @@ export function ClaudeCliCard(): JSX.Element {
 
   return (
     <section className="mt-8">
-      <h2 className="font-serif text-xl font-medium text-ink mb-3">Claude CLI (subscription)</h2>
+      <h2 className="font-serif text-xl font-medium text-ink mb-3">Codex CLI (subscription)</h2>
       <div className="nb-card p-6 space-y-4">
         <p className="text-sm text-muted leading-snug">
-          Generate through your locally logged-in <code className="font-mono">claude</code> CLI
+          Generate through your locally logged-in <code className="font-mono">codex</code> CLI
           instead of an API key. Available only where BlogForge runs on a host with the CLI (not on
           cloud deploys).
         </p>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -10,7 +10,7 @@ import {
   importDraft,
   updateDraft,
 } from "../../api/drafts";
-import { listProviderAvailability } from "../../api/providers";
+import { getDefaultProvider, listProviderAvailability } from "../../api/providers";
 import { type Template, deleteTemplate, listTemplates } from "../../api/templates";
 import { loadDefaults, loadLastMode, saveDefaults, saveLastMode } from "../../lib/composeDefaults";
 import { parseOutline } from "../../lib/parseOutline";
@@ -33,6 +33,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   google: "Google",
   "claude-cli": "Claude CLI",
+  "codex-cli": "Codex CLI",
   tanzu: "Tanzu",
 };
 
@@ -80,11 +81,41 @@ export function ComposeStudio(): JSX.Element {
   const [notes, setNotes] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [providers, setProviders] = useState<Record<string, boolean>>({});
+  const [allowProviderAutoPick, setAllowProviderAutoPick] = useState(false);
+  const [providerPreferenceReady, setProviderPreferenceReady] = useState(false);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const providerWasSelected = useRef(false);
 
   useEffect(() => {
     listTemplates()
       .then(setTemplates)
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getDefaultProvider()
+      .then(({ default_provider }) => {
+        if (cancelled) return;
+        if (default_provider && !providerWasSelected.current) {
+          setSettings((current) => ({ ...current, provider: default_provider, model: "" }));
+        } else if (!default_provider) {
+          setAllowProviderAutoPick(true);
+        }
+        setProviderPreferenceReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Preference availability is non-critical. Fall back to the legacy
+        // availability-based selection so a stale unavailable local choice
+        // cannot strand the compose screen.
+        setAllowProviderAutoPick(true);
+        setProviderPreferenceReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function refreshProviders(): void {
@@ -98,7 +129,8 @@ export function ComposeStudio(): JSX.Element {
     refreshProviders();
   }, []);
 
-  const canRun = !!settings.model && providers[settings.provider] === true;
+  const canRun =
+    providerPreferenceReady && !!settings.model && providers[settings.provider] === true;
   const providersLoaded = Object.keys(providers).length > 0;
   const hasAnyProvider = Object.values(providers).some(Boolean);
   const providerLabel = PROVIDER_LABELS[settings.provider] ?? settings.provider;
@@ -113,6 +145,7 @@ export function ComposeStudio(): JSX.Element {
   }
 
   function applyTemplate(t: Template): void {
+    providerWasSelected.current = true;
     setTopic(t.topic);
     setBullets(t.bullets);
     setNotes(t.notes);
@@ -124,6 +157,13 @@ export function ComposeStudio(): JSX.Element {
       target_words: t.target_words,
       format: t.format,
     }));
+  }
+
+  function updateSettings(next: ComposeSettings): void {
+    if (next.provider !== settingsRef.current.provider) {
+      providerWasSelected.current = true;
+    }
+    setSettings(next);
   }
 
   async function removeTemplate(t: Template): Promise<void> {
@@ -446,7 +486,11 @@ export function ComposeStudio(): JSX.Element {
             provider/model even when collapsed (the quick flows submit these);
             just visually hidden until the user opens Advanced. */}
         <div className={advancedOpen ? "glass-card p-4 mt-3" : "hidden"}>
-          <SetupFields value={settings} onChange={setSettings} />
+          <SetupFields
+            value={settings}
+            onChange={updateSettings}
+            autoPickProvider={allowProviderAutoPick}
+          />
         </div>
       </div>
     </div>

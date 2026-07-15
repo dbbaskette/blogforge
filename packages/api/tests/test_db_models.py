@@ -31,6 +31,7 @@ async def test_create_user(session):
     assert row.role == "user"
     assert row.status == "approved"
     assert isinstance(row.created_at, datetime)
+    assert row.default_provider is None
 
 
 async def test_draft_belongs_to_user(session):

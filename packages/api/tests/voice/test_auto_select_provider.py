@@ -12,8 +12,49 @@ import uuid
 
 import pytest
 
-from blogforge.api.voice import _auto_select_provider
+from blogforge.api.voice import _auto_select_provider, _default_model
+from blogforge.db.engine import get_sessionmaker
+from blogforge.db.models import User
 from blogforge.keys import KeyVault
+
+
+async def _user_with_default(default_provider: str) -> User:
+    user = User(
+        email=f"{uuid.uuid4()}@example.com",
+        password_hash="x",
+        status="approved",
+        role="user",
+        default_provider=default_provider,
+    )
+    async with get_sessionmaker()() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    return user
+
+
+@pytest.mark.parametrize("default_provider", ["codex-cli", "openai"])
+async def test_returns_explicit_user_default_before_legacy_selection(
+    default_provider: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: True)
+    user = await _user_with_default(default_provider)
+
+    assert await _auto_select_provider(user.id) == default_provider
+
+
+async def test_returns_explicit_default_even_when_provider_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: False)
+    user = await _user_with_default("codex-cli")
+
+    assert await _auto_select_provider(user.id) == "codex-cli"
+
+
+def test_codex_cli_uses_codex_default_model() -> None:
+    assert _default_model("codex-cli") == "codex-default"
 
 
 async def test_prefers_claude_cli_over_a_configured_api_key(
@@ -57,3 +98,16 @@ async def test_returns_none_when_no_keys_no_cli_no_tanzu(
     monkeypatch.delenv("BLOGFORGE_TANZU_API_KEY", raising=False)
     get_settings.cache_clear()
     assert await _auto_select_provider(uuid.uuid4()) is None
+
+
+async def test_uses_tanzu_when_null_preference_and_no_cli_or_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from blogforge.config import get_settings
+
+    monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: False)
+    monkeypatch.setenv("BLOGFORGE_TANZU_API_BASE", "https://tanzu.example.test")
+    monkeypatch.setenv("BLOGFORGE_TANZU_API_KEY", "tanzu-key")
+    get_settings.cache_clear()
+
+    assert await _auto_select_provider(uuid.uuid4()) == "tanzu"
