@@ -6,13 +6,14 @@ import {
   type Draft,
   type LintFinding,
   checkClaims,
-  inlineEdit,
   lintDraft,
 } from "../../api/drafts";
 import { useElapsed } from "../../hooks/useElapsed";
-import { dismiss as dismissFinding, loadDismissed, restore } from "../../lib/lintDismissals";
+import { proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
+import { type ReviewGroup, ReviewRail } from "../review/ReviewRail";
 import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
+import { makeProofreadApply } from "./proofreadApply";
 
 interface LintPanelProps {
   draft: Draft;
@@ -23,35 +24,15 @@ interface LintPanelProps {
   onClose: () => void;
 }
 
-/** Expand [start,end) to its enclosing sentence so the AI rewrites with context. */
-function enclosingSpan(text: string, start: number, end: number): { s: number; e: number } {
-  const boundary = (c: string): boolean => c === "." || c === "!" || c === "?" || c === "\n";
-  let s = start;
-  while (s > 0 && !boundary(text[s - 1])) s--;
-  while (s < start && /\s/.test(text[s])) s++;
-  let e = end;
-  while (e < text.length && !boundary(text[e])) e++;
-  if (e < text.length) e++; // include the closing punctuation
-  return { s, e };
-}
-
-/** Scroll the editor to a section and flash it. */
+/** Scroll the editor to a section and flash it. Also used as the rail's
+ * onHighlight — the "Highlight" action on a proofread issue jumps to and
+ * flashes its section, same as the old Jump button did. */
 function jumpToSection(sectionId: string): void {
   const el = document.getElementById(`section-${sectionId}`);
   if (!el) return;
   el.scrollIntoView({ behavior: "smooth", block: "start" });
   el.classList.add("lint-flash");
   window.setTimeout(() => el.classList.remove("lint-flash"), 1600);
-}
-
-/** Build a fix instruction that names the exact flagged text, so the model
- * actually removes it instead of vaguely "avoiding the flagged wording". */
-function fixInstruction(finding: LintFinding): string {
-  if (finding.kind === "repetition") {
-    return "Rewrite this sentence to remove the repeated phrasing, keeping the meaning and the author's voice. Do not use em dashes. Return only the rewritten sentence.";
-  }
-  const target = finding.match ? `the flagged text "${finding.match}"` : "the flagged wording";
-  return `Rewrite this sentence to remove ${target}, recasting it naturally while keeping the meaning and the author's voice. Do not use em dashes. Return only the rewritten sentence.`;
 }
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -174,16 +155,11 @@ export function LintPanel({
   const [repetitions, setRepetitions] = useState<LintFinding[]>([]);
   const [hits, setHits] = useState<LintFinding[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed(draftId));
-  const [showDismissed, setShowDismissed] = useState(false);
 
   const [claims, setClaims] = useState<ClaimResult[] | null>(null);
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimsError, setClaimsError] = useState<string | null>(null);
   const [hasRefs, setHasRefs] = useState(true);
-  // Findings the user just accepted/applied — hidden immediately so the list
-  // clears as you go; reset whenever a fresh lint replaces the truth.
-  const [resolved, setResolved] = useState<Set<string>>(new Set());
 
   const runLint = useCallback(() => {
     setLoading(true);
@@ -192,7 +168,6 @@ export function LintPanel({
         setViolations(r.violations);
         setRepetitions(r.repetitions ?? []);
         setHits(r.hits);
-        setResolved(new Set());
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
@@ -200,17 +175,23 @@ export function LintPanel({
 
   useEffect(() => runLint(), [runLint]);
 
-  const onDismiss = (id: string): void => setDismissed(dismissFinding(draftId, id));
-  const onRestore = (id: string): void => setDismissed(restore(draftId, id));
-
-  const actionable = useMemo(() => [...violations, ...repetitions], [violations, repetitions]);
-  const visible = actionable.filter((f) => !dismissed.has(f.id) && !resolved.has(f.id));
-  const hiddenCount = actionable.length - visible.length;
+  const issues = useMemo(
+    () => proofreadFindingsToIssues({ violations, repetitions }),
+    [violations, repetitions],
+  );
+  const apply = useMemo(() => makeProofreadApply({ draft, onSectionSave }), [draft, onSectionSave]);
+  const groups = useMemo<ReviewGroup[]>(() => {
+    const keys = [...new Set(issues.map((i) => i.lever))];
+    return keys.map((k) => ({ key: k, label: k }));
+  }, [issues]);
   // The Humanity Score reflects what's still WRONG IN THE TEXT — only fixing a
-  // finding (or editing it away, so a re-lint drops it) improves it. Dismissing
-  // an item just declutters the list; leaving an em-dash in place doesn't make
-  // the writing more human, so a dismissed-but-unfixed finding still counts.
-  const scoreOpen = actionable.filter((f) => !resolved.has(f.id)).length;
+  // finding (or editing it away, so a re-lint drops it) improves it. Dismissal
+  // is now owned by ReviewRail, which doesn't expose its dismissed set here —
+  // but that's the same semantic as before: dismissing just declutters the
+  // list, it never counted toward the score either. So the raw actionable
+  // count (every violation + repetition, regardless of dismissal or in-review
+  // status) is the open count, unchanged until a re-lint drops a fixed one.
+  const scoreOpen = issues.length;
 
   const runClaims = async (): Promise<void> => {
     setClaimsLoading(true);
@@ -257,9 +238,9 @@ export function LintPanel({
         </div>
         <div className="mt-1 flex items-center justify-between gap-4">
           <h2 className="font-serif text-2xl font-medium text-ink tracking-tight">
-            Review {visible.length > 0 && <span className="text-coral">· {visible.length}</span>}
+            Review {issues.length > 0 && <span className="text-coral">· {issues.length}</span>}
           </h2>
-          {!error && !(loading && visible.length === 0) && (
+          {!error && !(loading && issues.length === 0) && (
             <HumanityRing openCount={scoreOpen} hitCount={hits.length} />
           )}
         </div>
@@ -282,57 +263,25 @@ export function LintPanel({
 
       {!error && (
         <div className="p-6 space-y-4">
-          {loading && visible.length === 0 ? (
+          {loading && issues.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted">Running lint…</p>
-          ) : visible.length === 0 ? (
-            <p className="text-sm text-muted italic font-serif py-6 text-center">
-              Nothing flagged — clean copy.
-            </p>
           ) : (
-            <ul className="space-y-3">
-              {visible.map((f) => (
-                <FindingCard
-                  key={f.id}
-                  finding={f}
-                  draft={draft}
-                  onSectionSave={onSectionSave}
-                  onTrackChange={onTrackChange}
-                  onDismiss={() => onDismiss(f.id)}
-                  onApplied={runLint}
-                  onResolved={() => setResolved((p) => new Set(p).add(f.id))}
-                />
-              ))}
-            </ul>
-          )}
-
-          {hiddenCount > 0 && (
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setShowDismissed((v) => !v)}
-                className="text-xs font-medium text-muted hover:text-ink underline underline-offset-2"
-              >
-                {showDismissed ? "Hide" : "Show"} dismissed ({hiddenCount})
-              </button>
-              {showDismissed && (
-                <ul className="mt-2 space-y-1.5">
-                  {actionable
-                    .filter((f) => dismissed.has(f.id))
-                    .map((f) => (
-                      <li key={f.id} className="flex items-center gap-2 text-xs text-muted">
-                        <span className="truncate flex-1">{f.message}</span>
-                        <button
-                          type="button"
-                          onClick={() => onRestore(f.id)}
-                          className="text-cobalt-600 hover:text-cobalt-700 shrink-0"
-                        >
-                          restore
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </div>
+            <ReviewRail
+              issues={issues}
+              groups={groups}
+              draftId={draftId}
+              apply={apply}
+              save={onSectionSave}
+              onHighlight={jumpToSection}
+              onApplied={(_issue, applied) =>
+                onTrackChange?.(applied.sectionId, applied.before, applied.after, "proofread")
+              }
+              emptyState={
+                <p className="text-sm text-muted italic font-serif py-6 text-center">
+                  Nothing flagged — clean copy.
+                </p>
+              }
+            />
           )}
 
           {hits.length > 0 && (
@@ -370,154 +319,6 @@ export function LintPanel({
         </div>
       )}
     </div>
-  );
-}
-
-function FindingCard({
-  finding,
-  draft,
-  onSectionSave,
-  onTrackChange,
-  onDismiss,
-  onApplied,
-  onResolved,
-}: {
-  finding: LintFinding;
-  draft: Draft;
-  onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
-  onTrackChange?: (sectionId: string, before: string, after: string, source: string) => void;
-  onDismiss: () => void;
-  onApplied: () => void;
-  onResolved: () => void;
-}): JSX.Element {
-  const [suggestion, setSuggestion] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const section = draft.sections.find((s) => s.id === finding.section_id);
-  const accent =
-    finding.kind === "violation"
-      ? { border: "#f7c3b6", tag: "#b5321b" }
-      : { border: "#f3d89b", tag: "#92600a" };
-
-  // Locate the span in the current section content; null if it drifted.
-  const locate = (): { s: number; e: number } | null => {
-    if (!section) return null;
-    const c = section.content_md;
-    if (
-      finding.start != null &&
-      finding.end != null &&
-      c.slice(finding.start, finding.end) === finding.match
-    ) {
-      return { s: finding.start, e: finding.end };
-    }
-    const idx = c.indexOf(finding.match);
-    return idx >= 0 ? { s: idx, e: idx + finding.match.length } : null;
-  };
-  const located = section ? locate() : null;
-
-  const aiFix = async (): Promise<void> => {
-    if (!section || !located) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      const span = enclosingSpan(section.content_md, located.s, located.e);
-      const sentence = section.content_md.slice(span.s, span.e);
-      const { text } = await inlineEdit(draft.id, {
-        text: sentence,
-        action: "custom", // custom honors `instruction`; preset actions ignore it
-        instruction: fixInstruction(finding),
-      });
-      setSuggestion(text.trim());
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const accept = async (): Promise<void> => {
-    if (!section || !located || suggestion == null) return;
-    setBusy(true);
-    setErr(null);
-    try {
-      const span = enclosingSpan(section.content_md, located.s, located.e);
-      const next =
-        section.content_md.slice(0, span.s) + suggestion + section.content_md.slice(span.e);
-      await onSectionSave(section.id, next);
-      onTrackChange?.(section.id, section.content_md, next, "lint:fix");
-      setSuggestion(null);
-      onResolved(); // remove this finding from the list right away
-      onApplied(); // re-lint to refresh the rest
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <li className="nb-card p-3 text-sm" style={{ borderLeft: `3px solid ${accent.border}` }}>
-      <p className="text-ink-2 leading-snug">{finding.message}</p>
-      {finding.match && (
-        <p className="mt-1 font-mono text-[12px] text-muted truncate" title={finding.match}>
-          “{finding.match}”
-        </p>
-      )}
-
-      {suggestion != null ? (
-        <div className="mt-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-cobalt-600 mb-1">
-            Suggested rewrite
-          </p>
-          <p className="font-serif text-[14px] text-ink bg-cobalt-50/60 rounded-nb-sm px-2.5 py-2 leading-snug">
-            {suggestion}
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={accept}
-              disabled={busy}
-              className="nb-btn nb-btn-primary nb-btn-sm"
-            >
-              {busy ? "Applying…" : "Accept"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setSuggestion(null)}
-              disabled={busy}
-              className="nb-btn nb-btn-ghost nb-btn-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          <button
-            type="button"
-            onClick={() => finding.section_id && jumpToSection(finding.section_id)}
-            disabled={!finding.section_id}
-            className="nb-btn nb-btn-ghost nb-btn-sm"
-          >
-            Jump
-          </button>
-          <button
-            type="button"
-            onClick={aiFix}
-            disabled={busy || !located}
-            className="nb-btn nb-btn-sm"
-            title={!located ? "Text changed — re-lint to refresh" : undefined}
-          >
-            {busy ? "Thinking…" : "AI fix"}
-          </button>
-          <button type="button" onClick={onDismiss} className="nb-btn nb-btn-ghost nb-btn-sm">
-            Leave it
-          </button>
-        </div>
-      )}
-      {err && <p className="mt-1.5 text-xs text-coral">{err}</p>}
-    </li>
   );
 }
 

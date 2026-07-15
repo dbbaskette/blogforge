@@ -19,11 +19,12 @@ import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
 import { hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
 import { HighlightedText } from "../review/HighlightedText";
+import { type ReviewGroup, ReviewRail } from "../review/ReviewRail";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { useDialogA11y } from "../ui/useDialogA11y";
 import { GeoReviewRail } from "./GeoReviewRail";
-import { ProofreadReviewRail } from "./ProofreadReviewRail";
 import { computeTotalScore } from "./geoScore";
+import { makeProofreadApply } from "./proofreadApply";
 import type { TrackedChangeKind } from "./trackedChangeDecoration";
 
 type ReviewView = "seo" | "proofreading" | "all";
@@ -258,7 +259,24 @@ export function OptimizePanel({
   );
 
   const geoCount = useMemo(() => (report ? geoFindingsToIssues(report).length : 0), [report]);
-  const lintCount = useMemo(() => (lint ? proofreadFindingsToIssues(lint).length : 0), [lint]);
+  const lintIssues = useMemo(() => (lint ? proofreadFindingsToIssues(lint) : []), [lint]);
+  const lintCount = lintIssues.length;
+  const lintApply = useMemo(
+    () => makeProofreadApply({ draft, onSectionSave }),
+    [draft, onSectionSave],
+  );
+  // Proofread issues only ever touch section body text — never a title or the
+  // opening (those are GEO-only fields) — so undo's `field` param is always
+  // ignored here. Adapts onSectionSave's `createVersion?: boolean` 3rd param
+  // to the shape useIssueLifecycle's `save` expects (`field?: AppliedField`).
+  const lintSave = useCallback(
+    (sectionId: string, content: string) => onSectionSave(sectionId, content),
+    [onSectionSave],
+  );
+  const lintGroups = useMemo<ReviewGroup[]>(() => {
+    const keys = [...new Set(lintIssues.map((i) => i.lever))];
+    return keys.map((k) => ({ key: k, label: k }));
+  }, [lintIssues]);
   const totalIssues =
     view === "seo" ? geoCount : view === "proofreading" ? lintCount : geoCount + lintCount;
   const grade = report ? gradeColor(report.grade) : gradeColor("F");
@@ -448,11 +466,18 @@ export function OptimizePanel({
                 <p className="py-10 text-center text-sm text-muted">Proofreading…</p>
               )}
               {lint && (
-                <ProofreadReviewRail
-                  lint={lint}
-                  draft={draft}
-                  onSectionSave={onSectionSave}
+                <ReviewRail
+                  issues={lintIssues}
+                  groups={lintGroups}
+                  draftId={draft.id}
+                  apply={lintApply}
+                  save={lintSave}
                   onHighlight={onHighlight}
+                  emptyState={
+                    <p className="py-8 text-center text-sm text-muted">
+                      No proofreading issues. Clean draft.
+                    </p>
+                  }
                 />
               )}
             </div>
