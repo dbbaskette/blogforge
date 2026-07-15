@@ -1,16 +1,35 @@
 """GET /api/providers — availability via KeyVault (per-user keys)."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from blogforge.auth.dependencies import get_current_user
+from blogforge.auth.dependencies import _get_session, get_current_user
 from blogforge.config import get_settings
 from blogforge.db.models import User
 from blogforge.keys import SUPPORTED_PROVIDERS, KeyVault
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
+
+TEXT_PROVIDERS = (
+    "anthropic",
+    "openai",
+    "google",
+    "claude-cli",
+    "codex-cli",
+    "tanzu",
+)
+
+
+class DefaultProviderBody(BaseModel):
+    default_provider: Literal[*TEXT_PROVIDERS]
+
+
+class DefaultProviderResponse(BaseModel):
+    default_provider: str | None
 
 
 @router.get("")
@@ -44,6 +63,27 @@ async def codex_cli_status(current: User = Depends(get_current_user)) -> dict[st
     from blogforge.llm.codex_cli import codex_status
 
     return await codex_status()
+
+
+@router.get("/default", response_model=DefaultProviderResponse)
+async def get_default_provider(
+    current: User = Depends(get_current_user),
+) -> DefaultProviderResponse:
+    return DefaultProviderResponse(default_provider=current.default_provider)
+
+
+@router.put("/default", response_model=DefaultProviderResponse)
+async def set_default_provider(
+    body: DefaultProviderBody,
+    current: User = Depends(get_current_user),
+    session: AsyncSession = Depends(_get_session),
+) -> DefaultProviderResponse:
+    user = await session.get(User, current.id)
+    if user is None:  # Defensive: authentication already established this user.
+        raise HTTPException(status_code=401, detail="Authentication required")
+    user.default_provider = body.default_provider
+    await session.commit()
+    return DefaultProviderResponse(default_provider=user.default_provider)
 
 
 @router.get("/{provider}/models")
