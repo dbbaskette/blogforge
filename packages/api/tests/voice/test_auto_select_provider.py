@@ -98,3 +98,16 @@ async def test_returns_none_when_no_keys_no_cli_no_tanzu(
     monkeypatch.delenv("BLOGFORGE_TANZU_API_KEY", raising=False)
     get_settings.cache_clear()
     assert await _auto_select_provider(uuid.uuid4()) is None
+
+
+async def test_uses_tanzu_when_null_preference_and_no_cli_or_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from blogforge.config import get_settings
+
+    monkeypatch.setattr("blogforge.llm.claude_cli.claude_available", lambda: False)
+    monkeypatch.setenv("BLOGFORGE_TANZU_API_BASE", "https://tanzu.example.test")
+    monkeypatch.setenv("BLOGFORGE_TANZU_API_KEY", "tanzu-key")
+    get_settings.cache_clear()
+
+    assert await _auto_select_provider(uuid.uuid4()) == "tanzu"
