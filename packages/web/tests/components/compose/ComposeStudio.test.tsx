@@ -82,6 +82,23 @@ describe("ComposeStudio", () => {
     await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("codex-cli"));
   });
 
+  it("keeps an unavailable explicit server preference instead of availability auto-picking", async () => {
+    vi.mocked(getDefaultProvider).mockResolvedValue({ default_provider: "codex-cli" });
+    vi.mocked(listProviderAvailability).mockResolvedValue({
+      anthropic: true,
+      "codex-cli": false,
+    });
+
+    renderStudio();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("codex-cli"));
+    await waitFor(() =>
+      expect(screen.getByText("Codex CLI is not installed.")).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText("Provider")).toHaveValue("codex-cli");
+  });
+
   it("keeps availability auto-pick when the server has no preference", async () => {
     vi.mocked(listProviderAvailability).mockResolvedValue({ anthropic: true });
     renderStudio();
@@ -95,7 +112,10 @@ describe("ComposeStudio", () => {
     renderStudio();
     fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
     await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("anthropic"));
+    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("m1"));
     fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "openai" } });
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("openai"));
+    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("m1"));
     fireEvent.click(screen.getByText(/Blank page/));
     const btn = screen.getByRole("button", { name: /open editor/i });
     await waitFor(() => expect(btn).toBeEnabled());

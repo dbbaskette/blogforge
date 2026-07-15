@@ -20,6 +20,7 @@ export type { ComposeSettings };
 interface SetupFieldsProps {
   value: ComposeSettings;
   onChange: (next: ComposeSettings) => void;
+  autoPickProvider?: boolean;
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -118,7 +119,11 @@ function Field({
   );
 }
 
-export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element {
+export function SetupFields({
+  value,
+  onChange,
+  autoPickProvider = true,
+}: SetupFieldsProps): JSX.Element {
   const [packs, setPacks] = useState<PackSummary[]>([]);
   const [providers, setProviders] = useState<Record<string, boolean>>({});
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -152,7 +157,9 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
   // key/service (e.g. the "anthropic" default on a Tanzu-only deploy), switch
   // to the first available one. Guarded so it never fights a later manual pick.
   useEffect(() => {
-    if (providerAutoPicked.current || Object.keys(providers).length === 0) return;
+    if (!autoPickProvider || providerAutoPicked.current || Object.keys(providers).length === 0) {
+      return;
+    }
     providerAutoPicked.current = true;
     if (!providers[valueRef.current.provider]) {
       const order: Provider[] = [
@@ -166,7 +173,7 @@ export function SetupFields({ value, onChange }: SetupFieldsProps): JSX.Element 
       const next = order.find((p) => providers[p]);
       if (next) onChange({ ...valueRef.current, provider: next });
     }
-  }, [providers, onChange]);
+  }, [autoPickProvider, providers, onChange]);
 
   // Load formats when pack_slug changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-run when pack_slug changes; reading value.format inside is intentional

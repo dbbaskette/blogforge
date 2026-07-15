@@ -81,6 +81,7 @@ export function ComposeStudio(): JSX.Element {
   const [notes, setNotes] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [providers, setProviders] = useState<Record<string, boolean>>({});
+  const [allowProviderAutoPick, setAllowProviderAutoPick] = useState(false);
 
   useEffect(() => {
     listTemplates()
@@ -92,8 +93,11 @@ export function ComposeStudio(): JSX.Element {
     let cancelled = false;
     getDefaultProvider()
       .then(({ default_provider }) => {
-        if (!cancelled && default_provider) {
+        if (cancelled) return;
+        if (default_provider) {
           setSettings((current) => ({ ...current, provider: default_provider, model: "" }));
+        } else {
+          setAllowProviderAutoPick(true);
         }
       })
       .catch(() => {});
@@ -461,7 +465,11 @@ export function ComposeStudio(): JSX.Element {
             provider/model even when collapsed (the quick flows submit these);
             just visually hidden until the user opens Advanced. */}
         <div className={advancedOpen ? "glass-card p-4 mt-3" : "hidden"}>
-          <SetupFields value={settings} onChange={setSettings} />
+          <SetupFields
+            value={settings}
+            onChange={setSettings}
+            autoPickProvider={allowProviderAutoPick}
+          />
         </div>
       </div>
     </div>
