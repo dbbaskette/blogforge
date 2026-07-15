@@ -1,5 +1,5 @@
 /**
- * The unified issue model shared by the GEO and Proofreader review panels.
+ * The unified issue model shared by every review panel (GEO, Proofread, Humanize, Shape).
  *
  * Every finding from either panel maps to an `Issue`; both panels render the
  * same `<IssueCard>` and drive the same `useIssueLifecycle` state machine, so
@@ -16,6 +16,7 @@ export type IssueAction =
   | "highlight"
   | "generate"
   | "write_own"
+  | "choose_option"
   | "cite_source"
   | "quote_source"
   | "add_fact"
@@ -26,7 +27,7 @@ export type IssueAction =
 export interface Issue {
   /** Stable per finding within a report. */
   id: string;
-  panel: "geo" | "proofread" | "humanize";
+  panel: "geo" | "proofread" | "humanize" | "shape";
   /** Lever/check key, e.g. "answer_first", "citations", "grammar". */
   lever: string;
   /** Short headline, e.g. "This section buries its answer". */
@@ -41,6 +42,12 @@ export interface Issue {
   /** Precomputed rewrite for the flagged passage (Humanize findings carry the
    *  suggestion up front, so apply needs no model call). */
   suggestion?: string;
+  /** Concrete alternatives the writer picks between (Shape's reword options /
+   *  expand ideas). Rendered as chips when `choose_option` is in `actions`. */
+  options?: string[];
+  /** Prefix for the impact line, e.g. "GEO". Absent renders it unprefixed —
+   *  keeps IssueCard panel-neutral. */
+  impactLabel?: string;
   /** The backend's specific fix tag (e.g. "bullets", "alt_text",
    *  "question_heading", "faq") — lets apply dispatch precisely where a lever
    *  hosts more than one kind of fix. Falls back to the lever key. */
