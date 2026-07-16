@@ -43,6 +43,7 @@ origin_sha="$(git rev-parse origin/main)"
 
 read -r -d '' REMOTE_PROGRAM <<'REMOTE' || true
 set -euo pipefail
+export PATH="/usr/local/bin:$HOME/.local/bin:$PATH"
 remote_dir="$(printf '%s' "$REMOTE_DIR_B64" | base64 --decode)"
 intended_sha="$(printf '%s' "$INTENDED_SHA_B64" | base64 --decode)"
 previous_sha=unknown

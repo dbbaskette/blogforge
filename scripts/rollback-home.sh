@@ -40,6 +40,7 @@ fi
 
 read -r -d '' REMOTE_PROGRAM <<'REMOTE' || true
 set -euo pipefail
+export PATH="/usr/local/bin:$HOME/.local/bin:$PATH"
 remote_dir="$(printf '%s' "$REMOTE_DIR_B64" | base64 --decode)"
 revision="$(printf '%s' "$REVISION_B64" | base64 --decode)"
 previous_sha=unknown
