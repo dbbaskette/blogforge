@@ -29,22 +29,34 @@ CURL_BIN="${BLOGFORGE_CURL:-curl}"
 SSH_KEY="${BLOGFORGE_SSH_KEY:-$HOME/.ssh/blogforge_home_services}"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10)
 
+[ -f "$SSH_KEY" ] || { echo "dedicated SSH key is missing: $SSH_KEY" >&2; exit 1; }
+"$SSH_BIN" "${SSH_OPTS[@]}" "$DEPLOY_HOST" true
+
 if [ "$YES" -ne 1 ]; then
   printf 'Type rollback to deploy %s to %s: ' "$revision" "$DEPLOY_HOST"
   read -r answer
   [ "$answer" = rollback ] || { echo "rollback cancelled" >&2; exit 1; }
 fi
 
-[ -f "$SSH_KEY" ] || { echo "dedicated SSH key is missing: $SSH_KEY" >&2; exit 1; }
-"$SSH_BIN" "${SSH_OPTS[@]}" "$DEPLOY_HOST" true
-
 read -r -d '' REMOTE_PROGRAM <<'REMOTE' || true
 set -euo pipefail
-cd "$1"
+remote_dir="$(printf '%s' "$REMOTE_DIR_B64" | base64 --decode)"
+revision="$(printf '%s' "$REVISION_B64" | base64 --decode)"
+previous_sha=unknown
+rollback_sha=unknown
+failure_report() {
+  status=$?
+  printf 'BLOGFORGE_ROLLBACK_FAILURE\t%s\t%s\n' "$previous_sha" "$rollback_sha" >&2
+  printf 'Inspect: ssh blogforge-home '\''launchctl print gui/$(id -u)/com.baskettecase.blogforge'\''\n' >&2
+  printf 'Inspect: ssh blogforge-home '\''tail -n 200 ~/.blogforge/logs/*.log'\''\n' >&2
+  exit "$status"
+}
+trap failure_report ERR
+cd "$remote_dir"
 git diff --quiet || { echo "tracked remote changes block rollback" >&2; exit 1; }
 git diff --cached --quiet || { echo "tracked remote changes block rollback" >&2; exit 1; }
 git fetch origin main
-rollback_sha="$(git rev-parse --verify "$2^{commit}")"
+rollback_sha="$(git rev-parse --verify "$revision^{commit}")"
 git merge-base --is-ancestor "$rollback_sha" origin/main || {
   echo "rollback commit is not reachable from origin/main" >&2
   exit 1
@@ -59,9 +71,18 @@ printf 'BLOGFORGE_ROLLBACK_RESULT\t%s\t%s\t%s\t%s\n' \
 REMOTE
 
 echo "==> Rolling back $DEPLOY_HOST to $revision"
-remote_output="$(printf '%s\n' "$REMOTE_PROGRAM" | \
-  "$SSH_BIN" "${SSH_OPTS[@]}" "$DEPLOY_HOST" bash -s -- "$REMOTE_DIR" "$revision")"
+remote_dir_b64="$(printf '%s' "$REMOTE_DIR" | base64 | tr -d '\n')"
+revision_b64="$(printf '%s' "$revision" | base64 | tr -d '\n')"
+set +e
+remote_output="$({
+  printf "REMOTE_DIR_B64='%s'\n" "$remote_dir_b64"
+  printf "REVISION_B64='%s'\n" "$revision_b64"
+  printf '%s\n' "$REMOTE_PROGRAM"
+} | "$SSH_BIN" "${SSH_OPTS[@]}" "$DEPLOY_HOST" bash -s)"
+remote_status=$?
+set -e
 printf '%s\n' "$remote_output"
+[ "$remote_status" -eq 0 ] || { echo "remote rollback failed (status $remote_status)" >&2; exit "$remote_status"; }
 
 result_count="$(printf '%s\n' "$remote_output" | grep -c '^BLOGFORGE_ROLLBACK_RESULT' || true)"
 [ "$result_count" = 1 ] || { echo "remote rollback returned no unique result record" >&2; exit 1; }

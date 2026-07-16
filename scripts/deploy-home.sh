@@ -43,7 +43,19 @@ origin_sha="$(git rev-parse origin/main)"
 
 read -r -d '' REMOTE_PROGRAM <<'REMOTE' || true
 set -euo pipefail
-cd "$1"
+remote_dir="$(printf '%s' "$REMOTE_DIR_B64" | base64 --decode)"
+intended_sha="$(printf '%s' "$INTENDED_SHA_B64" | base64 --decode)"
+previous_sha=unknown
+deployed_sha="$intended_sha"
+failure_report() {
+  status=$?
+  printf 'BLOGFORGE_DEPLOY_FAILURE\t%s\t%s\n' "$previous_sha" "$deployed_sha" >&2
+  printf 'Inspect: ssh blogforge-home '\''launchctl print gui/$(id -u)/com.baskettecase.blogforge'\''\n' >&2
+  printf 'Inspect: ssh blogforge-home '\''tail -n 200 ~/.blogforge/logs/*.log'\''\n' >&2
+  exit "$status"
+}
+trap failure_report ERR
+cd "$remote_dir"
 previous_sha="$(git rev-parse HEAD)"
 branch="$(git branch --show-current)"
 if [ -n "$branch" ] && [ "$branch" != main ]; then
@@ -60,7 +72,7 @@ git merge-base --is-ancestor "$previous_sha" origin/main || {
 git checkout main
 git merge --ff-only origin/main
 deployed_sha="$(git rev-parse HEAD)"
-[ "$deployed_sha" = "$2" ] || { echo "remote SHA differs from intended SHA" >&2; exit 1; }
+[ "$deployed_sha" = "$intended_sha" ] || { echo "remote SHA differs from intended SHA" >&2; false; }
 scripts/redeploy.sh --sync
 version="$(scripts/version.sh)"
 health="$(curl -fsS --max-time 10 http://127.0.0.1:7880/api/health)"
@@ -69,9 +81,18 @@ printf 'BLOGFORGE_DEPLOY_RESULT\t%s\t%s\t%s\t%s\n' \
 REMOTE
 
 echo "==> Fast-forwarding and redeploying $DEPLOY_HOST"
-remote_output="$(printf '%s\n' "$REMOTE_PROGRAM" | \
-  "$SSH_BIN" "${SSH_OPTS[@]}" "$DEPLOY_HOST" bash -s -- "$REMOTE_DIR" "$intended_sha")"
+remote_dir_b64="$(printf '%s' "$REMOTE_DIR" | base64 | tr -d '\n')"
+intended_sha_b64="$(printf '%s' "$intended_sha" | base64 | tr -d '\n')"
+set +e
+remote_output="$({
+  printf "REMOTE_DIR_B64='%s'\n" "$remote_dir_b64"
+  printf "INTENDED_SHA_B64='%s'\n" "$intended_sha_b64"
+  printf '%s\n' "$REMOTE_PROGRAM"
+} | "$SSH_BIN" "${SSH_OPTS[@]}" "$DEPLOY_HOST" bash -s)"
+remote_status=$?
+set -e
 printf '%s\n' "$remote_output"
+[ "$remote_status" -eq 0 ] || { echo "remote deploy failed (status $remote_status)" >&2; exit "$remote_status"; }
 
 result_count="$(printf '%s\n' "$remote_output" | grep -c '^BLOGFORGE_DEPLOY_RESULT' || true)"
 [ "$result_count" = 1 ] || { echo "remote deploy returned no unique result record" >&2; exit 1; }
