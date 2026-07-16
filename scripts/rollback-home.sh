@@ -48,7 +48,7 @@ failure_report() {
   status=$?
   printf 'BLOGFORGE_ROLLBACK_FAILURE\t%s\t%s\n' "$previous_sha" "$rollback_sha" >&2
   printf 'Inspect: ssh blogforge-home '\''launchctl print gui/$(id -u)/com.baskettecase.blogforge'\''\n' >&2
-  printf 'Inspect: ssh blogforge-home '\''tail -n 200 ~/.blogforge/logs/*.log'\''\n' >&2
+  printf 'Inspect: ssh blogforge-home '\''tail -n 200 ~/.blogforge/serve.log'\''\n' >&2
   exit "$status"
 }
 trap failure_report ERR
@@ -92,13 +92,26 @@ IFS=$'\t' read -r marker previous_sha rollback_sha version internal_health <<<"$
   [ -n "$rollback_sha" ] && [ -n "$version" ] && [ -n "$internal_health" ] || {
   echo "remote rollback returned a malformed result record" >&2; exit 1;
 }
+local_failure_report() {
+  echo "rollback health verification failed" >&2
+  printf 'previous SHA: %s\nattempted SHA: %s\n' "$previous_sha" "$rollback_sha" >&2
+  printf 'Inspect: ssh blogforge-home '\''launchctl print gui/$(id -u)/com.baskettecase.blogforge'\''\n' >&2
+  printf 'Inspect: ssh blogforge-home '\''tail -n 200 ~/.blogforge/serve.log'\''\n' >&2
+  exit 1
+}
 printf '%s' "$internal_health" | grep -Fq "\"version\":\"$version\"" || {
-  echo "internal health version does not match $version" >&2; exit 1;
+  echo "internal health version does not match $version" >&2
+  local_failure_report
 }
 
+set +e
 public_health="$("$CURL_BIN" -fsS --max-time 15 https://blogforge.baskettecase.com/api/health)"
+public_status=$?
+set -e
+[ "$public_status" -eq 0 ] || { echo "public health request failed (status $public_status)" >&2; local_failure_report; }
 printf '%s' "$public_health" | grep -Fq "\"version\":\"$version\"" || {
-  echo "public health version does not match $version" >&2; exit 1;
+  echo "public health version does not match $version" >&2
+  local_failure_report
 }
 
 echo "✓ previous SHA: $previous_sha"

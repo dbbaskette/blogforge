@@ -57,7 +57,10 @@ def deploy_repo(tmp_path: Path) -> tuple[Path, dict[str, str], Path]:
     ssh.chmod(0o755)
 
     curl = fake_bin / "curl"
-    curl.write_text('#!/bin/bash\nprintf "%s" "${PUBLIC_HEALTH}"\n')
+    curl.write_text(
+        '#!/bin/bash\n[ "${PUBLIC_CURL_FAIL:-0}" != 1 ] || exit 22\n'
+        'printf "%s" "${PUBLIC_HEALTH}"\n'
+    )
     curl.chmod(0o755)
 
     env = os.environ.copy()
@@ -278,6 +281,15 @@ def test_deploy_executable_remote_program_refuses_tracked_changes(deploy_repo) -
     assert "tracked remote changes block deploy" in result.stderr
 
 
+def test_deploy_recovers_detached_remote_to_main(deploy_repo) -> None:
+    repo, env, _ = deploy_repo
+    remote = _remote_clone(repo, env)
+    _git(remote, "checkout", "--detach", "HEAD")
+    result = _run(repo, env, "deploy-home.sh")
+    assert result.returncode == 0, result.stderr
+    assert _git(remote, "branch", "--show-current") == "main"
+
+
 def test_rollback_executes_reachable_detached_checkout(deploy_repo) -> None:
     repo, env, _ = deploy_repo
     remote = _remote_clone(repo, env)
@@ -310,6 +322,41 @@ def test_remote_redeploy_failure_reports_both_shas(deploy_repo) -> None:
     assert result.returncode != 0
     assert f"BLOGFORGE_DEPLOY_FAILURE\t{sha}\t{sha}" in result.stderr
     assert "launchctl print" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("script", "result_record", "args"),
+    [
+        (
+            "deploy-home.sh",
+            'BLOGFORGE_DEPLOY_RESULT\\tprevious\\tattempted\\t0.6.4\\t'
+            '{"status":"ok","version":"0.6.4"}',
+            (),
+        ),
+        (
+            "rollback-home.sh",
+            'BLOGFORGE_ROLLBACK_RESULT\\tprevious\\tattempted\\t0.6.4\\t'
+            '{"status":"ok","version":"0.6.4"}',
+            ("--yes", "HEAD"),
+        ),
+    ],
+)
+def test_public_health_failure_reports_shas_and_recovery_commands(
+    deploy_repo, script: str, result_record: str, args: tuple[str, ...]
+) -> None:
+    repo, env, _ = deploy_repo
+    expected_attempted = "attempted"
+    if script == "deploy-home.sh":
+        expected_attempted = _git(repo, "rev-parse", "HEAD")
+        result_record = result_record.replace("attempted", expected_attempted)
+    env["SSH_RESULT"] = result_record
+    env["PUBLIC_CURL_FAIL"] = "1"
+    result = _run(repo, env, script, *args)
+    assert result.returncode != 0
+    assert "previous SHA: previous" in result.stderr
+    assert f"attempted SHA: {expected_attempted}" in result.stderr
+    assert "launchctl print" in result.stderr
+    assert "~/.blogforge/serve.log" in result.stderr
 
 
 def test_help_does_not_require_git_or_ssh(deploy_repo) -> None:
