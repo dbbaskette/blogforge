@@ -160,6 +160,7 @@ def test_deploy_sends_safe_remote_program_and_reports_health(deploy_repo) -> Non
     assert result.returncode == 0, result.stderr
     remote = Path(env["SSH_STDIN"]).read_text()
     for required in (
+        'export PATH="/usr/local/bin:$HOME/.local/bin:$PATH"',
         "git diff --quiet",
         "git diff --cached --quiet",
         "git fetch origin main",

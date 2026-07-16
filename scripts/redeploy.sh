@@ -15,6 +15,7 @@
 #   scripts/redeploy.sh --skip-build  # backend-only change: restart + verify
 #   scripts/redeploy.sh --sync        # dependencies changed: also `uv sync`
 set -euo pipefail
+export PATH="/usr/local/bin:$HOME/.local/bin:$PATH"
 cd "$(dirname "$0")/.."
 
 AGENT="com.baskettecase.blogforge"
