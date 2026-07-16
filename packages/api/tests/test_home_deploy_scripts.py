@@ -29,6 +29,7 @@ def deploy_repo(tmp_path: Path) -> tuple[Path, dict[str, str], Path]:
     _git(repo, "commit", "-m", "initial")
     _git(repo, "remote", "add", "origin", str(origin))
     _git(repo, "push", "-u", "origin", "main")
+    _git(origin, "symbolic-ref", "HEAD", "refs/heads/main")
 
     scripts = repo / "scripts"
     scripts.mkdir()
