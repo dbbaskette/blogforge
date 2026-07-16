@@ -180,6 +180,20 @@ Then pick the matching CLI provider on a draft.
 BlogForge invokes `codex exec` ephemerally and uses the model configured as the Codex CLI default.
 Codex CLI generation can search and fetch the web.
 
+## Home services production
+
+The production instance at `https://blogforge.baskettecase.com` deploys only reviewed commits from
+`origin/main` over the dedicated `blogforge-home` SSH connection:
+
+```bash
+git checkout main
+git pull --ff-only
+scripts/deploy-home.sh
+```
+
+See [`docs/home-services-deploy.md`](docs/home-services-deploy.md) for SSH bootstrap, preflight
+rules, status and log commands, failure recovery, and explicit rollback.
+
 ## Local dev (without Docker)
 
 Run Postgres + MinIO in Docker, API/web from your host. The host-mapped Postgres port is **5433**
