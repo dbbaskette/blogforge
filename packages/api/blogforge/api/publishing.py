@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.publishing.github_client import GitHubPublisherClient, PublishingError
 from blogforge.publishing.models import PublishingPreset, PublishingSettings
+from blogforge.publishing.service import PublishResult, publish_draft_to_github
 from blogforge.publishing.settings_store import PublishingSettingsStore
 from blogforge.publishing.token_vault import PublishingTokenVault
 
 router = APIRouter(prefix="/api/publishing", tags=["publishing"])
+draft_router = APIRouter(prefix="/api/drafts", tags=["publishing"])
 
 
 class PublishingSettingsBody(BaseModel):
@@ -155,3 +157,15 @@ async def validate_publishing_destination(
         validated_login=access.login,
         private=access.private,
     )
+
+
+@draft_router.post("/{draft_id}/publish/github", response_model=PublishResult)
+async def publish_draft(
+    draft_id: str,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> PublishResult:
+    try:
+        return await publish_draft_to_github(draft_id, current.id, request.app.state.draft_store)
+    except PublishingError as exc:
+        raise _github_error(exc) from exc
