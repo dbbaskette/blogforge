@@ -27,6 +27,8 @@ def upgrade() -> None:
         sa.Column(
             "frontmatter_preset", sa.String(length=16), nullable=False, server_default="hugo"
         ),
+        sa.Column("validated_login", sa.String(length=100), nullable=True),
+        sa.Column("validated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
@@ -36,9 +38,15 @@ def upgrade() -> None:
     op.add_column(
         "drafts", sa.Column("published_commit_url", sa.String(length=1024), nullable=True)
     )
+    op.add_column("drafts", sa.Column("published_owner", sa.String(length=100), nullable=True))
+    op.add_column("drafts", sa.Column("published_repo", sa.String(length=100), nullable=True))
+    op.add_column("drafts", sa.Column("published_branch", sa.String(length=256), nullable=True))
 
 
 def downgrade() -> None:
+    op.drop_column("drafts", "published_branch")
+    op.drop_column("drafts", "published_repo")
+    op.drop_column("drafts", "published_owner")
     op.drop_column("drafts", "published_commit_url")
     op.drop_column("drafts", "published_sha")
     op.drop_column("drafts", "published_path")

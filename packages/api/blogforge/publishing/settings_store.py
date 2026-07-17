@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -9,6 +11,12 @@ from sqlalchemy import select
 from blogforge.db.engine import get_sessionmaker
 from blogforge.db.models import UserPublishingSettings
 from blogforge.publishing.models import PublishingSettings
+
+
+@dataclass(frozen=True)
+class PublishingValidationState:
+    login: str | None
+    validated_at: datetime | None
 
 
 def normalize_content_dir(raw: str) -> str:
@@ -54,5 +62,32 @@ class PublishingSettingsStore:
             else:
                 for field, value in cleaned.model_dump().items():
                     setattr(row, field, value)
+                row.validated_login = None
+                row.validated_at = None
             await session.commit()
         return cleaned
+
+    async def validation(self, user_id: UUID) -> PublishingValidationState:
+        async with get_sessionmaker()() as session:
+            row = await session.get(UserPublishingSettings, user_id)
+        return PublishingValidationState(
+            login=row.validated_login if row else None,
+            validated_at=row.validated_at if row else None,
+        )
+
+    async def record_validation(self, user_id: UUID, login: str) -> None:
+        async with get_sessionmaker()() as session:
+            row = await session.get(UserPublishingSettings, user_id)
+            if row is None:
+                raise ValueError("Publishing settings do not exist.")
+            row.validated_login = login
+            row.validated_at = datetime.now(UTC)
+            await session.commit()
+
+    async def clear_validation(self, user_id: UUID) -> None:
+        async with get_sessionmaker()() as session:
+            row = await session.get(UserPublishingSettings, user_id)
+            if row is not None:
+                row.validated_login = None
+                row.validated_at = None
+                await session.commit()

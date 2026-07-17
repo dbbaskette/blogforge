@@ -63,11 +63,16 @@ def _github_error(exc: PublishingError) -> HTTPException:
     error: dict[str, object] = {"code": exc.code, "message": str(exc)}
     if exc.retry_after is not None:
         error["retry_after"] = exc.retry_after
+    if exc.repository_url is not None:
+        error["repository_url"] = exc.repository_url
+    if exc.path is not None:
+        error["path"] = exc.path
     return HTTPException(status_code=exc.status_code, detail={"error": error})
 
 
 async def _response_for(user_id, settings: PublishingSettings | None) -> PublishingSettingsResponse:
     token_set = await PublishingTokenVault(user_id).is_set()
+    validation = await PublishingSettingsStore().validation(user_id)
     if settings is None:
         return PublishingSettingsResponse(
             configured=False,
@@ -82,6 +87,8 @@ async def _response_for(user_id, settings: PublishingSettings | None) -> Publish
         configured=True,
         **settings.model_dump(),
         token_set=token_set,
+        validated_login=validation.login,
+        ready=bool(token_set and validation.login and validation.validated_at),
     )
 
 
@@ -121,6 +128,7 @@ async def put_publishing_token(
     except PublishingError as exc:
         raise _github_error(exc) from exc
     await PublishingTokenVault(current.id).set(cleaned)
+    await PublishingSettingsStore().clear_validation(current.id)
     return PublishingTokenResponse(token_set=True, login=login)
 
 
@@ -129,6 +137,7 @@ async def delete_publishing_token(
     current: User = Depends(get_current_user),
 ) -> Response:
     await PublishingTokenVault(current.id).delete()
+    await PublishingSettingsStore().clear_validation(current.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -152,6 +161,7 @@ async def validate_publishing_destination(
         )
     except PublishingError as exc:
         raise _github_error(exc) from exc
+    await PublishingSettingsStore().record_validation(current.id, access.login)
     return PublishingValidationResponse(
         ready=True,
         validated_login=access.login,

@@ -96,6 +96,9 @@ def test_publish_route_commits_and_records_draft(authed_client) -> None:
     saved = client.get(f"/api/drafts/{draft['id']}").json()
     assert saved["published_path"] == body["path"]
     assert saved["published_sha"] == "blob-1"
+    assert saved["published_owner"] == "dbbaskette"
+    assert saved["published_repo"] == "writing"
+    assert saved["published_branch"] == "main"
 
 
 def test_republish_uses_same_path_and_latest_sha_after_title_change(authed_client) -> None:
@@ -137,5 +140,8 @@ def test_publish_route_reports_first_path_collision(authed_client) -> None:
     response = client.post(f"/api/drafts/{draft['id']}/publish/github")
 
     assert response.status_code == 409
-    assert response.json()["detail"]["error"]["code"] == "publish_path_exists"
+    error = response.json()["detail"]["error"]
+    assert error["code"] == "publish_path_exists"
+    assert error["repository_url"] == "https://github.com/dbbaskette/writing"
+    assert error["path"] == "content/posts/a-private-repository-post.md"
     assert client.get(f"/api/drafts/{draft['id']}").json()["published_path"] is None

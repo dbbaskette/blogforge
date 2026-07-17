@@ -136,6 +136,14 @@ def test_build_publish_path_uses_preset_filename(preset: str, expected: str) -> 
     assert build_publish_path(_settings(preset), _draft(), date(2026, 7, 17)) == expected
 
 
+def test_build_publish_path_rejects_title_without_slug_characters() -> None:
+    with pytest.raises(PublishingError) as caught:
+        build_publish_path(_settings(), _draft(title="🎉"), date(2026, 7, 17))
+
+    assert caught.value.code == "publish_title_invalid"
+    assert caught.value.status_code == 400
+
+
 @pytest.mark.asyncio
 async def test_first_publish_creates_markdown_and_records_metadata() -> None:
     user_id = uuid4()
@@ -166,6 +174,9 @@ async def test_first_publish_creates_markdown_and_records_metadata() -> None:
             "published_path": result.path,
             "published_sha": "blob-1",
             "published_commit_url": "https://github.test/commit/1",
+            "published_owner": "dbbaskette",
+            "published_repo": "writing",
+            "published_branch": "main",
         }
     ]
 
@@ -192,6 +203,9 @@ async def test_title_change_updates_original_path_with_stored_sha() -> None:
     original = _draft(
         published_path="content/posts/original-title.md",
         published_sha="old-blob",
+        published_owner="dbbaskette",
+        published_repo="writing",
+        published_branch="main",
     )
     renamed = original.model_copy(update={"title": "A completely different title"})
     store = FakeDraftStore(renamed)
@@ -230,6 +244,8 @@ async def test_first_publish_stops_when_path_already_exists() -> None:
             github=github,
         )
     assert caught.value.code == "publish_path_exists"
+    assert caught.value.repository_url == "https://github.com/dbbaskette/writing"
+    assert caught.value.path == "content/posts/cafe-notes-a-better-day.md"
     assert not github.put_calls
     assert not store.record_calls
 
@@ -244,7 +260,13 @@ async def test_first_publish_stops_when_path_already_exists() -> None:
 )
 async def test_failed_write_does_not_change_publication_metadata(failure) -> None:
     user_id = uuid4()
-    draft = _draft(published_path="content/posts/post.md", published_sha="old")
+    draft = _draft(
+        published_path="content/posts/post.md",
+        published_sha="old",
+        published_owner="dbbaskette",
+        published_repo="writing",
+        published_branch="main",
+    )
     store = FakeDraftStore(draft)
     github = FakeGitHub()
     github.raise_on_put = failure
@@ -261,6 +283,35 @@ async def test_failed_write_does_not_change_publication_metadata(failure) -> Non
     assert caught.value.code == failure.code
     assert not store.record_calls
     assert store.draft.published_sha == "old"
+
+
+@pytest.mark.asyncio
+async def test_republish_rejects_a_changed_destination_before_github_write() -> None:
+    draft = _draft(
+        published_path="content/posts/post.md",
+        published_sha="old",
+        published_owner="dbbaskette",
+        published_repo="original-repo",
+        published_branch="main",
+    )
+    store = FakeDraftStore(draft)
+    github = FakeGitHub()
+
+    with pytest.raises(PublishingError) as caught:
+        await publish_draft_to_github(
+            draft.id,
+            uuid4(),
+            store,
+            settings_store=FakeSettingsStore(_settings()),
+            token_vault=FakeVault("secret"),
+            github=github,
+        )
+
+    assert caught.value.code == "publish_destination_changed"
+    assert caught.value.status_code == 409
+    assert caught.value.repository_url == "https://github.com/dbbaskette/original-repo"
+    assert caught.value.path == "content/posts/post.md"
+    assert not github.put_calls
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ Every method takes a user_id and scopes its query so users can never see
 or mutate each other's drafts. Cross-user attempts silently 404 (return
 None or skip) rather than 403, to avoid leaking ID existence.
 """
+
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -93,6 +94,9 @@ def _draft_from_row(row: DraftRow) -> Draft:
         published_path=row.published_path,
         published_sha=row.published_sha,
         published_commit_url=row.published_commit_url,
+        published_owner=row.published_owner,
+        published_repo=row.published_repo,
+        published_branch=row.published_branch,
     )
 
 
@@ -109,20 +113,22 @@ def _section_version_from_row(row: SectionVersionRow) -> SectionVersion:
     )
 
 
-async def _prune_section_versions(
-    session: AsyncSession, draft_uuid: UUID, section_id: str
-) -> None:
+async def _prune_section_versions(session: AsyncSession, draft_uuid: UUID, section_id: str) -> None:
     """Delete all but the most-recent _MAX_VERSIONS_PER_SECTION snapshots."""
     rows = (
-        await session.execute(
-            select(SectionVersionRow)
-            .where(
-                SectionVersionRow.draft_id == draft_uuid,
-                SectionVersionRow.section_id == section_id,
+        (
+            await session.execute(
+                select(SectionVersionRow)
+                .where(
+                    SectionVersionRow.draft_id == draft_uuid,
+                    SectionVersionRow.section_id == section_id,
+                )
+                .order_by(SectionVersionRow.created_at.desc())
             )
-            .order_by(SectionVersionRow.created_at.desc())
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for old in rows[_MAX_VERSIONS_PER_SECTION:]:
         await session.delete(old)
 
@@ -146,12 +152,16 @@ class SqlDraftStore:
     async def list_for_user(self, user_id: UUID) -> list[DraftSummary]:
         async with get_sessionmaker()() as session:
             rows = (
-                await session.execute(
-                    select(DraftRow)
-                    .where(DraftRow.user_id == user_id, DraftRow.deleted_at.is_(None))
-                    .order_by(DraftRow.updated_at.desc())
+                (
+                    await session.execute(
+                        select(DraftRow)
+                        .where(DraftRow.user_id == user_id, DraftRow.deleted_at.is_(None))
+                        .order_by(DraftRow.updated_at.desc())
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             # Eagerly load sections for word counts.
             for r in rows:
                 await session.refresh(r, ["sections"])
@@ -198,9 +208,7 @@ class SqlDraftStore:
         async with get_sessionmaker()() as session:
             row = (
                 await session.execute(
-                    select(DraftRow).where(
-                        DraftRow.id == uuid, DraftRow.user_id == user_id
-                    )
+                    select(DraftRow).where(DraftRow.id == uuid, DraftRow.user_id == user_id)
                 )
             ).scalar_one_or_none()
             if row is None:
@@ -267,6 +275,9 @@ class SqlDraftStore:
         published_path: str,
         published_sha: str,
         published_commit_url: str,
+        published_owner: str,
+        published_repo: str,
+        published_branch: str,
     ) -> Draft | None:
         """Atomically record a GitHub commit after the upstream write succeeds."""
         try:
@@ -287,13 +298,14 @@ class SqlDraftStore:
             row.published_path = published_path
             row.published_sha = published_sha
             row.published_commit_url = published_commit_url
+            row.published_owner = published_owner
+            row.published_repo = published_repo
+            row.published_branch = published_branch
             await session.commit()
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
 
-    async def set_stage(
-        self, draft_id: str, stage: str, *, user_id: UUID
-    ) -> Draft | None:
+    async def set_stage(self, draft_id: str, stage: str, *, user_id: UUID) -> Draft | None:
         """Move a draft to a stage explicitly (allows regressing back to
         'research' to rework). Only the stage pointer changes — outline,
         sections, and ideation history are preserved. None if not found."""
@@ -319,9 +331,7 @@ class SqlDraftStore:
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
 
-    async def set_tags(
-        self, draft_id: str, tags: list[str], *, user_id: UUID
-    ) -> Draft | None:
+    async def set_tags(self, draft_id: str, tags: list[str], *, user_id: UUID) -> Draft | None:
         """Replace a draft's tags (lightweight — doesn't touch sections).
         Returns the updated draft, or None if not found / not owned."""
         try:
@@ -367,9 +377,7 @@ class SqlDraftStore:
         async with get_sessionmaker()() as session:
             row = (
                 await session.execute(
-                    select(DraftRow).where(
-                        DraftRow.id == uuid, DraftRow.user_id == user_id
-                    )
+                    select(DraftRow).where(DraftRow.id == uuid, DraftRow.user_id == user_id)
                 )
             ).scalar_one_or_none()
             if row is None:
@@ -381,12 +389,16 @@ class SqlDraftStore:
         """Soft-deleted drafts, most-recently-trashed first."""
         async with get_sessionmaker()() as session:
             rows = (
-                await session.execute(
-                    select(DraftRow)
-                    .where(DraftRow.user_id == user_id, DraftRow.deleted_at.is_not(None))
-                    .order_by(DraftRow.deleted_at.desc())
+                (
+                    await session.execute(
+                        select(DraftRow)
+                        .where(DraftRow.user_id == user_id, DraftRow.deleted_at.is_not(None))
+                        .order_by(DraftRow.deleted_at.desc())
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for r in rows:
                 await session.refresh(r, ["sections"])
             return [_summary_from_row(r) for r in rows]
@@ -441,9 +453,7 @@ class SqlDraftStore:
     async def _owns_draft(self, session: AsyncSession, draft_uuid: UUID, user_id: UUID) -> bool:
         owner = (
             await session.execute(
-                select(DraftRow.id).where(
-                    DraftRow.id == draft_uuid, DraftRow.user_id == user_id
-                )
+                select(DraftRow.id).where(DraftRow.id == draft_uuid, DraftRow.user_id == user_id)
             )
         ).scalar_one_or_none()
         return owner is not None
@@ -500,15 +510,19 @@ class SqlDraftStore:
             if not await self._owns_draft(session, duuid, user_id):
                 return []
             rows = (
-                await session.execute(
-                    select(SectionVersionRow)
-                    .where(
-                        SectionVersionRow.draft_id == duuid,
-                        SectionVersionRow.section_id == section_id,
+                (
+                    await session.execute(
+                        select(SectionVersionRow)
+                        .where(
+                            SectionVersionRow.draft_id == duuid,
+                            SectionVersionRow.section_id == section_id,
+                        )
+                        .order_by(SectionVersionRow.created_at.desc())
                     )
-                    .order_by(SectionVersionRow.created_at.desc())
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return [_section_version_from_row(r) for r in rows]
 
     async def revert_section(

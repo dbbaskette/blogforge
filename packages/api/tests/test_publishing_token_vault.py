@@ -37,3 +37,23 @@ async def test_token_can_be_replaced_and_cleared() -> None:
     await vault.delete()
     assert await vault.get() == ""
     assert await vault.is_set() is False
+
+
+async def test_undecryptable_token_is_treated_as_unset() -> None:
+    user_id = uuid4()
+    vault = PublishingTokenVault(user_id)
+    await vault.set("github_pat_secret")
+
+    async with get_sessionmaker()() as session:
+        row = await session.scalar(
+            select(UserProviderKey).where(
+                UserProviderKey.user_id == user_id,
+                UserProviderKey.provider == PUBLISHING_PROVIDER,
+            )
+        )
+        assert row is not None
+        row.encrypted_key = "corrupt-ciphertext"
+        await session.commit()
+
+    assert await vault.get() == ""
+    assert await vault.is_set() is False

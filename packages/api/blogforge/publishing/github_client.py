@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import base64
+import math
+import time
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
@@ -24,11 +26,15 @@ class PublishingError(Exception):
         status_code: int,
         *,
         retry_after: int | None = None,
+        repository_url: str | None = None,
+        path: str | None = None,
     ) -> None:
         super().__init__(message)
         self.code = code
         self.status_code = status_code
         self.retry_after = retry_after
+        self.repository_url = repository_url
+        self.path = path
 
 
 @dataclass(frozen=True)
@@ -79,10 +85,42 @@ class GitHubPublisherClient:
             ) from exc
 
     @staticmethod
+    def _json_object(response: httpx.Response) -> dict[str, Any]:
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise PublishingError(
+                "github_unavailable",
+                "GitHub returned an invalid response. Try publishing again.",
+                502,
+            ) from exc
+        if not isinstance(body, dict):
+            raise PublishingError(
+                "github_unavailable",
+                "GitHub returned an invalid response. Try publishing again.",
+                502,
+            )
+        return body
+
+    @staticmethod
+    def _required_string(body: dict[str, Any], key: str) -> str:
+        value = body.get(key)
+        if not isinstance(value, str) or not value:
+            raise PublishingError(
+                "github_unavailable",
+                "GitHub returned an invalid response. Try publishing again.",
+                502,
+            )
+        return value
+
+    @staticmethod
     def _retry_after(response: httpx.Response) -> int | None:
         raw = response.headers.get("Retry-After")
         try:
-            return int(raw) if raw else None
+            if raw:
+                return int(raw)
+            reset = response.headers.get("X-RateLimit-Reset")
+            return max(0, math.ceil(float(reset) - time.time())) if reset else None
         except ValueError:
             return None
 
@@ -102,7 +140,11 @@ class GitHubPublisherClient:
                 400,
             )
         if response.status_code in {403, 429}:
-            if response.status_code == 429 or response.headers.get("X-RateLimit-Remaining") == "0":
+            if (
+                response.status_code == 429
+                or response.headers.get("X-RateLimit-Remaining") == "0"
+                or response.headers.get("Retry-After") is not None
+            ):
                 raise PublishingError(
                     "github_rate_limited",
                     "GitHub's API rate limit has been reached. Try again later.",
@@ -131,12 +173,7 @@ class GitHubPublisherClient:
     async def get_identity(self) -> str:
         response = await self._send("GET", "/user")
         self._raise_for_response(response)
-        login = response.json().get("login")
-        if not isinstance(login, str) or not login:
-            raise PublishingError(
-                "github_unavailable", "GitHub returned an invalid identity response.", 502
-            )
-        return login
+        return self._required_string(self._json_object(response), "login")
 
     async def validate_destination(
         self, owner: str, repo: str, branch: str
@@ -144,7 +181,7 @@ class GitHubPublisherClient:
         login = await self.get_identity()
         repo_response = await self._send("GET", f"/repos/{quote(owner)}/{quote(repo)}")
         self._raise_for_response(repo_response)
-        repo_body = repo_response.json()
+        repo_body = self._json_object(repo_response)
         can_push = bool(repo_body.get("permissions", {}).get("push"))
         if not can_push:
             raise PublishingError(
@@ -179,8 +216,11 @@ class GitHubPublisherClient:
         if response.status_code == 404:
             return None
         self._raise_for_response(response)
-        body = response.json()
-        return GitHubContent(sha=str(body["sha"]), html_url=str(body.get("html_url", "")))
+        body = self._json_object(response)
+        return GitHubContent(
+            sha=self._required_string(body, "sha"),
+            html_url=str(body.get("html_url", "")),
+        )
 
     async def put_content(
         self,
@@ -209,14 +249,22 @@ class GitHubPublisherClient:
                 "publish_conflict",
                 "The GitHub file changed after BlogForge last published it.",
                 409,
+                repository_url=f"https://github.com/{owner}/{repo}",
+                path=path,
             )
         self._raise_for_response(response)
-        body = response.json()
+        body = self._json_object(response)
         content_body = body.get("content") or {}
         commit_body = body.get("commit") or {}
+        if not isinstance(content_body, dict) or not isinstance(commit_body, dict):
+            raise PublishingError(
+                "github_unavailable",
+                "GitHub returned an invalid response. Try publishing again.",
+                502,
+            )
         return GitHubCommitResult(
-            content_sha=str(content_body["sha"]),
+            content_sha=self._required_string(content_body, "sha"),
             content_url=str(content_body.get("html_url", "")),
-            commit_sha=str(commit_body["sha"]),
+            commit_sha=self._required_string(commit_body, "sha"),
             commit_url=str(commit_body.get("html_url", "")),
         )

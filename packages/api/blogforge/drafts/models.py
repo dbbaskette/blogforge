@@ -1,4 +1,5 @@
 """Pydantic shapes for drafts."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -155,6 +156,9 @@ class Draft(BaseModel):
     published_path: str | None = None
     published_sha: str | None = None
     published_commit_url: str | None = None
+    published_owner: str | None = None
+    published_repo: str | None = None
+    published_branch: str | None = None
 
     @field_validator("stage", mode="before")
     @classmethod
@@ -166,6 +170,7 @@ class Draft(BaseModel):
         — a deprecation window of a release or two is fine."""
         if v == "idea":
             import logging
+
             logging.getLogger(__name__).warning(
                 "Draft body sent stage='idea'; coercing to 'research'."
             )

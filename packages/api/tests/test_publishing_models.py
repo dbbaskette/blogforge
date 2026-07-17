@@ -15,6 +15,8 @@ async def test_publishing_settings_defaults_and_belongs_to_user(session) -> None
     assert settings.branch == "main"
     assert settings.content_dir == "content/posts"
     assert settings.frontmatter_preset == "hugo"
+    assert settings.validated_login is None
+    assert settings.validated_at is None
     assert isinstance(settings.created_at, datetime)
 
 
@@ -30,3 +32,6 @@ async def test_draft_publication_metadata_defaults_to_unpublished(session) -> No
     assert draft.published_path is None
     assert draft.published_sha is None
     assert draft.published_commit_url is None
+    assert draft.published_owner is None
+    assert draft.published_repo is None
+    assert draft.published_branch is None

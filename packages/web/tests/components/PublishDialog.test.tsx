@@ -34,7 +34,7 @@ const configured: publishingApi.PublishingSettings = {
   frontmatter_preset: "hugo",
   token_set: true,
   validated_login: null,
-  ready: false,
+  ready: true,
 };
 
 function renderDialog(value: Draft = draft): void {
@@ -122,7 +122,14 @@ describe("PublishDialog", () => {
   ])("maps %s to an actionable retry message", async (code, expected) => {
     const publish = vi
       .spyOn(draftsApi, "publishDraftToGitHub")
-      .mockRejectedValueOnce(Object.assign(new Error("raw upstream error"), { status: 409, code }))
+      .mockRejectedValueOnce(
+        Object.assign(new Error("raw upstream error"), {
+          status: 409,
+          code,
+          repositoryUrl: "https://github.com/dbbaskette/blog-content",
+          path: "content/posts/post.md",
+        }),
+      )
       .mockResolvedValueOnce({
         path: "content/posts/post.md",
         file_url: "https://github.test/file",
@@ -135,6 +142,12 @@ describe("PublishDialog", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Publish" }));
     expect(await screen.findByText(expected)).toBeInTheDocument();
+    if (code === "publish_conflict" || code === "publish_path_exists") {
+      expect(screen.getByRole("link", { name: "Inspect GitHub file" })).toHaveAttribute(
+        "href",
+        "https://github.com/dbbaskette/blog-content/blob/main/content/posts/post.md",
+      );
+    }
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));

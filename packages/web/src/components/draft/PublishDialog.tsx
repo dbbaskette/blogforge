@@ -18,6 +18,8 @@ const ERROR_COPY: Record<string, string> = {
   github_write_forbidden:
     "The saved token cannot write to this repository. Replace it in Settings and retry.",
   github_token_invalid: "GitHub rejected the saved token. Replace it in Settings and retry.",
+  publish_destination_changed:
+    "This draft was published to a different repository or branch. Restore that destination in Settings before republishing.",
 };
 
 function errorMessage(reason: unknown): string {
@@ -37,6 +39,7 @@ export function PublishDialog({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inspectionUrl, setInspectionUrl] = useState<string | null>(null);
   const [result, setResult] = useState<GitHubPublishResult | null>(null);
 
   useEffect(() => {
@@ -68,10 +71,18 @@ export function PublishDialog({
   async function publish(): Promise<void> {
     setBusy(true);
     setError(null);
+    setInspectionUrl(null);
     try {
       setResult(await publishDraftToGitHub(draft.id));
     } catch (reason) {
       setError(errorMessage(reason));
+      const apiError = reason as Partial<ApiError>;
+      if (apiError.repositoryUrl && apiError.path && settings) {
+        const encodedPath = apiError.path.split("/").map(encodeURIComponent).join("/");
+        setInspectionUrl(
+          `${apiError.repositoryUrl}/blob/${encodeURIComponent(settings.branch)}/${encodedPath}`,
+        );
+      }
     } finally {
       setBusy(false);
     }
@@ -90,7 +101,7 @@ export function PublishDialog({
         .filter(Boolean)
         .join("/")
     : "";
-  const unavailable = settings && (!settings.configured || !settings.token_set);
+  const unavailable = settings && (!settings.configured || !settings.token_set || !settings.ready);
 
   return createPortal(
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
@@ -139,7 +150,9 @@ export function PublishDialog({
             <p className="text-sm text-ink-2">
               {!settings.configured
                 ? "GitHub publishing is not configured."
-                : "GitHub publishing token is not set."}
+                : !settings.token_set
+                  ? "GitHub publishing token is not set."
+                  : "GitHub publishing has not been validated."}
             </p>
             <Link to="/settings" className="nb-btn nb-btn-primary nb-btn-sm inline-flex">
               Open Settings
@@ -183,12 +196,22 @@ export function PublishDialog({
             )}
 
             {error && (
-              <p
-                className="px-3 py-2 rounded-nb-sm text-sm"
+              <div
+                className="px-3 py-2 rounded-nb-sm text-sm space-y-1"
                 style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
               >
-                {error}
-              </p>
+                <p>{error}</p>
+                {inspectionUrl && (
+                  <a
+                    href={inspectionUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block font-medium underline"
+                  >
+                    Inspect GitHub file
+                  </a>
+                )}
+              </div>
             )}
 
             {!result && (

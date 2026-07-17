@@ -9,6 +9,8 @@ const BASE = import.meta.env.VITE_API_URL ?? "";
 export interface ApiError extends Error {
   status: number;
   code?: string;
+  repositoryUrl?: string;
+  path?: string;
 }
 
 export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
@@ -37,6 +39,8 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     }
     let detail: string | undefined;
     let code: string | undefined;
+    let repositoryUrl: string | undefined;
+    let errorPath: string | undefined;
     try {
       const j = await res.json();
       const structured = j?.detail?.error ?? j?.error;
@@ -47,6 +51,9 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
             ? structured.message
             : JSON.stringify(j);
       code = typeof structured?.code === "string" ? structured.code : undefined;
+      repositoryUrl =
+        typeof structured?.repository_url === "string" ? structured.repository_url : undefined;
+      errorPath = typeof structured?.path === "string" ? structured.path : undefined;
     } catch {
       /* fall through */
     }
@@ -55,6 +62,8 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
       {
         status: res.status,
         code,
+        repositoryUrl,
+        path: errorPath,
       },
     );
     throw err;

@@ -121,6 +121,8 @@ async def test_stale_sha_maps_to_publish_conflict() -> None:
             "dan", "blog", "main", "posts/a.md", "# A", "Update: A", "old"
         )
     assert caught.value.code == "publish_conflict"
+    assert caught.value.repository_url == "https://github.com/dan/blog"
+    assert caught.value.path == "posts/a.md"
     assert "token" not in str(caught.value)
 
 
@@ -140,6 +142,22 @@ async def test_rate_limit_maps_retry_after() -> None:
     assert caught.value.retry_after == 30
 
 
+@respx.mock
+async def test_secondary_rate_limit_with_retry_after_is_not_misclassified() -> None:
+    respx.get(f"{API}/user").mock(
+        return_value=httpx.Response(
+            403,
+            headers={"Retry-After": "60", "X-RateLimit-Remaining": "42"},
+            json={"message": "You have exceeded a secondary rate limit."},
+        )
+    )
+    with pytest.raises(PublishingError) as caught:
+        await GitHubPublisherClient("token").get_identity()
+    assert caught.value.code == "github_rate_limited"
+    assert caught.value.status_code == 429
+    assert caught.value.retry_after == 60
+
+
 async def test_timeout_maps_to_unavailable() -> None:
     def timeout(_request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("slow")
@@ -149,3 +167,28 @@ async def test_timeout_maps_to_unavailable() -> None:
         await client.get_identity()
     assert caught.value.code == "github_unavailable"
     assert "slow" not in str(caught.value)
+
+
+@respx.mock
+async def test_malformed_success_response_maps_to_unavailable() -> None:
+    respx.get(f"{API}/user").mock(return_value=httpx.Response(200, content=b"not-json"))
+
+    with pytest.raises(PublishingError) as caught:
+        await GitHubPublisherClient("token").get_identity()
+
+    assert caught.value.code == "github_unavailable"
+    assert caught.value.status_code == 502
+
+
+@respx.mock
+async def test_success_response_missing_commit_shape_maps_to_unavailable() -> None:
+    respx.put(f"{API}/repos/dan/blog/contents/posts/a.md").mock(
+        return_value=httpx.Response(201, json={"content": {"sha": "blob"}})
+    )
+
+    with pytest.raises(PublishingError) as caught:
+        await GitHubPublisherClient("token").put_content(
+            "dan", "blog", "main", "posts/a.md", "# A", "Publish: A", None
+        )
+
+    assert caught.value.code == "github_unavailable"

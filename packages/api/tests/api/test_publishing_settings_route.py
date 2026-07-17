@@ -140,6 +140,27 @@ def test_validate_returns_authenticated_login_and_ready(authed_client) -> None:
         "validated_login": "octocat",
         "private": True,
     }
+    persisted = client.get("/api/publishing/settings").json()
+    assert persisted["ready"] is True
+    assert persisted["validated_login"] == "octocat"
+
+
+def test_destination_or_token_change_invalidates_saved_validation(authed_client) -> None:
+    client, _ = authed_client
+    client.put("/api/publishing/settings", json=_destination())
+    client.put("/api/publishing/token", json={"token": "github_pat_secret"})
+    client.post("/api/publishing/validate")
+
+    client.put("/api/publishing/settings", json=_destination(branch="release"))
+    changed = client.get("/api/publishing/settings").json()
+    assert changed["ready"] is False
+    assert changed["validated_login"] is None
+
+    client.post("/api/publishing/validate")
+    client.put("/api/publishing/token", json={"token": "replacement"})
+    replaced = client.get("/api/publishing/settings").json()
+    assert replaced["ready"] is False
+    assert replaced["validated_login"] is None
 
 
 def test_validate_requires_token(authed_client) -> None:
