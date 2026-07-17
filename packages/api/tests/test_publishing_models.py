@@ -35,3 +35,5 @@ async def test_draft_publication_metadata_defaults_to_unpublished(session) -> No
     assert draft.published_owner is None
     assert draft.published_repo is None
     assert draft.published_branch is None
+    assert draft.published_hero_path is None
+    assert draft.published_hero_sha is None

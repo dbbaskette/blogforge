@@ -43,7 +43,7 @@ def extract_faqs(draft: Draft) -> list[tuple[str, str]]:
     return pairs
 
 
-def frontmatter_block(draft: Draft) -> str:
+def frontmatter_block(draft: Draft, *, hero_reference: str | None = None) -> str:
     """A YAML frontmatter block (title / date / lastmod / pack / tags) for
     static-site generators. `date` is when the post was created (published),
     `lastmod` when it last changed — the freshness signal AI engines and SSGs
@@ -56,8 +56,9 @@ def frontmatter_block(draft: Draft) -> str:
     }
     if draft.tags:
         data["tags"] = list(draft.tags)
-    if draft.hero_image_key:
-        data["image"] = draft.hero_image_key
+    image = hero_reference or draft.hero_image_key
+    if image:
+        data["image"] = image
     dumped = yaml.safe_dump(data, sort_keys=False, allow_unicode=True).strip()
     return f"---\n{dumped}\n---\n\n"
 
@@ -100,9 +101,18 @@ def json_ld(draft: Draft, author: str | None = None) -> str:
     )
 
 
-def to_markdown(draft: Draft, *, frontmatter: bool = False) -> str:
+def to_markdown(
+    draft: Draft,
+    *,
+    frontmatter: bool = False,
+    hero_reference: str | None = None,
+    include_hero_in_body: bool = False,
+) -> str:
     body = SqlDraftStore.assemble_markdown(draft)
-    return frontmatter_block(draft) + body if frontmatter else body
+    if include_hero_in_body and hero_reference:
+        title = draft.title or draft.idea.topic or "Post hero"
+        body = f"![{title}]({hero_reference})\n\n{body}"
+    return frontmatter_block(draft, hero_reference=hero_reference) + body if frontmatter else body
 
 
 def to_html(draft: Draft, *, hero_data_uri: str | None = None, author: str | None = None) -> str:

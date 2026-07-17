@@ -58,6 +58,8 @@ export interface Draft {
   published_path?: string | null;
   published_sha?: string | null;
   published_commit_url?: string | null;
+  published_hero_path?: string | null;
+  published_hero_sha?: string | null;
   /** Populated only by create_draft: source URLs that failed to fetch. */
   reference_warnings?: ReferenceWarning[];
 }
