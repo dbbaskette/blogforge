@@ -77,7 +77,8 @@ persist to Postgres + S3, multi-user, scoped per account.
 - **Export** — Markdown, Markdown + YAML frontmatter, standalone HTML (hero image inlined), or
   Word (`.docx`).
 - **Direct GitHub publishing** — each user can commit a finished post directly to one configured
-  public or private content repository, with a stable path for safe republishing.
+  public or private content repository, with a stable path for safe republishing. Generated hero
+  graphics are saved beside the post and referenced with a portable relative path.
 
 ## Your voice
 
@@ -120,12 +121,14 @@ read-only GitHub OAuth sign-in token, and publishing tokens do not belong in `.e
    private-repository access, branch, and write permission before reporting ready. The token is
    encrypted at rest, scoped to your BlogForge user, and is never returned to the browser again.
 4. Open a finished draft and click **Publish to GitHub**. BlogForge commits directly to the branch
-   and returns links to the file and commit.
+   and returns links to the file and commit. If the draft has a generated hero graphic, BlogForge
+   saves the PNG beside the post and commits both files atomically.
 
 The first publish fixes the draft's repository path. Later publishes update that same file with its
-last confirmed GitHub SHA, even if the draft title changes. BlogForge will not overwrite an
-unrelated file at the first-publish path, and it stops with a conflict if the published file changed
-in GitHub since the last BlogForge commit. Resolve the repository copy deliberately, then retry.
+last confirmed GitHub SHA, even if the draft title changes. Hero graphics keep the same stable
+sidecar path. BlogForge will not overwrite an unrelated post or image at the first-publish paths,
+and it stops with a conflict if either published file changed in GitHub since the last BlogForge
+commit. Resolve the repository copy deliberately, then retry.
 
 ## Quickstart (Docker)
 
