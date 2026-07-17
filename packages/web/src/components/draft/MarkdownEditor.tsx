@@ -70,7 +70,6 @@ export function MarkdownEditor({
   const dirtyRef = useRef(false);
   const versionedRef = useRef(false); // did we snapshot this edit session's baseline yet?
   const applyingExternalRef = useRef(false); // suppress autosave during programmatic setContent
-  const loadedRef = useRef(false); // has the initial content been loaded into the editor?
   const saveTimerRef = useRef<number | null>(null);
   const scheduleSaveRef = useRef<() => void>(() => {});
 
@@ -116,7 +115,10 @@ export function MarkdownEditor({
       TableCell,
       TrackedChangeDecoration,
     ],
-    content: "",
+    // TipTap may replace its Editor instance after a StrictMode or deferred
+    // mount. Every replacement must be born with the section content; a
+    // one-shot effect cannot safely seed an instance that does not exist yet.
+    content: marked.parse(initialMarkdown) as string,
     editorProps: {
       attributes: {
         class: "prose-body max-w-none min-h-[200px] p-5 focus:outline-none",
@@ -143,10 +145,11 @@ export function MarkdownEditor({
     },
   });
 
-  // Load the initial content once the editor is ready, then ONLY accept genuine
-  // external changes (regenerate/revise/refetch): never clobber unsaved local
-  // edits, and ignore the echo of our own just-saved content (which would reset
-  // the cursor mid-typing because section saves replace the whole draft state).
+  // Accept genuine external changes (regenerate/revise/refetch), but never
+  // clobber unsaved local edits or the echo of our own just-saved content
+  // (which would reset the cursor mid-typing because section saves replace the
+  // whole draft state). Initial content is supplied to useEditor above so a
+  // replacement TipTap instance cannot start empty before this effect runs.
   useEffect(() => {
     if (!editor) return;
     const applyExternal = (md: string): void => {
@@ -157,35 +160,6 @@ export function MarkdownEditor({
       latestMdRef.current = md;
       lastSavedRef.current = md;
     };
-    if (!loadedRef.current) {
-      loadedRef.current = true;
-      applyExternal(initialMarkdown);
-      // LOAD-BEARING — do not remove without testing a COLD first load in Safari.
-      // WebKit (Safari macOS/iOS) leaves freshly-setContent ProseMirror text
-      // unpainted when the editor first mounts via a deferred/Suspense reveal
-      // (SectionsPanel is lazy-loaded, so the very first visit mounts async) —
-      // the text only appears after a reflow (collapse/restore, or navigate away
-      // and back). Force one repaint on the frame AFTER the mount's paint has
-      // committed. Frame-aligned (double rAF) not a fixed timeout, so it lands
-      // regardless of mount timing. An earlier setTimeout(300) version (56c40d4,
-      // removed in b894b62) was "not strong enough" because the opacity entrance
-      // animations — since removed — were fighting it.
-      const dom = editor.view.dom as HTMLElement;
-      let raf2 = 0;
-      const raf1 = window.requestAnimationFrame(() => {
-        raf2 = window.requestAnimationFrame(() => {
-          if (editor.isDestroyed) return;
-          const prev = dom.style.display;
-          dom.style.display = "none";
-          void dom.offsetHeight; // force reflow + repaint
-          dom.style.display = prev;
-        });
-      });
-      return () => {
-        window.cancelAnimationFrame(raf1);
-        window.cancelAnimationFrame(raf2);
-      };
-    }
     if (initialMarkdown === lastSavedRef.current) return; // our own save echoed back
     if (dirtyRef.current) return; // protect unsaved local edits
     applyExternal(initialMarkdown);
