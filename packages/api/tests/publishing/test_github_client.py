@@ -158,6 +158,21 @@ async def test_secondary_rate_limit_with_retry_after_is_not_misclassified() -> N
     assert caught.value.retry_after == 60
 
 
+@respx.mock
+async def test_headerless_secondary_rate_limit_message_is_not_misclassified() -> None:
+    respx.get(f"{API}/user").mock(
+        return_value=httpx.Response(
+            403,
+            json={"message": "You have exceeded a secondary rate limit."},
+        )
+    )
+    with pytest.raises(PublishingError) as caught:
+        await GitHubPublisherClient("token").get_identity()
+    assert caught.value.code == "github_rate_limited"
+    assert caught.value.status_code == 429
+    assert caught.value.retry_after == 60
+
+
 async def test_timeout_maps_to_unavailable() -> None:
     def timeout(_request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("slow")

@@ -140,16 +140,27 @@ class GitHubPublisherClient:
                 400,
             )
         if response.status_code in {403, 429}:
+            try:
+                error_body = response.json()
+                error_message = (
+                    str(error_body.get("message", "")).lower()
+                    if isinstance(error_body, dict)
+                    else ""
+                )
+            except ValueError:
+                error_message = ""
+            message_signals_rate_limit = "rate limit" in error_message
             if (
                 response.status_code == 429
                 or response.headers.get("X-RateLimit-Remaining") == "0"
                 or response.headers.get("Retry-After") is not None
+                or message_signals_rate_limit
             ):
                 raise PublishingError(
                     "github_rate_limited",
                     "GitHub's API rate limit has been reached. Try again later.",
                     429,
-                    retry_after=self._retry_after(response),
+                    retry_after=self._retry_after(response) or 60,
                 )
             raise PublishingError(
                 "github_write_forbidden",

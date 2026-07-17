@@ -110,7 +110,8 @@ async def publish_draft_to_github(
         if not same_destination:
             raise PublishingError(
                 "publish_destination_changed",
-                "This draft was published to a different repository or branch. Restore that destination in Settings before republishing.",
+                "This draft was published to a different repository or branch. "
+                "Restore that destination in Settings before republishing.",
                 409,
                 repository_url=(
                     f"https://github.com/{draft.published_owner}/{draft.published_repo}"
