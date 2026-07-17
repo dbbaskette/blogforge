@@ -159,6 +159,8 @@ class Draft(BaseModel):
     published_owner: str | None = None
     published_repo: str | None = None
     published_branch: str | None = None
+    published_hero_path: str | None = None
+    published_hero_sha: str | None = None
 
     @field_validator("stage", mode="before")
     @classmethod

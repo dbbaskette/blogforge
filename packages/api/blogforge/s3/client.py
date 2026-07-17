@@ -17,7 +17,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 import aiobotocore.session
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from blogforge.config import get_settings
 
@@ -97,14 +97,14 @@ class S3Client:
                 raise S3Error(f"put_object({key!r}) failed: {err}") from err
 
     async def get_object(self, key: str) -> bytes:
-        async with self._client_ctx() as client:
-            try:
+        try:
+            async with self._client_ctx() as client:
                 resp = await client.get_object(Bucket=self._bucket, Key=key)
-            except ClientError as err:
-                raise S3Error(f"get_object({key!r}) failed: {err}") from err
-            async with resp["Body"] as stream:
-                body: bytes = await stream.read()
-                return body
+                async with resp["Body"] as stream:
+                    body: bytes = await stream.read()
+                    return body
+        except (ClientError, BotoCoreError):
+            raise S3Error("get_object failed") from None
 
     async def head_object(self, key: str) -> bool:
         async with self._client_ctx() as client:

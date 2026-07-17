@@ -5,7 +5,11 @@ import httpx
 import pytest
 import respx
 
-from blogforge.publishing.github_client import GitHubPublisherClient, PublishingError
+from blogforge.publishing.github_client import (
+    GitHubFileWrite,
+    GitHubPublisherClient,
+    PublishingError,
+)
 
 API = "https://api.github.com"
 
@@ -109,6 +113,115 @@ async def test_update_sends_expected_sha() -> None:
     payload = json.loads(route.calls.last.request.content)
     assert payload["sha"] == "old-blob"
     assert result.content_sha == "new-blob"
+
+
+@respx.mock
+async def test_commit_files_creates_one_commit_with_both_blobs() -> None:
+    respx.get(f"{API}/repos/dan/blog/git/commits/old-head").mock(
+        return_value=httpx.Response(200, json={"tree": {"sha": "base-tree"}})
+    )
+    blob_route = respx.post(f"{API}/repos/dan/blog/git/blobs").mock(
+        side_effect=[
+            httpx.Response(201, json={"sha": "markdown-blob"}),
+            httpx.Response(201, json={"sha": "image-blob"}),
+        ]
+    )
+    tree_route = respx.post(f"{API}/repos/dan/blog/git/trees").mock(
+        return_value=httpx.Response(201, json={"sha": "new-tree"})
+    )
+    commit_route = respx.post(f"{API}/repos/dan/blog/git/commits").mock(
+        return_value=httpx.Response(201, json={"sha": "new-commit"})
+    )
+    ref_route = respx.patch(f"{API}/repos/dan/blog/git/refs/heads/main").mock(
+        return_value=httpx.Response(200, json={"object": {"sha": "new-commit"}})
+    )
+
+    result = await GitHubPublisherClient("token").commit_files(
+        "dan",
+        "blog",
+        "main",
+        [
+            GitHubFileWrite("posts/a.md", b"# A"),
+            GitHubFileWrite("posts/a-hero.png", b"\x89PNG"),
+        ],
+        "Publish: A",
+        "old-head",
+    )
+
+    assert result.file_shas == {
+        "posts/a.md": "markdown-blob",
+        "posts/a-hero.png": "image-blob",
+    }
+    assert result.commit_sha == "new-commit"
+    assert result.commit_url == "https://github.com/dan/blog/commit/new-commit"
+    blob_payloads = [json.loads(call.request.content) for call in blob_route.calls]
+    assert base64.b64decode(blob_payloads[0]["content"]) == b"# A"
+    assert base64.b64decode(blob_payloads[1]["content"]) == b"\x89PNG"
+    assert json.loads(tree_route.calls.last.request.content) == {
+        "base_tree": "base-tree",
+        "tree": [
+            {"path": "posts/a.md", "mode": "100644", "type": "blob", "sha": "markdown-blob"},
+            {
+                "path": "posts/a-hero.png",
+                "mode": "100644",
+                "type": "blob",
+                "sha": "image-blob",
+            },
+        ],
+    }
+    assert json.loads(commit_route.calls.last.request.content) == {
+        "message": "Publish: A",
+        "tree": "new-tree",
+        "parents": ["old-head"],
+    }
+    assert json.loads(ref_route.calls.last.request.content) == {
+        "sha": "new-commit",
+        "force": False,
+    }
+
+
+@respx.mock
+async def test_commit_files_maps_branch_race_to_publish_conflict() -> None:
+    respx.get(f"{API}/repos/dan/blog/git/commits/old-head").mock(
+        return_value=httpx.Response(200, json={"tree": {"sha": "base-tree"}})
+    )
+    respx.post(f"{API}/repos/dan/blog/git/blobs").mock(
+        return_value=httpx.Response(201, json={"sha": "markdown-blob"})
+    )
+    respx.post(f"{API}/repos/dan/blog/git/trees").mock(
+        return_value=httpx.Response(201, json={"sha": "new-tree"})
+    )
+    respx.post(f"{API}/repos/dan/blog/git/commits").mock(
+        return_value=httpx.Response(201, json={"sha": "new-commit"})
+    )
+    respx.patch(f"{API}/repos/dan/blog/git/refs/heads/main").mock(
+        return_value=httpx.Response(422, json={"message": "Reference update failed"})
+    )
+
+    with pytest.raises(PublishingError) as caught:
+        await GitHubPublisherClient("token").commit_files(
+            "dan",
+            "blog",
+            "main",
+            [GitHubFileWrite("posts/a.md", b"# A")],
+            "Update: A",
+            "old-head",
+        )
+
+    assert caught.value.code == "publish_conflict"
+    assert caught.value.repository_url == "https://github.com/dan/blog"
+    assert caught.value.path == "posts/a.md"
+
+
+@respx.mock
+async def test_get_branch_head_returns_immutable_validation_ref() -> None:
+    respx.get(f"{API}/repos/dan/blog/git/ref/heads/feature%2Fposts").mock(
+        return_value=httpx.Response(200, json={"object": {"sha": "validated-head"}})
+    )
+
+    result = await GitHubPublisherClient("token").get_branch_head("dan", "blog", "feature/posts")
+
+    assert result == "validated-head"
 
 
 @respx.mock

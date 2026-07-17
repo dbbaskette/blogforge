@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from blogforge.drafts.models import Draft, IdeaInput, OutlineProposal, Section
-from blogforge.export.render import json_ld
+from blogforge.export.render import json_ld, to_markdown
 
 
 def _draft() -> Draft:
@@ -41,3 +41,27 @@ def test_json_ld_description_capped_and_whitespace_collapsed() -> None:
     m = re.search(r'"description": "([^"]*)"', out)
     assert m and len(m.group(1)) <= 160
     json.loads(out.split("</script>")[0].split(">", 1)[1])  # Article block is valid JSON
+
+
+def test_publish_frontmatter_uses_portable_hero_reference() -> None:
+    draft = _draft()
+    draft.hero_image_key = "drafts/internal/hero/generated.png"
+
+    rendered = to_markdown(
+        draft,
+        frontmatter=True,
+        hero_reference="my-post-hero.png",
+    )
+
+    assert "image: my-post-hero.png" in rendered
+    assert "drafts/internal" not in rendered
+
+
+def test_plain_publish_markdown_leads_with_hero_reference() -> None:
+    rendered = to_markdown(
+        _draft(),
+        hero_reference="my-post-hero.png",
+        include_hero_in_body=True,
+    )
+
+    assert rendered.startswith("![My Post](my-post-hero.png)\n\n")

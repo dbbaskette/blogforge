@@ -121,6 +121,8 @@ class Draft(Base):
     published_owner: Mapped[str | None] = mapped_column(String(100), nullable=True)
     published_repo: Mapped[str | None] = mapped_column(String(100), nullable=True)
     published_branch: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    published_hero_path: Mapped[str | None] = mapped_column(String(768), nullable=True)
+    published_hero_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="drafts")
     sections: Mapped[list["Section"]] = relationship(

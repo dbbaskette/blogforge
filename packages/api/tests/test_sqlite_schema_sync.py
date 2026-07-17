@@ -76,6 +76,8 @@ def test_adds_every_missing_column_across_tables(tmp_path) -> None:  # type: ign
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("published_slug", sa.String(256), nullable=True),
         sa.Column("published_sha", sa.String(64), nullable=True),
+        sa.Column("published_hero_path", sa.String(768), nullable=True),
+        sa.Column("published_hero_sha", sa.String(64), nullable=True),
         sa.Column("description", sa.Text, nullable=True),
     )
     with engine.begin() as conn:
@@ -84,5 +86,7 @@ def test_adds_every_missing_column_across_tables(tmp_path) -> None:  # type: ign
         "drafts.published_at",
         "drafts.published_slug",
         "drafts.published_sha",
+        "drafts.published_hero_path",
+        "drafts.published_hero_sha",
         "drafts.description",
     ]

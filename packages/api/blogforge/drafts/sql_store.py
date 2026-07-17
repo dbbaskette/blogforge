@@ -97,6 +97,8 @@ def _draft_from_row(row: DraftRow) -> Draft:
         published_owner=row.published_owner,
         published_repo=row.published_repo,
         published_branch=row.published_branch,
+        published_hero_path=row.published_hero_path,
+        published_hero_sha=row.published_hero_sha,
     )
 
 
@@ -278,6 +280,8 @@ class SqlDraftStore:
         published_owner: str,
         published_repo: str,
         published_branch: str,
+        published_hero_path: str | None,
+        published_hero_sha: str | None,
     ) -> Draft | None:
         """Atomically record a GitHub commit after the upstream write succeeds."""
         try:
@@ -301,6 +305,8 @@ class SqlDraftStore:
             row.published_owner = published_owner
             row.published_repo = published_repo
             row.published_branch = published_branch
+            row.published_hero_path = published_hero_path
+            row.published_hero_sha = published_hero_sha
             await session.commit()
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
