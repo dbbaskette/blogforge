@@ -5,8 +5,10 @@ from typing import ClassVar
 import pytest
 
 from blogforge.publishing.github_client import (
+    GitHubAtomicCommitResult,
     GitHubCommitResult,
     GitHubContent,
+    GitHubFileWrite,
     GitHubIdentityAccess,
 )
 from tests.conftest import _seed_approved_user, _signed_client
@@ -15,6 +17,7 @@ from tests.conftest import _seed_approved_user, _signed_client
 class FakeGitHubClient:
     existing: GitHubContent | None = None
     put_calls: ClassVar[list[dict]] = []
+    atomic_calls: ClassVar[list[dict]] = []
 
     def __init__(self, token: str) -> None:
         self.token = token
@@ -47,13 +50,40 @@ class FakeGitHubClient:
             commit_url=f"https://github.test/commit/{n}",
         )
 
+    async def commit_files(
+        self,
+        owner: str,
+        repo: str,
+        branch: str,
+        files: list[GitHubFileWrite],
+        message: str,
+    ) -> GitHubAtomicCommitResult:
+        self.atomic_calls.append({"files": files, "message": message})
+        return GitHubAtomicCommitResult(
+            file_shas={file.path: f"atomic-{index}" for index, file in enumerate(files, 1)},
+            commit_sha="atomic-commit",
+            commit_url="https://github.test/commit/atomic-commit",
+        )
+
+
+class FakeBlobStore:
+    fail: ClassVar[bool] = False
+
+    async def get_object(self, key: str) -> bytes:
+        if self.fail:
+            raise OSError("blob unavailable")
+        return b"\x89PNG route hero"
+
 
 @pytest.fixture(autouse=True)
 def _fake_github(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeGitHubClient.existing = None
     FakeGitHubClient.put_calls = []
+    FakeGitHubClient.atomic_calls = []
+    FakeBlobStore.fail = False
     monkeypatch.setattr("blogforge.api.publishing.GitHubPublisherClient", FakeGitHubClient)
     monkeypatch.setattr("blogforge.publishing.service.GitHubPublisherClient", FakeGitHubClient)
+    monkeypatch.setattr("blogforge.publishing.service.get_s3_client", FakeBlobStore)
 
 
 def _idea() -> dict:
@@ -115,6 +145,41 @@ def test_republish_uses_same_path_and_latest_sha_after_title_change(authed_clien
     assert second.status_code == 200
     assert second.json()["path"] == first["path"]
     assert FakeGitHubClient.put_calls[1]["expected_sha"] == "blob-1"
+
+
+def test_publish_route_records_atomically_published_hero(authed_client) -> None:
+    client, _ = authed_client
+    _configure(client)
+    draft = client.post("/api/drafts", json=_idea()).json()
+    draft["hero_image_key"] = "drafts/internal/generated.png"
+    assert client.put(f"/api/drafts/{draft['id']}", json=draft).status_code == 200
+
+    response = client.post(f"/api/drafts/{draft['id']}/publish/github")
+
+    assert response.status_code == 200
+    assert response.json()["content_sha"] == "atomic-1"
+    assert len(FakeGitHubClient.atomic_calls) == 1
+    saved = client.get(f"/api/drafts/{draft['id']}").json()
+    assert saved["published_hero_path"] == ("content/posts/a-private-repository-post-hero.png")
+    assert saved["published_hero_sha"] == "atomic-2"
+
+
+def test_publish_route_returns_structured_error_when_hero_is_unavailable(
+    authed_client,
+) -> None:
+    client, _ = authed_client
+    _configure(client)
+    draft = client.post("/api/drafts", json=_idea()).json()
+    draft["hero_image_key"] = "drafts/internal/missing.png"
+    assert client.put(f"/api/drafts/{draft['id']}", json=draft).status_code == 200
+    FakeBlobStore.fail = True
+
+    response = client.post(f"/api/drafts/{draft['id']}/publish/github")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["error"]["code"] == "hero_image_unavailable"
+    assert not FakeGitHubClient.put_calls
+    assert not FakeGitHubClient.atomic_calls
 
 
 @pytest.mark.asyncio
