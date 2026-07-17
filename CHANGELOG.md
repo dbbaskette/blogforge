@@ -13,6 +13,22 @@ bundle and the API in lockstep). Pre-`1.0.0`, the API is still evolving.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-17
+
+### Added
+- **Per-user GitHub publishing** — each writer can configure one public or private content
+  repository in Settings and publish a draft with a direct server-side commit.
+- Fine-grained GitHub PATs are validated before storage, encrypted at rest, scoped to the current
+  BlogForge user, replaceable/clearable, and never returned by the API.
+- First publishes reject existing paths; republishes retain the original path and use the last
+  confirmed content SHA so title changes cannot create duplicate posts or overwrite remote edits.
+- The publish dialog now reports authoritative file and commit links plus actionable conflict,
+  permission, token, and rate-limit recovery messages.
+
+### Changed
+- The browser-only GitHub new-file editor, clipboard fallback, and per-publish repository form were
+  replaced by a saved Settings destination and one-click direct commit.
+
 ### Fixed
 - Draft editors now receive their section content when each TipTap instance is
   created, preventing the intro and early sections from appearing blank until a
@@ -101,6 +117,7 @@ Initial BlogForge: idea → outline → single-pass compose, voice packs and the
 "Your Voice" profile, GEO optimization, Proofreader, Shape assistant, section
 version history, hero images, export, and GitHub-only auth.
 
-[Unreleased]: https://github.com/dbbaskette/blogforge/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dbbaskette/blogforge/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/dbbaskette/blogforge/compare/v0.7.2...v0.8.0
 [0.2.0]: https://github.com/dbbaskette/blogforge/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dbbaskette/blogforge/releases/tag/v0.1.0

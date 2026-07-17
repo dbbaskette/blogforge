@@ -76,6 +76,8 @@ persist to Postgres + S3, multi-user, scoped per account.
 - **Headline & hook lab** — generate and apply alternative titles or opening hooks.
 - **Export** — Markdown, Markdown + YAML frontmatter, standalone HTML (hero image inlined), or
   Word (`.docx`).
+- **Direct GitHub publishing** — each user can commit a finished post directly to one configured
+  public or private content repository, with a stable path for safe republishing.
 
 ## Your voice
 
@@ -104,6 +106,26 @@ Pick a provider per draft:
 - **Codex CLI (subscription)** — generate through your locally logged-in
   [Codex CLI](https://developers.openai.com/codex/cli/) (`codex exec`) instead of an API key, with
   web search and fetch available. Requires running the API on the host where `codex` is installed.
+
+## Publish to GitHub
+
+GitHub publishing is configured separately for each BlogForge user. It does not reuse the
+read-only GitHub OAuth sign-in token, and publishing tokens do not belong in `.env` files.
+
+1. In GitHub, create a **fine-grained personal access token**. Limit repository access to the
+   content repository you want BlogForge to publish into and grant **Contents: Read and write**.
+2. In **BlogForge → Settings → Publish to GitHub**, enter the repository owner, repository name,
+   branch, content folder, and frontmatter preset (Hugo, Jekyll, or plain Markdown).
+3. Paste the token and click **Save and test**. BlogForge verifies the authenticated GitHub login,
+   private-repository access, branch, and write permission before reporting ready. The token is
+   encrypted at rest, scoped to your BlogForge user, and is never returned to the browser again.
+4. Open a finished draft and click **Publish to GitHub**. BlogForge commits directly to the branch
+   and returns links to the file and commit.
+
+The first publish fixes the draft's repository path. Later publishes update that same file with its
+last confirmed GitHub SHA, even if the draft title changes. BlogForge will not overwrite an
+unrelated file at the first-publish path, and it stops with a conflict if the published file changed
+in GitHub since the last BlogForge commit. Resolve the repository copy deliberately, then retry.
 
 ## Quickstart (Docker)
 

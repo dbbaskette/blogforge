@@ -102,10 +102,7 @@ class GitHubPublisherClient:
                 400,
             )
         if response.status_code in {403, 429}:
-            if (
-                response.status_code == 429
-                or response.headers.get("X-RateLimit-Remaining") == "0"
-            ):
+            if response.status_code == 429 or response.headers.get("X-RateLimit-Remaining") == "0":
                 raise PublishingError(
                     "github_rate_limited",
                     "GitHub's API rate limit has been reached. Try again later.",

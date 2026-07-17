@@ -50,9 +50,10 @@ async def test_missing_content_returns_none() -> None:
     respx.get(f"{API}/repos/dan/blog/contents/posts/a.md?ref=main").mock(
         return_value=httpx.Response(404, json={"message": "Not Found"})
     )
-    assert await GitHubPublisherClient("token").get_content(
-        "dan", "blog", "main", "posts/a.md"
-    ) is None
+    assert (
+        await GitHubPublisherClient("token").get_content("dan", "blog", "main", "posts/a.md")
+        is None
+    )
 
 
 @respx.mock
