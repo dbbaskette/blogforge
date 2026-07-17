@@ -13,6 +13,11 @@ bundle and the API in lockstep). Pre-`1.0.0`, the API is still evolving.
 
 ## [Unreleased]
 
+### Fixed
+- Draft editors now receive their section content when each TipTap instance is
+  created, preventing the intro and early sections from appearing blank until a
+  browser refresh after React replaces an editor during the initial load.
+
 ## [0.3.0] — 2026-07-08
 
 Editing, GEO, and voice improvements from real use of v0.2.0.
