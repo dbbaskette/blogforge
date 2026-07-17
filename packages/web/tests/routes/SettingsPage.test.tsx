@@ -31,6 +31,24 @@ vi.mock("../../src/api/keys", () => ({
   deleteKey: vi.fn(),
 }));
 
+vi.mock("../../src/api/publishing", () => ({
+  getPublishingSettings: vi.fn().mockResolvedValue({
+    configured: false,
+    owner: "",
+    repo: "",
+    branch: "main",
+    content_dir: "content/posts",
+    frontmatter_preset: "hugo",
+    token_set: false,
+    validated_login: null,
+    ready: false,
+  }),
+  savePublishingSettings: vi.fn(),
+  savePublishingToken: vi.fn(),
+  clearPublishingToken: vi.fn(),
+  validatePublishingSettings: vi.fn(),
+}));
+
 function renderPage(): void {
   render(
     <MemoryRouter>
@@ -52,6 +70,11 @@ describe("SettingsPage", () => {
     renderPage();
     expect(screen.queryByLabelText(/current password/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/new password/i)).not.toBeInTheDocument();
+  });
+
+  it("renders per-user GitHub publishing settings", async () => {
+    renderPage();
+    expect(await screen.findByRole("heading", { name: "Publish to GitHub" })).toBeInTheDocument();
   });
 
   it("calls revokeAllSessions when Sign out everywhere is confirmed", async () => {

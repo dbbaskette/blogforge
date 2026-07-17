@@ -36,10 +36,17 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
       }
     }
     let detail: string | undefined;
+    let code: string | undefined;
     try {
       const j = await res.json();
+      const structured = j?.detail?.error ?? j?.error;
       detail =
-        typeof j?.detail === "string" ? j.detail : (j?.detail?.error?.message ?? JSON.stringify(j));
+        typeof j?.detail === "string"
+          ? j.detail
+          : typeof structured?.message === "string"
+            ? structured.message
+            : JSON.stringify(j);
+      code = typeof structured?.code === "string" ? structured.code : undefined;
     } catch {
       /* fall through */
     }
@@ -47,7 +54,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
       new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`),
       {
         status: res.status,
-        code: detail,
+        code,
       },
     );
     throw err;
