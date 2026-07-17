@@ -1,0 +1,1 @@
+"""GitHub publishing service tests."""

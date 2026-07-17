@@ -4,11 +4,22 @@ Uses SQLAlchemy 2.0 typed-mapped style. JSON columns store the existing
 pydantic structures (IdeaInput, OutlineProposal) as dicts — they're
 validated at the API boundary, not at the ORM boundary.
 """
+
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -29,7 +40,9 @@ class User(Base):
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
     email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True, index=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
-    github_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, index=True, nullable=True)
+    github_id: Mapped[int | None] = mapped_column(
+        BigInteger, unique=True, index=True, nullable=True
+    )
     github_login: Mapped[str | None] = mapped_column(String(100), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
@@ -50,6 +63,32 @@ class User(Base):
     drafts: Mapped[list["Draft"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    publishing_settings: Mapped["UserPublishingSettings | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class UserPublishingSettings(Base):
+    """One GitHub content destination for a BlogForge user."""
+
+    __tablename__ = "user_publishing_settings"
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    owner: Mapped[str] = mapped_column(String(100), nullable=False)
+    repo: Mapped[str] = mapped_column(String(100), nullable=False)
+    branch: Mapped[str] = mapped_column(String(256), nullable=False, default="main")
+    content_dir: Mapped[str] = mapped_column(String(512), nullable=False, default="content/posts")
+    frontmatter_preset: Mapped[str] = mapped_column(String(16), nullable=False, default="hugo")
+    validated_login: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+    user: Mapped[User] = relationship(back_populates="publishing_settings")
 
 
 class Draft(Base):
@@ -75,6 +114,13 @@ class Draft(Base):
         DateTime(timezone=True), default=_now, onupdate=_now
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_path: Mapped[str | None] = mapped_column(String(768), nullable=True)
+    published_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    published_commit_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    published_owner: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    published_repo: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    published_branch: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="drafts")
     sections: Mapped[list["Section"]] = relationship(
@@ -182,9 +228,7 @@ class IdeationMessage(Base):
     """
 
     __tablename__ = "ideation_messages"
-    __table_args__ = (
-        UniqueConstraint("draft_id", "position", name="uq_ideation_position"),
-    )
+    __table_args__ = (UniqueConstraint("draft_id", "position", name="uq_ideation_position"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     draft_id: Mapped[UUID] = mapped_column(
@@ -202,6 +246,7 @@ class IdeationMessage(Base):
 
 class UserProviderKey(Base):
     """Per-user, encrypted LLM provider API key."""
+
     __tablename__ = "user_provider_keys"
 
     user_id: Mapped[UUID] = mapped_column(
@@ -286,9 +331,7 @@ class VoiceProfile(Base):
     persona_tone: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     rules: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     distilled_style_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    distilled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    distilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(

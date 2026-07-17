@@ -5,6 +5,7 @@ import { revokeAllSessions } from "../api/auth";
 import { ClaudeCliCard } from "../components/settings/ClaudeCliCard";
 import { CodexCliCard } from "../components/settings/CodexCliCard";
 import { DefaultProviderCard } from "../components/settings/DefaultProviderCard";
+import { GitHubPublishingCard } from "../components/settings/GitHubPublishingCard";
 import { ProviderKeysCard } from "../components/settings/ProviderKeysCard";
 import { useConfirm } from "../components/ui/ConfirmDialog";
 import { useToast } from "../components/ui/Toast";
@@ -50,6 +51,7 @@ export function SettingsPage(): JSX.Element {
       </section>
 
       <DefaultProviderCard />
+      <GitHubPublishingCard />
       <CodexCliCard />
       <ClaudeCliCard />
       <ProviderKeysCard />
