@@ -25,20 +25,28 @@ def deploy_repo(tmp_path: Path) -> tuple[Path, dict[str, str], Path]:
     _git(repo, "config", "user.email", "deploy-test@example.com")
     _git(repo, "config", "user.name", "Deploy Test")
     (repo / "tracked.txt").write_text("initial\n")
-    _git(repo, "add", "tracked.txt")
-    _git(repo, "commit", "-m", "initial")
-    _git(repo, "remote", "add", "origin", str(origin))
-    _git(repo, "push", "-u", "origin", "main")
-    _git(origin, "symbolic-ref", "HEAD", "refs/heads/main")
+
+    web_package = repo / "packages/web/package.json"
+    api_init = repo / "packages/api/blogforge/__init__.py"
+    web_package.parent.mkdir(parents=True)
+    api_init.parent.mkdir(parents=True)
+    web_package.write_text('{\n  "version": "0.6.4"\n}\n')
+    api_init.write_text('__version__ = "0.6.4"\n')
 
     scripts = repo / "scripts"
     scripts.mkdir()
-    for name in ("deploy-home.sh", "rollback-home.sh"):
+    for name in ("deploy-home.sh", "rollback-home.sh", "version.sh"):
         source = ROOT / "scripts" / name
         if source.exists():
             target = scripts / name
             target.write_text(source.read_text())
             target.chmod(0o755)
+
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "initial")
+    _git(repo, "remote", "add", "origin", str(origin))
+    _git(repo, "push", "-u", "origin", "main")
+    _git(origin, "symbolic-ref", "HEAD", "refs/heads/main")
 
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
@@ -111,9 +119,6 @@ def _remote_clone(repo: Path, env: dict[str, str]) -> Path:
     redeploy = scripts / "redeploy.sh"
     redeploy.write_text('#!/bin/bash\n[ "${REMOTE_REDEPLOY_FAIL:-0}" != 1 ]\n')
     redeploy.chmod(0o755)
-    version = scripts / "version.sh"
-    version.write_text("#!/bin/bash\necho 0.6.4\n")
-    version.chmod(0o755)
     env.update(
         {
             "BLOGFORGE_REMOTE_DIR": str(remote),
@@ -122,6 +127,15 @@ def _remote_clone(repo: Path, env: dict[str, str]) -> Path:
         }
     )
     return remote
+
+
+def _set_versions(repo: Path, version: str) -> None:
+    (repo / "packages/web/package.json").write_text(
+        f'{{\n  "version": "{version}"\n}}\n'
+    )
+    (repo / "packages/api/blogforge/__init__.py").write_text(
+        f'__version__ = "{version}"\n'
+    )
 
 
 def test_deploy_refuses_non_main_branch(deploy_repo) -> None:
@@ -253,14 +267,58 @@ def test_deploy_executes_remote_program_and_preserves_untracked_files(deploy_rep
     remote = _remote_clone(repo, env)
     (remote / ".python-version").write_text("3.12\n")
     (repo / "tracked.txt").write_text("release\n")
-    _git(repo, "add", "tracked.txt")
+    _set_versions(repo, "0.6.5")
+    _git(repo, "add", ".")
     _git(repo, "commit", "-m", "release")
     _git(repo, "push", "origin", "main")
+    env["PUBLIC_HEALTH"] = '{"status":"ok","version":"0.6.5"}'
     result = _run(repo, env, "deploy-home.sh")
     assert result.returncode == 0, result.stderr
     assert _git(remote, "rev-parse", "HEAD") == _git(repo, "rev-parse", "HEAD")
     assert (remote / ".python-version").read_text() == "3.12\n"
     assert "deployed SHA" in result.stdout
+
+
+def test_deploy_rejects_new_sha_with_same_version_before_checkout(deploy_repo) -> None:
+    repo, env, _ = deploy_repo
+    remote = _remote_clone(repo, env)
+    before = _git(remote, "rev-parse", "HEAD")
+    (repo / "tracked.txt").write_text("new release without bump\n")
+    _git(repo, "add", "tracked.txt")
+    _git(repo, "commit", "-m", "unversioned release")
+    _git(repo, "push", "origin", "main")
+
+    result = _run(repo, env, "deploy-home.sh")
+
+    assert result.returncode != 0
+    assert "must be greater" in result.stderr
+    assert _git(remote, "rev-parse", "HEAD") == before
+
+
+def test_deploy_accepts_new_sha_with_patch_bump(deploy_repo) -> None:
+    repo, env, _ = deploy_repo
+    remote = _remote_clone(repo, env)
+    _set_versions(repo, "0.6.5")
+    (repo / "tracked.txt").write_text("versioned release\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "versioned release")
+    _git(repo, "push", "origin", "main")
+    env["PUBLIC_HEALTH"] = '{"status":"ok","version":"0.6.5"}'
+
+    result = _run(repo, env, "deploy-home.sh")
+
+    assert result.returncode == 0, result.stderr
+    assert _git(remote, "rev-parse", "HEAD") == _git(repo, "rev-parse", "HEAD")
+
+
+def test_deploy_allows_same_sha_redeploy(deploy_repo) -> None:
+    repo, env, _ = deploy_repo
+    remote = _remote_clone(repo, env)
+
+    result = _run(repo, env, "deploy-home.sh")
+
+    assert result.returncode == 0, result.stderr
+    assert _git(remote, "rev-parse", "HEAD") == _git(repo, "rev-parse", "HEAD")
 
 
 def test_deploy_executable_remote_program_refuses_divergent_history(deploy_repo) -> None:

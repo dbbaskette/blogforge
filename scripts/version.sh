@@ -11,11 +11,46 @@
 #   scripts/version.sh patch           # 0.2.0 -> 0.2.1  (bug fixes only)
 #   scripts/version.sh minor           # 0.2.0 -> 0.3.0  (backwards-compatible features)
 #   scripts/version.sh major           # 0.2.0 -> 1.0.0  (breaking changes)
+#   scripts/version.sh compare 0.7.0 0.7.1  # succeeds only when second is newer
 #   scripts/version.sh 1.4.2           # set an explicit version
 #   scripts/version.sh minor --tag     # bump AND create annotated git tag v0.3.0
 #
 # After a bump, rebuild (scripts/serve-local.sh) so the running app reports it.
 set -euo pipefail
+
+if [ "${1:-}" = compare ]; then
+  [ "$#" -eq 3 ] || {
+    echo "usage: version.sh compare BASELINE CANDIDATE" >&2
+    exit 2
+  }
+  baseline="$2"
+  candidate="$3"
+  semver_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+  [[ "$baseline" =~ $semver_re ]] || {
+    echo "invalid baseline semantic version: $baseline" >&2
+    exit 2
+  }
+  [[ "$candidate" =~ $semver_re ]] || {
+    echo "invalid candidate semantic version: $candidate" >&2
+    exit 2
+  }
+  IFS=. read -r baseline_major baseline_minor baseline_patch <<<"$baseline"
+  IFS=. read -r candidate_major candidate_minor candidate_patch <<<"$candidate"
+  baseline_parts=("$baseline_major" "$baseline_minor" "$baseline_patch")
+  candidate_parts=("$candidate_major" "$candidate_minor" "$candidate_patch")
+  for index in 0 1 2; do
+    baseline_number=$((10#${baseline_parts[$index]}))
+    candidate_number=$((10#${candidate_parts[$index]}))
+    if (( candidate_number > baseline_number )); then
+      echo "✓ candidate version $candidate is greater than $baseline"
+      exit 0
+    fi
+    (( candidate_number == baseline_number )) || break
+  done
+  echo "candidate version $candidate must be greater than $baseline" >&2
+  exit 1
+fi
+
 cd "$(dirname "$0")/.."
 
 PKG="packages/web/package.json"

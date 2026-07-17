@@ -70,6 +70,28 @@ git merge-base --is-ancestor "$previous_sha" origin/main || {
   echo "remote history is not fast-forwardable to origin/main" >&2
   exit 1
 }
+scripts/version.sh check >/dev/null
+current_version="$(scripts/version.sh)"
+candidate_web_version="$(
+  git show "$intended_sha:packages/web/package.json" |
+    sed -n 's/.*"version":[[:space:]]*"\([^"]*\)".*/\1/p' |
+    head -n 1
+)"
+candidate_api_version="$(
+  git show "$intended_sha:packages/api/blogforge/__init__.py" |
+    sed -n 's/^__version__ = "\([^"]*\)"/\1/p'
+)"
+[ -n "$candidate_web_version" ] && [ "$candidate_web_version" = "$candidate_api_version" ] || {
+  echo "candidate version mismatch — web=$candidate_web_version api=$candidate_api_version" >&2
+  exit 1
+}
+if [ "$previous_sha" != "$intended_sha" ]; then
+  git show "$intended_sha:scripts/version.sh" |
+    bash -s -- compare "$current_version" "$candidate_web_version" || {
+      echo "new deployment version must be greater: current=$current_version candidate=$candidate_web_version" >&2
+      exit 1
+    }
+fi
 git checkout main
 git merge --ff-only origin/main
 deployed_sha="$(git rev-parse HEAD)"
