@@ -58,6 +58,19 @@ class GitHubCommitResult:
     commit_url: str
 
 
+@dataclass(frozen=True)
+class GitHubFileWrite:
+    path: str
+    content: bytes
+
+
+@dataclass(frozen=True)
+class GitHubAtomicCommitResult:
+    file_shas: dict[str, str]
+    commit_sha: str
+    commit_url: str
+
+
 class GitHubPublisherClient:
     def __init__(
         self,
@@ -278,4 +291,94 @@ class GitHubPublisherClient:
             content_url=str(content_body.get("html_url", "")),
             commit_sha=self._required_string(commit_body, "sha"),
             commit_url=str(commit_body.get("html_url", "")),
+        )
+
+    async def commit_files(
+        self,
+        owner: str,
+        repo: str,
+        branch: str,
+        files: list[GitHubFileWrite],
+        message: str,
+    ) -> GitHubAtomicCommitResult:
+        """Advance one branch with all supplied files in a single Git commit."""
+        repo_api = f"/repos/{quote(owner)}/{quote(repo)}"
+        encoded_branch = quote(branch, safe="")
+
+        ref_response = await self._send("GET", f"{repo_api}/git/ref/heads/{encoded_branch}")
+        self._raise_for_response(ref_response)
+        ref_body = self._json_object(ref_response)
+        ref_object = ref_body.get("object")
+        if not isinstance(ref_object, dict):
+            raise PublishingError(
+                "github_unavailable",
+                "GitHub returned an invalid response. Try publishing again.",
+                502,
+            )
+        head_sha = self._required_string(ref_object, "sha")
+
+        commit_response = await self._send("GET", f"{repo_api}/git/commits/{head_sha}")
+        self._raise_for_response(commit_response)
+        commit_body = self._json_object(commit_response)
+        base_tree = commit_body.get("tree")
+        if not isinstance(base_tree, dict):
+            raise PublishingError(
+                "github_unavailable",
+                "GitHub returned an invalid response. Try publishing again.",
+                502,
+            )
+        base_tree_sha = self._required_string(base_tree, "sha")
+
+        file_shas: dict[str, str] = {}
+        tree_entries: list[dict[str, str]] = []
+        for file in files:
+            blob_response = await self._send(
+                "POST",
+                f"{repo_api}/git/blobs",
+                json={
+                    "content": base64.b64encode(file.content).decode("ascii"),
+                    "encoding": "base64",
+                },
+            )
+            self._raise_for_response(blob_response)
+            blob_sha = self._required_string(self._json_object(blob_response), "sha")
+            file_shas[file.path] = blob_sha
+            tree_entries.append(
+                {"path": file.path, "mode": "100644", "type": "blob", "sha": blob_sha}
+            )
+
+        tree_response = await self._send(
+            "POST",
+            f"{repo_api}/git/trees",
+            json={"base_tree": base_tree_sha, "tree": tree_entries},
+        )
+        self._raise_for_response(tree_response)
+        tree_sha = self._required_string(self._json_object(tree_response), "sha")
+
+        new_commit_response = await self._send(
+            "POST",
+            f"{repo_api}/git/commits",
+            json={"message": message, "tree": tree_sha, "parents": [head_sha]},
+        )
+        self._raise_for_response(new_commit_response)
+        new_commit_sha = self._required_string(self._json_object(new_commit_response), "sha")
+
+        update_response = await self._send(
+            "PATCH",
+            f"{repo_api}/git/refs/heads/{encoded_branch}",
+            json={"sha": new_commit_sha, "force": False},
+        )
+        if update_response.status_code in {409, 422}:
+            raise PublishingError(
+                "publish_conflict",
+                "The GitHub branch changed while BlogForge was publishing.",
+                409,
+                repository_url=f"https://github.com/{owner}/{repo}",
+                path=files[0].path if files else None,
+            )
+        self._raise_for_response(update_response)
+        return GitHubAtomicCommitResult(
+            file_shas=file_shas,
+            commit_sha=new_commit_sha,
+            commit_url=f"https://github.com/{owner}/{repo}/commit/{new_commit_sha}",
         )
