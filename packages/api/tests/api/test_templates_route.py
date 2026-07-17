@@ -43,6 +43,15 @@ async def test_create_list_delete_template(authed_client) -> None:
     assert client.get("/api/templates").json() == []
 
 
+async def test_create_template_persists_codex_cli_provider(authed_client) -> None:
+    client, _ = authed_client
+    body = {**_template_json(), "provider": "codex-cli", "model": "codex-default"}
+    created = client.post("/api/templates", json=body)
+    assert created.status_code == 201
+    assert created.json()["provider"] == "codex-cli"
+    assert created.json()["model"] == "codex-default"
+
+
 async def test_create_from_draft_lifts_idea_defaults(authed_client) -> None:
     client, _ = authed_client
     did = client.post("/api/drafts", json=_idea_json()).json()["id"]

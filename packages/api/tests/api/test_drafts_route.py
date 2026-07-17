@@ -21,6 +21,15 @@ async def test_create_draft(authed_client) -> None:
     assert body["stage"] == "research"
 
 
+async def test_create_draft_persists_codex_cli_provider(authed_client) -> None:
+    client, _ = authed_client
+    idea = {**_idea_json(), "provider": "codex-cli", "model": "codex-default"}
+    r = client.post("/api/drafts", json=idea)
+    assert r.status_code == 201
+    assert r.json()["idea"]["provider"] == "codex-cli"
+    assert r.json()["idea"]["model"] == "codex-default"
+
+
 async def test_import_keeps_the_opening_above_the_first_section(authed_client) -> None:
     """Prose before the first ## is the article's opening — it lands in
     outline.opening_hook (which exports above the sections), NOT folded under the
@@ -83,6 +92,19 @@ async def test_update_draft(authed_client) -> None:
     assert r.json()["title"] == "Updated title"
 
 
+async def test_update_draft_persists_codex_cli_provider(authed_client) -> None:
+    client, _ = authed_client
+    created = client.post("/api/drafts", json=_idea_json()).json()
+    created["idea"]["provider"] = "codex-cli"
+    created["idea"]["model"] = "codex-default"
+
+    updated = client.put(f"/api/drafts/{created['id']}", json=created)
+    assert updated.status_code == 200
+    fetched = client.get(f"/api/drafts/{created['id']}")
+    assert fetched.json()["idea"]["provider"] == "codex-cli"
+    assert fetched.json()["idea"]["model"] == "codex-default"
+
+
 async def test_delete_draft(authed_client) -> None:
     client, _ = authed_client
     created = client.post("/api/drafts", json=_idea_json()).json()
@@ -142,6 +164,19 @@ async def test_import_draft_splits_by_headings(authed_client) -> None:
     assert d["sections"][0]["content_md"] == "Hello."
     # A matching outline is seeded so the Outline view stays consistent.
     assert [s["title"] for s in d["outline"]["sections"]] == ["Intro", "Body"]
+
+
+async def test_import_draft_persists_codex_cli_provider(authed_client) -> None:
+    client, _ = authed_client
+    body = {
+        **_import_body("# Codex post\n\n## Body\n\nDraft text."),
+        "provider": "codex-cli",
+        "model": "codex-default",
+    }
+    r = client.post("/api/drafts/import", json=body)
+    assert r.status_code == 201
+    assert r.json()["idea"]["provider"] == "codex-cli"
+    assert r.json()["idea"]["model"] == "codex-default"
 
 
 async def test_import_draft_no_headings_single_section(authed_client) -> None:
