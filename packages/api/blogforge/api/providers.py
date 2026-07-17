@@ -1,7 +1,7 @@
 """GET /api/providers — availability via KeyVault (per-user keys)."""
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -11,21 +11,12 @@ from blogforge.auth.dependencies import _get_session, get_current_user
 from blogforge.config import get_settings
 from blogforge.db.models import User
 from blogforge.keys import SUPPORTED_PROVIDERS, KeyVault
+from blogforge.llm.types import TextProvider
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 
-TEXT_PROVIDERS = (
-    "anthropic",
-    "openai",
-    "google",
-    "claude-cli",
-    "codex-cli",
-    "tanzu",
-)
-
-
 class DefaultProviderBody(BaseModel):
-    default_provider: Literal[*TEXT_PROVIDERS]
+    default_provider: TextProvider
 
 
 class DefaultProviderResponse(BaseModel):

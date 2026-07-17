@@ -6,6 +6,15 @@ import pytest
 @pytest.mark.asyncio
 async def test_humanize_route_returns_report(authed_client, monkeypatch):
     monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
+    from blogforge.test_helpers.mock_provider import MockProvider
+
+    resolved: list[str] = []
+
+    async def resolve_provider(_user_id, provider: str):  # type: ignore[no-untyped-def]
+        resolved.append(provider)
+        return MockProvider()
+
+    monkeypatch.setattr("blogforge.api.geo.build_provider_for", resolve_provider)
     client, _user_id = authed_client
     # Create a draft (voice-profile mode — no pack_slug needed) the pass can run on.
     draft = client.post(
@@ -20,6 +29,7 @@ async def test_humanize_route_returns_report(authed_client, monkeypatch):
     assert body["intensity"] == "light"
     assert [g["key"] for g in body["lenses"]] == ["flow", "soul"]
     assert isinstance(body["score"], int)
+    assert resolved == ["codex-cli"]
 
 
 @pytest.mark.asyncio
