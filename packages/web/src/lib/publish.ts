@@ -61,27 +61,3 @@ export function slugify(title: string): string {
 export function buildFilename(preset: FrontmatterPreset, slug: string, isoDate: string): string {
   return preset === "jekyll" ? `${isoDate}-${slug}.md` : `${slug}.md`;
 }
-
-// GitHub's ?value= prefill silently drops content past a few KB; stay well
-// under so short posts land pre-filled and long ones fall back to clipboard.
-const VALUE_LIMIT = 6000;
-
-/**
- * Build the GitHub "create new file" URL: the directory lives in the path and
- * the filename is a query param (GitHub's documented prefill shape). `content`
- * is prefilled only when it's short enough to survive.
- */
-export function newFileUrl(config: PublishConfig, filename: string, content: string): string {
-  const dir = config.dir.replace(/^\/+|\/+$/g, "");
-  const base = `https://github.com/${encodeURIComponent(config.owner)}/${encodeURIComponent(
-    config.repo,
-  )}/new/${encodeURIComponent(config.branch)}${dir ? `/${dir}` : ""}`;
-  const params = new URLSearchParams({ filename });
-  if (content.length <= VALUE_LIMIT) params.set("value", content);
-  return `${base}?${params.toString()}`;
-}
-
-/** Did the URL manage to prefill the content, or must the writer paste it? */
-export function willPrefillContent(content: string): boolean {
-  return content.length <= VALUE_LIMIT;
-}

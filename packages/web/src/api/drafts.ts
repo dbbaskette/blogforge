@@ -54,8 +54,27 @@ export interface Draft {
   sections: Section[];
   tags: string[];
   hero_image_key: string | null;
+  published_at?: string | null;
+  published_path?: string | null;
+  published_sha?: string | null;
+  published_commit_url?: string | null;
   /** Populated only by create_draft: source URLs that failed to fetch. */
   reference_warnings?: ReferenceWarning[];
+}
+
+export interface GitHubPublishResult {
+  path: string;
+  file_url: string;
+  commit_url: string;
+  commit_sha: string;
+  content_sha: string;
+  published_at: string;
+}
+
+export function publishDraftToGitHub(id: string): Promise<GitHubPublishResult> {
+  return api<GitHubPublishResult>(`/api/drafts/${encodeURIComponent(id)}/publish/github`, {
+    method: "POST",
+  });
 }
 export interface DraftSummary {
   id: string;
