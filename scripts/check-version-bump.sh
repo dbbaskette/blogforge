@@ -32,7 +32,7 @@ while IFS= read -r path; do
     requires_bump=true
     break
   fi
-done < <(git diff --name-only --diff-filter=ACMRT "$base_ref"...HEAD)
+done < <(git diff --name-only --diff-filter=ACDMRT "$base_ref"...HEAD)
 
 if ! $requires_bump; then
   echo "✓ changed files are version-bump exempt"

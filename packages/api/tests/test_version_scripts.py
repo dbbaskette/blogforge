@@ -77,6 +77,9 @@ def version_repo(tmp_path: Path) -> tuple[Path, str]:
             shutil.copy2(source, target)
             target.chmod(0o755)
     _set_versions(repo, "0.7.0")
+    server = repo / "packages/api/blogforge/server.py"
+    server.parent.mkdir(parents=True, exist_ok=True)
+    server.write_text("initial runtime\n")
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "base")
     return repo, _git(repo, "rev-parse", "HEAD")
@@ -139,6 +142,16 @@ def test_exempt_only_change_does_not_require_bump(
 def test_unknown_path_defaults_to_requiring_bump(version_repo) -> None:
     repo, base = version_repo
     _commit_file(repo, "future-runtime/config.toml", "changed\n")
+    result = _check(repo, base)
+    assert result.returncode != 0
+    assert "must be greater" in result.stderr
+
+
+def test_deleted_runtime_file_requires_newer_version(version_repo) -> None:
+    repo, base = version_repo
+    (repo / "packages/api/blogforge/server.py").unlink()
+    _git(repo, "add", "-u")
+    _git(repo, "commit", "-m", "delete runtime")
     result = _check(repo, base)
     assert result.returncode != 0
     assert "must be greater" in result.stderr
