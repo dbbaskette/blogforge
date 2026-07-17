@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from blogforge.llm.types import TextProvider
 from blogforge.utctime import UtcDatetime
 
 
@@ -29,14 +30,14 @@ class IdeaInput(BaseModel):
     # pack_slug), so a fresh profile-only user can compose without picking one.
     pack_slug: str = ""
     format: str | None = None
-    provider: Literal["anthropic", "openai", "google", "claude-cli", "tanzu"]
+    provider: TextProvider
     model: str = Field(min_length=1)
     target_words: int = Field(default=1500, ge=300, le=10000)
     notes: str = ""
     use_voice_profile: bool = True
 
     @model_validator(mode="after")
-    def _pack_required_for_pack_mode(self) -> "IdeaInput":
+    def _pack_required_for_pack_mode(self) -> IdeaInput:
         if not self.use_voice_profile and not self.pack_slug:
             raise ValueError("pack_slug is required when use_voice_profile is false")
         return self

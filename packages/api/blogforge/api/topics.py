@@ -7,7 +7,6 @@ Topic box can get unstuck without first creating a draft.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Literal
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -18,6 +17,7 @@ from blogforge.db.models import User
 from blogforge.generate.topics import generate_topics
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
+from blogforge.llm.types import TextProvider
 from blogforge.voice.compose import ComposeError
 from blogforge.voice.resolve import resolve_voice
 
@@ -27,7 +27,7 @@ router = APIRouter(tags=["ideation"])
 class _TopicsBody(BaseModel):
     # What the writer has typed so far (may be empty — then we free-brainstorm).
     seed: str = Field(default="", max_length=2000)
-    provider: Literal["anthropic", "openai", "google", "claude-cli", "tanzu"]
+    provider: TextProvider
     model: str = Field(min_length=1)
     use_voice_profile: bool = True
     pack_slug: str = ""

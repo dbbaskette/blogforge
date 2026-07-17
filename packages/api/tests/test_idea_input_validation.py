@@ -1,7 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
+from blogforge.api.topics import _TopicsBody
 from blogforge.drafts.models import IdeaInput
+from blogforge.templates.models import TemplateInput
 
 
 def _base(**over):
@@ -15,6 +17,36 @@ def test_tanzu_is_an_allowed_provider() -> None:
     # IdeaInput must accept it (regression: the Literal used to exclude tanzu).
     idea = IdeaInput(**_base(provider="tanzu"))
     assert idea.provider == "tanzu"
+
+
+def test_codex_cli_is_an_allowed_draft_provider() -> None:
+    idea = IdeaInput(**_base(provider="codex-cli", model="codex-default"))
+    assert idea.provider == "codex-cli"
+    assert idea.model == "codex-default"
+
+
+def test_codex_cli_is_an_allowed_template_provider() -> None:
+    template = TemplateInput(
+        name="Codex template",
+        provider="codex-cli",
+        model="codex-default",
+    )
+    assert template.provider == "codex-cli"
+
+
+def test_codex_cli_is_an_allowed_topics_provider() -> None:
+    body = _TopicsBody(
+        provider="codex-cli",
+        model="codex-default",
+        seed="meeting audio",
+    )
+    assert body.provider == "codex-cli"
+
+
+@pytest.mark.parametrize("provider", ["unknown", "codex_api"])
+def test_unknown_draft_provider_is_rejected(provider: str) -> None:
+    with pytest.raises(ValidationError):
+        IdeaInput(**_base(provider=provider))
 
 
 def test_pack_slug_optional_in_voice_profile_mode() -> None:
