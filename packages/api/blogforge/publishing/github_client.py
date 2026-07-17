@@ -246,6 +246,22 @@ class GitHubPublisherClient:
             html_url=str(body.get("html_url", "")),
         )
 
+    async def get_branch_head(self, owner: str, repo: str, branch: str) -> str:
+        """Return the immutable commit SHA currently at a branch head."""
+        response = await self._send(
+            "GET",
+            f"/repos/{quote(owner)}/{quote(repo)}/git/ref/heads/{quote(branch, safe='')}",
+        )
+        self._raise_for_response(response)
+        ref_object = self._json_object(response).get("object")
+        if not isinstance(ref_object, dict):
+            raise PublishingError(
+                "github_unavailable",
+                "GitHub returned an invalid response. Try publishing again.",
+                502,
+            )
+        return self._required_string(ref_object, "sha")
+
     async def put_content(
         self,
         owner: str,
@@ -300,24 +316,13 @@ class GitHubPublisherClient:
         branch: str,
         files: list[GitHubFileWrite],
         message: str,
+        expected_head_sha: str,
     ) -> GitHubAtomicCommitResult:
         """Advance one branch with all supplied files in a single Git commit."""
         repo_api = f"/repos/{quote(owner)}/{quote(repo)}"
         encoded_branch = quote(branch, safe="")
 
-        ref_response = await self._send("GET", f"{repo_api}/git/ref/heads/{encoded_branch}")
-        self._raise_for_response(ref_response)
-        ref_body = self._json_object(ref_response)
-        ref_object = ref_body.get("object")
-        if not isinstance(ref_object, dict):
-            raise PublishingError(
-                "github_unavailable",
-                "GitHub returned an invalid response. Try publishing again.",
-                502,
-            )
-        head_sha = self._required_string(ref_object, "sha")
-
-        commit_response = await self._send("GET", f"{repo_api}/git/commits/{head_sha}")
+        commit_response = await self._send("GET", f"{repo_api}/git/commits/{expected_head_sha}")
         self._raise_for_response(commit_response)
         commit_body = self._json_object(commit_response)
         base_tree = commit_body.get("tree")
@@ -358,7 +363,7 @@ class GitHubPublisherClient:
         new_commit_response = await self._send(
             "POST",
             f"{repo_api}/git/commits",
-            json={"message": message, "tree": tree_sha, "parents": [head_sha]},
+            json={"message": message, "tree": tree_sha, "parents": [expected_head_sha]},
         )
         self._raise_for_response(new_commit_response)
         new_commit_sha = self._required_string(self._json_object(new_commit_response), "sha")

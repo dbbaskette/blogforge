@@ -83,11 +83,16 @@ class FakeGitHub:
         self.atomic_calls: list[dict] = []
         self.existing_by_path: dict[str, GitHubContent] = {}
         self.raise_on_put: PublishingError | None = None
+        self.content_refs: list[str] = []
+
+    async def get_branch_head(self, owner: str, repo: str, branch: str) -> str:
+        return "validated-head"
 
     async def validate_destination(self, owner: str, repo: str, branch: str):
         return GitHubIdentityAccess(login="octocat", private=True, can_push=True)
 
     async def get_content(self, owner: str, repo: str, branch: str, path: str):
+        self.content_refs.append(branch)
         return self.existing_by_path.get(path, self.existing)
 
     async def put_content(
@@ -128,6 +133,7 @@ class FakeGitHub:
         branch: str,
         files: list[GitHubFileWrite],
         message: str,
+        expected_head_sha: str,
     ) -> GitHubAtomicCommitResult:
         self.atomic_calls.append(
             {
@@ -136,6 +142,7 @@ class FakeGitHub:
                 "branch": branch,
                 "files": files,
                 "message": message,
+                "expected_head_sha": expected_head_sha,
             }
         )
         return GitHubAtomicCommitResult(
@@ -266,6 +273,8 @@ async def test_first_publish_atomically_commits_hero_and_portable_markdown() -> 
 
     assert not github.put_calls
     assert len(github.atomic_calls) == 1
+    assert github.content_refs == ["validated-head", "validated-head"]
+    assert github.atomic_calls[0]["expected_head_sha"] == "validated-head"
     files = {file.path: file.content for file in github.atomic_calls[0]["files"]}
     hero_path = "content/posts/cafe-notes-a-better-day-hero.png"
     assert files[hero_path] == b"\x89PNG hero"
@@ -343,6 +352,38 @@ async def test_first_publish_stops_when_hero_path_exists() -> None:
     assert caught.value.code == "publish_path_exists"
     assert caught.value.path == hero_path
     assert not github.atomic_calls
+
+
+@pytest.mark.asyncio
+async def test_atomic_republish_anchors_checks_and_commit_to_one_branch_head() -> None:
+    draft = _draft(
+        hero_image_key="drafts/internal/generated.png",
+        published_path="content/posts/original.md",
+        published_sha="post-old",
+        published_hero_path="content/posts/original-hero.png",
+        published_hero_sha="hero-old",
+        published_owner="dbbaskette",
+        published_repo="writing",
+        published_branch="main",
+    )
+    github = FakeGitHub()
+    github.existing_by_path = {
+        draft.published_path: GitHubContent("post-old", "https://github.test/post"),
+        draft.published_hero_path: GitHubContent("hero-old", "https://github.test/hero"),
+    }
+
+    await publish_draft_to_github(
+        draft.id,
+        uuid4(),
+        FakeDraftStore(draft),
+        settings_store=FakeSettingsStore(_settings()),
+        token_vault=FakeVault("secret"),
+        github=github,
+        blob_store=FakeBlobStore({draft.hero_image_key: b"new image"}),
+    )
+
+    assert github.content_refs == ["validated-head", "validated-head"]
+    assert github.atomic_calls[0]["expected_head_sha"] == "validated-head"
 
 
 @pytest.mark.asyncio

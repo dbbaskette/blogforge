@@ -123,12 +123,12 @@ async def publish_draft_to_github(
         storage = blob_store or get_s3_client()
         try:
             hero_bytes = await storage.get_object(draft.hero_image_key)
-        except (S3Error, OSError) as exc:
+        except (S3Error, OSError):
             raise PublishingError(
                 "hero_image_unavailable",
                 "The draft hero image could not be read. Regenerate it and try again.",
                 503,
-            ) from exc
+            ) from None
 
     clock = now or (lambda: datetime.now(UTC))
     published_at = clock()
@@ -181,33 +181,39 @@ async def publish_draft_to_github(
 
     client = github or GitHubPublisherClient(token)
     await client.validate_destination(settings.owner, settings.repo, settings.branch)
+    atomic_head_sha = (
+        await client.get_branch_head(settings.owner, settings.repo, settings.branch)
+        if hero_path is not None
+        else None
+    )
+    validation_ref = atomic_head_sha or settings.branch
 
     if not is_update:
-        existing = await client.get_content(settings.owner, settings.repo, settings.branch, path)
+        existing = await client.get_content(settings.owner, settings.repo, validation_ref, path)
         if existing is not None:
             _raise_path_exists(settings, path)
         if hero_path is not None:
             existing_hero = await client.get_content(
-                settings.owner, settings.repo, settings.branch, hero_path
+                settings.owner, settings.repo, validation_ref, hero_path
             )
             if existing_hero is not None:
                 _raise_path_exists(settings, hero_path)
         expected_sha = None
     elif hero_path is not None:
         existing_post = await client.get_content(
-            settings.owner, settings.repo, settings.branch, path
+            settings.owner, settings.repo, validation_ref, path
         )
         if existing_post is None or existing_post.sha != expected_sha:
             _raise_publish_conflict(settings, path)
         if draft.published_hero_path:
             existing_hero = await client.get_content(
-                settings.owner, settings.repo, settings.branch, hero_path
+                settings.owner, settings.repo, validation_ref, hero_path
             )
             if existing_hero is None or existing_hero.sha != draft.published_hero_sha:
                 _raise_publish_conflict(settings, hero_path)
         else:
             existing_hero = await client.get_content(
-                settings.owner, settings.repo, settings.branch, hero_path
+                settings.owner, settings.repo, validation_ref, hero_path
             )
             if existing_hero is not None:
                 _raise_path_exists(settings, hero_path)
@@ -222,6 +228,7 @@ async def publish_draft_to_github(
     title = draft.title or draft.idea.topic
     message = f"{'Update' if is_update else 'Publish'}: {title}"
     if hero_path is not None and hero_bytes is not None:
+        assert atomic_head_sha is not None
         atomic_result = await client.commit_files(
             settings.owner,
             settings.repo,
@@ -231,6 +238,7 @@ async def publish_draft_to_github(
                 GitHubFileWrite(path=hero_path, content=hero_bytes),
             ],
             message,
+            atomic_head_sha,
         )
         content_sha = atomic_result.file_shas[path]
         hero_sha = atomic_result.file_shas[hero_path]

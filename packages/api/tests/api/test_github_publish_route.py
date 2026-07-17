@@ -31,6 +31,9 @@ class FakeGitHubClient:
     async def get_content(self, owner: str, repo: str, branch: str, path: str):
         return self.existing
 
+    async def get_branch_head(self, owner: str, repo: str, branch: str) -> str:
+        return "validated-head"
+
     async def put_content(
         self,
         owner: str,
@@ -57,8 +60,15 @@ class FakeGitHubClient:
         branch: str,
         files: list[GitHubFileWrite],
         message: str,
+        expected_head_sha: str,
     ) -> GitHubAtomicCommitResult:
-        self.atomic_calls.append({"files": files, "message": message})
+        self.atomic_calls.append(
+            {
+                "files": files,
+                "message": message,
+                "expected_head_sha": expected_head_sha,
+            }
+        )
         return GitHubAtomicCommitResult(
             file_shas={file.path: f"atomic-{index}" for index, file in enumerate(files, 1)},
             commit_sha="atomic-commit",

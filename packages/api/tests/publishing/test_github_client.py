@@ -117,9 +117,6 @@ async def test_update_sends_expected_sha() -> None:
 
 @respx.mock
 async def test_commit_files_creates_one_commit_with_both_blobs() -> None:
-    respx.get(f"{API}/repos/dan/blog/git/ref/heads/main").mock(
-        return_value=httpx.Response(200, json={"object": {"sha": "old-head"}})
-    )
     respx.get(f"{API}/repos/dan/blog/git/commits/old-head").mock(
         return_value=httpx.Response(200, json={"tree": {"sha": "base-tree"}})
     )
@@ -148,6 +145,7 @@ async def test_commit_files_creates_one_commit_with_both_blobs() -> None:
             GitHubFileWrite("posts/a-hero.png", b"\x89PNG"),
         ],
         "Publish: A",
+        "old-head",
     )
 
     assert result.file_shas == {
@@ -184,9 +182,6 @@ async def test_commit_files_creates_one_commit_with_both_blobs() -> None:
 
 @respx.mock
 async def test_commit_files_maps_branch_race_to_publish_conflict() -> None:
-    respx.get(f"{API}/repos/dan/blog/git/ref/heads/main").mock(
-        return_value=httpx.Response(200, json={"object": {"sha": "old-head"}})
-    )
     respx.get(f"{API}/repos/dan/blog/git/commits/old-head").mock(
         return_value=httpx.Response(200, json={"tree": {"sha": "base-tree"}})
     )
@@ -210,11 +205,23 @@ async def test_commit_files_maps_branch_race_to_publish_conflict() -> None:
             "main",
             [GitHubFileWrite("posts/a.md", b"# A")],
             "Update: A",
+            "old-head",
         )
 
     assert caught.value.code == "publish_conflict"
     assert caught.value.repository_url == "https://github.com/dan/blog"
     assert caught.value.path == "posts/a.md"
+
+
+@respx.mock
+async def test_get_branch_head_returns_immutable_validation_ref() -> None:
+    respx.get(f"{API}/repos/dan/blog/git/ref/heads/feature%2Fposts").mock(
+        return_value=httpx.Response(200, json={"object": {"sha": "validated-head"}})
+    )
+
+    result = await GitHubPublisherClient("token").get_branch_head("dan", "blog", "feature/posts")
+
+    assert result == "validated-head"
 
 
 @respx.mock

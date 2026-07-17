@@ -1,10 +1,12 @@
 """S3Client round-trips against an in-process moto S3 server."""
+
 import pytest
 import pytest_asyncio
+from botocore.exceptions import ResponseStreamingError
 from moto.server import ThreadedMotoServer
 
 from blogforge.config import get_settings
-from blogforge.s3 import S3Error, get_s3_client, reset_s3_client_for_tests
+from blogforge.s3 import S3Client, S3Error, get_s3_client, reset_s3_client_for_tests
 
 
 @pytest_asyncio.fixture
@@ -85,3 +87,35 @@ async def test_delete_prefix_removes_all_matching(s3):
 async def test_get_missing_raises_s3_error(s3):
     with pytest.raises(S3Error):
         await s3.get_object("does-not-exist.txt")
+
+
+async def test_get_wraps_response_stream_failures_without_exposing_key() -> None:
+    class BrokenBody:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def read(self):
+            raise ResponseStreamingError(error="connection dropped")
+
+    class FakeBoto:
+        async def get_object(self, **_kwargs):
+            return {"Body": BrokenBody()}
+
+    class FakeContext:
+        async def __aenter__(self):
+            return FakeBoto()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    client = object.__new__(S3Client)
+    client._bucket = "private-bucket"
+    client._client_ctx = lambda: FakeContext()
+
+    with pytest.raises(S3Error) as caught:
+        await client.get_object("drafts/private/internal.png")
+
+    assert "drafts/private" not in str(caught.value)
