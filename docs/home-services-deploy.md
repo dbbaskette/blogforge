@@ -67,10 +67,18 @@ git pull --ff-only
 scripts/deploy-home.sh
 ```
 
+Every new production SHA must carry a semantic version greater than the
+currently deployed checkout. Use `scripts/version.sh patch` for a bug fix and
+`scripts/version.sh minor` or `major` when appropriate, then commit both version
+files with the change. Redeploying the exact same SHA for recovery is allowed
+without another bump.
+
 The script refuses non-`main` branches, tracked local changes, local commits
 that differ from `origin/main`, missing SSH authentication, tracked remote
-changes, divergent remote history, and a resulting SHA other than the intended
-commit. It ignores untracked files rather than transferring or removing them.
+changes, divergent remote history, a new SHA without a greater version, and a
+resulting SHA other than the intended commit. Version rejection happens before
+the remote checkout is changed. The script ignores untracked files rather than
+transferring or removing them.
 
 On success, the remote fast-forwards its own checkout and runs
 `scripts/redeploy.sh --sync`. That synchronizes dependencies, rebuilds and
