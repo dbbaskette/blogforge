@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from blogforge.llm.types import TextProvider
 
 
 def _now() -> datetime:
@@ -18,7 +19,7 @@ class TemplateInput(BaseModel):
     topic: str = ""
     # Empty in voice-profile mode (mirrors IdeaInput.pack_slug).
     pack_slug: str = ""
-    provider: Literal["anthropic", "openai", "google", "claude-cli", "tanzu"]
+    provider: TextProvider
     model: str = Field(min_length=1)
     target_words: int = Field(default=1500, ge=300, le=10000)
     format: str | None = None

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -22,6 +21,7 @@ from blogforge.drafts.models import (
 )
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.ingest import ingest_document
+from blogforge.llm.types import TextProvider
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
@@ -144,7 +144,7 @@ class _ImportBody(BaseModel):
     text: str = Field(min_length=1, max_length=200_000)
     pack_slug: str = ""
     format: str | None = None
-    provider: Literal["anthropic", "openai", "google", "claude-cli", "tanzu"]
+    provider: TextProvider
     model: str = Field(min_length=1)
     target_words: int = Field(default=1500, ge=300, le=10000)
     use_voice_profile: bool = True
