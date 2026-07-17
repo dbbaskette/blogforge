@@ -256,4 +256,3 @@ token.
 - creating pull requests;
 - publishing hero-image binaries or other assets;
 - webhook-driven synchronization from GitHub back into BlogForge.
-

@@ -488,4 +488,3 @@ Push `codex/github-publishing`, open a pull request, inspect its diff and checks
 - [ ] **Step 7: Production private-repository smoke test**
 
 In Settings, save a repository-scoped test PAT and destination, validate it, publish a draft, edit its title and body, republish, and verify both commits target the same GitHub path. Confirm the UI and Admin logs never display the token.
-
