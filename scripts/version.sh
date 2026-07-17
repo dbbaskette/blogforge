@@ -25,7 +25,7 @@ if [ "${1:-}" = compare ]; then
   }
   baseline="$2"
   candidate="$3"
-  semver_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+  semver_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
   [[ "$baseline" =~ $semver_re ]] || {
     echo "invalid baseline semantic version: $baseline" >&2
     exit 2

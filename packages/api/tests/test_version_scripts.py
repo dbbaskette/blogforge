@@ -42,6 +42,8 @@ def test_compare_accepts_strict_increase(baseline: str, candidate: str) -> None:
         ("0.7.1", "0.7.0"),
         ("0.7", "0.7.1"),
         ("0.7.0", "next"),
+        ("0.07.0", "0.7.1"),
+        ("0.7.0", "0.07.1"),
     ],
 )
 def test_compare_rejects_nonincrease_or_malformed(
