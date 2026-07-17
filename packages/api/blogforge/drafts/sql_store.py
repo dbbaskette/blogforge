@@ -89,6 +89,10 @@ def _draft_from_row(row: DraftRow) -> Draft:
         ],
         tags=list(row.tags or []),
         hero_image_key=row.hero_image_key,
+        published_at=row.published_at,
+        published_path=row.published_path,
+        published_sha=row.published_sha,
+        published_commit_url=row.published_commit_url,
     )
 
 
@@ -250,6 +254,39 @@ class SqlDraftStore:
             # Anything left in existing_by_id was removed by the user.
             for orphan in existing_by_id.values():
                 await session.delete(orphan)
+            await session.commit()
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
+            return _draft_from_row(row)
+
+    async def record_publication(
+        self,
+        draft_id: str,
+        *,
+        user_id: UUID,
+        published_at: datetime,
+        published_path: str,
+        published_sha: str,
+        published_commit_url: str,
+    ) -> Draft | None:
+        """Atomically record a GitHub commit after the upstream write succeeds."""
+        try:
+            draft_uuid = UUID(draft_id)
+        except ValueError:
+            return None
+        async with get_sessionmaker()() as session:
+            row = await session.scalar(
+                select(DraftRow).where(
+                    DraftRow.id == draft_uuid,
+                    DraftRow.user_id == user_id,
+                    DraftRow.deleted_at.is_(None),
+                )
+            )
+            if row is None:
+                return None
+            row.published_at = published_at
+            row.published_path = published_path
+            row.published_sha = published_sha
+            row.published_commit_url = published_commit_url
             await session.commit()
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)

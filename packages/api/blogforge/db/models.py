@@ -50,6 +50,32 @@ class User(Base):
     drafts: Mapped[list["Draft"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    publishing_settings: Mapped["UserPublishingSettings | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class UserPublishingSettings(Base):
+    """One GitHub content destination for a BlogForge user."""
+
+    __tablename__ = "user_publishing_settings"
+
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    owner: Mapped[str] = mapped_column(String(100), nullable=False)
+    repo: Mapped[str] = mapped_column(String(100), nullable=False)
+    branch: Mapped[str] = mapped_column(String(256), nullable=False, default="main")
+    content_dir: Mapped[str] = mapped_column(
+        String(512), nullable=False, default="content/posts"
+    )
+    frontmatter_preset: Mapped[str] = mapped_column(String(16), nullable=False, default="hugo")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now
+    )
+
+    user: Mapped[User] = relationship(back_populates="publishing_settings")
 
 
 class Draft(Base):
@@ -75,6 +101,10 @@ class Draft(Base):
         DateTime(timezone=True), default=_now, onupdate=_now
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_path: Mapped[str | None] = mapped_column(String(768), nullable=True)
+    published_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    published_commit_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="drafts")
     sections: Mapped[list["Section"]] = relationship(

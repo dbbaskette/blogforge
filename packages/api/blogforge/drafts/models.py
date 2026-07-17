@@ -151,6 +151,10 @@ class Draft(BaseModel):
     # S3 key of the AI-generated hero image, if any. Served via the hero-image
     # endpoint; included in HTML/frontmatter export.
     hero_image_key: str | None = None
+    published_at: UtcDatetime | None = None
+    published_path: str | None = None
+    published_sha: str | None = None
+    published_commit_url: str | None = None
 
     @field_validator("stage", mode="before")
     @classmethod
