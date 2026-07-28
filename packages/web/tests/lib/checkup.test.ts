@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { GeoReport } from "../../src/api/geo";
 import type { HumanizeReport } from "../../src/api/humanize";
 import type { SuggestResult } from "../../src/api/suggest";
-import { type LintResult, summarizeCheckup } from "../../src/lib/checkup";
+import {
+  type CheckupSummary,
+  type LintResult,
+  isCurrentCheckupSummary,
+  summarizeCheckup,
+} from "../../src/lib/checkup";
 
 const lint = (violations: number, repetitions = 0, hits = 0): LintResult => ({
   // biome-ignore lint/suspicious/noExplicitAny: minimal finding stubs
@@ -114,5 +119,46 @@ describe("summarizeCheckup", () => {
     expect(row.label).toBe("Humanization");
     expect(row.detail).toBe("Humanize review unavailable");
     expect(row.severity).toBe("warn");
+  });
+});
+
+describe("isCurrentCheckupSummary", () => {
+  it("rejects cached summaries that still contain the retired score shape", () => {
+    const legacy = {
+      headline: "Looks clean",
+      humanity: 80,
+      antiRobot: 100,
+      humanSignal: 60,
+      rows: [
+        {
+          key: "humanize",
+          label: "Humanness",
+          count: 2,
+          detail: "60% human signal · 2 findings",
+          severity: "warn",
+        },
+      ],
+      totalOpen: 0,
+    };
+
+    expect(isCurrentCheckupSummary(legacy)).toBe(false);
+  });
+
+  it("accepts the count-based summary shape", () => {
+    const current: CheckupSummary = {
+      headline: "Looks clean",
+      rows: [
+        {
+          key: "humanize",
+          label: "Humanization",
+          count: 2,
+          detail: "2 suggestions across 3 lenses",
+          severity: "warn",
+        },
+      ],
+      totalOpen: 0,
+    };
+
+    expect(isCurrentCheckupSummary(current)).toBe(true);
   });
 });

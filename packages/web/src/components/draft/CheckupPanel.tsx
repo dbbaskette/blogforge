@@ -4,7 +4,12 @@ import { type Draft, lintDraft } from "../../api/drafts";
 import { type GeoReport, analyzeGeo } from "../../api/geo";
 import { type HumanizeReport, analyzeHumanize } from "../../api/humanize";
 import { type SuggestResult, suggestImprovements } from "../../api/suggest";
-import { type CheckupSummary, type Severity, summarizeCheckup } from "../../lib/checkup";
+import {
+  type CheckupSummary,
+  type Severity,
+  isCurrentCheckupSummary,
+  summarizeCheckup,
+} from "../../lib/checkup";
 import { getCached, hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
@@ -110,7 +115,7 @@ export function CheckupPanel({
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
     const saved = peekCached<CheckupSummary>("checkup", draft.id);
-    if (saved) {
+    if (saved && isCurrentCheckupSummary(saved.data)) {
       setSummary(saved.data);
       setStale(saved.hash !== hash);
     } else {

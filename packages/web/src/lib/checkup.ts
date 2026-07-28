@@ -33,6 +33,26 @@ export interface LintResult {
   repetitions: LintFinding[];
 }
 
+/** Reject browser-cached summaries created before the count-based
+ * Humanization Check replaced the blended score. */
+export function isCurrentCheckupSummary(value: unknown): value is CheckupSummary {
+  if (!value || typeof value !== "object") return false;
+  if ("humanity" in value || "antiRobot" in value || "humanSignal" in value) return false;
+  const rows = (value as { rows?: unknown }).rows;
+  if (!Array.isArray(rows)) return false;
+  const humanize = rows.find(
+    (row): row is { key: string; label: string; detail: string } =>
+      Boolean(row) &&
+      typeof row === "object" &&
+      (row as { key?: unknown }).key === "humanize" &&
+      typeof (row as { label?: unknown }).label === "string" &&
+      typeof (row as { detail?: unknown }).detail === "string",
+  );
+  return Boolean(
+    humanize && humanize.label === "Humanization" && !humanize.detail.includes("% human signal"),
+  );
+}
+
 function geoSeverity(grade?: string): Severity {
   if (!grade) return "warn";
   if (grade === "A" || grade === "B") return "good";
