@@ -1,6 +1,7 @@
 """Render a VoiceProfile as a portable Markdown 'voice guide' for external LLMs."""
 from __future__ import annotations
 
+from blogforge.prompt_rules import PromptRule, render_prompt_rules
 from blogforge.voice.ai_tells import load_ai_tells
 from blogforge.voice.models import VoiceProfile
 
@@ -8,13 +9,20 @@ _PREAMBLE = (
     "> **How to use:** When you write for me, follow this voice guide — match the\n"
     "> persona and style below, and never use the words, phrases, or patterns under\n"
     '> "Avoid these AI-writing tells." Paste it into any AI assistant as a style\n'
-    "> instruction, or keep it as a personal reference."
+    "> instruction, or keep it as a personal reference. `Rule:` and `Because:` labels\n"
+    "> are writing-process instructions; do not copy either label into article output."
 )
 
 
 def build_voice_guide(profile: VoiceProfile) -> str:
     ai = load_ai_tells()
     parts: list[str] = [f"# {profile.name or 'My Voice'} — Writing Voice Guide", _PREAMBLE]
+    parts.append(render_prompt_rules([
+        PromptRule(
+            "Do not copy the `Rule:` and `Because:` labels into article output.",
+            "They are instructions for the writing process, not content for the article.",
+        )
+    ]))
 
     persona: list[str] = []
     if profile.persona_identity.strip():
@@ -36,16 +44,40 @@ def build_voice_guide(profile: VoiceProfile) -> str:
     words = [w for w in profile.rules.banished_words if w.strip()]
     phrases = [p for p in profile.rules.banished_phrases if p.strip()]
     if words or phrases:
-        b = ["## My banished words & phrases", "Never use these in my writing:"]
+        b = ["## My banished words & phrases"]
+        b.append(render_prompt_rules([
+            PromptRule(
+                "Do not use the following words and phrases in my writing.",
+                "They conflict with the author's established voice and explicit preferences.",
+            )
+        ]))
         if words:
-            b.append(f"- **Words:** {', '.join(words)}")
+            b.append(f"Words: {', '.join(words)}")
         if phrases:
-            b.append(f"- **Phrases:** {', '.join(phrases)}")
+            b.append(f"Phrases: {', '.join(phrases)}")
         parts.append("\n".join(b))
 
+    ai_rules = render_prompt_rules([
+        PromptRule(
+            "Do not use any item in the universal AI-tell word list.",
+            "These words are recurrent style defects that make prose sound machine-generated.",
+        ),
+        PromptRule(
+            "Do not use any item in the universal AI-tell phrase list.",
+            "These phrases are recurrent style defects that make prose sound machine-generated.",
+        ),
+        PromptRule(
+            "Do not begin sentences with any item in the universal AI-tell opener list.",
+            "Repeated stock openers are a recognizable AI-writing tell.",
+        ),
+        PromptRule(
+            "Avoid each structural pattern listed below.",
+            "These patterns are recurrent style defects that make prose sound machine-generated.",
+        ),
+    ])
     parts.append(
         "## Avoid these AI-writing tells\n\n"
-        "Universal signs of machine-written text. Don't use them.\n\n"
+        f"{ai_rules}\n\n"
         f"### Words to avoid\n\n{', '.join(ai.words)}\n\n"
         "### Phrases to avoid\n\n" + "\n".join(f"- {p}" for p in ai.phrases) + "\n\n"
         f"### Sentence openers to avoid\n\n{', '.join(ai.sentence_starters)}\n\n"

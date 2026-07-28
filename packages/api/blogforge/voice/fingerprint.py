@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 from collections import Counter
 
+from blogforge.prompt_rules import VOICE_RATIONALE, PromptRule, render_prompt_rules
+
 _STOP = frozenset(
     """a an and the of to in on at for with as is are was were be been being by it its
     this that these those i we you he she they them his her our your my me us him then
@@ -18,7 +20,7 @@ _STOP = frozenset(
     about than too very just like get got one two three what which who when where why how
     there here their theirs ours yours mine he's she's it's i'm we're you're they're""".split()
 )
-_WORD = re.compile(r"[A-Za-z][A-Za-z'’]*")
+_WORD = re.compile(r"[A-Za-z][A-Za-z'\u2019]*")
 _SENT = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -39,7 +41,7 @@ def compute_stats(sample_texts: list[str]) -> dict:
     content = [w for w in words if w not in _STOP and len(w) > 2]
     top_words = [w for w, _ in Counter(content).most_common(8)]
 
-    # Signature phrases: 2–3 word n-grams that recur and aren't all stopwords.
+    # Signature phrases: 2-3 word n-grams that recur and aren't all stopwords.
     grams: Counter[str] = Counter()
     for n in (3, 2):
         for i in range(len(words) - n + 1):
@@ -73,11 +75,24 @@ def render_fingerprint_md(sample_texts: list[str]) -> str:
     )
     phrases = "".join(f'\n- "{p}"' for p in s["signature_phrases"]) or "\n- (none found)"
     words = ", ".join(s["top_words"]) or "(none)"
+    rules = render_prompt_rules([
+        PromptRule(
+            "Match this sentence-length distribution.",
+            "Flattening the rhythm changes the author's recognizable cadence.",
+        ),
+        PromptRule(
+            "Use the author's signature phrases only when natural; never force them.",
+            VOICE_RATIONALE,
+        ),
+        PromptRule(
+            "Prefer the author's characteristic vocabulary when it fits the meaning.",
+            VOICE_RATIONALE,
+        ),
+    ], bullet=True)
     return (
         "## Voice fingerprint (measured from the author's samples)\n\n"
-        f"- Sentence rhythm: average {s['avg_sentence_len']} words; {mix}. "
-        "Match this distribution — do not flatten to uniform mid-length sentences.\n"
-        f"- Signature phrases the author actually uses (reach for these when natural, "
-        f"never force them):{phrases}\n"
-        f"- Characteristic vocabulary: {words}.\n"
+        f"{rules}\n"
+        f"  Measured sentence rhythm: average {s['avg_sentence_len']} words; {mix}.\n"
+        f"  Signature phrases:{phrases}\n"
+        f"  Characteristic vocabulary: {words}.\n"
     )

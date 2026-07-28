@@ -1,6 +1,13 @@
 from datetime import UTC, datetime
+
 from blogforge.voice.guide import build_voice_guide
 from blogforge.voice.models import VoiceProfile, VoiceRules
+
+
+def assert_paired(prompt: str, instruction: str, rationale_fragment: str) -> None:
+    pair = f"Rule: {instruction}\nBecause: "
+    assert pair in prompt
+    assert rationale_fragment in prompt[prompt.index(pair):]
 
 
 def _profile(**kw) -> VoiceProfile:
@@ -26,6 +33,11 @@ def test_full_profile_renders_all_sections() -> None:
     assert "delve" in md
     assert "Phrases to avoid" in md and "Words to avoid" in md
     assert "writing samples" in md
+    assert_paired(
+        md,
+        "Do not copy the `Rule:` and `Because:` labels into article output.",
+        "instructions for the writing process",
+    )
 
 
 def test_empty_profile_does_not_crash() -> None:

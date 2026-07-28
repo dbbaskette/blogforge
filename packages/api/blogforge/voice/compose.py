@@ -11,6 +11,13 @@ from pathlib import Path
 
 import yaml
 
+from blogforge.prompt_rules import (
+    PRESERVATION_RATIONALE,
+    TTS_RATIONALE,
+    VOICE_RATIONALE,
+    PromptRule,
+    render_prompt_rules,
+)
 from blogforge.voice.ai_tells import (
     effective_phrases,
     effective_sentence_starters,
@@ -119,11 +126,21 @@ def _render_writing_craft(pack_root: Path) -> str:
 
 def _render_header(m: Manifest) -> str:
     tone = m.persona.tone or "authentic to the author's voice"
-    return (
+    intro = (
         f"ROLE: You are {m.persona.identity}. {m.persona.one_line}\n\n"
-        "TASK: Rewrite the input text to be 100% authentic to the style guide "
-        f"below. The output must be {tone}."
+        "TASK: Rewrite the input text according to the style guide below.\n\n"
     )
+    rules = [
+        PromptRule(
+            "Preserve the input text's meaning, structure, and ideas.",
+            PRESERVATION_RATIONALE,
+        ),
+        PromptRule(
+            f"Make the output {tone} and authentic to the author's style guide.",
+            VOICE_RATIONALE,
+        ),
+    ]
+    return intro + render_prompt_rules(rules)
 
 
 def _load_ai_patterns(pack_root: Path) -> str:
@@ -139,44 +156,113 @@ def _render_humanizer(m: Manifest, pack_root: Path) -> str:
 
     words = effective_words(m)
     if words:
-        lines.append("**Banished Vocabulary** (do NOT use):")
-        lines.append(", ".join(words))
+        lines.append("**Banished Vocabulary**")
+        local_words = m.banished.words
+        if local_words:
+            joined_local_words = ", ".join(f'"{word}"' for word in local_words)
+            lines.append(render_prompt_rules([
+                PromptRule(
+                    f"Do not use any item in this banished vocabulary list: {joined_local_words}.",
+                    "These terms conflict with the author's established voice and "
+                    "explicit preferences.",
+                )
+            ]))
+        local_word_keys = {word.lower() for word in local_words}
+        shared_words = [word for word in words if word.lower() not in local_word_keys]
+        if shared_words:
+            lines.append(render_prompt_rules([
+                PromptRule(
+                    "Do not use any item in the universal AI-tell vocabulary list.",
+                    "These terms are recurrent style defects that make prose sound "
+                    "machine-generated.",
+                )
+            ]))
+            lines.append(", ".join(shared_words))
+        if local_words:
+            lines.append(", ".join(local_words))
         lines.append("")
 
     phrases = effective_phrases(m)
     if phrases:
-        lines.append("**Banished Phrases** (strike on sight):")
-        for ph in phrases:
-            lines.append(f'- "{ph}"')
+        lines.append("**Banished Phrases**")
+        local_phrases = m.banished.phrases
+        if local_phrases:
+            joined_local_phrases = ", ".join(f'"{phrase}"' for phrase in local_phrases)
+            lines.append(render_prompt_rules([
+                PromptRule(
+                    f"Do not use any item in this banished phrase list: {joined_local_phrases}.",
+                    "These phrases conflict with the author's established voice and "
+                    "explicit preferences.",
+                )
+            ]))
+        shared_phrases = [
+            phrase for phrase in phrases if phrase.lower() not in {p.lower() for p in local_phrases}
+        ]
+        if shared_phrases:
+            lines.append(render_prompt_rules([
+                PromptRule(
+                    "Do not use any item in the universal AI-tell phrase list.",
+                    "These phrases are recurrent style defects that make prose sound "
+                    "machine-generated.",
+                )
+            ]))
+            lines.extend(f'- "{phrase}"' for phrase in shared_phrases)
+        if local_phrases:
+            lines.extend(f'- "{phrase}"' for phrase in local_phrases)
         lines.append("")
 
     if m.banished.permitted_exceptions:
-        lines.append("**Permitted exceptions** (on-brand overlaps with AI tells):")
+        lines.append("**Permitted exceptions**")
+        lines.append(render_prompt_rules([
+            PromptRule(
+                "Allow the following listed exceptions to the banished vocabulary "
+                "and phrase rules.",
+                "Each listed overlap is intentional and on-brand for the author's voice.",
+            )
+        ]))
         for ex in m.banished.permitted_exceptions:
             lines.append(f"- *{ex.term}*: {ex.reason}")
         lines.append("")
 
-    rules: list[str] = []
+    rules: list[PromptRule] = []
     if m.rules.no_em_dashes:
-        rules.append("No em dashes.")
+        rules.append(PromptRule("Do not use em dashes.", TTS_RATIONALE))
     if m.rules.no_ascii_double_hyphen_between_letters:
-        rules.append("No ASCII double-hyphen (`--`) between letters.")
+        rules.append(PromptRule(
+            "Do not use ASCII double-hyphens (`--`) between letters.",
+            TTS_RATIONALE,
+        ))
     starters = effective_sentence_starters(m)
     if starters:
         joined = ", ".join(f'"{s}"' for s in starters)
-        rules.append(f"No sentence starts with: {joined}.")
+        rules.append(PromptRule(
+            f"Do not start a sentence with any of these phrases: {joined}.",
+            "Repeated stock openers are a recognizable AI-writing tell.",
+        ))
     if rules:
         lines.append("**Rules:**")
-        for r in rules:
-            lines.append(f"- {r}")
+        lines.append(render_prompt_rules(rules))
         lines.append("")
 
     if m.pop_culture.allowed or m.pop_culture.banned:
         lines.append("**Pop culture:**")
         if m.pop_culture.allowed:
-            lines.append(f"- Allowed franchises: {', '.join(m.pop_culture.allowed)}")
+            lines.append(render_prompt_rules([
+                PromptRule(
+                    "Use pop-culture references only from this allowed franchise list.",
+                    "These references are part of the author's established voice.",
+                )
+            ], bullet=True))
+            lines.append(f"  Allowed franchises: {', '.join(m.pop_culture.allowed)}")
         if m.pop_culture.banned:
-            lines.append(f"- Banned franchises: {', '.join(m.pop_culture.banned)}")
+            lines.append(render_prompt_rules([
+                PromptRule(
+                    "Do not use pop-culture references from this banned franchise list.",
+                    "These references conflict with the author's established voice "
+                    "and preferences.",
+                )
+            ], bullet=True))
+            lines.append(f"  Banned franchises: {', '.join(m.pop_culture.banned)}")
         lines.append("")
 
     lines.append("**Avoid these AI sentence patterns:**\n")
@@ -190,7 +276,13 @@ def _render_format(pack_root: Path, m: Manifest, name: str) -> str:
     if fmt is None:
         raise ComposeError(f"format '{name}' not found in pack manifest")
     body = (pack_root / fmt.file).read_text(encoding="utf-8")
-    return f"---\n\n## Additional format-specific instructions\n\n{body}"
+    rule = render_prompt_rules([
+        PromptRule(
+            "Follow the format-specific instructions below.",
+            "The selected publishing format has surface-specific reader and layout requirements.",
+        )
+    ])
+    return f"---\n\n## Additional format-specific instructions\n\n{rule}\n\n{body}"
 
 
 def _render_samples(pack_root: Path, m: Manifest, ids: list[str]) -> str:

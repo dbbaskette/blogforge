@@ -33,6 +33,8 @@ def test_render_fingerprint_md_summarizes_rhythm_and_phrases():
     assert "## Voice fingerprint" in md
     assert "short" in md.lower()
     assert "here's the thing" in md.lower()
+    assert "Rule: Match this sentence-length distribution" in md
+    assert "Because: Flattening the rhythm changes the author's recognizable cadence" in md
 
 
 def test_render_fingerprint_md_handles_empty():

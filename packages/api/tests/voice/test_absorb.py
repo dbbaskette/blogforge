@@ -1,10 +1,24 @@
 from pathlib import Path
 
+
+def assert_paired(prompt: str, instruction: str, rationale_fragment: str) -> None:
+    pair = f"Rule: {instruction}\nBecause: "
+    assert pair in prompt
+    assert rationale_fragment in prompt[prompt.index(pair):]
+
 def test_public_api_imports() -> None:
     from blogforge.voice import (  # noqa: F401
-        ComposeError, LintHit, Manifest, PackStore, Violation,
-        compose_prompt, detect_ai_patterns, detect_positive_hits,
-        lint, lint_to_hits, validate_pack,
+        ComposeError,
+        LintHit,
+        Manifest,
+        PackStore,
+        Violation,
+        compose_prompt,
+        detect_ai_patterns,
+        detect_positive_hits,
+        lint,
+        lint_to_hits,
+        validate_pack,
     )
 
 def test_ai_tells_resource_loads() -> None:
@@ -25,12 +39,24 @@ def test_compose_prompt_smoke(tmp_path: Path) -> None:
         "  author: Tester\n"
         "persona:\n"
         "  identity: A plain writer.\n"
-        "  one_line: Writes plainly and directly.\n",
+        "  one_line: Writes plainly and directly.\n"
+        "banished:\n"
+        "  words: [delve]\n",
         encoding="utf-8",
     )
     (pack / "style-guide.md").write_text("Write plainly. Avoid jargon.\n", encoding="utf-8")
     out = compose_prompt(pack_root=pack, samples=[], draft="Hello world")
     assert "Write plainly" in out and "Hello world" in out
+    assert_paired(
+        out,
+        "Do not use em dashes.",
+        "will be read by a text-to-speech engine",
+    )
+    assert_paired(
+        out,
+        'Do not use any item in this banished vocabulary list: "delve".',
+        "author's established voice",
+    )
 
 def test_compose_prompt_includes_fingerprint_single_voice_block(tmp_path: Path) -> None:
     from blogforge.voice import compose_prompt
@@ -76,6 +102,7 @@ def test_compose_prompt_includes_fingerprint_single_voice_block(tmp_path: Path) 
 
 def test_validate_template_pack() -> None:
     from importlib import resources
+
     from blogforge.voice import validate_pack
     tmpl = resources.files("blogforge.voice").joinpath("bundled_packs/_template")
     res = validate_pack(Path(str(tmpl)))
