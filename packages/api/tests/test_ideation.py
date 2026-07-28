@@ -91,6 +91,14 @@ def test_build_prompt_includes_prior_assistant_turns():
 def test_ideation_system_block_mentions_json():
     assert "JSON" in IDEATION_SYSTEM_BLOCK
     assert "OutlineProposal" in IDEATION_SYSTEM_BLOCK
+    assert (
+        "Rule: Give every section a distinct job that depends on the sections before it.\n"
+        "Because: A continuous argument needs progression instead of standalone essays."
+    ) in IDEATION_SYSTEM_BLOCK
+    assert (
+        "Rule: Return the outline in a fenced ```json block matching the OutlineProposal "
+        "schema.\nBecause: The client parses that schema"
+    ) in IDEATION_SYSTEM_BLOCK
 
 
 # ── JSON block parser ───────────────────────────────────────────────

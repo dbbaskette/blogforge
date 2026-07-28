@@ -12,7 +12,7 @@ class _CaptureProvider:
     async def stream(self, *, model: str, prompt: str):  # type: ignore[no-untyped-def]
         self.prompt = prompt
         return
-        yield  # noqa: unreachable — marks this an async generator
+        yield  # Marks this as an async generator.
 
 
 def _draft() -> Draft:
@@ -41,7 +41,19 @@ async def _capture(mode: str) -> str:
 async def test_interview_mode_uses_interview_block() -> None:
     prompt = await _capture("interview")
     assert "interviewing the author" in prompt
-    assert "EXACTLY ONE focused question" in prompt
+    assert "Ask exactly one focused question" in prompt
+    assert (
+        "Rule: Ask exactly one focused question per reply.\nBecause: One concrete question "
+        "keeps the interview easy to answer"
+    ) in prompt
+    assert (
+        "Rule: Do not write the piece or propose an outline while information is still missing.\n"
+        "Because: Premature drafting locks in assumptions"
+    ) in prompt
+    assert (
+        "Rule: Emit no JSON until announcing that enough information has been gathered.\n"
+        "Because: The client treats JSON as the transition"
+    ) in prompt
 
 
 async def test_ideate_mode_does_not_use_interview_block() -> None:

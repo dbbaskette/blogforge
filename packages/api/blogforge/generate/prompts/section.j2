@@ -1,22 +1,44 @@
-You are writing section {{ position }} of a SINGLE, continuous blog post titled "{{ title }}". The outline is a content guide, not a list of standalone essays — this section is one movement in one coherent argument and must read as part of the same piece, not a self-contained article.
+You are writing section {{ position }} of a SINGLE, continuous blog post titled "{{ title }}".
 
-Full outline (current section marked **bold**):
+Full outline (context; current section marked **bold**):
 {{ outline_md }}
 {% if story_so_far %}
-What has already been written (earlier sections of THIS post). Continue from here — do NOT re-introduce the topic, restate points already made, or reuse their phrasing, metaphors, or examples:
+Earlier sections that have already been written (context):
 {{ story_so_far }}
 {% endif %}{% if whats_next %}
-Sections that come AFTER this one — do NOT cover this ground; leave it for them:
+Later-section briefs (context):
 {{ whats_next }}
 {% endif %}
-This section's title: {{ section_title }}
-This section's brief: {{ section_brief }}
-Target length: ~{{ target_section_words }} words.
-
-Write the section as flowing markdown prose. Do NOT include the section title as a heading; the renderer adds it.
-{% if is_first %}This is the OPENING section — establish the conflict/question/surprise. The post already opens with a hook ("{{ opening_hook }}"); do NOT repeat or paraphrase it — pick up where it leaves off.
-{% elif is_last %}This is the CLOSING section — land the argument; the brief above tells you the closing beat. Build on what came before instead of summarizing it mechanically.
-{% else %}Pick up the thread from the previous section and hand off toward the next. Open mid-thought with a fresh transition — do NOT start the way earlier sections start.
+Current section title (context): {{ section_title }}
+Current section brief (context): {{ section_brief }}
+Target length (context): ~{{ target_section_words }} words.
+{% if is_first %}
+Opening-hook context (already shown to the reader): {{ opening_hook }}
 {% endif %}
-Continuity rules: this is ONE article written straight through. Don't recycle stock phrases, metaphors, or examples that earlier sections already used — if an image or analogy appeared above, reach for a different one. Vary how each section opens. Assume the reader has just read everything above; write the next part, not a restart.
-Use the author's voice. Banished words/phrases never appear.
+
+Rule: Write flowing Markdown prose without including the section title as a heading.
+Because: The renderer adds the heading around this independently generated section.
+
+Rule: Treat this section as one movement in a continuous argument, not a self-contained article.
+Because: The reader is moving through one post and should not feel the argument restart.
+
+Rule: Do not re-introduce the topic, restate earlier points, or reuse earlier phrasing, metaphors, or examples.
+Because: The reader has already read the earlier sections, so repetition breaks continuity.
+
+Rule: Do not cover the ground reserved for later sections.
+Because: Future sections need their own distinct contribution to the argument.
+
+Rule: Vary how this section opens and use a natural handoff from the previous section toward the next.
+Because: Fresh transitions make separate generation calls read like one continuous draft.
+{% if is_first %}
+Rule: Establish the conflict, question, or surprise without repeating or paraphrasing the opening hook.
+Because: The hook has already opened the post, and this section must pick up where it leaves off.
+{% elif is_last %}
+Rule: Land the argument using the closing beat in the brief instead of mechanically summarizing earlier sections.
+Because: A closing should resolve the throughline rather than repeat the article.
+{% else %}
+Rule: Pick up the thread from the previous section and hand off toward the next one.
+Because: Middle sections must advance the argument between the surrounding movements.
+{% endif %}
+Rule: Use the author's voice and never use banished words or phrases.
+Because: This section must sound like part of the same authored post.

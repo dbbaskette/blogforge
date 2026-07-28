@@ -69,7 +69,10 @@ def _draft() -> Draft:
 
 
 def test_split_maps_headings_to_sections_in_order_without_heading_lines() -> None:
-    doc = "## The Betrayal\nHiDock shipped your data.\n\n## The Concept\nKeep it local.\n\n## The Payoff\nYou own it."
+    doc = (
+        "## The Betrayal\nHiDock shipped your data.\n\n## The Concept\nKeep it local.\n\n"
+        "## The Payoff\nYou own it."
+    )
     out = split_document(doc, _sections())
     assert out["s1"] == "HiDock shipped your data."
     assert out["s2"] == "Keep it local."
@@ -79,7 +82,10 @@ def test_split_maps_headings_to_sections_in_order_without_heading_lines() -> Non
 
 
 def test_split_folds_preamble_into_first_section() -> None:
-    doc = "A stray lead paragraph.\n\n## The Betrayal\nBody one.\n\n## The Concept\nBody two.\n\n## The Payoff\nBody three."
+    doc = (
+        "A stray lead paragraph.\n\n## The Betrayal\nBody one.\n\n"
+        "## The Concept\nBody two.\n\n## The Payoff\nBody three."
+    )
     out = split_document(doc, _sections())
     assert out["s1"].startswith("A stray lead paragraph.")
     assert "Body one." in out["s1"]
@@ -116,8 +122,20 @@ def test_render_document_prompt_lists_sections_and_forbids_repetition() -> None:
     assert "## The Betrayal" in rendered
     assert "## The Payoff" in rendered
     assert "COMPLETE blog post" in rendered
-    assert "NEVER restate" in rendered
+    assert "Never restate" in rendered
     assert "Your gadget betrayed you." in rendered  # hook passed as do-not-repeat context
+    assert (
+        "Rule: Never restate a point, example, metaphor, or stock phrase from an "
+        "earlier section.\nBecause: These sections form one continuous article"
+    ) in rendered
+    assert (
+        "Rule: Use each supplied section title verbatim as an `##` heading in the "
+        "given order.\nBecause: BlogForge maps the generated document back"
+    ) in rendered
+    assert (
+        "Rule: Return only the post body as Markdown.\nBecause: Downstream code "
+        "splits the response into editable sections"
+    ) in rendered
 
 
 class _CompleteRecorder:

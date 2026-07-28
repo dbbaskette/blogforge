@@ -36,6 +36,10 @@ def test_directive_resolves_by_slug() -> None:
     directive = builtin_format_directive("product-release")
     assert directive is not None
     assert "PRODUCT RELEASE" in directive
+    assert (
+        "Rule: Open with what the product or feature is and name the single headline "
+        "change in the first lines.\n  Because: Readers need immediate context" in directive
+    )
 
 
 def test_directive_resolves_by_label_case_insensitively() -> None:
@@ -55,6 +59,10 @@ def test_section_note_wraps_directive_as_context() -> None:
     assert "do not reproduce the whole structure" in note
     # Still carries the underlying directive so section conventions apply.
     assert "HOW-TO" in note
+    assert (
+        "Rule: Write only the current section; do not reproduce the whole "
+        "structure.\nBecause: BlogForge stores and regenerates sections independently"
+    ) in note
 
 
 def test_section_note_none_for_non_builtin() -> None:

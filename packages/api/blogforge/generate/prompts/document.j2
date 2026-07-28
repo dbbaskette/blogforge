@@ -1,20 +1,38 @@
-You are writing a COMPLETE blog post in a single pass, in the author's voice (described in the SYSTEM context). Write the whole piece end to end as ONE coherent, flowing argument — not a stack of independent sections.
+You are writing a COMPLETE blog post in a single pass, in the author's voice (described in the SYSTEM context).
 
-Title: {{ title }}
+Title (context): {{ title }}
 {% if opening_hook %}
-The post already opens with this hook (shown to the reader before your text). Do NOT repeat or paraphrase it — continue from where it leaves off:
+Opening hook already shown to the reader (context):
 {{ opening_hook }}
 {% endif %}
-Follow this outline exactly, in order. Each item is one section: use its title verbatim as a markdown H2 (`## `), then write the prose beneath it, covering the brief.
-
+Supplied outline (context; each item is one section):
 {% for s in sections %}## {{ s.title }}
 {% if s.brief %}— {{ s.brief }}{% endif %}
 {% endfor %}
 
-Rules — this is the whole article, written straight through:
-- Write it as one continuous read. Each section advances the argument and builds on what came before. NEVER restate a point an earlier section already made; never reuse the same example, metaphor, or stock phrase twice.
-- Use each section's title verbatim as an `## ` heading, in the given order. Do NOT add, drop, merge, rename, or reorder sections. Do NOT write an H1 title. Do NOT repeat the opening hook.
-- Open each section differently and use natural transitions between them, so the seams disappear and it reads as a single essay.
-- Aim for ~{{ target_words }} words total, distributed sensibly — denser where the argument needs it, not padded to hit a number.
+Rule: Write the post as one continuous argument in which every section advances what came before.
+Because: Independent mini-essays create visible seams and a repetitive reading experience.
 
-Output ONLY the post body in markdown: the `## ` section headings and their prose, nothing else. Use the author's voice; banished words/phrases never appear.
+Rule: Never restate a point, example, metaphor, or stock phrase from an earlier section.
+Because: These sections form one continuous article, so repetition makes the argument restart.
+
+Rule: Use each supplied section title verbatim as an `##` heading in the given order.
+Because: BlogForge maps the generated document back into section records by heading order.
+
+Rule: Do not add, drop, merge, rename, or reorder supplied sections, and do not write an H1 title.
+Because: The document splitter relies on the approved section structure and H2 headings.
+
+Rule: Do not repeat or paraphrase the opening hook.
+Because: The hook is already visible before this response and repeating it stalls the opening.
+
+Rule: Open each section differently and use natural transitions between them.
+Because: Varied entrances and handoffs make the sections read as one essay.
+
+Rule: Aim for ~{{ target_words }} words total, distributing detail where the argument needs it rather than padding.
+Because: The target is a planning budget, not a reason to make every section equally long.
+
+Rule: Return only the post body as Markdown.
+Because: Downstream code splits the response into editable sections and process commentary would become article text.
+
+Rule: Use the author's voice and never use banished words or phrases.
+Because: The article must remain recognizably authored rather than sounding templated.

@@ -73,7 +73,7 @@ def test_render_section_prompt_marks_current_first_section() -> None:
     draft = _draft()
     prompt = _render_section_prompt(draft, draft.sections[0])
     assert "**First**" in prompt
-    assert "OPENING section" in prompt
+    assert "Establish the conflict" in prompt
     assert "Hook sentence." in prompt
 
 
@@ -81,7 +81,7 @@ def test_render_section_prompt_marks_last_section() -> None:
     draft = _draft()
     prompt = _render_section_prompt(draft, draft.sections[2])
     assert "**Third**" in prompt
-    assert "CLOSING section" in prompt
+    assert "Land the argument" in prompt
 
 
 def test_render_section_prompt_middle_section() -> None:
@@ -105,6 +105,14 @@ def test_section_prompt_threads_prior_prose_for_continuity() -> None:
     assert "Third" in prompt
     # And the single-coherent-piece framing is present.
     assert "SINGLE, continuous blog post" in prompt
+    assert (
+        "Rule: Do not cover the ground reserved for later sections.\nBecause: Future "
+        "sections need their own distinct contribution"
+    ) in prompt
+    assert (
+        "Rule: Do not re-introduce the topic, restate earlier points, or reuse earlier "
+        "phrasing, metaphors, or examples.\nBecause: The reader has already read"
+    ) in prompt
 
 
 def test_section_prompt_omits_unwritten_prior_sections() -> None:
@@ -118,7 +126,7 @@ def test_section_prompt_omits_unwritten_prior_sections() -> None:
 def test_first_section_warned_off_repeating_hook() -> None:
     draft = _draft()
     prompt = _render_section_prompt(draft, draft.sections[0])
-    assert "do NOT repeat or paraphrase it" in prompt
+    assert "without repeating or paraphrasing the opening hook" in prompt
 
 
 @pytest.mark.asyncio
@@ -192,6 +200,10 @@ async def test_notes_on_existing_section_do_targeted_edit(tmp_path: Path) -> Non
     assert "SURGICAL" in rec.prompt
     assert "VERBATIM" in rec.prompt
     assert "add a concrete number to the second paragraph" in rec.prompt
+    assert (
+        "Rule: Reproduce every part the note does not require changing VERBATIM.\n"
+        "Because: BlogForge needs a bounded edit that preserves the approved"
+    ) in rec.prompt
     # …and it must NOT fall back to the write-from-scratch directive.
     assert "REVISION DIRECTIVE" not in rec.prompt
 

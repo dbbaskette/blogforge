@@ -48,13 +48,25 @@ def test_outline_prompt_demands_a_nonoverlapping_progression() -> None:
     assert "ONE continuous argument" in rendered
     assert "PROGRESSION" in rendered
     assert "NO two sections" in rendered
-    assert "3–5 sections" in rendered  # adaptive count for 1500 words
+    assert "3\u20135 sections" in rendered  # adaptive count for 1500 words
+    assert (
+        "Rule: Give every section a distinct job in a clear progression that depends "
+        "on the sections before it.\nBecause: A continuous argument needs each movement"
+    ) in rendered
+    assert (
+        "Rule: State what each `brief` uniquely contributes, how it advances the argument, "
+        "and, where useful, what belongs later.\nBecause: Clear boundaries prevent"
+    ) in rendered
 
 
 def test_ideation_block_enforces_single_argument() -> None:
     assert "ONE continuous argument" in IDEATION_SYSTEM_BLOCK
     assert "NO two sections" in IDEATION_SYSTEM_BLOCK
     assert "5-9" not in IDEATION_SYSTEM_BLOCK  # the old over-sectioning is gone
+    assert (
+        "Rule: Give every section a distinct job that depends on the sections before it.\n"
+        "Because: A continuous argument needs progression instead of standalone essays."
+    ) in IDEATION_SYSTEM_BLOCK
 
 
 @pytest.mark.asyncio
