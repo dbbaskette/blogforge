@@ -23,11 +23,6 @@ export interface CheckupRow {
 
 export interface CheckupSummary {
   headline: string;
-  /** 0-100 blended "reads human" score (anti-robot + human-signal). */
-  humanity: number;
-  /** The two sub-scores behind `humanity`, so the meter can show the split. */
-  antiRobot: number;
-  humanSignal: number | null;
   rows: CheckupRow[];
   totalOpen: number;
 }
@@ -36,13 +31,6 @@ export interface LintResult {
   violations: LintFinding[];
   hits: LintFinding[];
   repetitions: LintFinding[];
-}
-
-/** Mirrors LintPanel's humanity score so Checkup and the panel agree. */
-export function humanityScore(openCount: number, hitCount: number): number {
-  const base = 100 - openCount * 6;
-  const bonus = openCount === 0 ? 0 : Math.min(hitCount * 2, 10);
-  return Math.max(0, Math.min(100, base + bonus));
 }
 
 function geoSeverity(grade?: string): Severity {
@@ -60,29 +48,11 @@ function countShape(shape: SuggestResult): number {
   return Object.values(shape).reduce((n, arr) => n + (arr?.length ?? 0), 0);
 }
 
-/** coral (low) → amber (mid) → leaf/green (high); mirrors LintPanel/HumannessPulse's scoreColor. */
-function humanizeSeverity(score?: number): Severity {
-  if (score === undefined) return "warn";
-  if (score >= 70) return "good";
-  if (score >= 45) return "warn";
-  return "bad";
-}
-
 function countHumanizeFindings(humanize: HumanizeReport): number {
   return humanize.lenses.reduce((n, l) => n + l.findings.length, 0);
 }
 
 const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
-
-const W_ROBOT = 0.5;
-const W_HUMAN = 0.5;
-
-/** One "Reads X% human" number from the anti-robot lint sub-score and the
- * (optional, until Humanize has run) human-signal sub-score. */
-export function blendHumanness(antiRobot: number, humanSignal: number | null): number {
-  if (humanSignal == null) return Math.max(0, Math.min(100, Math.round(antiRobot)));
-  return Math.max(0, Math.min(100, Math.round(W_ROBOT * antiRobot + W_HUMAN * humanSignal)));
-}
 
 /**
  * Fold the three raw pass results into a prioritized summary. Mechanical
@@ -96,14 +66,13 @@ export function summarizeCheckup(
   humanize: HumanizeReport | null,
 ): CheckupSummary {
   const reviewOpen = lint ? lint.violations.length + lint.repetitions.length : 0;
-  const hits = lint ? lint.hits.length : 0;
-  const antiRobot = humanityScore(reviewOpen, hits);
-  const humanSignal = humanize ? humanize.score : null;
-  const humanity = blendHumanness(antiRobot, humanSignal);
 
   const geoFixes = geo ? countGeoFixes(geo) : 0;
   const shapeCount = shape ? countShape(shape) : 0;
   const humanizeCount = humanize ? countHumanizeFindings(humanize) : 0;
+  const humanizeLenses = humanize
+    ? `${humanize.lenses.length} ${humanize.lenses.length === 1 ? "lens" : "lenses"}`
+    : "";
 
   const rows: CheckupRow[] = [
     {
@@ -131,12 +100,14 @@ export function summarizeCheckup(
     },
     {
       key: "humanize",
-      label: "Humanness",
+      label: "Humanization",
       count: humanizeCount,
       detail: humanize
-        ? `${humanize.score}% human signal · ${plural(humanizeCount, "finding")}`
-        : "Not scored yet",
-      severity: humanizeSeverity(humanize?.score),
+        ? humanizeCount === 0
+          ? `No suggestions across ${humanizeLenses}`
+          : `${plural(humanizeCount, "suggestion")} across ${humanizeLenses}`
+        : "Humanize review unavailable",
+      severity: humanize ? (humanizeCount === 0 ? "good" : "warn") : "warn",
     },
   ];
 
@@ -152,5 +123,5 @@ export function summarizeCheckup(
     headline = "Almost ready — a few tweaks left";
   }
 
-  return { headline, humanity, antiRobot, humanSignal, rows, totalOpen };
+  return { headline, rows, totalOpen };
 }
