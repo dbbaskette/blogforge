@@ -23,6 +23,32 @@ from blogforge.generate.geo import (
     score_structural,
 )
 
+EXPECTED_GEO_PAIRS = (
+    (
+        "Score the draft without rewriting it.",
+        "The analysis panel needs findings against the existing draft.",
+    ),
+    (
+        "Never invent facts, statistics, brands, sources, data, or quotations.",
+        "Unsupported material damages factual trust",
+    ),
+    (
+        "Use verbatim draft text for passage-level targets.",
+        "The client locates findings by exact text",
+    ),
+    (
+        "Return JSON matching the supplied semantic schema.",
+        "Downstream code parses this response",
+    ),
+)
+
+
+def _assert_rule_pair(prompt: str, instruction: str, rationale: str) -> None:
+    rule_at = prompt.index(f"Rule: {instruction}")
+    because_at = prompt.index(f"Because: {rationale}", rule_at)
+    next_rule_at = prompt.find("Rule:", rule_at + 1)
+    assert next_rule_at == -1 or because_at < next_rule_at
+
 
 def _lever_dict(key: str, score: int) -> dict:  # type: ignore[type-arg]
     return {
@@ -788,6 +814,33 @@ async def test_semantic_prompt_includes_attached_sources(tmp_path) -> None:  # t
     assert "ATTACHED SOURCES" in captured["prompt"]
     assert "Tanzu 10.4 release notes" in captured["prompt"]
     assert "https://docs.example/tanzu" in captured["prompt"]
+
+
+async def test_semantic_prompt_renders_rule_rationale_pairs(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from blogforge.generate.geo import _run_semantic
+
+    captured: dict[str, str] = {}
+
+    class FakeProvider:
+        name = "fake"
+
+        async def complete(self, **kw):  # type: ignore[no-untyped-def]
+            from blogforge.llm.base import LLMResponse
+
+            captured["prompt"] = kw["prompt"]
+            return LLMResponse(
+                text="{}", input_tokens=1, output_tokens=1, model="m", finish_reason="stop"
+            )
+
+    await _run_semantic(
+        _draft([_sec("Intro", "BlogForge turns source notes into a draft.")]),
+        _fake_pack(tmp_path),
+        FakeProvider(),
+        model="m",
+    )
+
+    for instruction, rationale in EXPECTED_GEO_PAIRS:
+        _assert_rule_pair(captured["prompt"], instruction, rationale)
 
 
 def test_parse_semantic_citations_carries_suggestion_and_matched_url() -> None:
