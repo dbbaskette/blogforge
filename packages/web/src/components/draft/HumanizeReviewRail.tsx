@@ -53,7 +53,7 @@ export function HumanizeReviewRail({
       groupLabelFor={(key) => report.lenses.find((l) => l.key === key)?.label ?? key}
       emptyState={
         <p className="py-8 text-center text-sm text-muted">
-          No robotic tells found — this already reads human.
+          No Humanize suggestions found for these lenses.
         </p>
       }
     />

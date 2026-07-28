@@ -13,6 +13,13 @@ bundle and the API in lockstep). Pre-`1.0.0`, the API is still evolving.
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-07-28
+
+### Changed
+- Replaced the misleading blended “reads human” percentage with a transparent
+  Humanization Check that reports voice-rule findings and Humanize suggestions
+  separately, including honest pending and unavailable states.
+
 ## [0.8.2] — 2026-07-28
 
 ### Changed

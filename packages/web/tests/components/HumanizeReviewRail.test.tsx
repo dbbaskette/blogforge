@@ -78,6 +78,6 @@ describe("HumanizeReviewRail", () => {
         onSectionSave={vi.fn()}
       />,
     );
-    expect(screen.getByText(/reads human/i)).toBeInTheDocument();
+    expect(screen.getByText("No Humanize suggestions found for these lenses.")).toBeInTheDocument();
   });
 });

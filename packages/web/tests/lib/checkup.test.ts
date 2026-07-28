@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { GeoReport } from "../../src/api/geo";
 import type { HumanizeReport } from "../../src/api/humanize";
 import type { SuggestResult } from "../../src/api/suggest";
-import { type LintResult, blendHumanness, humanityScore, summarizeCheckup } from "../../src/lib/checkup";
+import {
+  type CheckupSummary,
+  type LintResult,
+  isCurrentCheckupSummary,
+  summarizeCheckup,
+} from "../../src/lib/checkup";
 
 const lint = (violations: number, repetitions = 0, hits = 0): LintResult => ({
   // biome-ignore lint/suspicious/noExplicitAny: minimal finding stubs
@@ -35,36 +40,15 @@ const shape = (n: number): SuggestResult => ({
   reword: Array.from({ length: n }, () => ({}) as any),
 });
 
-const humanize = (score: number, findingCounts: number[]): HumanizeReport => ({
+const humanize = (findingCounts: number[]): HumanizeReport => ({
   intensity: "medium",
-  score,
+  score: 0,
   lenses: findingCounts.map((n, i) => ({
     key: `lens${i}`,
     label: `Lens ${i}`,
     // biome-ignore lint/suspicious/noExplicitAny: minimal finding stubs
     findings: Array.from({ length: n }, () => ({}) as any),
   })),
-});
-
-describe("humanityScore", () => {
-  it("drops with open issues and floors at 0", () => {
-    expect(humanityScore(0, 0)).toBe(100);
-    expect(humanityScore(3, 0)).toBe(82);
-    expect(humanityScore(50, 0)).toBe(0);
-  });
-});
-
-describe("blendHumanness", () => {
-  it("returns the anti-robot score when Humanize has not run", () => {
-    expect(blendHumanness(80, null)).toBe(80);
-  });
-  it("averages the two sub-scores 50/50 when both present", () => {
-    expect(blendHumanness(80, 60)).toBe(70);
-  });
-  it("clamps to 0..100", () => {
-    expect(blendHumanness(0, 0)).toBe(0);
-    expect(blendHumanness(100, 100)).toBe(100);
-  });
 });
 
 describe("summarizeCheckup", () => {
@@ -87,7 +71,9 @@ describe("summarizeCheckup", () => {
     const s = summarizeCheckup(lint(0), geo("A", 0), shape(0), null);
     expect(s.headline).toBe("Looks clean — ready to publish");
     expect(s.totalOpen).toBe(0);
-    expect(s.humanity).toBe(100);
+    expect(s).not.toHaveProperty("humanity");
+    expect(s).not.toHaveProperty("antiRobot");
+    expect(s).not.toHaveProperty("humanSignal");
   });
 
   it("sums totals, singularizes counts, and reads 'almost ready' when clean but with tweaks", () => {
@@ -110,14 +96,69 @@ describe("summarizeCheckup", () => {
     expect(s.rows[1].severity).toBe("warn");
   });
 
-  it("adds a humanize row and blends the humanity score when a Humanize report is present", () => {
-    const s = summarizeCheckup(lint(0), null, null, humanize(60, [2, 1]));
+  it("reports exact Humanize suggestion and lens counts", () => {
+    const s = summarizeCheckup(lint(0), null, null, humanize([2, 1]));
     const row = s.rows[3];
     expect(row.key).toBe("humanize");
-    expect(row.label).toBe("Humanness");
+    expect(row.label).toBe("Humanization");
     expect(row.count).toBe(3);
-    expect(row.severity).toBe("warn"); // score 60 -> mid band
-    // humanityScore(0, 0) is 100 (clean lint); blended 50/50 with a 60 human-signal -> 80.
-    expect(s.humanity).toBe(80);
+    expect(row.detail).toBe("3 suggestions across 2 lenses");
+    expect(row.severity).toBe("warn");
+  });
+
+  it("reports a clean completed Humanize review", () => {
+    const s = summarizeCheckup(lint(0), null, null, humanize([0, 0, 0]));
+    const row = s.rows[3];
+    expect(row.detail).toBe("No suggestions across 3 lenses");
+    expect(row.severity).toBe("good");
+  });
+
+  it("reports an unavailable Humanize review instead of a partial score", () => {
+    const s = summarizeCheckup(lint(0), null, null, null);
+    const row = s.rows[3];
+    expect(row.label).toBe("Humanization");
+    expect(row.detail).toBe("Humanize review unavailable");
+    expect(row.severity).toBe("warn");
+  });
+});
+
+describe("isCurrentCheckupSummary", () => {
+  it("rejects cached summaries that still contain the retired score shape", () => {
+    const legacy = {
+      headline: "Looks clean",
+      humanity: 80,
+      antiRobot: 100,
+      humanSignal: 60,
+      rows: [
+        {
+          key: "humanize",
+          label: "Humanness",
+          count: 2,
+          detail: "60% human signal · 2 findings",
+          severity: "warn",
+        },
+      ],
+      totalOpen: 0,
+    };
+
+    expect(isCurrentCheckupSummary(legacy)).toBe(false);
+  });
+
+  it("accepts the count-based summary shape", () => {
+    const current: CheckupSummary = {
+      headline: "Looks clean",
+      rows: [
+        {
+          key: "humanize",
+          label: "Humanization",
+          count: 2,
+          detail: "2 suggestions across 3 lenses",
+          severity: "warn",
+        },
+      ],
+      totalOpen: 0,
+    };
+
+    expect(isCurrentCheckupSummary(current)).toBe(true);
   });
 });
