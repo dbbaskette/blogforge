@@ -124,6 +124,16 @@ def test_draft_text_excludes_opening_hook():
     assert "The Setup" in text  # body sections are still included
 
 
+def test_humanize_prompt_preserves_facts_with_a_reason():
+    prompt = humanize._build_directive(("flow", "soul"))
+    assert "Rule: Preserve every number, URL, and quoted span." in prompt
+    assert "Because: Humanization must not alter the article's factual record" in prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "suggestions."
+    ) in prompt
+
+
 def test_parse_matches_section_with_emphasized_title():
     # Stored titles can carry markdown emphasis (e.g. a pasted "## **The Setup**").
     # The model echoes the clean title "The Setup"; both sides must normalize the

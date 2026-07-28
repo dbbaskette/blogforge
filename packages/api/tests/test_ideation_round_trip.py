@@ -137,6 +137,7 @@ async def test_post_message_returns_job_id_and_persists_messages(signed_admin_cl
     assert history[1]["role"] == "assistant"
     assert history[1]["proposed_outline"] is not None
     assert history[1]["proposed_outline"]["opening_hook"] == "h"
+    assert history[1]["proposed_outline"]["sections"][0]["brief"] == "b"
 
 
 async def test_accept_copies_outline_and_advances_stage(signed_admin_client):

@@ -1,23 +1,43 @@
 ## flow — Flow & Rhythm
-- Real thinking is not metronomic. Some thoughts land in three words; others unspool across a long clause before they resolve. Break any run of same-length sentences.
-- Read each sentence as if said aloud. Where a real speaker would pause or change pace, the writing should too. A sentence with nowhere to breathe reads like a document, not a person.
-- Vary how paragraphs open. Do not march.
-- Also flag staccato paired-list runs — consecutive short "X and Y." sentences (or fragments starting "As well as") that chop a list into uniform pieces.
+- Rule: Break any run of same-length sentences. Let some thoughts land in three words and let others unspool across a longer clause.
+  Because: Real thinking is not metronomic, and varied rhythm helps preserve the author's voice.
+- Rule: Read each sentence as if said aloud. Where a real speaker would pause or change pace, the writing should too.
+  Because: A sentence with nowhere to breathe reads like a document rather than a person.
+- Rule: Vary how paragraphs open; do not march through the same opening shape.
+  Because: Repeated openings flatten the author's natural rhythm.
+- Rule: Flag staccato paired-list runs, including consecutive short "X and Y." sentences or fragments starting "As well as."
+  Because: Uniform paired fragments make a list sound mechanical instead of preserving natural flow.
 
 ## voice — Voice & POV
-- The writer has a stance. Say what they actually think, not a balanced survey of what could be thought.
-- Let a small qualification or contradiction stand ("I was mostly wrong about that"). Real opinions have edges.
-- Neutral-observer hedging ("it can be argued", "some might say") is a tell. Cut it or commit.
+- Rule: State what the writer actually thinks instead of presenting a balanced survey of what could be thought.
+  Because: The writer's stance is part of the author's recognizable voice.
+- Rule: Let a small qualification or contradiction stand, such as "I was mostly wrong about that."
+  Because: Real opinions have edges, and smoothing them away damages the author's voice.
+- Rule: Cut neutral-observer hedging such as "it can be argued" or "some might say," or commit to a clear claim.
+  Because: Generic hedging obscures the writer's actual stance.
 
 ## imperfections — Imperfections
-- Lived-in writing has texture: a strong aside, a beat of hesitation, occasionally an incomplete sentence where the rhythm calls for one.
-- Do not smooth every edge. One deliberate rough spot beats uniform polish.
-- Only the kind of imperfection someone who actually did the thing would leave in. Never add filler or errors for their own sake.
+- Rule: Keep lived-in texture, including a strong aside, a beat of hesitation, or an occasional incomplete sentence where the rhythm calls for one.
+  Because: Carefully bounded imperfections preserve the human character of the author's voice.
+- Rule: Do not smooth every edge; one deliberate rough spot can be better than uniform polish.
+  Because: Over-polishing can erase the voice established in the original prose.
+- Rule: Keep only the kind of imperfection someone who actually did the thing would leave in; never add filler or errors for their own sake.
+  Because: Fabricated imperfections damage the meaning and credibility of the approved article.
 
 ## soul — De-robot / Soul
-- Find the sentences that sound most manufactured — too precise, too constructed, too eager to please — and rewrite them as if telling a friend who already trusts you.
-- Over-polish reads as untrustworthy. If a line sounds optimized, loosen it.
-- Kill formula tells: the setup-then-payoff, the forced rule-of-three, the tidy summary bow.
+- Rule: Rewrite sentences that sound manufactured, too precise, too constructed, or too eager to please as if telling a friend who already trusts you.
+  Because: This retains the writer's intent while removing a templated, model-like surface.
+- Rule: Loosen a line that sounds optimized instead of over-polishing it.
+  Because: Over-polish reads as untrustworthy and can damage the author's voice.
+- Rule: Remove formula tells such as the setup-then-payoff, the forced rule-of-three, and the tidy summary bow.
+  Because: These patterns are recurrent style defects that make prose sound machine-generated.
 
 ## GUARDRAIL (all lenses)
-Change wording, rhythm, and stance only. Never invent, drop, or alter a fact, number, name, quotation, or link. Never rewrite the article's opening answer sentence.
+Rule: Change wording, rhythm, and stance only.
+Because: Humanize is a prose edit, not permission to change the article's approved substance.
+
+Rule: Never invent, drop, or alter a fact, number, name, quotation, or link.
+Because: Humanization must preserve the article's factual record and attribution.
+
+Rule: Never rewrite the article's opening answer sentence.
+Because: GEO relies on the approved answer-first opening remaining stable for scoring and reader continuity.

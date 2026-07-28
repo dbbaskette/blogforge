@@ -26,7 +26,7 @@ _WORDS_PER_SECTION = 400
 def _section_budget(target_words: int) -> tuple[int, int, int]:
     """Return (min_sections, max_sections, words_per_section) for a length.
 
-    Scales the section count to the word budget and clamps to 3–7 so short
+    Scales the section count to the word budget and clamps to 3-7 so short
     posts don't get sliced into thin, overlapping fragments and long ones
     don't sprawl."""
     ideal = min(7, max(3, round(target_words / _WORDS_PER_SECTION)))

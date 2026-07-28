@@ -9,6 +9,8 @@ provider, per the product decision to reuse the existing Google key.
 NOTE: Imagen on the Gemini API requires a paid-tier key; a free key returns
 403, surfaced as a clean ProviderError to the caller.
 """
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import base64
@@ -18,6 +20,7 @@ import httpx
 from blogforge.drafts.models import Draft
 from blogforge.llm.base import LLMProvider
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey, ProviderRateLimit
+from blogforge.prompt_rules import PromptRule, render_prompt_rules
 
 _BASE = "https://generativelanguage.googleapis.com/v1beta"
 # Imagen 4 via the :predict endpoint — verified available on the Gemini API
@@ -26,10 +29,27 @@ _BASE = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_IMAGE_MODEL = "imagen-4.0-generate-001"
 
 
-# Shared editorial styling appended to every hero prompt.
-_HERO_STYLE = (
-    "Conceptual and tasteful, evocative of the theme, cinematic lighting, "
-    "no text, letters, or words anywhere in the image. Wide 16:9 banner composition."
+# Shared editorial rules appended to every hero prompt.
+_HERO_STYLE = render_prompt_rules(
+    [
+        PromptRule(
+            "Make the image conceptual, tasteful, and evocative of the theme with cinematic lighting.",
+            "An editorial hero should convey the article's subject without looking like generic stock art.",
+        ),
+        PromptRule(
+            "The image must contain no text, letters, words, or logos.",
+            "Generated lettering is unreliable and can make the hero unusable.",
+        ),
+        PromptRule(
+            "Use a wide 16:9 banner composition.",
+            "The publishing layout crops hero images into a wide banner.",
+        ),
+        PromptRule(
+            "Do not render the `Rule` or `Because` labels or their rationales in "
+            "the image.",
+            "Prompt metadata must not appear in the published hero image.",
+        ),
+    ]
 )
 
 
@@ -66,13 +86,37 @@ def _hero_context(draft: Draft, *, max_sections: int = 6) -> str:
     return "\n".join(parts)
 
 
-_HERO_DISTILL_INSTRUCTION = (
-    "You design blog cover art. From the post below, write ONE vivid prompt for "
-    "an image generator to create its hero banner. Name a concrete subject, "
-    "setting, and mood that capture what the post is actually about — real "
-    "objects or a scene, not vague abstractions. One sentence, under 40 words. "
-    "The image must contain no text, letters, or logos. Output only the prompt — "
-    "no preamble, quotes, or explanation.\n\n"
+_HERO_DISTILL_INSTRUCTION = "You design blog cover art. From the post below, write a vivid prompt for an image generator to create its hero banner.\n\n"
+
+
+_HERO_DISTILL_RULES = render_prompt_rules(
+    [
+        PromptRule(
+            "Name a concrete subject, setting, and mood that capture what the post is actually about.",
+            "Specific visual material gives the image generator a usable editorial concept.",
+        ),
+        PromptRule(
+            "Use real objects or a scene rather than vague abstractions.",
+            "Concrete imagery renders more reliably than an abstract theme alone.",
+        ),
+        PromptRule(
+            "Write one sentence under 40 words.",
+            "A compact concept is easier to frame consistently as a hero image.",
+        ),
+        PromptRule(
+            "Do not request text, letters, words, or logos in the image.",
+            "Generated lettering is unreliable and can make the hero unusable.",
+        ),
+        PromptRule(
+            "Output only the image prompt, without a preamble, quotes, or explanation.",
+            "The returned text is passed directly into the image-generation prompt.",
+        ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "the image prompt.",
+            "Those labels are prompt metadata rather than image-description content.",
+        ),
+    ]
 )
 
 
@@ -95,7 +139,8 @@ async def build_hero_prompt_ai(draft: Draft, provider: LLMProvider, model: str) 
     model, then frame it in the editorial styling. Raises on provider failure —
     callers fall back to :func:`build_hero_prompt`."""
     resp = await provider.complete(
-        model=model, prompt=f"{_HERO_DISTILL_INSTRUCTION}{_hero_context(draft)}"
+        model=model,
+        prompt=f"{_HERO_DISTILL_INSTRUCTION}{_HERO_DISTILL_RULES}\n\nPOST:\n{_hero_context(draft)}",
     )
     concept = _clean_concept(resp.text)
     return _frame_hero_prompt(concept) if concept else build_hero_prompt(draft)

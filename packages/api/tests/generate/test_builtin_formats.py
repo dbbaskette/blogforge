@@ -36,6 +36,29 @@ def test_directive_resolves_by_slug() -> None:
     directive = builtin_format_directive("product-release")
     assert directive is not None
     assert "PRODUCT RELEASE" in directive
+    assert (
+        "Rule: Open with what the product or feature is and name the single headline "
+        "change in the first lines.\n  Because: Readers need immediate context" in directive
+    )
+
+
+def test_every_builtin_directive_pairs_its_rules_with_rationales() -> None:
+    expected_pairs = {
+        "product-release": "Rule: Open with what the product or feature is",
+        "how-to": "Rule: Use numbered steps where each step is one action",
+        "deep-dive": "Rule: Use concrete examples.",
+        "comparison": "Rule: Lead with a compact comparison table",
+        "announcement": "Rule: State the news in the first sentence",
+        "listicle": "Rule: Use a numbered list with a bold lead-in",
+    }
+    for slug, expected_rule in expected_pairs.items():
+        directive = builtin_format_directive(slug)
+        assert directive is not None
+        lines = directive.splitlines()
+        for index, line in enumerate(lines):
+            if line.startswith("- Rule:"):
+                assert lines[index + 1].startswith("  Because:")
+        assert expected_rule in directive
 
 
 def test_directive_resolves_by_label_case_insensitively() -> None:
@@ -55,6 +78,14 @@ def test_section_note_wraps_directive_as_context() -> None:
     assert "do not reproduce the whole structure" in note
     # Still carries the underlying directive so section conventions apply.
     assert "HOW-TO" in note
+    assert (
+        "Rule: Write only the current section; do not reproduce the whole "
+        "structure.\nBecause: BlogForge stores and regenerates sections independently"
+    ) in note
+    lines = note.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("Rule:"):
+            assert lines[index + 1].startswith("Because:")
 
 
 def test_section_note_none_for_non_builtin() -> None:

@@ -1,28 +1,46 @@
-You are planning a SINGLE, coherent blog post in the author's voice (described in the SYSTEM context). The author's banished words / phrases / rules are non-negotiable.
+You are planning a SINGLE, coherent blog post in the author's voice (described in the SYSTEM context).
 
-Topic: {{ idea.topic }}
-
+Topic (context): {{ idea.topic }}
 {% if idea.bullets -%}
-Supporting points the author wants to make:
+Supporting points the author wants to make (context):
 {% for b in idea.bullets %}- {{ b }}
 {% endfor %}
 {%- endif %}
+{% if idea.notes %}Author notes (context): {{ idea.notes }}{% endif %}
+Target length (context): ~{{ idea.target_words }} words total.
 
-{% if idea.notes %}Notes: {{ idea.notes }}{% endif %}
+Rule: Make the outline ONE continuous argument, not a list of standalone essays.
+Because: The reader should move through one throughline rather than restart with every section.
 
-Target length: ~{{ idea.target_words }} words total.
+Rule: Give every section a distinct job in a clear progression that depends on the sections before it.
+Because: A continuous argument needs each movement in its PROGRESSION to carry the reader somewhere genuinely new.
 
-This is ONE continuous argument, not a list of standalone essays. The sections are movements in a single throughline that builds from start to finish: each one picks up where the previous left off and takes the reader somewhere genuinely new. A reader must never feel a section restating a point an earlier section already made.
+Rule: Ensure NO two sections make the same core point or cover the same ground; merge overlapping ideas.
+Because: Overlap produces repetitive sections instead of a useful sequence.
 
-Design the outline so that:
-- The sections form a clear PROGRESSION — e.g. set up the problem → complicate it → explain the mechanism → draw out the implication → resolve. Each section has a DISTINCT job that depends on the ones before it.
-- NO two sections make the same core point or cover the same ground. If two ideas overlap, merge them into one section.
-- Each `brief` names what THIS section uniquely contributes and how it advances the argument from the previous section — and, where useful, what it deliberately leaves to a later section.
-- Use the FEWEST sections that carry the argument without overlap: aim for {{ min_sections }}–{{ max_sections }} sections at this length (~{{ words_per_section }} words each). Fewer, meatier sections beat many thin ones — thin sections are what cause repetition.
+Rule: State what each `brief` uniquely contributes, how it advances the argument, and, where useful, what belongs later.
+Because: Clear boundaries prevent a section from repeating prior prose or pre-empting a future section.
 
-Return a JSON object matching the OutlineProposal schema:
-- opening_hook: one sentence that opens the post (Conflict & Resolution style if the voice uses that pattern). Section 1 must NOT restate or paraphrase the hook — it picks up from there.
-- sections: each with a short H2-style `title` and a 1-3 sentence `brief` (the section's unique job + how it builds on the prior one).
-- estimated_words: your honest estimate of total prose length.
+Rule: Use the FEWEST sections that carry the argument without overlap: aim for {{ min_sections }}–{{ max_sections }} sections at this length (~{{ words_per_section }} words each).
+Because: Fewer, meatier sections have room for distinct ideas, while thin sections cause repetition.
 
-Use the author's voice. Banished words/phrases never appear.
+Rule: Return a JSON object matching the OutlineProposal schema with `opening_hook`, `sections`, and `estimated_words`.
+Because: Downstream code validates those fields before it creates editable article sections.
+
+Rule: Make `opening_hook` one sentence.
+Because: The hook must give the reader one clear opening to carry into the first section.
+
+Rule: Ensure section 1 does not restate or paraphrase the opening_hook.
+Because: The first section must continue the opening rather than duplicate the reader's first impression.
+
+Rule: Give every section a short H2-style `title` and a one-to-three-sentence `brief`.
+Because: The generated document and section editor use those fields as their structural guide.
+
+Rule: Use the author's voice.
+Because: The outline is the source for later prose and must preserve the intended voice.
+
+Rule: Never use banished words or phrases.
+Because: Those terms conflict with the author's established voice and explicit preferences.
+
+Rule: Do not copy the `Rule` or `Because` labels or their rationales into the outline fields.
+Because: Prompt metadata would corrupt the JSON fields validated by the client.

@@ -6,6 +6,8 @@ angle) in the author's voice, optionally riffing on a seed the writer typed, so
 they can pick one and start. Unlike ``headlines`` this needs no Draft — it runs
 straight off a materialized pack root, so it works from the compose screen.
 """
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import json
@@ -13,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from blogforge.llm.base import LLMProvider
+from blogforge.prompt_rules import OUTPUT_RATIONALE, PromptRule, render_prompt_rules
 
 _TOPICS_SCHEMA: dict[str, object] = {
     "type": "object",
@@ -47,15 +50,50 @@ def _build_prompt(seed: str, n: int) -> str:
         else "The writer hasn't settled on a theme yet — propose a spread of ideas "
         "that suit this voice and the kinds of things this author writes about.\n\n"
     )
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Make each idea a genuinely different direction rather than a reworded version of one idea.",
+                "A useful brainstorm gives the writer distinct paths to choose from.",
+            ),
+            PromptRule(
+                "Vary the ideas across approaches such as a how-to, contrarian take, personal story, myth-buster, or trend read.",
+                "A mix of editorial shapes helps the writer find an angle that fits the subject.",
+            ),
+            PromptRule(
+                "Give each idea a punchy, concrete title.",
+                "The writer needs to recognize the post's promise at a glance.",
+            ),
+            PromptRule(
+                "Do not use clickbait in titles.",
+                "Misleading titles weaken reader trust.",
+            ),
+            PromptRule(
+                "Do not use trailing punctuation in titles.",
+                "Trailing punctuation makes titles look cluttered in publishing surfaces.",
+            ),
+            PromptRule(
+                "Give each idea a one-line angle describing what the post would argue or reveal.",
+                "A concise angle distinguishes an idea from a title alone.",
+            ),
+            PromptRule(
+                "Use the author's voice.", "The ideas should suit what this author actually writes."
+            ),
+            PromptRule(
+                "Do not use banished words or phrases.",
+                "Those terms conflict with the author's established voice and explicit preferences.",
+            ),
+            PromptRule("Return JSON matching the topics schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "topic titles or angles.",
+                "Those labels are prompt metadata rather than article prose.",
+            ),
+        ]
+    )
     return (
-        f"Brainstorm {n} distinct blog post ideas. {theme}"
-        "Make each idea a genuinely different direction (a how-to, a contrarian "
-        "take, a personal story, a myth-buster, a trend read — vary it), not "
-        "reworded versions of one idea. For each: a punchy, concrete TITLE (no "
-        "clickbait, no trailing punctuation) and a one-line ANGLE describing what "
-        "the post would argue or reveal. Stay in the author's voice; banished "
-        'words/phrases never appear. Return JSON: {"topics": [{"title": "...", '
-        '"angle": "..."}]}.'
+        f"Brainstorm {n} blog post ideas. {theme}{rules}\n\n"
+        'Topics schema: {"topics": [{"title": "...", "angle": "..."}]}.'
     )
 
 

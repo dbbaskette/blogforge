@@ -22,6 +22,12 @@ import logging
 import re
 from dataclasses import dataclass, field
 
+from blogforge.prompt_rules import (
+    PRESERVATION_RATIONALE,
+    TTS_RATIONALE,
+    PromptRule,
+    render_prompt_rules,
+)
 from blogforge.voice.lint import lint
 from blogforge.voice.packs.manifest import Manifest
 
@@ -29,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # Em dash + en dash (en is frequently emitted as an em-dash substitute), with
 # any surrounding whitespace collapsed.
-_DASH_RE = re.compile(r"\s*[—–]\s*")
+_DASH_RE = re.compile(r"\s*[\u2014\u2013]\s*")
 # ASCII double-hyphen used as a dash between words.
 _ASCII_HYPHEN_RE = re.compile(r"([A-Za-z])--([A-Za-z])")
 
@@ -51,7 +57,7 @@ def detect_violations(manifest: Manifest, text: str) -> RuleViolations:
         v.match for v in lint(manifest, text) if v.kind in ("word", "phrase")
     })
     return RuleViolations(
-        em_dash=bool(re.search(r"[—–]", text)),
+        em_dash=bool(re.search(r"[\u2014\u2013]", text)),
         ascii_hyphen=bool(_ASCII_HYPHEN_RE.search(text)),
         banished=banished,
     )
@@ -67,26 +73,53 @@ def deterministic_backstop(text: str) -> str:
 
 
 def build_repair_prompt(text: str, v: RuleViolations) -> str:
-    issues: list[str] = []
+    repair_rules: list[PromptRule] = []
     if v.em_dash:
-        issues.append(
-            "- Remove every em dash (—) and en dash (–). Recast each "
-            "sentence with a period, comma, colon, or parentheses. Do NOT swap "
-            "in another dash."
-        )
+        repair_rules.append(PromptRule(
+            "Remove every em dash (\N{EM DASH}) and en dash (\N{EN DASH}). Recast "
+            "each sentence with a period, comma, colon, or parentheses. Do not "
+            "swap in another dash.",
+            TTS_RATIONALE,
+        ))
     if v.ascii_hyphen:
-        issues.append("- Remove ASCII double-hyphens (`--`) used as dashes; rephrase.")
+        repair_rules.append(PromptRule(
+            "Remove ASCII double-hyphens (`--`) used as dashes; rephrase.",
+            TTS_RATIONALE,
+        ))
     if v.banished:
-        issues.append(
-            "- Replace these banished words/phrases with plain alternatives: "
+        repair_rules.append(PromptRule(
+            "Replace these banished words or phrases with plain alternatives: "
             + ", ".join(f'"{b}"' for b in v.banished)
-        )
+            + ".",
+            "These terms conflict with the author's established voice and explicit preferences.",
+        ))
+    repair_rules.extend([
+        PromptRule(
+            "Fix only the listed violations.",
+            "This repair is intentionally bounded to avoid changing approved prose.",
+        ),
+        PromptRule(
+            "Preserve the meaning, structure, ideas, and author's voice.",
+            PRESERVATION_RATIONALE,
+        ),
+        PromptRule(
+            "Do not add commentary or a preamble.",
+            "Downstream code replaces the original passage with this response.",
+        ),
+        PromptRule(
+            "Return only the corrected text.",
+            "Downstream code replaces the original passage with this response.",
+        ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "the corrected text.",
+            "Downstream code replaces the original passage with this response.",
+        ),
+    ])
     return (
         "The text below must follow these constraints but currently breaks them:\n"
-        + "\n".join(issues)
-        + "\n\nRewrite the text to fix ONLY these issues. Preserve the meaning, the "
-        "structure, and the author's voice exactly — do not add or drop ideas, and "
-        "do not add any commentary or preamble. Return ONLY the corrected text.\n\n"
+        + render_prompt_rules(repair_rules, bullet=True)
+        + "\n\n"
         "TEXT:\n" + text
     )
 
@@ -117,7 +150,7 @@ async def enforce_voice_rules(text: str, manifest: Manifest, provider, model: st
                 len(candidate),
                 len(text),
             )
-    except Exception as exc:  # noqa: BLE001 — repair is best-effort
+    except Exception as exc:
         logger.warning("voice-rule repair pass failed (%r); applying backstop", exc)
 
     return deterministic_backstop(repaired)

@@ -1,7 +1,13 @@
-import io, zipfile
+import io
+import zipfile
+
 import pytest
+
 from blogforge.voice.linkedin_import import (
-    parse_linkedin_archive, LinkedInImportError, build_persona_prompt, parse_persona,
+    LinkedInImportError,
+    build_persona_prompt,
+    parse_linkedin_archive,
+    parse_persona,
 )
 
 
@@ -15,7 +21,11 @@ def _zip(files: dict[str, str]) -> bytes:
 
 def test_parses_profile_and_article() -> None:
     csv_text = "Headline,Summary\r\n\"Sr. Director @ X\",\"A leader in technical marketing.\"\r\n"
-    html = "<html><head><title>My Article</title></head><body><p>" + ("Real writing about platforms. " * 20) + "</p></body></html>"
+    html = (
+        "<html><head><title>My Article</title></head><body><p>"
+        + ("Real writing about platforms. " * 20)
+        + "</p></body></html>"
+    )
     prof = parse_linkedin_archive(_zip({"Profile.csv": csv_text, "Articles/Articles/a.html": html}))
     assert prof.headline == "Sr. Director @ X"
     assert "technical marketing" in prof.summary
@@ -32,4 +42,10 @@ def test_empty_archive_raises() -> None:
 def test_persona_prompt_and_parse() -> None:
     p = build_persona_prompt("Head of X", "I build things.")
     assert "Head of X" in p and "I build things" in p
+    assert "Rule: Return JSON with exactly `identity`, `one_line`, and `tone`." in p
+    assert "Because: Downstream code parses these fields" in p
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the persona fields.\nBecause: Prompt metadata would corrupt the stored persona"
+    ) in p
     assert parse_persona('{"identity":"a","one_line":"b","tone":"c"}') == ("a", "b", "c")

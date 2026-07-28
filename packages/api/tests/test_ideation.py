@@ -91,6 +91,14 @@ def test_build_prompt_includes_prior_assistant_turns():
 def test_ideation_system_block_mentions_json():
     assert "JSON" in IDEATION_SYSTEM_BLOCK
     assert "OutlineProposal" in IDEATION_SYSTEM_BLOCK
+    assert (
+        "Rule: Give every section a distinct job that depends on the sections before it.\n"
+        "Because: A continuous argument needs progression instead of standalone essays."
+    ) in IDEATION_SYSTEM_BLOCK
+    assert (
+        "Rule: Return the outline in a fenced ```json block matching the OutlineProposal "
+        "schema.\nBecause: The client parses that schema"
+    ) in IDEATION_SYSTEM_BLOCK
 
 
 # ── JSON block parser ───────────────────────────────────────────────
@@ -192,6 +200,19 @@ async def test_stream_ideation_yields_chunks_and_returns_message_and_outline():
 
     assert "".join(collected_deltas) == "".join(chunks)
     assert "please propose" in (provider.last_prompt or "")
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the conversational reply or outline fields.\n"
+        "Because: Prompt metadata would pollute the author-facing chat and parsed outline."
+    ) in (provider.last_prompt or "")
+    assert (
+        "Rule: Use the author's voice.\nBecause: The accepted outline becomes the source "
+        "for prose in the author's recognizable voice."
+    ) in (provider.last_prompt or "")
+    assert (
+        "Rule: Never use banished words or phrases.\nBecause: Those terms conflict "
+        "with the author's established voice"
+    ) in (provider.last_prompt or "")
     assert final_text is not None and "opening_hook" in final_text
     assert final_outline is not None
     assert final_outline.estimated_words == 800

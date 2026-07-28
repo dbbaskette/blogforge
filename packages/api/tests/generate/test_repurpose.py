@@ -65,18 +65,112 @@ def test_build_prompt_embeds_article_and_channel_directive() -> None:
     prompt = _build_prompt("The whole article body here.", "x_thread")
     assert "The whole article body here." in prompt
     assert "280 characters" in prompt  # x_thread directive
-    assert "don't invent facts" in prompt
+    assert "Rule: Use only facts present in the source article." in prompt
+    assert "Because: Repurposed content must not introduce unsupported claims" in prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the repurposed content."
+    ) in prompt
 
 
 def test_linkedin_feed_and_article_formats_carry_geo_guardrails() -> None:
     # Feed post: capped short, teaching, brand named.
-    feed = FORMATS["linkedin"]["directive"]
-    assert "50-299 words" in feed
+    feed = _build_prompt("body", "linkedin")
+    assert "50 and 299 words" in feed
     assert "brand" in feed.lower()
     # Pulse article: long-form sweet spot (get cited far more than feed posts).
-    article = FORMATS["linkedin_article"]
-    assert "800-1,200 words" in article["directive"]
-    assert "Pulse" in article["label"]
+    article = _build_prompt("body", "linkedin_article")
+    assert "800 and 1,200 words" in article
+    assert "Pulse" in FORMATS["linkedin_article"]["label"]
+
+
+@pytest.mark.parametrize(
+    ("fmt", "instruction", "rationale"),
+    [
+        (
+            "x_thread",
+            "Make each tweet stand alone.",
+            "Readers encounter individual tweets out of context.",
+        ),
+        (
+            "linkedin",
+            "Do not pad the feed post to look longer.",
+            "Short LinkedIn posts can still be useful and cited",
+        ),
+        (
+            "linkedin_article",
+            "Keep the article original and first-hand.",
+            "First-hand detail makes the article more credible",
+        ),
+        (
+            "newsletter",
+            "End with an implicit 'read more'.",
+            "A subtle closing directs attention to the article",
+        ),
+        (
+            "tldr",
+            "Do not add fluff.",
+            "Readers choose a TL;DR for the article's essential information.",
+        ),
+        ("meta_description", "Do not use clickbait.", "Misleading search copy damages trust"),
+        ("email", "Link the reader to the post.", "Recipients need a path to the full article."),
+    ],
+)
+def test_every_channel_renders_an_adjacent_rule_and_reason(
+    fmt: str, instruction: str, rationale: str
+) -> None:
+    prompt = _build_prompt("body", fmt)  # type: ignore[arg-type]
+    assert f"Rule: {instruction}\nBecause: {rationale}" in prompt
+
+
+def _assert_rule_pair(prompt: str, instruction: str, rationale: str) -> None:
+    assert f"Rule: {instruction}\nBecause: {rationale}" in prompt
+
+
+def test_email_and_linkedin_rules_keep_split_requirements() -> None:
+    thread = _build_prompt("body", "x_thread")
+    _assert_rule_pair(
+        thread,
+        "Make each tweet stand alone.",
+        "Readers encounter individual tweets out of context.",
+    )
+    _assert_rule_pair(
+        thread,
+        "Keep each tweet under 280 characters.",
+        "The platform enforces its character limit.",
+    )
+    email = _build_prompt("body", "email")
+    _assert_rule_pair(
+        email,
+        "Explain why the post matters.",
+        "Recipients need a reason to care before they decide to read more.",
+    )
+    _assert_rule_pair(
+        email,
+        "Link the reader to the post.",
+        "Recipients need a path to the full article.",
+    )
+    _assert_rule_pair(
+        email,
+        "Use a warm, direct tone.",
+        "A personal tone makes an announcement email feel written for its recipient.",
+    )
+    _assert_rule_pair(
+        email,
+        "Use one clear call to action.",
+        "A focused email makes the next step easy for readers to act on.",
+    )
+    article = _build_prompt("body", "linkedin_article")
+    _assert_rule_pair(
+        article,
+        "Name the product or brand explicitly.",
+        "Clear attribution keeps the subject identifiable when the article is cited or shared.",
+    )
+    _assert_rule_pair(
+        article,
+        "Keep the article original and first-hand.",
+        "First-hand detail makes the article more credible than a generic repost.",
+    )
 
 
 @pytest.mark.asyncio

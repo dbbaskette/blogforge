@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 
 import trafilatura
 
+from blogforge.prompt_rules import PromptRule, render_prompt_rules
+
 PERSONA_SCHEMA: dict[str, object] = {
     "type": "object",
     "properties": {
@@ -65,7 +67,9 @@ def parse_linkedin_archive(data: bytes) -> LinkedInProfile:
             if len(text) < 40:
                 continue
             m = re.search(r"<title[^>]*>([^<]+)</title>", raw, re.IGNORECASE)
-            title = m.group(1).strip() if m else n.rsplit("/", 1)[-1].rsplit(".", 1)[0].replace("-", " ")
+            title = m.group(1).strip() if m else (
+                n.rsplit("/", 1)[-1].rsplit(".", 1)[0].replace("-", " ")
+            )
             prof.articles.append(Article(title=title, text=text))
 
     if not prof.headline and not prof.summary and not prof.articles:
@@ -74,12 +78,26 @@ def parse_linkedin_archive(data: bytes) -> LinkedInProfile:
 
 
 def build_persona_prompt(headline: str, summary: str) -> str:
+    rules = render_prompt_rules([
+        PromptRule(
+            "Write a concise writing-voice persona from this LinkedIn profile.",
+            "The profile should become a focused voice reference for later writing tasks.",
+        ),
+        PromptRule(
+            "Return JSON with exactly `identity`, `one_line`, and `tone`.",
+            "Downstream code parses these fields to populate the voice profile.",
+        ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "the persona fields.",
+            "Prompt metadata would corrupt the stored persona fields.",
+        ),
+    ])
     return (
-        "From this LinkedIn profile, write a concise writing-voice persona.\n\n"
+        f"{rules}\n\n"
         f"Headline: {headline}\n\nAbout:\n{summary}\n\n"
-        "Return JSON with three one-line fields: `identity` (who they are "
-        "professionally), `one_line` (a short tagline in their own voice), and "
-        "`tone` (a few words describing how they write)."
+        "Field meanings: `identity` is who they are professionally; `one_line` is a "
+        "short tagline in their own voice; `tone` is a few words describing how they write."
     )
 
 

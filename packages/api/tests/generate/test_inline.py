@@ -1,5 +1,6 @@
 """Inline AI transform composes a voice prompt for a selected passage and
 returns the provider's rewrite. Mirrors the section-prompt recorder pattern."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -59,8 +60,26 @@ def _draft() -> Draft:
 def test_build_user_prompt_embeds_passage_and_action() -> None:
     prompt = _build_user_prompt("the quick brown fox", "shorten", "")
     assert "the quick brown fox" in prompt
-    assert "fewer words" in prompt  # the 'shorten' directive
-    assert "Return ONLY the final rewritten passage" in prompt
+    assert "fewer words" in prompt  # the 'shorten' rule
+    assert "Rule: Return exactly one rewritten passage and nothing else." in prompt
+    assert "Because: The editor replaces the selected text with this response" in prompt
+    assert "Rule: Do not use banished words or phrases." in prompt
+    assert (
+        "Rule: Do not use em dashes.\nBecause: This text will be read by a text-to-speech engine"
+        in prompt
+    )
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the rewritten passage."
+    ) in prompt
+
+
+def test_fix_prompt_splits_preservation_and_splice_rules() -> None:
+    prompt = _build_user_prompt("some text", "fix", "")
+    assert "Rule: Preserve the passage's meaning." in prompt
+    assert "Rule: Preserve the author's voice and level of formality." in prompt
+    assert "Rule: Return the rewritten passage as Markdown" in prompt
+    assert "Because: The editor splices this response directly into the selected text." in prompt
 
 
 def test_build_user_prompt_custom_uses_instruction() -> None:

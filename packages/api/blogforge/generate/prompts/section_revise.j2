@@ -1,19 +1,42 @@
-You are revising ONE section of a SINGLE, continuous blog post titled "{{ title }}" (section {{ position }}). Apply the author's note below as a MINIMAL, SURGICAL edit to the section text that already exists — do not rewrite it.
+You are revising one section of a SINGLE, continuous blog post titled "{{ title }}" (section {{ position }}).
 
-Full outline (current section marked **bold**):
+Full outline (context; current section marked **bold**):
 {{ outline_md }}
 
-CURRENT SECTION TEXT — this is exactly what you are editing:
+Current section text (context; this is the exact text being edited):
 ---
 {{ current_content }}
 ---
 
-AUTHOR'S NOTE — the change to make:
+Author's note (context; requested change):
 {{ instruction }}
 
-How to revise:
-- Change ONLY what the note requires. If the note applies to one sentence, paragraph, or sub-section, edit just that part and reproduce EVERYTHING ELSE VERBATIM — identical wording, order, examples, links, and any `###` sub-headings.
-- Do NOT restructure, re-order, re-phrase, tighten, or "improve" parts the note does not mention. Leave them exactly as written, character for character.
-- Do NOT re-introduce the topic or repeat points made in other sections; keep the section's length and shape unless the note asks otherwise.
+Rule: Change only what the author's note requires.
+Because: This is a minimal, SURGICAL revision rather than a new draft.
 
-Return the COMPLETE revised section as markdown prose — the whole section, with only the necessary changes applied so it can replace the current text directly. Do NOT include the section title as a heading; the renderer adds it. Use the author's voice; banished words/phrases never appear.
+Rule: Reproduce every part the note does not require changing VERBATIM.
+Because: BlogForge needs a bounded edit that preserves the approved wording, order, examples, links, and `###` sub-headings.
+
+Rule: Do not restructure, reorder, rephrase, tighten, or otherwise improve parts the note does not mention.
+Because: Unrequested changes make a targeted revision unsafe to review and accept.
+
+Rule: Do not re-introduce the topic or repeat points made in other sections.
+Because: The revised section must remain a continuous part of the existing article.
+
+Rule: Keep the section's length and shape unless the note requires otherwise.
+Because: The edit should preserve the approved section structure.
+
+Rule: Return the complete revised section as Markdown prose, with only the necessary changes.
+Because: The response replaces the current section directly in the editor.
+
+Rule: Do not include the section title as a heading.
+Because: The renderer adds the section heading around this stored content.
+
+Rule: Use the author's voice.
+Because: The edit must remain consistent with the rest of the authored post.
+
+Rule: Never use banished words or phrases.
+Because: Those terms conflict with the author's established voice and explicit preferences.
+
+Rule: Do not copy the `Rule` or `Because` labels or their rationales into the revised section.
+Because: The response replaces the stored section and must contain only clean article prose.

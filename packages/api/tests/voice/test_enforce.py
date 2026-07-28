@@ -1,4 +1,6 @@
 from blogforge.voice.enforce import (
+    RuleViolations,
+    build_repair_prompt,
     detect_violations,
     deterministic_backstop,
     enforce_voice_rules,
@@ -33,9 +35,11 @@ class _FakeProvider:
 
 
 def test_backstop_guarantees_no_dashes() -> None:
-    out = deterministic_backstop("a — b, c–d, e--f")
-    assert "—" not in out
-    assert "–" not in out
+    em_dash = "\N{EM DASH}"
+    en_dash = "\N{EN DASH}"
+    out = deterministic_backstop(f"a {em_dash} b, c{en_dash}d, e--f")
+    assert em_dash not in out
+    assert en_dash not in out
     assert "a - b" in out
     assert "c - d" in out
     assert "e - f" in out
@@ -50,6 +54,16 @@ def test_detect_finds_em_dash_and_banished() -> None:
 def test_detect_clean_text_has_no_violations() -> None:
     v = detect_violations(_manifest(), "The cat sat on the warm rug today.")
     assert v.any is False
+
+
+def test_repair_prompt_pairs_output_constraint_with_its_reason() -> None:
+    repair_prompt = build_repair_prompt("We delve into it.", RuleViolations(banished=["delve"]))
+    assert "Rule: Return only the corrected text." in repair_prompt
+    assert "Because: Downstream code replaces the original passage" in repair_prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the corrected text.\n  Because: Downstream code replaces the original passage"
+    ) in repair_prompt
 
 
 async def test_enforce_strips_em_dash_even_if_model_ignores() -> None:

@@ -13,6 +13,16 @@ bundle and the API in lockstep). Pre-`1.0.0`, the API is still evolving.
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-07-28
+
+### Changed
+- Every model-facing writing rule now includes an adjacent operational reason,
+  improving compliance across drafting, editing, Humanize, GEO, voice
+  distillation, repair, and derived-content workflows.
+- Punctuation restrictions now explain that generated prose will be read by a
+  text-to-speech engine and that disruptive punctuation can produce confusing
+  pauses or phrasing.
+
 ## [0.8.1] — 2026-07-17
 
 ### Added

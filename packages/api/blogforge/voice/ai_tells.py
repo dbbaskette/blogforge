@@ -75,13 +75,29 @@ def effective_sentence_starters(m: Manifest) -> list[str]:
 
 
 _PATTERN_BULLET = re.compile(r"^- \*\*(.+?)\*\*\s*(.*)$")
+_RULE_PATTERN_BULLET = re.compile(r"^- Rule: (?:\*\*(.+?)\*\*\s*)?(.*)$")
 
 
 def parsed_patterns() -> list[dict[str, str]]:
-    """patterns.md bullets as {title, body} for the help page."""
+    """patterns.md bullets as {title, body} for the help page.
+
+    Bundled assets use rationale-backed ``- Rule:`` pairs, while user overrides
+    can continue using the original ``- **Title** body`` format.
+    """
     out = []
     for line in load_ai_tells().patterns.splitlines():
         m = _PATTERN_BULLET.match(line.strip())
         if m:
             out.append({"title": m.group(1).rstrip("."), "body": m.group(2).strip()})
+            continue
+        m = _RULE_PATTERN_BULLET.match(line.strip())
+        if m:
+            body = m.group(2).strip()
+            title = m.group(1)
+            if title is None:
+                title_match = re.search(r"\*\*(.+?)\*\*", body)
+                if title_match is not None:
+                    title = title_match.group(1)
+                    body = (body[:title_match.start()] + body[title_match.end():]).strip()
+            out.append({"title": (title or "Rule").rstrip("."), "body": body})
     return out

@@ -13,6 +13,9 @@ Two honesty rules baked in:
   add real data; it never invents statistics or citations.
 """
 
+# The GEO copy intentionally uses typographic ranges in writer-facing text.
+# ruff: noqa: RUF001, RUF003
+
 from __future__ import annotations
 
 import json
@@ -24,6 +27,14 @@ from blogforge.drafts.models import Draft
 from blogforge.generate.sanitize import strip_scaffolding
 from blogforge.generate.textutil import strip_inline_emphasis
 from blogforge.llm.base import LLMProvider
+from blogforge.prompt_rules import (
+    FACTUAL_RATIONALE,
+    OUTPUT_RATIONALE,
+    PRESERVATION_RATIONALE,
+    VOICE_RATIONALE,
+    PromptRule,
+    render_prompt_rules,
+)
 
 # Weights sum to 1.0; the two most-cited levers (answer-first, factual density)
 # carry the most, with citations — the strongest researched lever — right after.
@@ -908,92 +919,284 @@ _SEMANTIC_EXAMPLE = json.dumps(
 
 _SEMANTIC_DIRECTIVE = (
     "Evaluate this draft on the following Generative-Engine-Optimization dimensions. "
-    "Score each 0-100 and explain briefly. Do NOT rewrite anything.\n"
-    "1) answer_first: does each section OPEN with a direct, self-contained answer "
-    "(40-60 words) before context? List the titles of sections that bury the answer "
-    "in `weak_sections`.\n"
-    "2) definitional_opener: does the piece open with a clear, citable one-line "
-    "definition of its subject/thesis? Set `has_definition` true if such a "
-    "sentence EXISTS anywhere near the top (even if badly placed, duplicated, or "
-    "buried) — the score reflects execution; `has_definition` reflects existence. "
-    "This decides whether the tool offers to ADD one: adding on top of an "
-    "existing definition creates duplicates.\n"
-    "3) factual_density: does it use specific statistics, named sources, and quotes "
-    "rather than vague claims? Set `has_stats`, `has_named_sources`, and `has_quotes` "
-    "to reflect which of the three are present, and in `note` name which are MISSING "
-    "(this is the single best-proven citation lever). In `thin_spots`, quote vague "
-    "passages that WOULD be stronger with real data; in each `note` name the problem, "
-    "and in `suggestion` say concretely WHAT KIND of data to add and where they'd find "
-    'it (e.g. "Add your actual deployment count or a p95 latency benchmark from your '
-    'monitoring"). You CANNOT invent facts — never supply statistics or sources, only '
-    "describe what to add. Also set `first_hand` true if the author shows first-hand "
-    "experience ('we tested', 'I built', a result they measured) — engines weight "
-    "first-hand experience heavily.\n"
-    "4) brand_explicit: does the post name its product/brand/subject EXPLICITLY and "
-    "clearly (not just implied), ideally near the top? AI can cite content without "
-    "naming the source ('ghost citation'); an explicit brand name travels with the "
-    "citation. Put the brand you detect in `brand`, set `stated_up_top` true if it "
-    "appears in the first section, and score how clearly/early it's named. Never "
-    "invent a brand — if none is evident, say so in `note` and score low.\n"
-    "5) citations: do concrete, checkable claims carry a source? FIRST match each "
-    "uncited claim against the ATTACHED SOURCES list when one is provided: when a "
-    "claim matches an attached source, emit a finding whose `note` names it "
-    "('matches your attached: <title>'), whose `matched_source_url` is that URL, and "
-    "whose `suggestion` is the claim sentence rewritten VERBATIM with the markdown "
-    "link inserted at natural anchor text. Only for claims NO attached source covers, "
-    "say the specific KIND of source to find (e.g. 'a dated benchmark for the latency "
-    "claim') — never a generic 'add sources'. When sources are attached, the lever "
-    "`note` should acknowledge them ('N sources attached; M cited in-text'). Never "
-    "invent sources.\n"
-    "Finally, in `coverage.missing_subquestions` list up to 4 natural sub-questions "
-    "of this topic a search engine would decompose the query into that this draft "
-    "does NOT answer — only questions genuinely in-scope for the title.\n"
-    "For each thin-spot and each uncited claim, also return `impact`: ONE concrete "
-    "sentence of the GEO payoff (what it does for being quoted by an answer engine) "
-    "— never restate the fix.\n"
-    "6) stat_attribution: are numbers tied INLINE to a named source ('per Gartner, 2025')? "
-    "A bare number is a claim; a sourced number is a citable fact. Flag unattributed "
-    "stats in `findings` (quote each in `target`).\n"
-    "7) query_coverage: does the piece answer the adjacent questions a reader asks next "
-    "(cost? limits? alternatives? prerequisites?)? Flag the biggest gaps (note = the "
-    "missing question, suggestion = where it fits).\n"
-    "8) sound_bites: does it contain at least two self-contained one-sentence statements "
-    "under 25 words an engine could quote verbatim? Flag sections whose point never "
-    "lands in one liftable line.\n"
-    "9) entity_consistency: is each product/technology called ONE canonical name "
-    "throughout? Flag alias drift ('TP', 'the platform') with the canonical name in "
-    "`suggestion`.\n"
-    "10) experience_signals: does the author show first-hand experience ('we measured', "
-    "'when I ran this', a real result)? Flag sections that read as secondhand summary.\n"
-    "11) jargon_defined: is every specialist term given a short appositive definition on "
-    "first use? Flag undefined first-uses (term in `target`).\n"
-    "12) concrete_examples: are how-to claims backed by a worked example or code block? "
-    "Flag claims that assert without showing.\n"
-    "13) title_shape: does the H1 carry a how-to/number/year hook and stay under 60 "
-    "characters? Score the title's SERP shape; suggest a sharper title in `suggestion` "
-    "if weak. The draft's title is the first line of the document.\n"
-    "For all findings: `target` must be VERBATIM text from the draft when it refers to "
-    "a passage; omit `target` for document-level findings.\n"
-    "14) information_gain: does the draft contain ORIGINAL information — first-party "
-    "data ('we measured', 'our benchmark'), a novel case study, or a distinct point of "
-    "view — beyond what any summary of existing sources would say? Google's guidance "
-    "calls this 'non-commodity content' and it is the top citation driver. Flag "
-    "sections that only re-report common knowledge (suggestion = what first-party "
-    "detail the author could add). Never invent data.\n"
-    "15) semantic_triples: are the key claims stated as standalone subject-verb-object "
-    "assertions with a concrete named subject ('BlogForge strips AI tells "
-    "deterministically'), especially early in paragraphs and bullets? Flag key claims "
-    "buried in subordinate clauses (suggestion = the same claim recast as a direct "
-    "S-V-O sentence, preserving meaning).\n"
-    "16) intent_format_match: infer the query archetype the title targets (best/top → "
-    "comparative list; how-to → numbered steps; what-is → definition + Q&A) and score "
-    "whether the BODY structure matches it. Flag the mismatch (note = expected format, "
-    "suggestion = the structural change).\n"
-    "17) expert_quotes: does the piece quote named third-party experts with stated "
-    "credentials ('said Jane Doe, CTO at Acme')? Distinct from sound_bites (the "
-    "author's own lines). Flag sections that assert expert-level claims with no "
-    "third-party voice (suggestion = what kind of expert/source to quote). Never "
-    "fabricate quotes.\n"
+    "The descriptions explain what each lever measures.\n"
+    "1) answer_first: whether each section opens with a direct, self-contained answer "
+    "(40-60 words) before context.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "List the titles of sections that bury the answer in `weak_sections`.",
+                "The client maps those titles back to sections where the writer can apply a fix.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n2) definitional_opener: whether the piece opens with a clear, citable one-line "
+    "definition of its subject or thesis.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Set `has_definition` true when a definition exists near the top, even if it "
+                "is badly placed, duplicated, or buried; let the score reflect execution.",
+                "The client must improve an existing definition instead of adding a duplicate.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n3) factual_density: whether the draft uses specific statistics, named sources, "
+    "quotes, and first-hand evidence instead of vague claims.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Set `has_stats`, `has_named_sources`, and `has_quotes` to reflect what is "
+                "present, and name each missing evidence type in `note`.",
+                "The analysis panel shows which kinds of factual support the writer still needs.",
+            ),
+            PromptRule(
+                "In `thin_spots`, quote vague passages, name the problem in `note`, and "
+                "describe the specific kind and likely origin of supporting data in `suggestion`.",
+                "Actionable findings tell the writer what evidence to collect without "
+                "fabricating it.",
+            ),
+            PromptRule(
+                "Set `first_hand` true only when the author reports direct experience such as "
+                "something they tested, built, or measured.",
+                "First-hand evidence is distinct from secondhand summary and affects this lever.",
+            ),
+        ],
+        bullet=True,
+    )
+    + "\n4) brand_explicit: whether the product, brand, or subject is named clearly and "
+    "early enough for its name to travel with a citation.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Put the detected brand in `brand`, set `stated_up_top` true only when it "
+                "appears in the first section, and say in `note` when no brand is evident.",
+                "The panel needs the observed name and placement rather than an inferred brand.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n5) citations: whether concrete, checkable claims carry sources.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Match uncited claims against ATTACHED SOURCES before recommending a new source.",
+                "The author should be able to use evidence they already collected.",
+            ),
+            PromptRule(
+                "For a matching attached source, name it in `note`, copy its URL into "
+                "`matched_source_url`, and put the verbatim claim with a Markdown link inserted "
+                "at natural anchor text in `suggestion`.",
+                "The client can apply a matched citation directly only when these fields "
+                "are exact.",
+            ),
+            PromptRule(
+                "For a claim no attached source covers, name the specific kind of source to find "
+                "instead of giving a generic request to add sources.",
+                "A concrete source type turns the finding into a useful research action.",
+            ),
+            PromptRule(
+                "When sources are attached, acknowledge their total and in-text citation count "
+                "in the lever `note`.",
+                "The writer needs to distinguish missing evidence from collected but unused "
+                "evidence.",
+            ),
+        ],
+        bullet=True,
+    )
+    + "\ncoverage: natural in-scope subquestions a search engine could decompose from the "
+    "title but the draft does not answer.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "List at most four genuinely in-scope unanswered questions in "
+                "`coverage.missing_subquestions`.",
+                "The FAQ fix needs a focused set of relevant coverage gaps.",
+            ),
+            PromptRule(
+                "Return exactly one concrete sentence in `impact` for every thin spot and "
+                "uncited claim without restating the fix.",
+                "The panel needs a concise explanation of each recommendation's "
+                "answer-engine payoff.",
+            ),
+        ],
+        bullet=True,
+    )
+    + "\n6) stat_attribution: whether numbers are tied inline to named sources, so a number "
+    "reads as a citable fact rather than a bare claim.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag unattributed statistics in `findings` and copy each statistic-bearing "
+                "passage into `target`.",
+                "The writer needs to locate the exact number that lacks attribution.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n7) query_coverage: whether the piece answers adjacent questions such as cost, "
+    "limits, alternatives, and prerequisites.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag the largest coverage gaps with the missing question in `note` and its "
+                "best location in `suggestion`.",
+                "The writer needs both the unanswered question and where it belongs.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n8) sound_bites: whether the draft contains at least two self-contained sentences "
+    "under 25 words that an engine could quote verbatim.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag sections whose point never lands in one liftable line.",
+                "Those sections lack a compact extraction target.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n9) entity_consistency: whether each product or technology uses one canonical name.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag alias drift and put the canonical name in `suggestion`.",
+                "A consistent entity name helps answer engines resolve what the passage describes.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n10) experience_signals: whether the author reports first-hand experience such as "
+    "a measurement, a build decision, or a result.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag sections that read only as secondhand summary.",
+                "The writer needs to see where first-hand evidence is absent.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n11) jargon_defined: whether each specialist term receives a short appositive "
+    "definition on first use.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag undefined first uses and put the term in `target`.",
+                "The client previews the exact jargon that needs a definition.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n12) concrete_examples: whether how-to claims are backed by a worked example or "
+    "code block.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag claims that assert a procedure or result without showing it.",
+                "The writer needs to know where an example would make the claim concrete.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n13) title_shape: whether the H1 uses a how-to, number, or year hook and stays under "
+    "60 characters. The draft title is the first line.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "When the title is weak, put a sharper title in `suggestion`.",
+                "The panel needs an actionable alternative for a weak SERP shape.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n14) information_gain: whether the draft adds original information such as "
+    "first-party data, a novel case study, or a distinct point of view instead of "
+    "re-reporting common knowledge.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag commodity sections and describe first-party detail the author could add "
+                "in `suggestion`.",
+                "The writer must supply original evidence rather than receive invented data.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n15) semantic_triples: whether key claims use standalone subject-verb-object "
+    "assertions with concrete named subjects, especially early in paragraphs and bullets.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag key claims buried in subordinate clauses and recast the same claim as a "
+                "direct subject-verb-object sentence in `suggestion` without changing its meaning.",
+                "A direct alternative must remain faithful to the approved claim.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n16) intent_format_match: whether the body structure matches the query archetype "
+    "implied by the title, such as a comparative list, numbered how-to, or definition "
+    "with questions and answers.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag a mismatch with the expected format in `note` and the structural change "
+                "in `suggestion`.",
+                "The writer needs both the diagnosed intent and the repair.",
+            )
+        ],
+        bullet=True,
+    )
+    + "\n17) expert_quotes: whether expert-level claims include named third-party experts "
+    "with credentials, distinct from the author's own sound bites.\n"
+    + render_prompt_rules(
+        [
+            PromptRule(
+                "Flag unsupported expert-level claims and describe the kind of expert or source "
+                "to quote in `suggestion`.",
+                "The writer must seek real independent corroboration.",
+            )
+        ],
+        bullet=True,
+    )
+)
+
+_SEMANTIC_RULES = render_prompt_rules(
+    [
+        PromptRule(
+            "Score the draft without rewriting it.",
+            "The analysis panel needs findings against the existing draft.",
+        ),
+        PromptRule(
+            "Score every requested lever from 0 to 100 and explain it briefly.",
+            "Comparable scores and concise explanations let the panel rank the findings.",
+        ),
+        PromptRule(
+            "Never invent facts, statistics, brands, sources, data, or quotations.",
+            FACTUAL_RATIONALE,
+        ),
+        PromptRule(
+            "Use verbatim draft text for passage-level targets.",
+            "The client locates findings by exact text matching.",
+        ),
+        PromptRule(
+            "Omit `target` for document-level findings.",
+            "Document-level findings have no exact passage for the client to locate.",
+        ),
+        PromptRule(
+            "Return JSON matching the supplied semantic schema.",
+            OUTPUT_RATIONALE,
+        ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "semantic findings.",
+            "Prompt metadata would corrupt fields parsed by the GEO analysis panel.",
+        ),
+    ]
 )
 
 
@@ -1267,12 +1470,12 @@ async def _run_semantic(
     sources_block = ""
     if ref_lines or extra_sources:
         sources_block = (
-            "\n\nATTACHED SOURCES (the author already collected these — use them FIRST):\n"
+            "\n\nATTACHED SOURCES (already collected by the author):\n"
             f"{ref_lines}\n{extra_sources}\n"
         )
     prompt = (
-        f"{system}\n\n---\n\n{_SEMANTIC_DIRECTIVE}\n\n"
-        f"Return JSON matching: {_SEMANTIC_EXAMPLE}.{sources_block}\n\nDRAFT:\n"
+        f"{system}\n\n---\n\n{_SEMANTIC_DIRECTIVE}\n\n{_SEMANTIC_RULES}\n\n"
+        f"SEMANTIC JSON SHAPE:\n{_SEMANTIC_EXAMPLE}{sources_block}\n\nDRAFT:\n"
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_SEMANTIC_SCHEMA)
@@ -1397,22 +1600,60 @@ async def generate_faq(
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
     if questions:
-        ask = (
-            "Answer EXACTLY these reader questions from the post's own content — SKIP "
-            "any the draft cannot answer (do not guess): "
-            + "; ".join(q.strip() for q in questions if q.strip())
+        task = (
+            "Create FAQ entries for these supplied reader questions:\n"
+            + "\n".join(f"- {q.strip()}" for q in questions if q.strip())
         )
+        requested_rules = [
+            PromptRule(
+                "Answer exactly the supplied reader questions.",
+                "The coverage fix must address the questions the writer selected.",
+            ),
+            PromptRule(
+                "Skip any supplied question the draft cannot support.",
+                "Guessing would turn a coverage fix into unsupported content.",
+            ),
+        ]
     else:
-        ask = (
-            f"Write {n} FAQ entries a reader of THIS post would ask, answered from the "
-            "post's own content — real questions (the kind from sales calls or 'People "
-            "Also Ask')"
-        )
+        task = "Create FAQ entries that a reader of this post would naturally ask."
+        requested_rules = [
+            PromptRule(
+                f"Write {n} real reader questions of the kind heard on sales calls or in "
+                "People Also Ask.",
+                "The FAQ should address likely reader needs rather than generic filler.",
+            )
+        ]
+    rules = render_prompt_rules(
+        [
+            *requested_rules,
+            PromptRule(
+                "Base every question and answer only on the draft.",
+                FACTUAL_RATIONALE,
+            ),
+            PromptRule(
+                "Keep each answer to 2-3 concise sentences that stand alone.",
+                "FAQ answers may be extracted independently from the surrounding post.",
+            ),
+            PromptRule(
+                "Stay in the author's voice.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule(
+                "Never use banished words or phrases.",
+                "Those terms conflict with the author's established voice and "
+                "explicit preferences.",
+            ),
+            PromptRule("Return JSON matching the FAQ schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "FAQ fields.",
+                "Prompt metadata would corrupt fields parsed by the FAQ editor.",
+            ),
+        ]
+    )
     prompt = (
-        f"{system}\n\n---\n\n{ask}. Concise answers (2-3 sentences) that stand alone. "
-        "Ground every answer in the draft; invent no facts. Stay in the author's "
-        'voice; banished words never appear. Return JSON: {"faqs": '
-        '[{"q": "...", "a": "..."}]}.\n\nDRAFT:\n'
+        f"{system}\n\n---\n\nTASK:\n{task}\n\n{rules}\n\n"
+        'FAQ JSON SHAPE:\n{"faqs": [{"q": "...", "a": "..."}]}\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_FAQ_SCHEMA)
@@ -1442,13 +1683,39 @@ async def generate_opener(
     from blogforge.voice import compose_prompt
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Write exactly one sentence.",
+                "The client prepends the result as one opening sentence.",
+            ),
+            PromptRule(
+                "Define the subject, its category, and what it does or argues.",
+                "This sentence is the post's citable definitional opener.",
+            ),
+            PromptRule(
+                "Adapt the definition naturally to the author's voice.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule(
+                "Ground the sentence only in the draft and invent nothing.",
+                FACTUAL_RATIONALE,
+            ),
+            PromptRule(
+                "Return only the sentence, with no quotes, heading, or explanation.",
+                "The client prepends this response verbatim.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the sentence.",
+                "The client prepends this response verbatim as clean article prose.",
+            ),
+        ]
+    )
     prompt = (
-        f"{system}\n\n---\n\nWrite ONE citable opening sentence for this post that "
-        "defines its subject: what it is, what category it belongs to, and what it "
-        'does or argues — the pattern "<Subject> is a <category> that <differentiator>", '
-        "adapted naturally to the author's voice. Ground it in the draft; invent "
-        "nothing. Return ONLY the sentence — no quotes, no heading, no explanation.\n\n"
-        f"DRAFT:\n{_draft_text(draft)}"
+        f"{system}\n\n---\n\nTASK:\nCreate a citable definitional opener for this post. "
+        'A useful pattern is "<Subject> is a <category> that <differentiator>".\n\n'
+        f"{rules}\n\nDRAFT:\n{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return clean_opener(resp.text)
@@ -1485,14 +1752,41 @@ async def generate_table(
     if section is None or not section.content_md.strip():
         return ""
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Represent the comparison as one compact Markdown table, with comparison "
+                "dimensions as columns and options as rows, or vice versa when clearer.",
+                "The table should make the section's existing comparison easier to scan.",
+            ),
+            PromptRule(
+                "Use only facts, numbers, and options stated in the source section.",
+                FACTUAL_RATIONALE,
+            ),
+            PromptRule(
+                "Keep the author's terminology.",
+                "Changed labels could alter the section's intended distinctions.",
+            ),
+            PromptRule(
+                "Include a header row, a Markdown separator row, and data rows.",
+                "The table parser requires valid Markdown table structure.",
+            ),
+            PromptRule(
+                "Return only one valid Markdown table, with no title or prose.",
+                "The client splices this response directly into the source section.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the Markdown table.",
+                "Prompt metadata would invalidate content spliced directly into "
+                "the source section.",
+            ),
+        ]
+    )
     prompt = (
-        f"{system}\n\n---\n\nThe section below compares options/versions/tradeoffs in "
-        "prose. Turn that comparison into ONE compact Markdown table: columns are the "
-        "dimensions being compared, rows are the options (or vice-versa if that reads "
-        "better). Use ONLY facts, numbers, and options already in the section — invent "
-        "nothing and keep the author's terms. Return ONLY the Markdown table (a header "
-        "row, a |---| separator row, then the data rows) — no title, no prose.\n\n"
-        f"SECTION: {strip_inline_emphasis(section.title)}\n\n{section.content_md}"
+        f"{system}\n\n---\n\nTASK:\nTurn the source section's prose comparison into a "
+        f"table.\n\n{rules}\n\nSECTION: {strip_inline_emphasis(section.title)}\n\n"
+        f"{section.content_md}"
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return clean_table(resp.text)
@@ -1525,12 +1819,36 @@ async def generate_quotes(
 ) -> list[str]:
     """2-3 VERBATIM quote candidates from a reference's extracted text. The model
     is told to copy exactly; `verbatim_quotes` drops anything it didn't."""
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Select 2-3 passages of one or two sentences and fewer than 60 words each.",
+                "The citation picker needs a short, usable set of compact quotations.",
+            ),
+            PromptRule(
+                "Choose passages that would strongly support an article.",
+                "The writer needs quotations that add relevant evidence.",
+            ),
+            PromptRule(
+                "Copy every selected passage exactly, character for character.",
+                "Changed wording would falsely attribute words to the source.",
+            ),
+            PromptRule(
+                "Do not paraphrase, trim words, or fix punctuation.",
+                "Even small edits would make the result no longer verbatim.",
+            ),
+            PromptRule("Return JSON matching the quotations schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "quotation fields.",
+                "Prompt metadata would corrupt quotations parsed by the citation picker.",
+            ),
+        ]
+    )
     prompt = (
-        "From the source text below, select 2-3 short passages (one or two "
-        "sentences each, under 60 words) that would make strong supporting quotes "
-        "for an article. Copy them EXACTLY, character for character — do not "
-        "paraphrase, trim words, or fix punctuation. Return JSON: "
-        '{"quotes": ["..."]}.\n\nSOURCE:\n' + reference_text[:20000]
+        "TASK:\nSelect supporting quotation candidates from the source text.\n\n"
+        f"{rules}\n\nQUOTATIONS JSON SHAPE:\n"
+        '{"quotes": ["..."]}\n\nSOURCE:\n' + reference_text[:20000]
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_QUOTES_SCHEMA)
     return verbatim_quotes(resp.text, reference_text)
@@ -1564,12 +1882,43 @@ async def generate_takeaways(
     from blogforge.voice import compose_prompt
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Write 3-5 one-line takeaways.",
+                "The key-takeaways block needs a compact summary rather than another section.",
+            ),
+            PromptRule(
+                "Ground every takeaway strictly in the draft and invent nothing.",
+                FACTUAL_RATIONALE,
+            ),
+            PromptRule(
+                "Make every takeaway concrete.",
+                "A useful takeaway gives the reader a specific point from the post.",
+            ),
+            PromptRule(
+                "Make every takeaway stand alone.",
+                "Each bullet may be extracted independently from the surrounding post.",
+            ),
+            PromptRule(
+                "Write every takeaway in the author's voice.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule(
+                "Never use banished words or phrases.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule("Return JSON matching the takeaways schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "takeaway fields.",
+                "Prompt metadata would corrupt takeaways parsed into article bullets.",
+            ),
+        ]
+    )
     prompt = (
-        f"{system}\n\n---\n\nWrite 3-5 key takeaways for this post — one line each, "
-        "concrete, each standing alone (a reader who sees ONLY the bullet learns "
-        "something true from this post). Ground every bullet strictly in the draft; "
-        "invent nothing. Stay in the author's voice; banished words never appear. "
-        'Return JSON: {"takeaways": ["..."]}.\n\nDRAFT:\n'
+        f"{system}\n\n---\n\nTASK:\nCreate the key takeaways for this post.\n\n{rules}\n\n"
+        'TAKEAWAYS JSON SHAPE:\n{"takeaways": ["..."]}\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_TAKEAWAYS_SCHEMA)
@@ -1585,11 +1934,34 @@ async def generate_alt_text(
 ) -> str:
     """One concise descriptive alt text (<120 chars) for an image, from context.
     The client splices it into the image markdown's empty alt slot."""
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Describe only what the image context supports.",
+                FACTUAL_RATIONALE,
+            ),
+            PromptRule(
+                "Keep the alt text under 120 characters.",
+                "Concise descriptions are easier for screen-reader users to understand.",
+            ),
+            PromptRule(
+                "Do not begin with boilerplate such as 'Image of' or 'Picture of'.",
+                "Screen readers already announce that the element is an image.",
+            ),
+            PromptRule(
+                "Return only the alt text, with no quotes or explanation.",
+                "The client inserts this response directly into the image's alt-text slot.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the alt text.",
+                "The client inserts this response directly into the image's alt-text slot.",
+            ),
+        ]
+    )
     prompt = (
-        "Write one concise, descriptive alt text (under 120 characters) for an image "
-        "in the section below. Describe what the image most likely shows given the "
-        "surrounding prose. Return ONLY the alt text — no quotes, no 'Image of'.\n\n"
-        f"IMAGE MARKDOWN: {target}\n\nSECTION:\n{section_text[:4000]}"
+        "TASK:\nWrite descriptive alt text for the image using its surrounding section.\n\n"
+        f"{rules}\n\nIMAGE MARKDOWN: {target}\n\nSECTION:\n{section_text[:4000]}"
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return " ".join(resp.text.strip().strip("\"'`").split())[:120]
@@ -1624,12 +1996,36 @@ async def generate_queries(
     from blogforge.voice import compose_prompt
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Return 6-10 natural-language search queries.",
+                "The citation-check workflow needs a focused but useful query set.",
+            ),
+            PromptRule(
+                "Phrase queries like requests typed into ChatGPT, Perplexity, or Google.",
+                "The writer will use these strings for manual answer-engine checks.",
+            ),
+            PromptRule(
+                "Include only topics the post actually covers.",
+                FACTUAL_RATIONALE,
+            ),
+            PromptRule(
+                "Ground the queries in the post's title, headings, and FAQ.",
+                "Those elements define the draft's actual search intent.",
+            ),
+            PromptRule("Return JSON matching the queries schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "query fields.",
+                "Prompt metadata would corrupt queries parsed by the citation-check workflow.",
+            ),
+        ]
+    )
     prompt = (
-        f"{system}\n\n---\n\nList 6-10 natural-language search queries (the kind typed "
-        "into ChatGPT, Perplexity, or Google) for which this post should be the "
-        "definitive answer. Ground them in the post's actual title, headings, and FAQ "
-        "— no aspirational topics it does not cover. Return JSON: "
-        '{"queries": ["..."]}.\n\nDRAFT:\n'
+        f"{system}\n\n---\n\nTASK:\nCreate queries for which this post should be the "
+        f"definitive answer.\n\n{rules}\n\n"
+        'QUERIES JSON SHAPE:\n{"queries": ["..."]}\n\nDRAFT:\n'
         f"{_draft_text(draft)}"
     )
     resp = await provider.complete(model=model, prompt=prompt, json_schema=_QUERIES_SCHEMA)
@@ -1652,18 +2048,51 @@ async def generate_citation(
     from blogforge.voice import compose_prompt
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
-    link = f", linked as a Markdown link to {ref_url}" if ref_url else ""
-    quote_clause = (
-        f' Weave in this VERBATIM quote from the source, in quotation marks: "{quote}".'
-        if quote
-        else ""
+    source_context = f'SOURCE NAME: "{ref_name}"'
+    if ref_url:
+        source_context += f"\nSOURCE URL FOR MARKDOWN ATTRIBUTION: {ref_url}"
+    if quote:
+        source_context += f'\nOPTIONAL VERBATIM QUOTATION: "{quote}"'
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Add only the requested source attribution and optional supplied quotation.",
+                "This is a bounded citation edit, not permission to rewrite the passage.",
+            ),
+            PromptRule(
+                "Attribute the claim in the author's voice.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule(
+                "Use the supplied URL as a Markdown link when present.",
+                "The rewritten passage needs a clickable attribution to the requested source.",
+            ),
+            PromptRule(
+                "Do not change the passage's meaning or invent information.",
+                PRESERVATION_RATIONALE,
+            ),
+            PromptRule(
+                "Preserve a supplied quotation verbatim.",
+                "A changed quotation would falsely attribute words to the source.",
+            ),
+            PromptRule(
+                "Place a supplied quotation in quotation marks.",
+                "Quotation marks distinguish the source's words from the author's passage.",
+            ),
+            PromptRule(
+                "Return only the rewritten passage.",
+                "The client replaces the selected passage with this response.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the rewritten passage.",
+                "The client replaces the selected passage with this response.",
+            ),
+        ]
     )
     prompt = (
-        f"{system}\n\n---\n\nRewrite the passage below so it attributes its claim to "
-        f'the named source, in the author\'s voice: source name "{ref_name}"{link}.'
-        f"{quote_clause} Do not change the passage's meaning and do not invent "
-        "anything beyond the attribution. Return only the rewritten passage.\n\n"
-        f"PASSAGE:\n{passage}"
+        f"{system}\n\n---\n\nTASK:\nAdd source attribution to the passage.\n\n"
+        f"{source_context}\n\n{rules}\n\nPASSAGE:\n{passage}"
     )
     resp = await provider.complete(model=model, prompt=prompt)
     return resp.text.strip()
