@@ -116,10 +116,17 @@ def _load_default_baseline() -> str:
 def _render_writing_craft(pack_root: Path) -> str:
     override = pack_root / "writing-baseline.md"
     body = _read_cached(override) if override.is_file() else _load_default_baseline()
+    precedence = render_prompt_rules([
+        PromptRule(
+            "When general craft guidance conflicts with the author's style guide, "
+            "follow the style guide.",
+            "The author's style guide records their established preferences and takes precedence.",
+        )
+    ])
     return (
         "## Section 2: General Writing Craft\n\n"
-        "These are general craft defaults. Where the author's style guide "
-        "below conflicts, the style guide wins.\n\n"
+        "These are general craft defaults.\n\n"
+        f"{precedence}\n\n"
         f"{body}"
     )
 
@@ -152,7 +159,13 @@ def _load_ai_patterns(pack_root: Path) -> str:
 
 def _render_humanizer(m: Manifest, pack_root: Path) -> str:
     lines: list[str] = ["## Section 1: The Humanizer (Strict Anti-Robot Constraints)\n"]
-    lines.append("Before applying style, you must scrub the text of LLM-isms:\n")
+    lines.append(render_prompt_rules([
+        PromptRule(
+            "Scrub the text of LLM-isms before applying the author's style.",
+            "Removing formulaic language first keeps it from obscuring the author's voice.",
+        )
+    ]))
+    lines.append("")
 
     words = effective_words(m)
     if words:
@@ -265,7 +278,13 @@ def _render_humanizer(m: Manifest, pack_root: Path) -> str:
             lines.append(f"  Banned franchises: {', '.join(m.pop_culture.banned)}")
         lines.append("")
 
-    lines.append("**Avoid these AI sentence patterns:**\n")
+    lines.append(render_prompt_rules([
+        PromptRule(
+            "Avoid every AI sentence pattern listed below.",
+            "These patterns are recurrent style defects that make prose sound machine-generated.",
+        )
+    ]))
+    lines.append("")
     lines.append(_load_ai_patterns(pack_root))
 
     return "\n".join(lines)
@@ -286,7 +305,13 @@ def _render_format(pack_root: Path, m: Manifest, name: str) -> str:
 
 
 def _render_samples(pack_root: Path, m: Manifest, ids: list[str]) -> str:
-    out: list[str] = ["---\n\n## Voice exemplars (match the tone and rhythm of these)\n"]
+    exemplar_rule = render_prompt_rules([
+        PromptRule(
+            "Match the tone and rhythm of these voice exemplars.",
+            "These examples capture the author's voice in use.",
+        )
+    ])
+    out: list[str] = [f"---\n\n## Voice exemplars\n\n{exemplar_rule}\n"]
     for sid in ids:
         sample = next((s for s in m.samples if s.id == sid), None)
         if sample is None:

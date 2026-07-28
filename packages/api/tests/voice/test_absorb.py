@@ -57,6 +57,22 @@ def test_compose_prompt_smoke(tmp_path: Path) -> None:
         'Do not use any item in this banished vocabulary list: "delve".',
         "author's established voice",
     )
+    assert_paired(
+        out,
+        "When general craft guidance conflicts with the author's style guide, "
+        "follow the style guide.",
+        "author's style guide records their established preferences",
+    )
+    assert_paired(
+        out,
+        "Scrub the text of LLM-isms before applying the author's style.",
+        "Removing formulaic language first",
+    )
+    assert_paired(
+        out,
+        "Avoid every AI sentence pattern listed below.",
+        "style defects that make prose sound machine-generated",
+    )
 
 def test_compose_prompt_includes_fingerprint_single_voice_block(tmp_path: Path) -> None:
     from blogforge.voice import compose_prompt
@@ -98,6 +114,11 @@ def test_compose_prompt_includes_fingerprint_single_voice_block(tmp_path: Path) 
     assert prompt.count("## Voice exemplars") == 1
     assert "This is my real voice sample." in prompt
     assert "author's actual writing" not in prompt
+    assert_paired(
+        prompt,
+        "Match the tone and rhythm of these voice exemplars.",
+        "examples capture the author's voice in use",
+    )
 
 
 def test_validate_template_pack() -> None:

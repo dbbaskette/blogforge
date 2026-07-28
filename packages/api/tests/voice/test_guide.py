@@ -26,7 +26,7 @@ def test_full_profile_renders_all_sections() -> None:
         distilled_at=datetime(2026, 6, 19, tzinfo=UTC),
     )
     md = build_voice_guide(p)
-    assert "When you write for me" in md
+    assert "when you write for me" in md
     assert "pragmatic platform engineer" in md
     assert "Concrete nouns" in md
     assert "synergy" in md
@@ -37,6 +37,21 @@ def test_full_profile_renders_all_sections() -> None:
         md,
         "Do not copy the `Rule:` and `Because:` labels into article output.",
         "instructions for the writing process",
+    )
+    assert_paired(
+        md,
+        "Follow this voice guide when writing for me.",
+        "established voice",
+    )
+    assert_paired(
+        md,
+        "Match the persona and style described below.",
+        "recognizable voice",
+    )
+    assert_paired(
+        md,
+        "Do not use the words, phrases, or patterns under `Avoid these AI-writing tells.`",
+        "style defects that make prose sound machine-generated",
     )
 
 

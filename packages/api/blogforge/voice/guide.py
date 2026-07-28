@@ -6,11 +6,10 @@ from blogforge.voice.ai_tells import load_ai_tells
 from blogforge.voice.models import VoiceProfile
 
 _PREAMBLE = (
-    "> **How to use:** When you write for me, follow this voice guide — match the\n"
-    "> persona and style below, and never use the words, phrases, or patterns under\n"
-    '> "Avoid these AI-writing tells." Paste it into any AI assistant as a style\n'
-    "> instruction, or keep it as a personal reference. `Rule:` and `Because:` labels\n"
-    "> are writing-process instructions; do not copy either label into article output."
+    "> **How to use:** This guide is a portable reference for an AI assistant or\n"
+    "> personal writing workflow when you write for me. The paired rules below identify\n"
+    "> the constraints\n"
+    "> that shape article output."
 )
 
 
@@ -18,6 +17,18 @@ def build_voice_guide(profile: VoiceProfile) -> str:
     ai = load_ai_tells()
     parts: list[str] = [f"# {profile.name or 'My Voice'} — Writing Voice Guide", _PREAMBLE]
     parts.append(render_prompt_rules([
+        PromptRule(
+            "Follow this voice guide when writing for me.",
+            "It records the author's established voice and writing preferences.",
+        ),
+        PromptRule(
+            "Match the persona and style described below.",
+            "The persona and style define the author's recognizable voice.",
+        ),
+        PromptRule(
+            "Do not use the words, phrases, or patterns under `Avoid these AI-writing tells.`",
+            "These are recurrent style defects that make prose sound machine-generated.",
+        ),
         PromptRule(
             "Do not copy the `Rule:` and `Because:` labels into article output.",
             "They are instructions for the writing process, not content for the article.",
