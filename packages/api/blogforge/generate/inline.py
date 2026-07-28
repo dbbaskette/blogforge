@@ -21,7 +21,6 @@ from blogforge.drafts.models import Draft
 from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
 from blogforge.prompt_rules import (
-    OUTPUT_RATIONALE,
     PRESERVATION_RATIONALE,
     TTS_RATIONALE,
     PromptRule,
@@ -75,7 +74,11 @@ _ACTION_RULES: dict[str, tuple[PromptRule, ...]] = {
         ),
     ),
     "fix": (
-        PromptRule("Preserve the meaning, voice, and level of formality.", PRESERVATION_RATIONALE),
+        PromptRule("Preserve the passage's meaning.", PRESERVATION_RATIONALE),
+        PromptRule(
+            "Preserve the author's voice and level of formality.",
+            "A grammar or clarity fix should still read like the surrounding approved prose.",
+        ),
     ),
 }
 
@@ -101,7 +104,7 @@ def _build_user_prompt(text: str, action: InlineAction, instruction: str) -> str
             ),
             PromptRule(
                 "Return the rewritten passage as Markdown without a preamble, surrounding quotes, explanation, alternatives, or notes.",
-                OUTPUT_RATIONALE,
+                "The editor splices this response directly into the selected text.",
             ),
             PromptRule(
                 "Silently correct any mistake without narrating the correction.",
@@ -112,9 +115,12 @@ def _build_user_prompt(text: str, action: InlineAction, instruction: str) -> str
                 "The replacement must read as part of the existing article.",
             ),
             PromptRule(
-                "Do not use banished words or phrases, including em dashes.",
-                "These terms conflict with the author's established voice and explicit preferences. "
-                + TTS_RATIONALE,
+                "Do not use banished words or phrases.",
+                "Those terms conflict with the author's established voice and explicit preferences.",
+            ),
+            PromptRule(
+                "Do not use em dashes.",
+                TTS_RATIONALE,
             ),
             PromptRule(
                 "Do not copy the `Rule` or `Because` labels into the rewritten passage.",

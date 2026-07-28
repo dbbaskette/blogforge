@@ -49,9 +49,7 @@ _CLAIMS_SCHEMA: dict[str, object] = {
 def _build_prompt(markdown: str, reference_context: str) -> str:
     if reference_context.strip():
         sources = (
-            "Reference materials the author attached are below. Judge each claim "
-            "ONLY against these sources:\n\n"
-            f"{reference_context.strip()}"
+            f"Reference materials the author attached are below:\n\n{reference_context.strip()}"
         )
         source_rules = render_prompt_rules(
             [
@@ -106,6 +104,10 @@ def _build_prompt(markdown: str, reference_context: str) -> str:
             PromptRule(
                 "Return JSON matching the claims schema.",
                 OUTPUT_RATIONALE,
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels into claim text or notes.",
+                "Claim text and notes are parsed into writer-facing review fields, so prompt metadata would corrupt the factual review output.",
             ),
         ],
         bullet=True,

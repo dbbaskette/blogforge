@@ -12,12 +12,14 @@ from blogforge.generate.claims import _build_prompt, check_claims
 def test_prompt_uses_references_when_present() -> None:
     p = _build_prompt("The sky is green.", "## Reference Materials\nThe sky is blue.")
     assert "The sky is blue." in p  # reference context embedded
-    assert "Judge each claim" in p
+    assert "Reference materials the author attached are below:" in p
     assert "The sky is green." in p  # article embedded
     assert "Rule: Judge claims only against the attached sources." in p
     assert "Because: Unsupported material damages factual trust" in p
     assert "Rule: Return JSON matching the claims schema." in p
     assert "Because: Downstream code parses this response" in p
+    assert "Rule: Do not copy the `Rule` or `Because` labels into claim text or notes." in p
+    assert "Because: Claim text and notes are parsed into writer-facing review fields" in p
 
 
 def test_prompt_handles_no_references() -> None:

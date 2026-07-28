@@ -65,8 +65,12 @@ def _build_prompt(seed: str, n: int) -> str:
                 "The writer needs to recognize the post's promise at a glance.",
             ),
             PromptRule(
-                "Do not use clickbait or trailing punctuation in titles.",
-                "Misleading or cluttered titles weaken reader trust and display poorly.",
+                "Do not use clickbait in titles.",
+                "Misleading titles weaken reader trust.",
+            ),
+            PromptRule(
+                "Do not use trailing punctuation in titles.",
+                "Trailing punctuation makes titles look cluttered in publishing surfaces.",
             ),
             PromptRule(
                 "Give each idea a one-line angle describing what the post would argue or reveal.",

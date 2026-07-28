@@ -71,8 +71,12 @@ def _build_prompt(draft: Draft, kind: HeadlineKind, n: int) -> str:
                 "Readers need to understand the article's value at a glance.",
             ),
             PromptRule(
-                "Do not use clickbait or trailing punctuation in titles.",
-                "Misleading or cluttered titles weaken reader trust and display poorly.",
+                "Do not use clickbait in titles.",
+                "Misleading titles weaken reader trust.",
+            ),
+            PromptRule(
+                "Do not use trailing punctuation in titles.",
+                "Trailing punctuation makes titles look cluttered in publishing surfaces.",
             ),
         ]
         if kind == "title"

@@ -49,6 +49,11 @@ def test_build_prompt_grounds_in_draft_and_picks_kind() -> None:
     assert "The Betrayal" in title_prompt  # outline included
     assert "Rule: Ground every headline option in this post." in title_prompt
     assert "Because: A headline for a different topic misrepresents the article" in title_prompt
+    assert (
+        "Rule: Do not use clickbait in titles.\nBecause: Misleading titles weaken reader trust."
+        in title_prompt
+    )
+    assert "Rule: Do not use trailing punctuation in titles." in title_prompt
     hook_prompt = _build_prompt(_draft(), "hook", 3)
     assert "OPENING HOOKS" in hook_prompt
 

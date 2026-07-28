@@ -67,8 +67,12 @@ _FORMAT_RULES: dict[RepurposeFormat, tuple[PromptRule, ...]] = {
             "A complete thread needs enough space to develop the article's point without becoming a wall of posts.",
         ),
         PromptRule(
-            "Make each tweet stand alone and stay under 280 characters.",
-            "Readers encounter individual tweets out of context and the platform enforces its character limit.",
+            "Make each tweet stand alone.",
+            "Readers encounter individual tweets out of context.",
+        ),
+        PromptRule(
+            "Keep each tweet under 280 characters.",
+            "The platform enforces its character limit.",
         ),
         PromptRule(
             "Number tweets like 1/, 2/.", "Clear numbering preserves the thread's reading order."
@@ -82,6 +86,10 @@ _FORMAT_RULES: dict[RepurposeFormat, tuple[PromptRule, ...]] = {
         PromptRule(
             "Keep the feed post between 50 and 299 words.",
             "LinkedIn feed readers need a concise post that is not padded for length.",
+        ),
+        PromptRule(
+            "Do not pad the feed post to look longer.",
+            "Short LinkedIn posts can still be useful and cited, while padding wastes the reader's attention.",
         ),
         PromptRule(
             "Open with a strong first line.",
@@ -125,8 +133,12 @@ _FORMAT_RULES: dict[RepurposeFormat, tuple[PromptRule, ...]] = {
             "Readers open a Pulse article to learn, not to read promotional framing.",
         ),
         PromptRule(
-            "Name the product or brand explicitly and keep the article original and first-hand.",
-            "Clear attribution and first-hand detail make the article credible when it is cited or shared.",
+            "Name the product or brand explicitly.",
+            "Clear attribution keeps the subject identifiable when the article is cited or shared.",
+        ),
+        PromptRule(
+            "Keep the article original and first-hand.",
+            "First-hand detail makes the article more credible than a generic repost.",
         ),
         PromptRule(
             "Return the article body as Markdown.",
@@ -184,12 +196,20 @@ _FORMAT_RULES: dict[RepurposeFormat, tuple[PromptRule, ...]] = {
             "An announcement email should be concise enough to retain attention.",
         ),
         PromptRule(
-            "Explain why the post matters and link the reader to it.",
-            "Recipients need both a reason to care and a path to the full article.",
+            "Explain why the post matters.",
+            "Recipients need a reason to care before they decide to read more.",
         ),
         PromptRule(
-            "Use a warm, direct tone with one clear call to action.",
-            "A focused personal message is easier for readers to act on.",
+            "Link the reader to the post.",
+            "Recipients need a path to the full article.",
+        ),
+        PromptRule(
+            "Use a warm, direct tone.",
+            "A personal tone makes an announcement email feel written for its recipient.",
+        ),
+        PromptRule(
+            "Use one clear call to action.",
+            "A focused email makes the next step easy for readers to act on.",
         ),
     ),
 }

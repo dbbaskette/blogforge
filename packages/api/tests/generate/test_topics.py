@@ -6,6 +6,11 @@ def test_prompt_renders_rules_for_topics() -> None:
     assert "Rule: Make each idea a genuinely different direction" in prompt
     assert "Rule: Return JSON matching the topics schema." in prompt
     assert "Because: Downstream code parses this response" in prompt
+    assert (
+        "Rule: Do not use clickbait in titles.\nBecause: Misleading titles weaken reader trust."
+        in prompt
+    )
+    assert "Rule: Do not use trailing punctuation in titles." in prompt
 
 
 def test_parses_well_formed_json() -> None:

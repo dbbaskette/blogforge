@@ -8,6 +8,25 @@ def test_prompt_renders_rules_for_reword_suggestions() -> None:
     assert "Because: Downstream code parses this response" in prompt
 
 
+def test_prompt_renders_rules_for_fact_check_suggestions() -> None:
+    prompt = _build_prompt("fact_check", "SYSTEM", "# Draft", 4)
+    rule = "Rule: Do not assert whether a claim is true or false; flag only what to check."
+    assert rule in prompt
+    assert (
+        "Because: This assistant has the draft, not the evidence needed to verify factual truth."
+        in prompt
+    )
+
+
+def test_prompt_renders_rules_for_expand_suggestions() -> None:
+    prompt = _build_prompt("expand", "SYSTEM", "# Draft", 4)
+    assert "Rule: Do not write the addition itself." in prompt
+    assert (
+        "Because: This workflow offers editorial direction while leaving the prose to the author."
+        in prompt
+    )
+
+
 def test_parses_well_formed_suggestions() -> None:
     raw = (
         '{"suggestions": ['

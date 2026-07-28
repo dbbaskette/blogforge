@@ -63,6 +63,19 @@ def test_build_user_prompt_embeds_passage_and_action() -> None:
     assert "fewer words" in prompt  # the 'shorten' rule
     assert "Rule: Return exactly one rewritten passage and nothing else." in prompt
     assert "Because: The editor replaces the selected text with this response" in prompt
+    assert "Rule: Do not use banished words or phrases." in prompt
+    assert (
+        "Rule: Do not use em dashes.\nBecause: This text will be read by a text-to-speech engine"
+        in prompt
+    )
+
+
+def test_fix_prompt_splits_preservation_and_splice_rules() -> None:
+    prompt = _build_user_prompt("some text", "fix", "")
+    assert "Rule: Preserve the passage's meaning." in prompt
+    assert "Rule: Preserve the author's voice and level of formality." in prompt
+    assert "Rule: Return the rewritten passage as Markdown" in prompt
+    assert "Because: The editor splices this response directly into the selected text." in prompt
 
 
 def test_build_user_prompt_custom_uses_instruction() -> None:
