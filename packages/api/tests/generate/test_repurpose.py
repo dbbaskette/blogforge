@@ -65,18 +65,19 @@ def test_build_prompt_embeds_article_and_channel_directive() -> None:
     prompt = _build_prompt("The whole article body here.", "x_thread")
     assert "The whole article body here." in prompt
     assert "280 characters" in prompt  # x_thread directive
-    assert "don't invent facts" in prompt
+    assert "Rule: Use only facts present in the source article." in prompt
+    assert "Because: Repurposed content must not introduce unsupported claims" in prompt
 
 
 def test_linkedin_feed_and_article_formats_carry_geo_guardrails() -> None:
     # Feed post: capped short, teaching, brand named.
-    feed = FORMATS["linkedin"]["directive"]
-    assert "50-299 words" in feed
+    feed = _build_prompt("body", "linkedin")
+    assert "50 and 299 words" in feed
     assert "brand" in feed.lower()
     # Pulse article: long-form sweet spot (get cited far more than feed posts).
-    article = FORMATS["linkedin_article"]
-    assert "800-1,200 words" in article["directive"]
-    assert "Pulse" in article["label"]
+    article = _build_prompt("body", "linkedin_article")
+    assert "800 and 1,200 words" in article
+    assert "Pulse" in FORMATS["linkedin_article"]["label"]
 
 
 @pytest.mark.asyncio

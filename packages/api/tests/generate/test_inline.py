@@ -1,5 +1,6 @@
 """Inline AI transform composes a voice prompt for a selected passage and
 returns the provider's rewrite. Mirrors the section-prompt recorder pattern."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -59,8 +60,9 @@ def _draft() -> Draft:
 def test_build_user_prompt_embeds_passage_and_action() -> None:
     prompt = _build_user_prompt("the quick brown fox", "shorten", "")
     assert "the quick brown fox" in prompt
-    assert "fewer words" in prompt  # the 'shorten' directive
-    assert "Return ONLY the final rewritten passage" in prompt
+    assert "fewer words" in prompt  # the 'shorten' rule
+    assert "Rule: Return exactly one rewritten passage and nothing else." in prompt
+    assert "Because: The editor replaces the selected text with this response" in prompt
 
 
 def test_build_user_prompt_custom_uses_instruction() -> None:

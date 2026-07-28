@@ -1,4 +1,5 @@
 """Hero image: Imagen REST call (mocked) + export embedding."""
+
 from __future__ import annotations
 
 import base64
@@ -36,6 +37,8 @@ def test_build_hero_prompt_uses_title_and_forbids_text() -> None:
     p = build_hero_prompt(_draft())
     assert "Why local-first wins" in p
     assert "no text" in p.lower()
+    assert "Rule: The image must contain no text, letters, words, or logos." in p
+    assert "Because: Generated lettering is unreliable" in p
 
 
 def _rich_draft() -> Draft:
@@ -97,6 +100,7 @@ async def test_build_hero_prompt_ai_frames_model_concept_from_content() -> None:
     # The model actually saw the article's content, not just the title.
     assert "Offline-first sync" in prov.seen_prompt
     assert "Your data should live on your device" in prov.seen_prompt
+    assert "Rule: Output only the image prompt" in prov.seen_prompt
 
 
 @pytest.mark.asyncio
@@ -137,7 +141,9 @@ async def test_generate_hero_image_403_is_missing_key() -> None:
 @respx.mock
 @pytest.mark.asyncio
 async def test_generate_hero_image_empty_predictions_errors() -> None:
-    respx.post(url__startswith=_PREDICT).mock(return_value=httpx.Response(200, json={"predictions": []}))
+    respx.post(url__startswith=_PREDICT).mock(
+        return_value=httpx.Response(200, json={"predictions": []})
+    )
     with pytest.raises(ProviderError):
         await generate_hero_image("p", "sk-key")
 

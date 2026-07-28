@@ -1,5 +1,6 @@
 """On-demand Humanize pass — additive 'sound human' rewrites, complementing
 the subtractive anti-AI-tells Humanizer. Mirrors generate/geo.py."""
+# ruff: noqa: E501
 
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from typing import Any, Literal
 from blogforge.drafts.models import Draft
 from blogforge.generate.textutil import strip_inline_emphasis
 from blogforge.llm.base import LLMProvider
+from blogforge.prompt_rules import OUTPUT_RATIONALE, PromptRule, render_prompt_rules
 from blogforge.voice import compose_prompt
 
 Intensity = Literal["light", "medium", "strong"]
@@ -169,17 +171,48 @@ def parse_humanize(raw: str, draft: Draft, engaged: tuple[Lens, ...]) -> dict[st
 _PER_LENS_CAP = 15  # max points one lens can dock from the human-signal sub-score
 _DOCK_PER = 4
 
-_DIRECTIVE = (
-    "You are a line editor making prose read as written by a real person, not a "
-    "model. Using the lens rubric above, find sentences that read as robotic and "
-    "propose a rewrite for each. Only engage these lenses: {lenses}. For each "
-    "finding return the section title, the verbatim "
-    "target sentence copied exactly from the draft, a suggestion, and a one-line "
-    "note. GUARDRAIL: change wording, rhythm, and stance only — never alter a "
-    "number, name, quotation, or link, and never rewrite the opening answer "
-    'sentence. Return JSON: {{"lenses": {{"<lens>": [{{"section": "", '
-    '"target": "", "suggestion": "", "note": ""}}]}}}} with only the engaged lenses.'
-)
+_DIRECTIVE = "You are a line editor making prose read as written by a real person, not a model. Using the lens rubric above, find robotic sentences and propose a rewrite for each."
+
+
+def _build_directive(engaged: tuple[Lens, ...]) -> str:
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                f"Engage only these lenses: {', '.join(engaged)}.",
+                "The selected intensity controls which editing concerns the writer asked to review.",
+            ),
+            PromptRule(
+                "Return the section title, the target sentence copied verbatim from the draft, a suggestion, and a one-line note for each finding.",
+                "The editor anchors each suggestion to a precise, reviewable passage.",
+            ),
+            PromptRule(
+                "Preserve every number, URL, and quoted span.",
+                "Humanization must not alter the article's factual record.",
+            ),
+            PromptRule(
+                "Preserve every name.",
+                "Changing a named person, organization, or product would damage factual attribution.",
+            ),
+            PromptRule(
+                "Change wording, rhythm, and stance only.",
+                "This is a bounded edit rather than a rewrite of the approved article.",
+            ),
+            PromptRule(
+                "Do not rewrite the opening answer sentence.",
+                "That sentence is separately GEO-scored and must remain stable.",
+            ),
+            PromptRule(
+                "Return findings as JSON matching the supplied schema with only the engaged lenses.",
+                OUTPUT_RATIONALE,
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels into suggestions.",
+                "Those labels are prompt metadata rather than article prose.",
+            ),
+        ]
+    )
+    schema = '{"lenses": {"<lens>": [{"section": "", "target": "", "suggestion": "", "note": ""}]}}'
+    return f"{_DIRECTIVE}\n\n{rules}\n\nFindings schema: {schema}."
 
 
 def score_report(report: dict[str, Any]) -> int:
@@ -200,7 +233,7 @@ async def analyze_humanize(
     engaged = lenses_for(intensity)
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
     rubric = load_rubric(pack_root)
-    directive = _DIRECTIVE.format(lenses=", ".join(engaged))
+    directive = _build_directive(engaged)
     prompt = f"{system}\n\n---\n\n{rubric}\n\n{directive}\n\nDRAFT:\n{_draft_text(draft)}"
     resp = await provider.complete(model=model, prompt=prompt)
     report = parse_humanize(resp.text, draft, engaged)

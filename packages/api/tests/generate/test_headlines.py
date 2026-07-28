@@ -1,4 +1,5 @@
 """Headline lab: structured title/hook variants grounded in the draft."""
+
 from __future__ import annotations
 
 import json
@@ -46,6 +47,8 @@ def test_build_prompt_grounds_in_draft_and_picks_kind() -> None:
     assert "alternative TITLES" in title_prompt
     assert "Why local-first wins" in title_prompt  # grounded in the topic
     assert "The Betrayal" in title_prompt  # outline included
+    assert "Rule: Ground every headline option in this post." in title_prompt
+    assert "Because: A headline for a different topic misrepresents the article" in title_prompt
     hook_prompt = _build_prompt(_draft(), "hook", 3)
     assert "OPENING HOOKS" in hook_prompt
 
@@ -57,7 +60,9 @@ async def test_generate_headlines_parses_options(
     monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
     monkeypatch.setenv(
         "BLOGFORGE_MOCK_OUTPUT_JSON",
-        json.dumps({"options": ["The Quiet Betrayal", "Who Owns Your Words?", "Local-First, Finally"]}),
+        json.dumps(
+            {"options": ["The Quiet Betrayal", "Who Owns Your Words?", "Local-First, Finally"]}
+        ),
     )
     from blogforge.llm.registry import get_provider
 
@@ -69,7 +74,9 @@ async def test_generate_headlines_parses_options(
 
 
 @pytest.mark.asyncio
-async def test_generate_headlines_caps_to_n(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_generate_headlines_caps_to_n(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
     monkeypatch.setenv(
         "BLOGFORGE_MOCK_OUTPUT_JSON", json.dumps({"options": ["a", "b", "c", "d", "e"]})

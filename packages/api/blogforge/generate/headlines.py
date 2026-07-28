@@ -5,6 +5,8 @@ title or opening-hook options in the author's voice, so the author can pick the
 sharpest one instead of living with the first attempt. Uses structured JSON
 output (one provider.complete call) so we get a clean list.
 """
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import json
@@ -14,6 +16,7 @@ from typing import Any, Literal
 from blogforge.drafts.models import Draft
 from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
+from blogforge.prompt_rules import OUTPUT_RATIONALE, PromptRule, render_prompt_rules
 
 HeadlineKind = Literal["title", "hook"]
 
@@ -26,18 +29,8 @@ _OPTIONS_SCHEMA: dict[str, object] = {
 }
 
 _KIND_DIRECTIVE: dict[str, str] = {
-    "title": (
-        "Generate {n} distinct alternative TITLES for this post. Each should be a "
-        "different angle (curiosity, benefit, contrarian, specific-number, etc.) — "
-        "not minor rewordings of one idea. Punchy, concrete, no clickbait, no "
-        "trailing punctuation."
-    ),
-    "hook": (
-        "Generate {n} distinct alternative OPENING HOOKS (one sentence or two each) "
-        "for this post. Each should open the piece a different way (a scene, a "
-        "provocation, a surprising fact, a direct question). Make the reader want "
-        "to keep going."
-    ),
+    "title": ("Generate {n} alternative TITLES for this post."),
+    "hook": ("Generate {n} alternative OPENING HOOKS for this post."),
 }
 
 
@@ -63,11 +56,74 @@ def _context(draft: Draft) -> str:
 
 def _build_prompt(draft: Draft, kind: HeadlineKind, n: int) -> str:
     directive = _KIND_DIRECTIVE[kind].format(n=n)
+    kind_rules = (
+        [
+            PromptRule(
+                "Make every title a distinct angle rather than a minor rewording.",
+                "Distinct options help the author choose a genuinely different framing.",
+            ),
+            PromptRule(
+                "Explore different title angles such as curiosity, benefit, contrarian, or a specific number.",
+                "Varied approaches make the headline options useful alternatives instead of a single idea repeated.",
+            ),
+            PromptRule(
+                "Make each title punchy and concrete.",
+                "Readers need to understand the article's value at a glance.",
+            ),
+            PromptRule(
+                "Do not use clickbait or trailing punctuation in titles.",
+                "Misleading or cluttered titles weaken reader trust and display poorly.",
+            ),
+        ]
+        if kind == "title"
+        else [
+            PromptRule(
+                "Make every hook a distinct opening approach rather than a minor rewording.",
+                "Different openings let the author choose the strongest way into the article.",
+            ),
+            PromptRule(
+                "Vary the hooks with approaches such as a scene, provocation, surprising fact, or direct question.",
+                "Different opening shapes create meaningful choices for the article's first impression.",
+            ),
+            PromptRule(
+                "Keep each hook to one or two sentences.",
+                "An opening hook needs to establish momentum before the article begins.",
+            ),
+            PromptRule(
+                "Make each hook invite the reader to continue.",
+                "The hook's job is to earn attention for the article that follows.",
+            ),
+        ]
+    )
+    rules = render_prompt_rules(
+        [
+            *kind_rules,
+            PromptRule(
+                "Ground every headline option in this post.",
+                "A headline for a different topic misrepresents the article.",
+            ),
+            PromptRule(
+                "Use the author's voice.",
+                "The options should sound like the author, not a generic headline generator.",
+            ),
+            PromptRule(
+                "Do not use banished words or phrases.",
+                "Those terms conflict with the author's established voice and explicit preferences.",
+            ),
+            PromptRule(
+                "Return JSON matching the options schema.",
+                OUTPUT_RATIONALE,
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels into options.",
+                "Those labels are prompt metadata rather than article prose.",
+            ),
+        ]
+    )
     return (
         f"{directive}\n\n"
-        "Ground every option in the post described below — do not invent a "
-        "different topic. Stay in the author's voice; banished words/phrases never "
-        'appear. Return JSON: {"options": ["...", "..."]}.\n\n'
+        f"{rules}\n\n"
+        'Options schema: {"options": ["...", "..."]}.\n\n'
         f"{_context(draft)}"
     )
 

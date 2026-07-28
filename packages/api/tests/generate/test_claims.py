@@ -1,4 +1,5 @@
 """Fact-check: extract claims and judge them against references."""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +14,10 @@ def test_prompt_uses_references_when_present() -> None:
     assert "The sky is blue." in p  # reference context embedded
     assert "Judge each claim" in p
     assert "The sky is green." in p  # article embedded
+    assert "Rule: Judge claims only against the attached sources." in p
+    assert "Because: Unsupported material damages factual trust" in p
+    assert "Rule: Return JSON matching the claims schema." in p
+    assert "Because: Downstream code parses this response" in p
 
 
 def test_prompt_handles_no_references() -> None:
@@ -29,7 +34,11 @@ async def test_check_claims_parses_and_filters(monkeypatch: pytest.MonkeyPatch) 
         json.dumps(
             {
                 "claims": [
-                    {"text": "X happened in 2020.", "status": "contradicted", "note": "Ref says 2019."},
+                    {
+                        "text": "X happened in 2020.",
+                        "status": "contradicted",
+                        "note": "Ref says 2019.",
+                    },
                     {"text": "Y is fast.", "status": "unsupported", "note": "No source."},
                     {"text": "Z is true.", "status": "bogus", "note": "drop me"},  # invalid status
                     {"status": "supported", "note": "missing text"},  # no text → dropped

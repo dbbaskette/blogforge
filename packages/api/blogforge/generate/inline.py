@@ -9,6 +9,8 @@ The voice setup mirrors `stream_section` (same pack/format/samples → system
 prompt) so an inline edit reads in exactly the same voice as the surrounding
 prose.
 """
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import re
@@ -18,6 +20,13 @@ from typing import Any, Literal
 from blogforge.drafts.models import Draft
 from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
+from blogforge.prompt_rules import (
+    OUTPUT_RATIONALE,
+    PRESERVATION_RATIONALE,
+    TTS_RATIONALE,
+    PromptRule,
+    render_prompt_rules,
+)
 
 InlineAction = Literal["rephrase", "shorten", "expand", "fix", "custom"]
 
@@ -30,21 +39,43 @@ _SELF_CORRECTION_RE = re.compile(
 )
 
 _ACTION_DIRECTIVE: dict[str, str] = {
+    "rephrase": ("Rewrite the passage in fresh words."),
+    "shorten": ("Tighten the passage."),
+    "expand": ("Develop the passage further."),
+    "fix": ("Fix grammar, clarity, and flow."),
+}
+
+_ACTION_RULES: dict[str, tuple[PromptRule, ...]] = {
     "rephrase": (
-        "Rewrite the passage to say the same thing in fresh words — different "
-        "phrasing, same meaning, roughly the same length."
+        PromptRule("Preserve the passage's meaning.", PRESERVATION_RATIONALE),
+        PromptRule(
+            "Keep roughly the same length.",
+            "A rephrase should fit the selected passage's existing place in the article.",
+        ),
     ),
     "shorten": (
-        "Tighten the passage: same meaning, noticeably fewer words. Cut filler "
-        "and hedging, keep the substance."
+        PromptRule("Preserve the passage's meaning.", PRESERVATION_RATIONALE),
+        PromptRule(
+            "Use noticeably fewer words.",
+            "The editor selected this action to make the passage more concise.",
+        ),
+        PromptRule(
+            "Cut filler and hedging while keeping the substance.",
+            "Conciseness should not discard the point the passage makes.",
+        ),
     ),
     "expand": (
-        "Develop the passage further with one concrete detail, example, or "
-        "consequence. Add substance, not padding."
+        PromptRule(
+            "Add one concrete detail, example, or consequence.",
+            "An expansion needs useful substance rather than extra wording.",
+        ),
+        PromptRule(
+            "Add substance rather than padding.",
+            "The selected text should become more informative, not merely longer.",
+        ),
     ),
     "fix": (
-        "Fix grammar, clarity, and flow. Do NOT change the meaning, the voice, "
-        "or the level of formality."
+        PromptRule("Preserve the meaning, voice, and level of formality.", PRESERVATION_RATIONALE),
     ),
 }
 
@@ -57,20 +88,41 @@ def _auto_pick_samples(manifest: dict[str, Any], n: int = 3) -> list[str]:
 def _build_user_prompt(text: str, action: InlineAction, instruction: str) -> str:
     if action == "custom":
         directive = instruction.strip() or "Improve the passage."
+        action_rules: tuple[PromptRule, ...] = ()
     else:
         directive = _ACTION_DIRECTIVE[action]
-    return (
-        f"{directive}\n\n"
-        "Return ONLY the final rewritten passage as markdown — output exactly "
-        "one version and nothing else: no preamble, no surrounding quotes, no "
-        "explanation, no alternatives, and no notes about what you changed. If "
-        "you catch a mistake (e.g. an em dash), silently correct it and output "
-        "only the fixed final version — never narrate the correction. Match the "
-        "surrounding style and stay in the author's voice; banished "
-        "words/phrases (including em dashes) never appear.\n\n"
-        "PASSAGE:\n"
-        f"{text.strip()}"
+        action_rules = _ACTION_RULES[action]
+    rules = render_prompt_rules(
+        [
+            *action_rules,
+            PromptRule(
+                "Return exactly one rewritten passage and nothing else.",
+                "The editor replaces the selected text with this response.",
+            ),
+            PromptRule(
+                "Return the rewritten passage as Markdown without a preamble, surrounding quotes, explanation, alternatives, or notes.",
+                OUTPUT_RATIONALE,
+            ),
+            PromptRule(
+                "Silently correct any mistake without narrating the correction.",
+                "Editorial commentary would be inserted into the article instead of the selected text.",
+            ),
+            PromptRule(
+                "Match the surrounding style and the author's voice.",
+                "The replacement must read as part of the existing article.",
+            ),
+            PromptRule(
+                "Do not use banished words or phrases, including em dashes.",
+                "These terms conflict with the author's established voice and explicit preferences. "
+                + TTS_RATIONALE,
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels into the rewritten passage.",
+                "Those labels are prompt metadata rather than article prose.",
+            ),
+        ]
     )
+    return f"{directive}\n\n{rules}\n\nPASSAGE:\n{text.strip()}"
 
 
 def _clean_inline_output(text: str) -> str:
@@ -129,6 +181,6 @@ async def transform_text(
             from blogforge.voice.packs.manifest import Manifest
 
             out = await enforce_voice_rules(out, Manifest.model_validate(manifest), provider, model)
-        except Exception:  # noqa: BLE001 — enforcement is best-effort
+        except Exception:
             pass
     return out
