@@ -110,6 +110,11 @@ def build_repair_prompt(text: str, v: RuleViolations) -> str:
             "Return only the corrected text.",
             "Downstream code replaces the original passage with this response.",
         ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "the corrected text.",
+            "Downstream code replaces the original passage with this response.",
+        ),
     ])
     return (
         "The text below must follow these constraints but currently breaks them:\n"

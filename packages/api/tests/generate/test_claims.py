@@ -18,7 +18,10 @@ def test_prompt_uses_references_when_present() -> None:
     assert "Because: Unsupported material damages factual trust" in p
     assert "Rule: Return JSON matching the claims schema." in p
     assert "Because: Downstream code parses this response" in p
-    assert "Rule: Do not copy the `Rule` or `Because` labels into claim text or notes." in p
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "claim text or notes."
+    ) in p
     assert "Because: Claim text and notes are parsed into writer-facing review fields" in p
 
 

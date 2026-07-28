@@ -54,6 +54,10 @@ def test_build_prompt_grounds_in_draft_and_picks_kind() -> None:
         in title_prompt
     )
     assert "Rule: Do not use trailing punctuation in titles." in title_prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into options."
+        in title_prompt
+    )
     hook_prompt = _build_prompt(_draft(), "hook", 3)
     assert "OPENING HOOKS" in hook_prompt
 

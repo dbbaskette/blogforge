@@ -843,6 +843,11 @@ async def test_semantic_prompt_renders_rule_rationale_pairs(tmp_path) -> None:  
         _assert_rule_pair(captured["prompt"], instruction, rationale)
     _assert_rule_pair(
         captured["prompt"],
+        "Do not copy the `Rule` or `Because` labels or their rationales into semantic findings.",
+        "Prompt metadata would corrupt fields parsed by the GEO analysis panel.",
+    )
+    _assert_rule_pair(
+        captured["prompt"],
         "Return exactly one concrete sentence in `impact` for every thin spot and "
         "uncited claim without restating the fix.",
         "The panel needs a concise explanation of each recommendation's "

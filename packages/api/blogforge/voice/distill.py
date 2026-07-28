@@ -4,8 +4,10 @@ from __future__ import annotations
 from blogforge.llm.base import LLMProvider
 from blogforge.prompt_rules import (
     OUTPUT_RATIONALE,
+    STYLE_GUIDE_RATIONALE,
     VOICE_RATIONALE,
     PromptRule,
+    normalize_instruction_asset,
     render_prompt_rules,
 )
 
@@ -38,6 +40,26 @@ def _build_prompt(sample_texts: list[str]) -> str:
             VOICE_RATIONALE,
         ),
         PromptRule(
+            "Format every model-facing style instruction as an adjacent `Rule:` and "
+            "`Because:` pair.",
+            "A portable guide must explain why each instruction matters.",
+        ),
+        PromptRule(
+            "Give every `Rule:` its own tailored `Because:` line immediately below it.",
+            "A nearby operational reason keeps each instruction unambiguous.",
+        ),
+        PromptRule(
+            "Keep descriptive headings, observations, and examples as context rather "
+            "than labeling them as rules.",
+            "Only actual instructions require rationale metadata.",
+        ),
+        PromptRule(
+            "Do not copy the prompt's own `Rule:` or `Because:` labels, instructions, "
+            "or rationales verbatim into the style guide; use those labels only for "
+            "extracted style rules.",
+            "The guide must contain only the author's extracted voice guidance.",
+        ),
+        PromptRule(
             "Return only the markdown style guide.",
             OUTPUT_RATIONALE,
         ),
@@ -62,4 +84,7 @@ async def distill_style(
     model: str,
 ) -> str:
     resp = await provider.complete(model=model, prompt=_build_prompt(sample_texts))
-    return resp.text.strip()
+    return normalize_instruction_asset(
+        resp.text.strip(),
+        default_rationale=STYLE_GUIDE_RATIONALE,
+    )

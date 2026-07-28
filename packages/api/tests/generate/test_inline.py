@@ -68,6 +68,10 @@ def test_build_user_prompt_embeds_passage_and_action() -> None:
         "Rule: Do not use em dashes.\nBecause: This text will be read by a text-to-speech engine"
         in prompt
     )
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the rewritten passage."
+    ) in prompt
 
 
 def test_fix_prompt_splits_preservation_and_splice_rules() -> None:

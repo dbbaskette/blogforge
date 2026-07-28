@@ -67,6 +67,10 @@ def test_build_prompt_embeds_article_and_channel_directive() -> None:
     assert "280 characters" in prompt  # x_thread directive
     assert "Rule: Use only facts present in the source article." in prompt
     assert "Because: Repurposed content must not introduce unsupported claims" in prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the repurposed content."
+    ) in prompt
 
 
 def test_linkedin_feed_and_article_formats_carry_geo_guardrails() -> None:

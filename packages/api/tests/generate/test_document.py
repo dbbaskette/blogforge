@@ -136,6 +136,18 @@ def test_render_document_prompt_lists_sections_and_forbids_repetition() -> None:
         "Rule: Return only the post body as Markdown.\nBecause: Downstream code "
         "splits the response into editable sections"
     ) in rendered
+    assert (
+        "Rule: Use the author's voice.\nBecause: The article must remain "
+        "recognizably authored"
+    ) in rendered
+    assert (
+        "Rule: Never use banished words or phrases.\nBecause: Those terms conflict "
+        "with the author's established voice"
+    ) in rendered
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the post.\nBecause: The response must contain clean article prose"
+    ) in rendered
 
 
 class _CompleteRecorder:
@@ -164,3 +176,7 @@ async def test_generate_document_returns_one_pass_output(tmp_path: Path) -> None
     # Voice system prompt + all section titles reached the provider in one call.
     assert "Be brief." in rec.prompt
     assert "The Concept" in rec.prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the post.\nBecause: The response must contain clean article prose"
+    ) in rec.prompt

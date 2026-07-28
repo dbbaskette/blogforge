@@ -85,7 +85,8 @@ def _build_prompt(seed: str, n: int) -> str:
             ),
             PromptRule("Return JSON matching the topics schema.", OUTPUT_RATIONALE),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels into topic titles or angles.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "topic titles or angles.",
                 "Those labels are prompt metadata rather than article prose.",
             ),
         ]

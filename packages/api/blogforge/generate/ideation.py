@@ -72,12 +72,21 @@ Reference materials, when present above, are context for facts, examples, and an
             "The first section must continue the opening rather than duplicate it.",
         ),
         PromptRule(
-            "Use the author's voice and never use banished words or phrases.",
+            "Use the author's voice.",
             "The accepted outline becomes the source for prose in the author's recognizable voice.",
+        ),
+        PromptRule(
+            "Never use banished words or phrases.",
+            "Those terms conflict with the author's established voice and explicit preferences.",
         ),
         PromptRule(
             "Revise the proposed outline freely in response to the author's feedback.",
             "The outline is a collaborative planning artifact until the author accepts it.",
+        ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "the conversational reply or outline fields.",
+            "Prompt metadata would pollute the author-facing chat and parsed outline.",
         ),
     ]),
 ])
@@ -140,8 +149,17 @@ Reference materials, when present above, are context for questions, facts, and e
             "The resulting post must progress from one unique contribution to the next.",
         ),
         PromptRule(
-            "Use the author's voice and never use banished words or phrases.",
+            "Use the author's voice.",
             "Both the interview and its proposed outline must remain recognizably authored.",
+        ),
+        PromptRule(
+            "Never use banished words or phrases.",
+            "Those terms conflict with the author's established voice and explicit preferences.",
+        ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "interview replies or outline fields.",
+            "Prompt metadata would pollute the author-facing interview and parsed outline.",
         ),
     ]),
 ])

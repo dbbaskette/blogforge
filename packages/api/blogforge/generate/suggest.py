@@ -97,9 +97,12 @@ _KIND_RULES: dict[SuggestKind, tuple[PromptRule, ...]] = {
         ),
         PromptRule("Preserve the target's meaning and the author's voice.", PRESERVATION_RATIONALE),
         PromptRule(
-            "Do not use banished words or phrases, including em dashes.",
-            "These terms conflict with the author's established voice and explicit preferences. "
-            + TTS_RATIONALE,
+            "Do not use banished words or phrases.",
+            "These terms conflict with the author's established voice and explicit preferences.",
+        ),
+        PromptRule(
+            "Do not use em dashes.",
+            TTS_RATIONALE,
         ),
     ),
     "expand": (
@@ -185,7 +188,8 @@ def _build_prompt(kind: SuggestKind, system: str, draft_text: str, n: int) -> st
             *_KIND_RULES[kind],
             PromptRule("Return JSON matching the suggestions schema.", OUTPUT_RATIONALE),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels into suggestions.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "suggestions.",
                 "Those labels are prompt metadata rather than article prose.",
             ),
         ]

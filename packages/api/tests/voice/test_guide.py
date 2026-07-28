@@ -7,7 +7,8 @@ from blogforge.voice.models import VoiceProfile, VoiceRules
 def assert_paired(prompt: str, instruction: str, rationale_fragment: str) -> None:
     pair = f"Rule: {instruction}\nBecause: "
     assert pair in prompt
-    assert rationale_fragment in prompt[prompt.index(pair):]
+    reason = prompt[prompt.index(pair) + len(pair):].splitlines()[0]
+    assert rationale_fragment in reason
 
 
 def _profile(**kw) -> VoiceProfile:
@@ -35,7 +36,8 @@ def test_full_profile_renders_all_sections() -> None:
     assert "writing samples" in md
     assert_paired(
         md,
-        "Do not copy the `Rule:` and `Because:` labels into article output.",
+        "Do not copy the `Rule:` and `Because:` labels or their rationales into "
+        "article output.",
         "instructions for the writing process",
     )
     assert_paired(

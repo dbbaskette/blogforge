@@ -44,4 +44,8 @@ def test_persona_prompt_and_parse() -> None:
     assert "Head of X" in p and "I build things" in p
     assert "Rule: Return JSON with exactly `identity`, `one_line`, and `tone`." in p
     assert "Because: Downstream code parses these fields" in p
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the persona fields.\nBecause: Prompt metadata would corrupt the stored persona"
+    ) in p
     assert parse_persona('{"identity":"a","one_line":"b","tone":"c"}') == ("a", "b", "c")

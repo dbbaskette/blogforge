@@ -106,7 +106,8 @@ def _build_prompt(markdown: str, reference_context: str) -> str:
                 OUTPUT_RATIONALE,
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels into claim text or notes.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "claim text or notes.",
                 "Claim text and notes are parsed into writer-facing review fields, so prompt metadata would corrupt the factual review output.",
             ),
         ],

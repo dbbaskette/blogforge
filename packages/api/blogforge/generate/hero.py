@@ -44,6 +44,11 @@ _HERO_STYLE = render_prompt_rules(
             "Use a wide 16:9 banner composition.",
             "The publishing layout crops hero images into a wide banner.",
         ),
+        PromptRule(
+            "Do not render the `Rule` or `Because` labels or their rationales in "
+            "the image.",
+            "Prompt metadata must not appear in the published hero image.",
+        ),
     ]
 )
 
@@ -107,7 +112,8 @@ _HERO_DISTILL_RULES = render_prompt_rules(
             "The returned text is passed directly into the image-generation prompt.",
         ),
         PromptRule(
-            "Do not copy the `Rule` or `Because` labels into the image prompt.",
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "the image prompt.",
             "Those labels are prompt metadata rather than image-description content.",
         ),
     ]

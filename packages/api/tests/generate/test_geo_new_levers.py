@@ -44,6 +44,18 @@ def _assert_rule_pair(prompt: str, instruction: str, rationale: str) -> None:
     assert f"Rule: {instruction}\nBecause: {rationale}" in prompt
 
 
+def _assert_no_prompt_metadata(
+    prompt: str,
+    output_name: str,
+    rationale: str,
+) -> None:
+    _assert_rule_pair(
+        prompt,
+        f"Do not copy the `Rule` or `Because` labels or their rationales into {output_name}.",
+        rationale,
+    )
+
+
 def _fake_pack(tmp_path):  # type: ignore[no-untyped-def]
     root = tmp_path / "pack"
     root.mkdir()
@@ -103,6 +115,21 @@ async def test_generate_faq_prompt_renders_grounding_skip_and_json_rules(tmp_pat
         "Return JSON matching the FAQ schema.",
         "Downstream code parses this response, so extra or malformed content breaks the workflow.",
     )
+    _assert_rule_pair(
+        provider.prompt,
+        "Stay in the author's voice.",
+        "The result must retain the author's recognizable voice instead of sounding templated.",
+    )
+    _assert_rule_pair(
+        provider.prompt,
+        "Never use banished words or phrases.",
+        "Those terms conflict with the author's established voice and explicit preferences.",
+    )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "FAQ fields",
+        "Prompt metadata would corrupt fields parsed by the FAQ editor.",
+    )
 
 
 async def test_generate_opener_prompt_renders_sentence_grounding_and_output_rules(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -124,6 +151,11 @@ async def test_generate_opener_prompt_renders_sentence_grounding_and_output_rule
         provider.prompt,
         "Return only the sentence, with no quotes, heading, or explanation.",
         "The client prepends this response verbatim.",
+    )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "the sentence",
+        "The client prepends this response verbatim as clean article prose.",
     )
 
 
@@ -150,6 +182,11 @@ async def test_generate_table_prompt_renders_grounding_and_markdown_only_rules(t
         "Return only one valid Markdown table, with no title or prose.",
         "The client splices this response directly into the source section.",
     )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "the Markdown table",
+        "Prompt metadata would invalidate content spliced directly into the source section.",
+    )
 
 
 async def test_generate_quotes_prompt_renders_verbatim_length_count_and_json_rules() -> None:
@@ -172,6 +209,11 @@ async def test_generate_quotes_prompt_renders_verbatim_length_count_and_json_rul
         provider.prompt,
         "Return JSON matching the quotations schema.",
         "Downstream code parses this response, so extra or malformed content breaks the workflow.",
+    )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "quotation fields",
+        "Prompt metadata would corrupt quotations parsed by the citation picker.",
     )
 
 
@@ -205,6 +247,11 @@ async def test_generate_takeaways_prompt_renders_grounding_voice_and_json_rules(
         "Return JSON matching the takeaways schema.",
         "Downstream code parses this response, so extra or malformed content breaks the workflow.",
     )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "takeaway fields",
+        "Prompt metadata would corrupt takeaways parsed into article bullets.",
+    )
 
 
 async def test_generate_alt_text_prompt_renders_limit_boilerplate_and_output_rules() -> None:
@@ -232,6 +279,11 @@ async def test_generate_alt_text_prompt_renders_limit_boilerplate_and_output_rul
         "Return only the alt text, with no quotes or explanation.",
         "The client inserts this response directly into the image's alt-text slot.",
     )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "the alt text",
+        "The client inserts this response directly into the image's alt-text slot.",
+    )
 
 
 async def test_generate_queries_prompt_renders_coverage_count_and_json_rules(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -253,6 +305,11 @@ async def test_generate_queries_prompt_renders_coverage_count_and_json_rules(tmp
         provider.prompt,
         "Return JSON matching the queries schema.",
         "Downstream code parses this response, so extra or malformed content breaks the workflow.",
+    )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "query fields",
+        "Prompt metadata would corrupt queries parsed by the citation-check workflow.",
     )
 
 
@@ -307,6 +364,11 @@ async def test_generate_citation_prompt_renders_bounded_preservation_and_output_
     _assert_rule_pair(
         provider.prompt,
         "Return only the rewritten passage.",
+        "The client replaces the selected passage with this response.",
+    )
+    _assert_no_prompt_metadata(
+        provider.prompt,
+        "the rewritten passage",
         "The client replaces the selected passage with this response.",
     )
 

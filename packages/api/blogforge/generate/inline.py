@@ -123,7 +123,8 @@ def _build_user_prompt(text: str, action: InlineAction, instruction: str) -> str
                 TTS_RATIONALE,
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels into the rewritten passage.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the rewritten passage.",
                 "Those labels are prompt metadata rather than article prose.",
             ),
         ]

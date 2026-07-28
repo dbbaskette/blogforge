@@ -33,5 +33,11 @@
   Because: These patterns are recurrent style defects that make prose sound machine-generated.
 
 ## GUARDRAIL (all lenses)
-Rule: Change wording, rhythm, and stance only. Never invent, drop, or alter a fact, number, name, quotation, or link. Never rewrite the article's opening answer sentence.
-Because: This is a bounded edit and must not damage the approved article.
+Rule: Change wording, rhythm, and stance only.
+Because: Humanize is a prose edit, not permission to change the article's approved substance.
+
+Rule: Never invent, drop, or alter a fact, number, name, quotation, or link.
+Because: Humanization must preserve the article's factual record and attribution.
+
+Rule: Never rewrite the article's opening answer sentence.
+Because: GEO relies on the approved answer-first opening remaining stable for scoring and reader continuity.

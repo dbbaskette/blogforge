@@ -246,7 +246,8 @@ def _build_prompt(body: str, fmt: RepurposeFormat) -> str:
                 "The editor places this response directly into the selected publishing surface.",
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels into the repurposed content.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the repurposed content.",
                 "Those labels are prompt metadata rather than article prose.",
             ),
         ]

@@ -84,8 +84,16 @@ def test_render_section_prompt_marks_current_first_section() -> None:
         "the heading"
     ) in prompt
     assert (
-        "Rule: Use the author's voice and never use banished words or phrases.\nBecause: "
-        "This section must sound like part of the same authored post."
+        "Rule: Use the author's voice.\nBecause: This section must sound like part of "
+        "the same authored post."
+    ) in prompt
+    assert (
+        "Rule: Never use banished words or phrases.\nBecause: Those terms conflict "
+        "with the author's established voice"
+    ) in prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the section.\nBecause: The response must contain clean article prose"
     ) in prompt
 
 
@@ -235,6 +243,18 @@ async def test_notes_on_existing_section_do_targeted_edit(tmp_path: Path) -> Non
     assert (
         "Rule: Return the complete revised section as Markdown prose, with only the necessary "
         "changes.\nBecause: The response replaces the current section directly in the editor."
+    ) in rec.prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the revised section.\nBecause: The response replaces the stored section"
+    ) in rec.prompt
+    assert (
+        "Rule: Use the author's voice.\nBecause: The edit must remain consistent with "
+        "the rest of the authored post."
+    ) in rec.prompt
+    assert (
+        "Rule: Never use banished words or phrases.\nBecause: Those terms conflict "
+        "with the author's established voice"
     ) in rec.prompt
     # …and it must NOT fall back to the write-from-scratch directive.
     assert "REVISION DIRECTIVE" not in rec.prompt

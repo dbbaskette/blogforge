@@ -119,7 +119,7 @@ def _build_prompt(draft: Draft, kind: HeadlineKind, n: int) -> str:
                 OUTPUT_RATIONALE,
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels into options.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into options.",
                 "Those labels are prompt metadata rather than article prose.",
             ),
         ]

@@ -60,6 +60,10 @@ def test_repair_prompt_pairs_output_constraint_with_its_reason() -> None:
     repair_prompt = build_repair_prompt("We delve into it.", RuleViolations(banished=["delve"]))
     assert "Rule: Return only the corrected text." in repair_prompt
     assert "Because: Downstream code replaces the original passage" in repair_prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the corrected text.\n  Because: Downstream code replaces the original passage"
+    ) in repair_prompt
 
 
 async def test_enforce_strips_em_dash_even_if_model_ignores() -> None:

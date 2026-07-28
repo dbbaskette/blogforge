@@ -8,6 +8,7 @@ import pytest
 from blogforge.drafts.models import IdeaInput, OutlineProposal
 from blogforge.generate.ideation import IDEATION_SYSTEM_BLOCK
 from blogforge.generate.outline import _render_outline_prompt, _section_budget, propose_outline
+from blogforge.llm.base import LLMResponse
 
 _CANNED = {
     "opening_hook": "Most agents are demos.",
@@ -62,8 +63,12 @@ def test_outline_prompt_demands_a_nonoverlapping_progression() -> None:
         "`sections`, and `estimated_words`.\nBecause: Downstream code validates"
     ) in rendered
     assert (
-        "Rule: Use the author's voice and never use banished words or phrases.\nBecause: "
-        "The outline is the source for later prose"
+        "Rule: Use the author's voice.\nBecause: The outline is the source for later "
+        "prose and must preserve the intended voice."
+    ) in rendered
+    assert (
+        "Rule: Never use banished words or phrases.\nBecause: Those terms conflict "
+        "with the author's established voice"
     ) in rendered
     assert (
         "Rule: Make `opening_hook` one sentence.\nBecause: The hook must give the reader "
@@ -72,6 +77,10 @@ def test_outline_prompt_demands_a_nonoverlapping_progression() -> None:
     assert (
         "Rule: Ensure section 1 does not restate or paraphrase the opening_hook.\nBecause: "
         "The first section must continue"
+    ) in rendered
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the outline fields.\nBecause: Prompt metadata would corrupt the JSON fields"
     ) in rendered
 
 
@@ -125,3 +134,51 @@ persona:
     assert isinstance(proposal, OutlineProposal)
     assert proposal.opening_hook == "Most agents are demos."
     assert len(proposal.sections) == 2
+
+
+class _PromptRecorder:
+    name = "recorder"
+
+    def __init__(self) -> None:
+        self.prompt = ""
+
+    async def complete(
+        self, *, model: str, prompt: str, json_schema: dict[str, object] | None = None
+    ) -> LLMResponse:
+        self.prompt = prompt
+        return LLMResponse(
+            text=json.dumps(_CANNED),
+            input_tokens=1,
+            output_tokens=1,
+            model=model,
+            finish_reason="stop",
+        )
+
+
+@pytest.mark.asyncio
+async def test_complete_outline_provider_prompt_blocks_prompt_metadata(
+    tmp_path: Path,
+) -> None:
+    pack_root = tmp_path / "fakepack"
+    pack_root.mkdir()
+    (pack_root / "stylepack.yaml").write_text("""
+spec_version: '1.0'
+pack:
+  slug: dan
+  name: Dan
+  version: '1.0'
+  author: Dan
+persona:
+  identity: x
+  one_line: y
+""")
+    (pack_root / "style-guide.md").write_text("Be brief.\n")
+    recorder = _PromptRecorder()
+    idea = IdeaInput(topic="X", pack_slug="dan", provider="anthropic", model="m")
+
+    await propose_outline(idea, pack_root, {"samples": []}, recorder, model="m")
+
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "the outline fields.\nBecause: Prompt metadata would corrupt the JSON fields"
+    ) in recorder.prompt

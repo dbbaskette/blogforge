@@ -4,8 +4,20 @@ from blogforge.generate.suggest import _build_prompt, parse_suggestions
 def test_prompt_renders_rules_for_reword_suggestions() -> None:
     prompt = _build_prompt("reword", "SYSTEM", "# Draft", 4)
     assert "Rule: Preserve the target's meaning and the author's voice." in prompt
+    assert (
+        "Rule: Do not use banished words or phrases.\n"
+        "Because: These terms conflict with the author's established voice"
+    ) in prompt
+    assert (
+        "Rule: Do not use em dashes.\n"
+        "Because: This text will be read by a text-to-speech engine"
+    ) in prompt
     assert "Rule: Return JSON matching the suggestions schema." in prompt
     assert "Because: Downstream code parses this response" in prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "suggestions."
+    ) in prompt
 
 
 def test_prompt_renders_rules_for_fact_check_suggestions() -> None:

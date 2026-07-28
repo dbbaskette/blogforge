@@ -66,6 +66,19 @@ async def test_interview_mode_uses_interview_block() -> None:
         "Rule: Return a fenced ```json block matching the OutlineProposal schema.\nBecause: "
         "The schema gives the client a parseable proposal."
     ) in prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "interview replies or outline fields.\n"
+        "Because: Prompt metadata would pollute the author-facing interview and parsed outline."
+    ) in prompt
+    assert (
+        "Rule: Use the author's voice.\nBecause: Both the interview and its proposed "
+        "outline must remain recognizably authored."
+    ) in prompt
+    assert (
+        "Rule: Never use banished words or phrases.\nBecause: Those terms conflict "
+        "with the author's established voice"
+    ) in prompt
 
 
 async def test_ideate_mode_does_not_use_interview_block() -> None:

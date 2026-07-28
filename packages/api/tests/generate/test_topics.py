@@ -11,6 +11,10 @@ def test_prompt_renders_rules_for_topics() -> None:
         in prompt
     )
     assert "Rule: Do not use trailing punctuation in titles." in prompt
+    assert (
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
+        "topic titles or angles."
+    ) in prompt
 
 
 def test_parses_well_formed_json() -> None:

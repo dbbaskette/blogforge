@@ -87,6 +87,11 @@ def build_persona_prompt(headline: str, summary: str) -> str:
             "Return JSON with exactly `identity`, `one_line`, and `tone`.",
             "Downstream code parses these fields to populate the voice profile.",
         ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "the persona fields.",
+            "Prompt metadata would corrupt the stored persona fields.",
+        ),
     ])
     return (
         f"{rules}\n\n"

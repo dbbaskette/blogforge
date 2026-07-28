@@ -12,10 +12,13 @@ from pathlib import Path
 import yaml
 
 from blogforge.prompt_rules import (
+    FORMAT_INSTRUCTION_RATIONALE,
     PRESERVATION_RATIONALE,
+    STYLE_GUIDE_RATIONALE,
     TTS_RATIONALE,
     VOICE_RATIONALE,
     PromptRule,
+    normalize_instruction_asset,
     render_prompt_rules,
 )
 from blogforge.voice.ai_tells import (
@@ -86,11 +89,21 @@ def compose(
     parts.append(_render_header(manifest))
     parts.append(_render_humanizer(manifest, pack_root))
     parts.append(_render_writing_craft(pack_root))
-    parts.append(_read_cached(pack_root / "style-guide.md"))
+    parts.append(
+        normalize_instruction_asset(
+            _read_cached(pack_root / "style-guide.md"),
+            default_rationale=STYLE_GUIDE_RATIONALE,
+        )
+    )
 
     fingerprint = pack_root / "fingerprint.md"
     if fingerprint.is_file():
-        parts.append(_read_cached(fingerprint))
+        parts.append(
+            normalize_instruction_asset(
+                _read_cached(fingerprint),
+                default_rationale=STYLE_GUIDE_RATIONALE,
+            )
+        )
 
     if format is not None:
         parts.append(_render_format(pack_root, manifest, format))
@@ -116,6 +129,10 @@ def _load_default_baseline() -> str:
 def _render_writing_craft(pack_root: Path) -> str:
     override = pack_root / "writing-baseline.md"
     body = _read_cached(override) if override.is_file() else _load_default_baseline()
+    body = normalize_instruction_asset(
+        body,
+        default_rationale=STYLE_GUIDE_RATIONALE,
+    )
     precedence = render_prompt_rules([
         PromptRule(
             "When general craft guidance conflicts with the author's style guide, "
@@ -153,8 +170,13 @@ def _render_header(m: Manifest) -> str:
 def _load_ai_patterns(pack_root: Path) -> str:
     override = pack_root / "ai-patterns.md"
     if override.is_file():
-        return _read_cached(override)
-    return load_ai_tells().patterns
+        body = _read_cached(override)
+    else:
+        body = load_ai_tells().patterns
+    return normalize_instruction_asset(
+        body,
+        default_rationale=STYLE_GUIDE_RATIONALE,
+    )
 
 
 def _render_humanizer(m: Manifest, pack_root: Path) -> str:
@@ -295,6 +317,10 @@ def _render_format(pack_root: Path, m: Manifest, name: str) -> str:
     if fmt is None:
         raise ComposeError(f"format '{name}' not found in pack manifest")
     body = (pack_root / fmt.file).read_text(encoding="utf-8")
+    body = normalize_instruction_asset(
+        body,
+        default_rationale=FORMAT_INSTRUCTION_RATIONALE,
+    )
     rule = render_prompt_rules([
         PromptRule(
             "Follow the format-specific instructions below.",

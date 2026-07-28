@@ -63,6 +63,18 @@ def test_instruction_assets_pair_every_rule_with_a_reason() -> None:
         _assert_paired_bullets(asset)
     assert "Rule: Do not use em dashes or en dashes." in patterns
     assert "Because: This text will be read by a text-to-speech engine" in patterns
+    assert (
+        "Rule: Change wording, rhythm, and stance only.\n"
+        "Because: Humanize is a prose edit"
+    ) in lenses
+    assert (
+        "Rule: Never invent, drop, or alter a fact, number, name, quotation, or link.\n"
+        "Because: Humanization must preserve the article's factual record"
+    ) in lenses
+    assert (
+        "Rule: Never rewrite the article's opening answer sentence.\n"
+        "Because: GEO relies on the approved answer-first opening"
+    ) in lenses
 
 
 def test_pattern_parser_accepts_rationale_backed_and_legacy_bullets(monkeypatch) -> None:

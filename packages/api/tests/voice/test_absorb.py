@@ -4,7 +4,8 @@ from pathlib import Path
 def assert_paired(prompt: str, instruction: str, rationale_fragment: str) -> None:
     pair = f"Rule: {instruction}\nBecause: "
     assert pair in prompt
-    assert rationale_fragment in prompt[prompt.index(pair):]
+    reason = prompt[prompt.index(pair) + len(pair):].splitlines()[0]
+    assert rationale_fragment in reason
 
 def test_public_api_imports() -> None:
     from blogforge.voice import (  # noqa: F401
@@ -72,6 +73,137 @@ def test_compose_prompt_smoke(tmp_path: Path) -> None:
         out,
         "Avoid every AI sentence pattern listed below.",
         "style defects that make prose sound machine-generated",
+    )
+
+
+def test_compose_normalizes_legacy_style_rules_without_changing_context(
+    tmp_path: Path,
+) -> None:
+    from blogforge.voice import compose_prompt
+
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    (pack / "stylepack.yaml").write_text(
+        'spec_version: "1.0"\n'
+        "pack:\n"
+        "  slug: test\n"
+        "  name: Test Pack\n"
+        "  version: 0.1.0\n"
+        "  author: Tester\n"
+        "persona:\n"
+        "  identity: A plain writer.\n"
+        "  one_line: Writes plainly and directly.\n",
+        encoding="utf-8",
+    )
+    (pack / "style-guide.md").write_text(
+        "# Voice notes\n\n"
+        "These observations describe the approved samples.\n\n"
+        "Write plainly. Avoid jargon.\n\n"
+        "Example:\n"
+        "> The shortest useful sentence wins.\n",
+        encoding="utf-8",
+    )
+
+    prompt = compose_prompt(pack_root=pack, samples=[], draft=None)
+
+    assert "# Voice notes" in prompt
+    assert "These observations describe the approved samples." in prompt
+    assert "Example:\n> The shortest useful sentence wins." in prompt
+    assert_paired(
+        prompt,
+        "Write plainly.",
+        "approved and recognizable voice",
+    )
+    assert_paired(
+        prompt,
+        "Avoid jargon.",
+        "approved and recognizable voice",
+    )
+
+
+def test_compose_keeps_existing_style_rule_pairs_stable(tmp_path: Path) -> None:
+    from blogforge.voice import compose_prompt
+
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    (pack / "stylepack.yaml").write_text(
+        'spec_version: "1.0"\n'
+        "pack:\n"
+        "  slug: test\n"
+        "  name: Test Pack\n"
+        "  version: 0.1.0\n"
+        "  author: Tester\n"
+        "persona:\n"
+        "  identity: A plain writer.\n"
+        "  one_line: Writes plainly and directly.\n",
+        encoding="utf-8",
+    )
+    paired = (
+        "- Rule: Prefer concrete nouns.\n"
+        "  Because: Concrete nouns capture the author's approved voice."
+    )
+    (pack / "style-guide.md").write_text(
+        f"## Diction\n\n{paired}\n",
+        encoding="utf-8",
+    )
+
+    prompt = compose_prompt(pack_root=pack, samples=[], draft=None)
+
+    assert prompt.count(paired) == 1
+
+
+def test_compose_normalizes_custom_format_rules_with_surface_reasons(
+    tmp_path: Path,
+) -> None:
+    from blogforge.voice import compose_prompt
+
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    (pack / "formats").mkdir()
+    (pack / "stylepack.yaml").write_text(
+        'spec_version: "1.0"\n'
+        "pack:\n"
+        "  slug: test\n"
+        "  name: Test Pack\n"
+        "  version: 0.1.0\n"
+        "  author: Tester\n"
+        "persona:\n"
+        "  identity: A plain writer.\n"
+        "  one_line: Writes plainly and directly.\n"
+        "formats:\n"
+        "  - name: launch-note\n"
+        "    file: formats/launch-note.md\n",
+        encoding="utf-8",
+    )
+    (pack / "style-guide.md").write_text(
+        "Rule: Write plainly.\n"
+        "Because: Plain language matches the author's approved voice.\n",
+        encoding="utf-8",
+    )
+    (pack / "formats" / "launch-note.md").write_text(
+        "## Launch note layout\n\n"
+        "Use exactly three bullets.\n"
+        "End with a short call to action.\n",
+        encoding="utf-8",
+    )
+
+    prompt = compose_prompt(
+        pack_root=pack,
+        format="launch-note",
+        samples=[],
+        draft=None,
+    )
+
+    assert "## Launch note layout" in prompt
+    assert_paired(
+        prompt,
+        "Use exactly three bullets.",
+        "selected publishing surface requires this instruction",
+    )
+    assert_paired(
+        prompt,
+        "End with a short call to action.",
+        "selected publishing surface requires this instruction",
     )
 
 def test_compose_prompt_includes_fingerprint_single_voice_block(tmp_path: Path) -> None:

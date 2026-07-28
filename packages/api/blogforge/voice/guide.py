@@ -30,7 +30,8 @@ def build_voice_guide(profile: VoiceProfile) -> str:
             "These are recurrent style defects that make prose sound machine-generated.",
         ),
         PromptRule(
-            "Do not copy the `Rule:` and `Because:` labels into article output.",
+            "Do not copy the `Rule:` and `Because:` labels or their rationales into "
+            "article output.",
             "They are instructions for the writing process, not content for the article.",
         )
     ]))

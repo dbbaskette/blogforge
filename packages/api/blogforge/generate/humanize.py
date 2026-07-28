@@ -206,7 +206,8 @@ def _build_directive(engaged: tuple[Lens, ...]) -> str:
                 OUTPUT_RATIONALE,
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels into suggestions.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "suggestions.",
                 "Those labels are prompt metadata rather than article prose.",
             ),
         ]

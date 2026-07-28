@@ -1191,6 +1191,11 @@ _SEMANTIC_RULES = render_prompt_rules(
             "Return JSON matching the supplied semantic schema.",
             OUTPUT_RATIONALE,
         ),
+        PromptRule(
+            "Do not copy the `Rule` or `Because` labels or their rationales into "
+            "semantic findings.",
+            "Prompt metadata would corrupt fields parsed by the GEO analysis panel.",
+        ),
     ]
 )
 
@@ -1630,10 +1635,20 @@ async def generate_faq(
                 "FAQ answers may be extracted independently from the surrounding post.",
             ),
             PromptRule(
-                "Stay in the author's voice and never use banished words or phrases.",
+                "Stay in the author's voice.",
                 VOICE_RATIONALE,
             ),
+            PromptRule(
+                "Never use banished words or phrases.",
+                "Those terms conflict with the author's established voice and "
+                "explicit preferences.",
+            ),
             PromptRule("Return JSON matching the FAQ schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "FAQ fields.",
+                "Prompt metadata would corrupt fields parsed by the FAQ editor.",
+            ),
         ]
     )
     prompt = (
@@ -1689,6 +1704,11 @@ async def generate_opener(
             PromptRule(
                 "Return only the sentence, with no quotes, heading, or explanation.",
                 "The client prepends this response verbatim.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the sentence.",
+                "The client prepends this response verbatim as clean article prose.",
             ),
         ]
     )
@@ -1755,6 +1775,12 @@ async def generate_table(
                 "Return only one valid Markdown table, with no title or prose.",
                 "The client splices this response directly into the source section.",
             ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the Markdown table.",
+                "Prompt metadata would invalidate content spliced directly into "
+                "the source section.",
+            ),
         ]
     )
     prompt = (
@@ -1812,6 +1838,11 @@ async def generate_quotes(
                 "Even small edits would make the result no longer verbatim.",
             ),
             PromptRule("Return JSON matching the quotations schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "quotation fields.",
+                "Prompt metadata would corrupt quotations parsed by the citation picker.",
+            ),
         ]
     )
     prompt = (
@@ -1878,6 +1909,11 @@ async def generate_takeaways(
                 VOICE_RATIONALE,
             ),
             PromptRule("Return JSON matching the takeaways schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "takeaway fields.",
+                "Prompt metadata would corrupt takeaways parsed into article bullets.",
+            ),
         ]
     )
     prompt = (
@@ -1914,6 +1950,11 @@ async def generate_alt_text(
             ),
             PromptRule(
                 "Return only the alt text, with no quotes or explanation.",
+                "The client inserts this response directly into the image's alt-text slot.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the alt text.",
                 "The client inserts this response directly into the image's alt-text slot.",
             ),
         ]
@@ -1974,6 +2015,11 @@ async def generate_queries(
                 "Those elements define the draft's actual search intent.",
             ),
             PromptRule("Return JSON matching the queries schema.", OUTPUT_RATIONALE),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "query fields.",
+                "Prompt metadata would corrupt queries parsed by the citation-check workflow.",
+            ),
         ]
     )
     prompt = (
@@ -2035,6 +2081,11 @@ async def generate_citation(
             ),
             PromptRule(
                 "Return only the rewritten passage.",
+                "The client replaces the selected passage with this response.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the rewritten passage.",
                 "The client replaces the selected passage with this response.",
             ),
         ]
