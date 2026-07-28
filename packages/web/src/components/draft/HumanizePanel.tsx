@@ -1,8 +1,8 @@
 /**
  * Two-pane Humanize mode — shell mirrors OptimizePanel: the draft on the LEFT
- * (read view, heat-mapped where a finding's target sits) and the pulse/radar/
- * rhythm readouts + HumanizeReviewRail on the RIGHT. The header (mark, title,
- * intensity dial, HumannessPulse) is unchanged from the single-pane version.
+ * (read view, heat-mapped where a finding's target sits) and the radar/rhythm
+ * readouts + HumanizeReviewRail on the RIGHT. The header reports explicit
+ * voice-rule and Humanize finding states instead of a blended score.
  * Runs an on-demand "sound human" pass at the chosen Light/Medium/Strong
  * intensity, cached per content+intensity the same way OptimizePanel caches GEO.
  */
@@ -11,7 +11,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { type Draft, lintDraft } from "../../api/drafts";
-import { humanityScore } from "../../lib/checkup";
 import {
   type HumanizeFinding,
   type HumanizeReport,
@@ -23,8 +22,8 @@ import { findHighlight } from "../review/HighlightedText";
 import { Icon } from "../ui/Icon";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { useDialogA11y } from "../ui/useDialogA11y";
+import { HumanizationCheck, type HumanizationCheckState } from "./HumanizationCheck";
 import { HumanizeReviewRail } from "./HumanizeReviewRail";
-import { HumannessPulse } from "./HumannessPulse";
 import { LensBloom, type LensKey } from "./LensBloom";
 import { RhythmStrip } from "./RhythmStrip";
 import type { TrackedChangeKind } from "./trackedChangeDecoration";
@@ -40,6 +39,12 @@ const INTENSITIES: { value: Intensity; label: string; icon: string }[] = [
   { value: "medium", label: "Medium", icon: "/humanize/half.png" },
   { value: "strong", label: "Strong", icon: "/humanize/human.png" },
 ];
+
+const LENS_COUNTS: Record<Intensity, number> = {
+  light: 2,
+  medium: 3,
+  strong: 4,
+};
 
 const LENS_KEYS: LensKey[] = ["flow", "voice", "imperfections", "soul"];
 
@@ -148,17 +153,23 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
   const [error, setError] = useState<string | null>(null);
   // The saved pass predates the current content — kept until an explicit re-run.
   const [stale, setStale] = useState(false);
-  // The anti-robot sub-score from the (fast, deterministic) lint pass — the
-  // same number Checkup blends, so the two meters agree.
-  const [antiRobot, setAntiRobot] = useState<number | null>(null);
+  const [voiceRules, setVoiceRules] = useState<HumanizationCheckState>({
+    status: "pending",
+  });
   useEffect(() => {
     let cancelled = false;
+    setVoiceRules({ status: "pending" });
     lintDraft(draft.id)
       .then((l) => {
         if (cancelled) return;
-        setAntiRobot(humanityScore(l.violations.length + l.repetitions.length, l.hits.length));
+        setVoiceRules({
+          status: "complete",
+          count: l.violations.length + l.repetitions.length,
+        });
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setVoiceRules({ status: "unavailable" });
+      });
     return () => {
       cancelled = true;
     };
@@ -268,6 +279,13 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
 
   const engaged = useMemo(() => engagedLenses(report), [report]);
   const counts = useMemo(() => countsByLens(report), [report]);
+  const humanizeState = useMemo<HumanizationCheckState>(() => {
+    if (error) return { status: "unavailable" };
+    if (loading) return { status: "pending" };
+    if (!report) return { status: "pending" };
+    const count = report.lenses.reduce((total, lens) => total + lens.findings.length, 0);
+    return { status: "complete", count };
+  }, [error, loading, report]);
 
   // The section content the rhythm strip reads sentence lengths from: every
   // section's body plus the opening hook, in article order.
@@ -303,7 +321,8 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
   // substring matcher for just the ACTIVE section instead of the whole draft.
   const passiveMarks = useMemo(() => {
     const map = new Map<string, Mark[]>();
-    if (opening) map.set("opening", markRanges(opening, findingsBySection.get("opening") ?? [], null));
+    if (opening)
+      map.set("opening", markRanges(opening, findingsBySection.get("opening") ?? [], null));
     for (const s of draft.sections) {
       if (s.content_md?.trim()) {
         map.set(s.id, markRanges(s.content_md, findingsBySection.get(s.id) ?? [], null));
@@ -363,7 +382,8 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
             </p>
           )}
 
-          <div className="mt-4 grid grid-cols-3 gap-1.5" role="group" aria-label="Intensity">
+          <fieldset className="mt-4 grid grid-cols-3 gap-1.5">
+            <legend className="sr-only">Intensity</legend>
             {INTENSITIES.map((opt) => {
               const active = intensity === opt.value;
               return (
@@ -389,12 +409,13 @@ export function HumanizePanel({ draft, onSectionSave, onClose }: HumanizePanelPr
                 </button>
               );
             })}
-          </div>
+          </fieldset>
 
           <div className="mt-4">
-            <HumannessPulse
-              antiRobot={antiRobot ?? 88 /* momentary placeholder until the lint pass resolves */}
-              humanSignal={report ? report.score : null}
+            <HumanizationCheck
+              voiceRules={voiceRules}
+              humanize={humanizeState}
+              lensCount={LENS_COUNTS[intensity]}
             />
           </div>
         </div>

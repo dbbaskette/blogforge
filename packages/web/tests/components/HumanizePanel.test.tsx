@@ -10,6 +10,16 @@ vi.mock("../../src/api/humanize", () => ({
   }),
 }));
 
+vi.mock("../../src/api/drafts", async () => {
+  const actual =
+    await vi.importActual<typeof import("../../src/api/drafts")>("../../src/api/drafts");
+  return {
+    ...actual,
+    lintDraft: vi.fn().mockResolvedValue({ violations: [], repetitions: [], hits: [] }),
+  };
+});
+
+import { lintDraft } from "../../src/api/drafts";
 import { analyzeHumanize } from "../../src/api/humanize";
 import { HumanizePanel } from "../../src/components/draft/HumanizePanel";
 import { hashDraftContent, setCached } from "../../src/lib/panelCache";
@@ -26,6 +36,16 @@ describe("HumanizePanel", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    (lintDraft as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      violations: [],
+      repetitions: [],
+      hits: [],
+    });
+    (analyzeHumanize as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      intensity: "medium",
+      score: 90,
+      lenses: [{ key: "flow", label: "Flow & Rhythm", findings: [] }],
+    });
   });
 
   it("runs the pass on open and shows the intensity dial", async () => {
@@ -54,13 +74,74 @@ describe("HumanizePanel", () => {
     expect(srcs).toContain("/humanize/human.png");
   });
 
-  it("shows the HumannessPulse readout once the report loads", async () => {
+  it("shows transparent completed checks instead of a humanness percentage", async () => {
     render(
       <MemoryRouter>
         <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(screen.getByText("reads human")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Looks natural")).toBeInTheDocument());
+    expect(screen.getByText("No voice-rule issues")).toBeInTheDocument();
+    expect(screen.getByText("No suggestions across 3 lenses")).toBeInTheDocument();
+    expect(screen.queryByText(/reads human/i)).not.toBeInTheDocument();
+  });
+
+  it("reports exact deterministic and Humanize finding counts", async () => {
+    (lintDraft as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      violations: [{ id: "v1" }],
+      repetitions: [{ id: "r1" }],
+      hits: [],
+    });
+    (analyzeHumanize as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      intensity: "medium",
+      score: 85,
+      lenses: [
+        { key: "flow", label: "Flow & Rhythm", findings: [{ id: "f1" }] },
+        { key: "soul", label: "De-robot / Soul", findings: [{ id: "f2" }] },
+        { key: "voice", label: "Voice & POV", findings: [] },
+      ],
+    });
+
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText("Voice rules need attention")).toBeInTheDocument());
+    expect(screen.getByText("2 open findings")).toBeInTheDocument();
+    expect(screen.getByText("2 suggestions across 3 lenses")).toBeInTheDocument();
+  });
+
+  it("reports an unavailable Humanize review instead of a partial score", async () => {
+    (analyzeHumanize as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("HTTP 502"),
+    );
+
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText("Check incomplete")).toBeInTheDocument());
+    expect(screen.getByText("Humanize review unavailable")).toBeInTheDocument();
+    expect(screen.getByText("HTTP 502")).toBeInTheDocument();
+  });
+
+  it("reports an unavailable voice-rule check instead of a placeholder", async () => {
+    (lintDraft as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("lint failed"));
+
+    render(
+      <MemoryRouter>
+        <HumanizePanel draft={draft} onSectionSave={vi.fn()} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("Voice-rule check unavailable")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Check incomplete")).toBeInTheDocument();
   });
 
   it("switching intensity re-runs the pass and persists the choice", async () => {
