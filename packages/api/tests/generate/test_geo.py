@@ -841,6 +841,13 @@ async def test_semantic_prompt_renders_rule_rationale_pairs(tmp_path) -> None:  
 
     for instruction, rationale in EXPECTED_GEO_PAIRS:
         _assert_rule_pair(captured["prompt"], instruction, rationale)
+    _assert_rule_pair(
+        captured["prompt"],
+        "Return exactly one concrete sentence in `impact` for every thin spot and "
+        "uncited claim without restating the fix.",
+        "The panel needs a concise explanation of each recommendation's "
+        "answer-engine payoff.",
+    )
 
 
 def test_parse_semantic_citations_carries_suggestion_and_matched_url() -> None:

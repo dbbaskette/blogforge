@@ -1016,9 +1016,10 @@ _SEMANTIC_DIRECTIVE = (
                 "The FAQ fix needs a focused set of relevant coverage gaps.",
             ),
             PromptRule(
-                "For every thin spot and uncited claim, return one concrete GEO payoff in "
-                "`impact` without restating the fix.",
-                "The panel explains why each recommendation improves answer-engine extraction.",
+                "Return exactly one concrete sentence in `impact` for every thin spot and "
+                "uncited claim without restating the fix.",
+                "The panel needs a concise explanation of each recommendation's "
+                "answer-engine payoff.",
             ),
         ],
         bullet=True,
@@ -1600,10 +1601,13 @@ async def generate_faq(
         )
         requested_rules = [
             PromptRule(
-                "Answer exactly the supplied reader questions, and skip any the draft cannot "
-                "support.",
+                "Answer exactly the supplied reader questions.",
+                "The coverage fix must address the questions the writer selected.",
+            ),
+            PromptRule(
+                "Skip any supplied question the draft cannot support.",
                 "Guessing would turn a coverage fix into unsupported content.",
-            )
+            ),
         ]
     else:
         task = "Create FAQ entries that a reader of this post would naturally ask."
@@ -1858,9 +1862,16 @@ async def generate_takeaways(
                 FACTUAL_RATIONALE,
             ),
             PromptRule(
-                "Make every takeaway stand alone in the author's voice.",
-                "Each bullet may be extracted independently and should still sound like the "
-                "author.",
+                "Make every takeaway concrete.",
+                "A useful takeaway gives the reader a specific point from the post.",
+            ),
+            PromptRule(
+                "Make every takeaway stand alone.",
+                "Each bullet may be extracted independently from the surrounding post.",
+            ),
+            PromptRule(
+                "Write every takeaway in the author's voice.",
+                VOICE_RATIONALE,
             ),
             PromptRule(
                 "Never use banished words or phrases.",
@@ -2003,9 +2014,12 @@ async def generate_citation(
                 "This is a bounded citation edit, not permission to rewrite the passage.",
             ),
             PromptRule(
-                "Attribute the claim in the author's voice and use the supplied URL as a "
-                "Markdown link when present.",
-                "The replacement should identify the source in the article's established style.",
+                "Attribute the claim in the author's voice.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule(
+                "Use the supplied URL as a Markdown link when present.",
+                "The rewritten passage needs a clickable attribution to the requested source.",
             ),
             PromptRule(
                 "Do not change the passage's meaning or invent information.",
@@ -2014,6 +2028,10 @@ async def generate_citation(
             PromptRule(
                 "Preserve a supplied quotation verbatim.",
                 "A changed quotation would falsely attribute words to the source.",
+            ),
+            PromptRule(
+                "Place a supplied quotation in quotation marks.",
+                "Quotation marks distinguish the source's words from the author's passage.",
             ),
             PromptRule(
                 "Return only the rewritten passage.",

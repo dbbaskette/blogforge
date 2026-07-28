@@ -90,7 +90,12 @@ async def test_generate_faq_prompt_renders_grounding_skip_and_json_rules(tmp_pat
     )
     _assert_rule_pair(
         provider.prompt,
-        "Answer exactly the supplied reader questions, and skip any the draft cannot support.",
+        "Answer exactly the supplied reader questions.",
+        "The coverage fix must address the questions the writer selected.",
+    )
+    _assert_rule_pair(
+        provider.prompt,
+        "Skip any supplied question the draft cannot support.",
         "Guessing would turn a coverage fix into unsupported content.",
     )
     _assert_rule_pair(
@@ -182,8 +187,18 @@ async def test_generate_takeaways_prompt_renders_grounding_voice_and_json_rules(
     )
     _assert_rule_pair(
         provider.prompt,
-        "Make every takeaway stand alone in the author's voice.",
-        "Each bullet may be extracted independently and should still sound like the author.",
+        "Make every takeaway concrete.",
+        "A useful takeaway gives the reader a specific point from the post.",
+    )
+    _assert_rule_pair(
+        provider.prompt,
+        "Make every takeaway stand alone.",
+        "Each bullet may be extracted independently from the surrounding post.",
+    )
+    _assert_rule_pair(
+        provider.prompt,
+        "Write every takeaway in the author's voice.",
+        "The result must retain the author's recognizable voice instead of sounding templated.",
     )
     _assert_rule_pair(
         provider.prompt,
@@ -273,6 +288,21 @@ async def test_generate_citation_prompt_renders_bounded_preservation_and_output_
         provider.prompt,
         "Preserve a supplied quotation verbatim.",
         "A changed quotation would falsely attribute words to the source.",
+    )
+    _assert_rule_pair(
+        provider.prompt,
+        "Place a supplied quotation in quotation marks.",
+        "Quotation marks distinguish the source's words from the author's passage.",
+    )
+    _assert_rule_pair(
+        provider.prompt,
+        "Attribute the claim in the author's voice.",
+        "The result must retain the author's recognizable voice instead of sounding templated.",
+    )
+    _assert_rule_pair(
+        provider.prompt,
+        "Use the supplied URL as a Markdown link when present.",
+        "The rewritten passage needs a clickable attribution to the requested source.",
     )
     _assert_rule_pair(
         provider.prompt,
