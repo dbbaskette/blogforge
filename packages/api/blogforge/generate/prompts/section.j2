@@ -16,7 +16,10 @@ Target length (context): ~{{ target_section_words }} words.
 Opening-hook context (already shown to the reader): {{ opening_hook }}
 {% endif %}
 
-Rule: Write flowing Markdown prose without including the section title as a heading.
+Rule: Write flowing Markdown prose.
+Because: The generated body must read naturally inside the article.
+
+Rule: Do not include the section title as a heading.
 Because: The renderer adds the heading around this independently generated section.
 
 Rule: Treat this section as one movement in a continuous argument, not a self-contained article.

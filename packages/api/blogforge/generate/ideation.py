@@ -100,6 +100,10 @@ Reference materials, when present above, are context for questions, facts, and e
             "turn-by-turn state.",
         ),
         PromptRule(
+            "Keep the question short and concrete.",
+            "A concise prompt helps the author answer with useful specifics.",
+        ),
+        PromptRule(
             "Start broad, then deepen from topic, audience, and urgency into the claim, "
             "example, objection, and takeaway.",
             "A deliberate sequence uncovers the material needed for a specific, useful outline.",
@@ -124,10 +128,12 @@ Reference materials, when present above, are context for questions, facts, and e
             "without over-interviewing them.",
         ),
         PromptRule(
-            "Announce the transition in one line, then return a fenced ```json block "
-            "matching the OutlineProposal schema.",
-            "The announcement makes the mode change clear, and the schema gives the client "
-            "a parseable proposal.",
+            "Announce the transition in one line.",
+            "A short announcement makes the mode change clear before structured output.",
+        ),
+        PromptRule(
+            "Return a fenced ```json block matching the OutlineProposal schema.",
+            "The schema gives the client a parseable proposal.",
         ),
         PromptRule(
             "Make the outline one continuous argument with distinct, non-overlapping sections.",

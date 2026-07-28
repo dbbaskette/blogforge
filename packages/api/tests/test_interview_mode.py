@@ -54,6 +54,18 @@ async def test_interview_mode_uses_interview_block() -> None:
         "Rule: Emit no JSON until announcing that enough information has been gathered.\n"
         "Because: The client treats JSON as the transition"
     ) in prompt
+    assert (
+        "Rule: Keep the question short and concrete.\nBecause: A concise prompt helps the "
+        "author answer with useful specifics."
+    ) in prompt
+    assert (
+        "Rule: Announce the transition in one line.\nBecause: A short announcement makes "
+        "the mode change clear before structured output."
+    ) in prompt
+    assert (
+        "Rule: Return a fenced ```json block matching the OutlineProposal schema.\nBecause: "
+        "The schema gives the client a parseable proposal."
+    ) in prompt
 
 
 async def test_ideate_mode_does_not_use_interview_block() -> None:

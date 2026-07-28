@@ -11,6 +11,7 @@ from blogforge.drafts.models import Draft, Section
 from blogforge.generate.builtin_formats import builtin_format_section_note
 from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider, StreamChunk
+from blogforge.prompt_rules import PromptRule, render_prompt_rules
 
 _PROMPT_PATH = Path(__file__).parent / "prompts" / "section.j2"
 _REVISE_PROMPT_PATH = Path(__file__).parent / "prompts" / "section_revise.j2"
@@ -108,6 +109,21 @@ def _render_revise_prompt(draft: Draft, section: Section, instruction: str) -> s
     )
 
 
+def _render_fresh_section_revision_directive(instruction: str) -> str:
+    """Render author guidance for regenerating an empty section."""
+    rules = render_prompt_rules([
+        PromptRule(
+            "Follow the author's revision instruction when writing this section.",
+            "The author expects this fresh draft to address the requested change.",
+        ),
+        PromptRule(
+            "Stay in the author's voice.",
+            "A regenerated empty section must still match the rest of the post.",
+        ),
+    ])
+    return f"REVISION DIRECTIVE (context):\n{instruction}\n\n{rules}"
+
+
 def _auto_pick_samples(manifest: dict[str, Any], n: int = 3) -> list[str]:
     samples = (manifest.get("samples") or [])[:n]
     return [str(s.get("id", "")) for s in samples if s.get("id")]
@@ -153,10 +169,8 @@ async def stream_section(
         user = _render_section_prompt(draft, section)
         if instruction.strip():
             # No existing prose to preserve — fold the note into the fresh write.
-            user = (
-                f"{user}\n\n---\n\nREVISION DIRECTIVE — rewrite the section above "
-                f"following this instruction, staying in voice:\n{instruction.strip()}"
-            )
+            directive = _render_fresh_section_revision_directive(instruction.strip())
+            user = f"{user}\n\n---\n\n{directive}"
     if reference_context:
         user = f"{reference_context}\n\n---\n\n{user}"
     full_prompt = f"{system}\n\n---\n\n{user}"

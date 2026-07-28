@@ -106,8 +106,12 @@ BUILTIN_FORMATS: list[dict[str, str]] = [
                     "An explainer is incomplete if it describes only the happy path.",
                 ),
                 PromptRule(
-                    "Use concrete examples and a table when comparing options.",
-                    "Examples ground abstractions, while tables make shared criteria easy to scan.",
+                    "Use concrete examples.",
+                    "Examples ground abstractions in a reader's practical experience.",
+                ),
+                PromptRule(
+                    "Use a table when comparing options.",
+                    "Tables make shared criteria and their differences easy to scan.",
                 ),
                 PromptRule(
                     "Close with when to use the subject and when not to.",

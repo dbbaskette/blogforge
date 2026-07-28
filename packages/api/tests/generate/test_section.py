@@ -75,6 +75,18 @@ def test_render_section_prompt_marks_current_first_section() -> None:
     assert "**First**" in prompt
     assert "Establish the conflict" in prompt
     assert "Hook sentence." in prompt
+    assert (
+        "Rule: Write flowing Markdown prose.\nBecause: The generated body must read naturally "
+        "inside the article."
+    ) in prompt
+    assert (
+        "Rule: Do not include the section title as a heading.\nBecause: The renderer adds "
+        "the heading"
+    ) in prompt
+    assert (
+        "Rule: Use the author's voice and never use banished words or phrases.\nBecause: "
+        "This section must sound like part of the same authored post."
+    ) in prompt
 
 
 def test_render_section_prompt_marks_last_section() -> None:
@@ -149,6 +161,14 @@ async def test_stream_section_appends_instruction(tmp_path: Path) -> None:
     assert [c.delta for c in chunks] == ["ok"]
     assert "REVISION DIRECTIVE" in rec.prompt
     assert "make it punchier" in rec.prompt
+    assert (
+        "Rule: Follow the author's revision instruction when writing this section.\nBecause: "
+        "The author expects this fresh draft to address the requested change."
+    ) in rec.prompt
+    assert (
+        "Rule: Stay in the author's voice.\nBecause: A regenerated empty section must still "
+        "match the rest of the post."
+    ) in rec.prompt
 
 
 @pytest.mark.asyncio
@@ -203,6 +223,18 @@ async def test_notes_on_existing_section_do_targeted_edit(tmp_path: Path) -> Non
     assert (
         "Rule: Reproduce every part the note does not require changing VERBATIM.\n"
         "Because: BlogForge needs a bounded edit that preserves the approved"
+    ) in rec.prompt
+    assert (
+        "Rule: Do not re-introduce the topic or repeat points made in other sections.\n"
+        "Because: The revised section must remain a continuous part of the existing article."
+    ) in rec.prompt
+    assert (
+        "Rule: Keep the section's length and shape unless the note requires otherwise.\n"
+        "Because: The edit should preserve the approved section structure."
+    ) in rec.prompt
+    assert (
+        "Rule: Return the complete revised section as Markdown prose, with only the necessary "
+        "changes.\nBecause: The response replaces the current section directly in the editor."
     ) in rec.prompt
     # …and it must NOT fall back to the write-from-scratch directive.
     assert "REVISION DIRECTIVE" not in rec.prompt

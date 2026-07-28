@@ -57,6 +57,22 @@ def test_outline_prompt_demands_a_nonoverlapping_progression() -> None:
         "Rule: State what each `brief` uniquely contributes, how it advances the argument, "
         "and, where useful, what belongs later.\nBecause: Clear boundaries prevent"
     ) in rendered
+    assert (
+        "Rule: Return a JSON object matching the OutlineProposal schema with `opening_hook`, "
+        "`sections`, and `estimated_words`.\nBecause: Downstream code validates"
+    ) in rendered
+    assert (
+        "Rule: Use the author's voice and never use banished words or phrases.\nBecause: "
+        "The outline is the source for later prose"
+    ) in rendered
+    assert (
+        "Rule: Make `opening_hook` one sentence.\nBecause: The hook must give the reader "
+        "one clear opening"
+    ) in rendered
+    assert (
+        "Rule: Ensure section 1 does not restate or paraphrase the opening_hook.\nBecause: "
+        "The first section must continue"
+    ) in rendered
 
 
 def test_ideation_block_enforces_single_argument() -> None:

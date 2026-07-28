@@ -27,7 +27,10 @@ Because: Fewer, meatier sections have room for distinct ideas, while thin sectio
 Rule: Return a JSON object matching the OutlineProposal schema with `opening_hook`, `sections`, and `estimated_words`.
 Because: Downstream code validates those fields before it creates editable article sections.
 
-Rule: Make `opening_hook` one sentence, and ensure section 1 does not restate or paraphrase it.
+Rule: Make `opening_hook` one sentence.
+Because: The hook must give the reader one clear opening to carry into the first section.
+
+Rule: Ensure section 1 does not restate or paraphrase the opening_hook.
 Because: The first section must continue the opening rather than duplicate the reader's first impression.
 
 Rule: Give every section a short H2-style `title` and a one-to-three-sentence `brief`.

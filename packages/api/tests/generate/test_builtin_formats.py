@@ -42,6 +42,25 @@ def test_directive_resolves_by_slug() -> None:
     )
 
 
+def test_every_builtin_directive_pairs_its_rules_with_rationales() -> None:
+    expected_pairs = {
+        "product-release": "Rule: Open with what the product or feature is",
+        "how-to": "Rule: Use numbered steps where each step is one action",
+        "deep-dive": "Rule: Use concrete examples.",
+        "comparison": "Rule: Lead with a compact comparison table",
+        "announcement": "Rule: State the news in the first sentence",
+        "listicle": "Rule: Use a numbered list with a bold lead-in",
+    }
+    for slug, expected_rule in expected_pairs.items():
+        directive = builtin_format_directive(slug)
+        assert directive is not None
+        lines = directive.splitlines()
+        for index, line in enumerate(lines):
+            if line.startswith("- Rule:"):
+                assert lines[index + 1].startswith("  Because:")
+        assert expected_rule in directive
+
+
 def test_directive_resolves_by_label_case_insensitively() -> None:
     assert builtin_format_directive("How-To / Tutorial") == builtin_format_directive("how-to")
 
@@ -63,6 +82,10 @@ def test_section_note_wraps_directive_as_context() -> None:
         "Rule: Write only the current section; do not reproduce the whole "
         "structure.\nBecause: BlogForge stores and regenerates sections independently"
     ) in note
+    lines = note.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("Rule:"):
+            assert lines[index + 1].startswith("Because:")
 
 
 def test_section_note_none_for_non_builtin() -> None:
