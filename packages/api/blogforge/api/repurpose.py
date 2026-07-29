@@ -10,12 +10,14 @@ from __future__ import annotations
 from typing import Literal
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
+from blogforge.drafts.models import Draft, OutlineProposal, OutlineSection
 from blogforge.drafts.sql_store import SqlDraftStore
+from blogforge.generate.ingest import ingest_document
 from blogforge.generate.repurpose import FORMATS, repurpose
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
@@ -27,6 +29,8 @@ router = APIRouter(tags=["repurpose"])
 
 class _RepurposeBody(BaseModel):
     format: Literal[
+        "summary",
+        "extended",
         "x_thread",
         "linkedin",
         "linkedin_article",
@@ -35,6 +39,29 @@ class _RepurposeBody(BaseModel):
         "meta_description",
         "email",
     ]
+
+
+VariationFormat = Literal["summary", "extended", "linkedin"]
+
+
+class _SaveRepurposeBody(BaseModel):
+    format: VariationFormat
+    text: str = Field(min_length=1, max_length=200_000)
+
+
+class _LengthResponse(BaseModel):
+    metric: Literal["words", "characters"]
+    actual: int
+    minimum: int
+    maximum: int
+    within_target: bool
+    correction_attempted: bool
+
+
+class _RepurposeResponse(BaseModel):
+    format: str
+    text: str
+    length: _LengthResponse | None = None
 
 
 @router.get("/api/repurpose/formats")
@@ -50,7 +77,7 @@ async def repurpose_draft(
     body: _RepurposeBody,
     request: Request,
     current: User = Depends(get_current_user),
-) -> dict[str, str]:
+) -> _RepurposeResponse:
     store: SqlDraftStore = request.app.state.draft_store
     pack_store = request.app.state.pack_store
 
@@ -106,4 +133,90 @@ async def repurpose_draft(
                 }
             },
         ) from e
-    return {"format": body.format, "text": result}
+    length = (
+        None
+        if result.length is None
+        else _LengthResponse(
+            metric=result.length.metric,
+            actual=result.length.actual,
+            minimum=result.length.minimum,
+            maximum=result.length.maximum,
+            within_target=result.length.within_target,
+            correction_attempted=result.length.correction_attempted,
+        )
+    )
+    return _RepurposeResponse(format=body.format, text=result.text, length=length)
+
+
+@router.post(
+    "/api/drafts/{draft_id}/repurpose/save",
+    response_model=Draft,
+    status_code=status.HTTP_201_CREATED,
+)
+async def save_repurposed_draft(
+    draft_id: str,
+    body: _SaveRepurposeBody,
+    request: Request,
+    current: User = Depends(get_current_user),
+) -> Draft:
+    """Save an accepted length-controlled preview as a separate editable draft."""
+    store: SqlDraftStore = request.app.state.draft_store
+    source = await store.get(draft_id, user_id=current.id)
+    if source is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "draft_not_found", "message": draft_id}},
+        )
+
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "error": {
+                    "code": "empty_preview",
+                    "message": "Generate a preview before saving it.",
+                }
+            },
+        )
+
+    suffixes: dict[VariationFormat, str] = {
+        "summary": "Summary",
+        "extended": "Extended",
+        "linkedin": "LinkedIn Post",
+    }
+    source_title = source.title.strip() or source.idea.topic.strip()
+    title = f"{source_title} — {suffixes[body.format]}"
+    word_count = len(text.split())
+    idea = source.idea.model_copy(
+        deep=True,
+        update={
+            "topic": title,
+            "target_words": min(10_000, max(300, word_count)),
+        },
+    )
+    ingested = ingest_document(f"# {title}\n\n{text}")
+
+    saved = await store.create_complete(
+        user_id=current.id,
+        draft=Draft(
+            title=title,
+            stage="sections",
+            idea=idea,
+            sections=ingested.sections,
+            outline=OutlineProposal(
+                opening_hook=ingested.opening,
+                sections=[
+                    OutlineSection(id=section.id, title=section.title, brief=section.brief)
+                    for section in ingested.sections
+                ],
+                estimated_words=word_count,
+            ),
+            tags=list(source.tags),
+        ),
+    )
+
+    await request.app.state.event_bus.emit(
+        {"type": "draft:created", "id": saved.id, "title": saved.title}
+    )
+    return saved

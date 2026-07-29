@@ -320,17 +320,42 @@ export interface RepurposeFormat {
   label: string;
 }
 
+export type RepurposeLengthMetric = "words" | "characters";
+export interface RepurposeLength {
+  metric: RepurposeLengthMetric;
+  actual: number;
+  minimum: number;
+  maximum: number;
+  within_target: boolean;
+  correction_attempted: boolean;
+}
+export interface RepurposeResult {
+  format: string;
+  text: string;
+  length: RepurposeLength | null;
+}
+export type SavableRepurposeFormat = "summary" | "extended" | "linkedin";
+
 export async function listRepurposeFormats(): Promise<RepurposeFormat[]> {
   return api("/api/repurpose/formats");
 }
 
 /** Turn a finished draft into another channel (X thread, LinkedIn, etc.). */
-export async function repurposeDraft(
-  draftId: string,
-  format: string,
-): Promise<{ format: string; text: string }> {
+export async function repurposeDraft(draftId: string, format: string): Promise<RepurposeResult> {
   return api(`/api/drafts/${encodeURIComponent(draftId)}/repurpose`, {
     method: "POST",
     body: JSON.stringify({ format }),
+  });
+}
+
+/** Save an accepted length-controlled preview as a separate editable draft. */
+export async function saveRepurposeDraft(
+  draftId: string,
+  format: SavableRepurposeFormat,
+  text: string,
+): Promise<Draft> {
+  return api(`/api/drafts/${encodeURIComponent(draftId)}/repurpose/save`, {
+    method: "POST",
+    body: JSON.stringify({ format, text }),
   });
 }
