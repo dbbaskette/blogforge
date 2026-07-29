@@ -312,3 +312,74 @@ async def test_linkedin_uses_character_range(tmp_path: Path) -> None:
     assert (result.length.minimum, result.length.maximum) == (1300, 1600)
     assert result.length.actual == 1300
     assert result.length.within_target is True
+
+
+@pytest.mark.parametrize(
+    ("fmt", "source_words", "output_words", "minimum", "maximum", "within_target"),
+    [
+        ("summary", 200, 89, 90, 110, False),
+        ("summary", 200, 90, 90, 110, True),
+        ("summary", 200, 110, 90, 110, True),
+        ("summary", 200, 111, 90, 110, False),
+        ("extended", 100, 134, 135, 165, False),
+        ("extended", 100, 135, 135, 165, True),
+        ("extended", 100, 165, 135, 165, True),
+        ("extended", 100, 166, 135, 165, False),
+    ],
+)
+@pytest.mark.asyncio
+async def test_word_length_boundaries_are_inclusive(
+    tmp_path: Path,
+    fmt: str,
+    source_words: int,
+    output_words: int,
+    minimum: int,
+    maximum: int,
+    within_target: bool,
+) -> None:
+    source = " ".join(["source"] * source_words)
+    output = " ".join(["result"] * output_words)
+    recorder = _CompleteRecorder(output)
+
+    result = await repurpose(
+        _draft(),
+        _fake_pack(tmp_path),
+        {"samples": []},
+        recorder,
+        model="m",
+        body=source,
+        fmt=fmt,  # type: ignore[arg-type]
+    )
+
+    assert result.length is not None
+    assert (result.length.minimum, result.length.maximum) == (minimum, maximum)
+    assert result.length.actual == output_words
+    assert result.length.within_target is within_target
+    assert len(recorder.prompts) == (1 if within_target else 2)
+
+
+@pytest.mark.parametrize(
+    ("characters", "within_target"),
+    [(1299, False), (1300, True), (1600, True), (1601, False)],
+)
+@pytest.mark.asyncio
+async def test_linkedin_character_boundaries_are_inclusive(
+    tmp_path: Path, characters: int, within_target: bool
+) -> None:
+    output = "x" * characters
+    recorder = _CompleteRecorder(output)
+
+    result = await repurpose(
+        _draft(),
+        _fake_pack(tmp_path),
+        {"samples": []},
+        recorder,
+        model="m",
+        body="source article",
+        fmt="linkedin",
+    )
+
+    assert result.length is not None
+    assert result.length.actual == characters
+    assert result.length.within_target is within_target
+    assert len(recorder.prompts) == (1 if within_target else 2)

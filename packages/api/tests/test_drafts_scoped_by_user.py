@@ -1,11 +1,14 @@
 """SqlDraftStore enforces per-user scoping on every method."""
+
+import pytest
 import pytest_asyncio
+from sqlalchemy.exc import IntegrityError
 
 from blogforge.auth.passwords import hash_password
 from blogforge.db.base import Base
 from blogforge.db.engine import get_engine, get_sessionmaker, reset_engine_for_tests
 from blogforge.db.models import User
-from blogforge.drafts.models import IdeaInput
+from blogforge.drafts.models import Draft, IdeaInput, Section
 from blogforge.drafts.sql_store import SqlDraftStore
 
 
@@ -26,7 +29,11 @@ async def two_users():
 
 def _idea() -> IdeaInput:
     return IdeaInput(
-        topic="t", pack_slug="dan", provider="anthropic", model="m", target_words=1500,
+        topic="t",
+        pack_slug="dan",
+        provider="anthropic",
+        model="m",
+        target_words=1500,
     )
 
 
@@ -36,6 +43,53 @@ async def test_create_returns_draft_for_user(two_users):
     draft = await store.create(user_id=a_id, idea=_idea())
     assert draft.idea.topic == "t"
     assert draft.stage == "research"
+
+
+async def test_create_complete_persists_sections_in_one_call(two_users):
+    a_id, _ = two_users
+    store = SqlDraftStore()
+    complete = Draft(
+        title="Saved variation",
+        stage="sections",
+        idea=_idea(),
+        sections=[
+            Section(
+                id="result",
+                title="Result",
+                content_md="Generated preview.",
+                status="edited",
+                word_count=2,
+            )
+        ],
+        tags=["variation"],
+    )
+
+    saved = await store.create_complete(user_id=a_id, draft=complete)
+
+    assert saved.title == "Saved variation"
+    assert saved.stage == "sections"
+    assert saved.tags == ["variation"]
+    assert len(saved.sections) == 1
+    assert saved.sections[0].content_md == "Generated preview."
+
+
+async def test_create_complete_rolls_back_draft_when_a_section_fails(two_users):
+    a_id, _ = two_users
+    store = SqlDraftStore()
+    duplicate_sections = Draft(
+        title="Must roll back",
+        stage="sections",
+        idea=_idea(),
+        sections=[
+            Section(id="duplicate", title="First"),
+            Section(id="duplicate", title="Second"),
+        ],
+    )
+
+    with pytest.raises(IntegrityError):
+        await store.create_complete(user_id=a_id, draft=duplicate_sections)
+
+    assert await store.list_for_user(a_id) == []
 
 
 async def test_list_only_returns_user_drafts(two_users):

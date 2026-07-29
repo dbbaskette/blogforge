@@ -197,30 +197,24 @@ async def save_repurposed_draft(
     )
     ingested = ingest_document(f"# {title}\n\n{text}")
 
-    created = await store.create(user_id=current.id, idea=idea)
-    created.title = title
-    created.stage = "sections"
-    created.sections = ingested.sections
-    created.outline = OutlineProposal(
-        opening_hook=ingested.opening,
-        sections=[
-            OutlineSection(id=section.id, title=section.title, brief=section.brief)
-            for section in ingested.sections
-        ],
-        estimated_words=word_count,
+    saved = await store.create_complete(
+        user_id=current.id,
+        draft=Draft(
+            title=title,
+            stage="sections",
+            idea=idea,
+            sections=ingested.sections,
+            outline=OutlineProposal(
+                opening_hook=ingested.opening,
+                sections=[
+                    OutlineSection(id=section.id, title=section.title, brief=section.brief)
+                    for section in ingested.sections
+                ],
+                estimated_words=word_count,
+            ),
+            tags=list(source.tags),
+        ),
     )
-    created.tags = list(source.tags)
-    saved = await store.update(created.id, created, user_id=current.id)
-    if saved is None:  # pragma: no cover - the draft was created immediately above
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "error": {
-                    "code": "variation_save_failed",
-                    "message": "The new draft could not be saved.",
-                }
-            },
-        )
 
     await request.app.state.event_bus.emit(
         {"type": "draft:created", "id": saved.id, "title": saved.title}

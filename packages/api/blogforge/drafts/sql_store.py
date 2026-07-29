@@ -202,6 +202,41 @@ class SqlDraftStore:
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
 
+    async def create_complete(self, *, user_id: UUID, draft: Draft) -> Draft:
+        """Create a fully populated draft and its sections in one transaction."""
+        row = DraftRow(
+            id=UUID(draft.id),
+            user_id=user_id,
+            title=draft.title,
+            stage=draft.stage,
+            idea=draft.idea.model_dump(),
+            outline=draft.outline.model_dump() if draft.outline else None,
+            tags=list(draft.tags),
+            hero_image_key=draft.hero_image_key,
+        )
+        async with get_sessionmaker()() as session:
+            session.add(row)
+            session.add_all(
+                [
+                    SectionRow(
+                        id=section.id,
+                        draft_id=row.id,
+                        position=position,
+                        title=section.title,
+                        brief=section.brief,
+                        content_md=section.content_md,
+                        status=section.status,
+                        last_generated_at=section.last_generated_at,
+                        last_error=section.last_error,
+                        word_count=section.word_count,
+                    )
+                    for position, section in enumerate(draft.sections)
+                ]
+            )
+            await session.commit()
+            await session.refresh(row, ["sections", "references", "ideation_messages"])
+            return _draft_from_row(row)
+
     async def update(self, draft_id: str, draft: Draft, *, user_id: UUID) -> Draft | None:
         try:
             uuid = UUID(draft_id)
