@@ -12,6 +12,7 @@ repurposed copy reads like the same author wrote it for the new channel.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -21,11 +22,45 @@ from blogforge.llm.base import LLMProvider
 from blogforge.prompt_rules import PromptRule, render_prompt_rules
 
 RepurposeFormat = Literal[
-    "x_thread", "linkedin", "linkedin_article", "newsletter", "tldr", "meta_description", "email"
+    "summary",
+    "extended",
+    "x_thread",
+    "linkedin",
+    "linkedin_article",
+    "newsletter",
+    "tldr",
+    "meta_description",
+    "email",
 ]
+LengthMetric = Literal["words", "characters"]
+
+
+@dataclass(frozen=True)
+class LengthMetadata:
+    metric: LengthMetric
+    actual: int
+    minimum: int
+    maximum: int
+    within_target: bool
+    correction_attempted: bool
+
+
+@dataclass(frozen=True)
+class RepurposeResult:
+    text: str
+    length: LengthMetadata | None = None
+
 
 # label is for the UI; directive is the channel-specific instruction.
 FORMATS: dict[str, dict[str, str]] = {
+    "summary": {
+        "label": "Summarized version",
+        "directive": "Create a concise version of the source article.",
+    },
+    "extended": {
+        "label": "Extended version",
+        "directive": "Create a more developed version of the source article.",
+    },
     "x_thread": {
         "label": "X / Twitter thread",
         "directive": "Turn the post into an X (Twitter) thread.",
@@ -57,6 +92,34 @@ FORMATS: dict[str, dict[str, str]] = {
 }
 
 _FORMAT_RULES: dict[RepurposeFormat, tuple[PromptRule, ...]] = {
+    "summary": (
+        PromptRule(
+            "Preserve the source article's central argument, essential evidence, and conclusions.",
+            "A summary must reduce length without changing what the author means.",
+        ),
+        PromptRule(
+            "Remove secondary examples and repetition before removing essential reasoning.",
+            "Compression should preserve the article's useful substance.",
+        ),
+        PromptRule(
+            "Keep useful Markdown headings but do not add an H1 title.",
+            "The saved draft supplies its authoritative title separately.",
+        ),
+    ),
+    "extended": (
+        PromptRule(
+            "Develop the source article's existing reasoning, examples, and transitions.",
+            "An extended version should deepen the original argument rather than repeat it.",
+        ),
+        PromptRule(
+            "Do not invent new facts, quotations, statistics, or source claims.",
+            "Additional length must remain grounded in the source article.",
+        ),
+        PromptRule(
+            "Keep useful Markdown headings but do not add an H1 title.",
+            "The saved draft supplies its authoritative title separately.",
+        ),
+    ),
     "x_thread": (
         PromptRule(
             "Open with a scroll-stopping hook tweet.",
@@ -84,8 +147,8 @@ _FORMAT_RULES: dict[RepurposeFormat, tuple[PromptRule, ...]] = {
     ),
     "linkedin": (
         PromptRule(
-            "Keep the feed post between 50 and 299 words.",
-            "LinkedIn feed readers need a concise post that is not padded for length.",
+            "Keep the feed post between 1,300 and 1,600 characters, including whitespace.",
+            "This is the selected LinkedIn feed target while remaining below the platform's 3,000-character maximum.",
         ),
         PromptRule(
             "Do not pad the feed post to look longer.",
@@ -220,10 +283,43 @@ def _auto_pick_samples(manifest: dict[str, Any], n: int = 3) -> list[str]:
     return [str(s.get("id", "")) for s in samples if s.get("id")]
 
 
-def _build_prompt(body: str, fmt: RepurposeFormat) -> str:
+def _length_range(body: str, fmt: RepurposeFormat) -> tuple[LengthMetric, int, int] | None:
+    if fmt == "linkedin":
+        return ("characters", 1300, 1600)
+    if fmt not in {"summary", "extended"}:
+        return None
+
+    source_words = len(body.split())
+    factor = 0.5 if fmt == "summary" else 1.5
+    target = round(source_words * factor)
+    minimum = max(1, round(target * 0.9))
+    maximum = max(minimum, round(target * 1.1))
+    return ("words", minimum, maximum)
+
+
+def _measure(text: str, metric: LengthMetric) -> int:
+    return len(text) if metric == "characters" else len(text.split())
+
+
+def _build_prompt(
+    body: str,
+    fmt: RepurposeFormat,
+    length_range: tuple[LengthMetric, int, int] | None = None,
+) -> str:
     directive = FORMATS[fmt]["directive"]
+    controlled_range = length_range if length_range is not None else _length_range(body, fmt)
+    dynamic_rules: list[PromptRule] = []
+    if fmt in {"summary", "extended"} and controlled_range is not None:
+        metric, minimum, maximum = controlled_range
+        dynamic_rules.append(
+            PromptRule(
+                f"Keep the result between {minimum:,} and {maximum:,} {metric}.",
+                "This range implements the selected relative length while allowing natural prose.",
+            )
+        )
     rules = render_prompt_rules(
         [
+            *dynamic_rules,
             *_FORMAT_RULES[fmt],
             PromptRule(
                 "Use only facts present in the source article.",
@@ -255,6 +351,27 @@ def _build_prompt(body: str, fmt: RepurposeFormat) -> str:
     return f"{directive}\n\n{rules}\n\nARTICLE:\n{body.strip()}"
 
 
+def _build_correction_prompt(
+    *,
+    body: str,
+    fmt: RepurposeFormat,
+    prior_text: str,
+    length_range: tuple[LengthMetric, int, int],
+) -> str:
+    metric, minimum, maximum = length_range
+    actual = _measure(prior_text, metric)
+    return (
+        f"{FORMATS[fmt]['directive']}\n\n"
+        f"The prior result measured {actual:,} {metric}, outside the required range of "
+        f"between {minimum:,} and {maximum:,} {metric}. Revise it once to fit that range.\n\n"
+        "Preserve the source article's facts, argument, and the author's voice. "
+        "Change only what is necessary to reach the requested length. "
+        "Return only the corrected content without a preamble or explanation.\n\n"
+        f"SOURCE ARTICLE:\n{body.strip()}\n\n"
+        f"PRIOR RESULT:\n{prior_text.strip()}"
+    )
+
+
 async def repurpose(
     draft: Draft,
     pack_root: Path,
@@ -264,7 +381,7 @@ async def repurpose(
     model: str,
     body: str,
     fmt: RepurposeFormat,
-) -> str:
+) -> RepurposeResult:
     """Return the assembled-markdown ``body`` rewritten for channel ``fmt``."""
     from blogforge.voice import compose_prompt
 
@@ -275,7 +392,39 @@ async def repurpose(
         samples=sample_ids if sample_ids else None,
         draft=None,
     )
-    user = _build_prompt(body, fmt)
+    length_range = _length_range(body, fmt)
+    user = _build_prompt(body, fmt, length_range)
     full_prompt = f"{system}\n\n---\n\n{user}"
     resp = await provider.complete(model=model, prompt=full_prompt)
-    return resp.text.strip()
+    text = resp.text.strip()
+    if length_range is None:
+        return RepurposeResult(text=text)
+
+    metric, minimum, maximum = length_range
+    actual = _measure(text, metric)
+    correction_attempted = not minimum <= actual <= maximum
+    if correction_attempted:
+        correction = _build_correction_prompt(
+            body=body,
+            fmt=fmt,
+            prior_text=text,
+            length_range=length_range,
+        )
+        corrected = await provider.complete(
+            model=model,
+            prompt=f"{system}\n\n---\n\n{correction}",
+        )
+        text = corrected.text.strip()
+        actual = _measure(text, metric)
+
+    return RepurposeResult(
+        text=text,
+        length=LengthMetadata(
+            metric=metric,
+            actual=actual,
+            minimum=minimum,
+            maximum=maximum,
+            within_target=minimum <= actual <= maximum,
+            correction_attempted=correction_attempted,
+        ),
+    )
