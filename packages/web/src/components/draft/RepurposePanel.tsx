@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { type RepurposeFormat, listRepurposeFormats, repurposeDraft } from "../../api/drafts";
+import {
+  type RepurposeFormat,
+  type RepurposeResult,
+  type SavableRepurposeFormat,
+  listRepurposeFormats,
+  repurposeDraft,
+  saveRepurposeDraft,
+} from "../../api/drafts";
 import { useElapsed } from "../../hooks/useElapsed";
 import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
@@ -17,6 +25,10 @@ interface AtomizedResult {
 }
 
 type CardKind = "tweet" | "linkedin" | "email" | "default";
+
+function isSavableFormat(formatId: string): formatId is SavableRepurposeFormat {
+  return formatId === "summary" || formatId === "extended" || formatId === "linkedin";
+}
 
 /** Pick a platform style from the format's id/label (case-insensitive contains). */
 function kindFor(format: RepurposeFormat): CardKind {
@@ -241,11 +253,14 @@ function PreviewCard({
 }
 
 export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.Element {
+  const navigate = useNavigate();
   const [formats, setFormats] = useState<RepurposeFormat[]>([]);
   const [active, setActive] = useState<string | null>(null);
-  const [result, setResult] = useState<string>("");
+  const [result, setResult] = useState<RepurposeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   // Atomize-all state: when set, the panel shows every format's card.
   const [atomizing, setAtomizing] = useState(false);
@@ -263,11 +278,11 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
     setAtomized(null);
     setLoading(true);
     setError(null);
-    setResult("");
+    setResult(null);
+    setSaveError(null);
     setCopiedId(null);
     try {
-      const { text } = await repurposeDraft(draftId, formatId);
-      setResult(text);
+      setResult(await repurposeDraft(draftId, formatId));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -278,8 +293,9 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
   const atomizeAll = async (): Promise<void> => {
     if (formats.length === 0) return;
     setActive(null);
-    setResult("");
+    setResult(null);
     setError(null);
+    setSaveError(null);
     setCopiedId(null);
     setAtomized(null);
     setAtomizing(true);
@@ -305,6 +321,20 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
     setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 2000);
   };
 
+  const saveAsDraft = async (): Promise<void> => {
+    if (!active || !isSavableFormat(active) || !result) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const saved = await saveRepurposeDraft(draftId, active, result.text);
+      navigate(`/drafts/${saved.id}`);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const panelRef = useDialogA11y(true, onClose);
   const busy = loading || atomizing;
   const activeFormat = formats.find((f) => f.id === active);
@@ -313,15 +343,17 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
   return (
     <div
       className="fixed inset-0 z-40 flex justify-end bg-ink/30 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       role="presentation"
     >
       <div
         ref={panelRef}
+        // biome-ignore lint/a11y/useSemanticElements: a slide-in side panel with shared focus-trap behavior
         role="dialog"
         aria-modal="true"
         className="w-[480px] max-w-full bg-canvas border-l border-rule-2 h-full overflow-y-auto shadow-nb-pop m-0 p-0 text-ink animate-slide-in-right"
-        onClick={(e) => e.stopPropagation()}
         aria-label="Repurpose draft"
       >
         <header className="px-6 pt-6 pb-4 border-b border-rule bg-white sticky top-0 z-10">
@@ -345,7 +377,7 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
           <button
             type="button"
             onClick={atomizeAll}
-            disabled={busy || formats.length === 0}
+            disabled={busy || saving || formats.length === 0}
             className="nb-btn nb-btn-primary w-full justify-center"
           >
             ✨ Atomize all{formats.length > 0 ? ` (${formats.length})` : ""}
@@ -357,7 +389,7 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
                 key={f.id}
                 type="button"
                 onClick={() => run(f.id)}
-                disabled={busy}
+                disabled={busy || saving}
                 aria-pressed={active === f.id}
                 className={`nb-btn nb-btn-sm ${active === f.id ? "nb-btn-primary" : ""}`}
               >
@@ -433,13 +465,52 @@ export function RepurposePanel({ draftId, onClose }: RepurposePanelProps): JSX.E
 
           {/* Single-format view. */}
           {!busy && !atomized && result && activeFormat && (
-            <section className="animate-fade-in">
+            <section className="animate-fade-in space-y-3">
               <PreviewCard
                 format={activeFormat}
-                text={result}
+                text={result.text}
                 copied={copiedId === activeFormat.id}
                 onCopy={(t) => copy(t, activeFormat.id)}
               />
+              {result.length && (
+                <div className="rounded-nb-sm border border-rule bg-white px-3 py-2">
+                  <p className="text-xs text-muted">
+                    {result.length.actual.toLocaleString()} {result.length.metric} · target{" "}
+                    {result.length.minimum.toLocaleString()}–
+                    {result.length.maximum.toLocaleString()}
+                  </p>
+                  {!result.length.within_target && (
+                    <p className="mt-1 text-xs leading-relaxed text-amber-ink">
+                      This result is outside the target range after one adjustment. You can still
+                      copy or save it.
+                    </p>
+                  )}
+                </div>
+              )}
+              {isSavableFormat(activeFormat.id) && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    className="nb-btn nb-btn-primary w-full justify-center"
+                    disabled={saving}
+                    onClick={saveAsDraft}
+                  >
+                    {saving ? "Saving new draft…" : "Save as new draft"}
+                  </button>
+                  {saveError && (
+                    <div
+                      className="px-3 py-2 rounded-nb-sm text-sm"
+                      style={{
+                        background: "#fde7e2",
+                        border: "1px solid #f7c3b6",
+                        color: "#b5321b",
+                      }}
+                    >
+                      {saveError}
+                    </div>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
