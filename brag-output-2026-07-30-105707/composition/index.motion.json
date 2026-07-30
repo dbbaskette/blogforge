@@ -1,0 +1,8 @@
+{
+  "duration": 24,
+  "assertions": [
+    {"kind":"appearsBy","selector":"#slot-hook","bySec":0.1},
+    {"kind":"before","a":"#slot-voice","b":"#slot-finish"},
+    {"kind":"keepsMoving","withinSelector":"#root","maxStaticSec":1.8}
+  ]
+}

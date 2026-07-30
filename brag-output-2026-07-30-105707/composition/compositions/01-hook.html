@@ -1,0 +1,46 @@
+<template>
+  <style>
+    #scene-hook{position:relative;width:1920px;height:1080px;overflow:hidden;background:#e6efff;color:#15224a;font-family:Inter,sans-serif}
+    #scene-hook .wash{position:absolute;inset:0;background:radial-gradient(circle at 84% 16%,#fff4e0 0,transparent 34%),linear-gradient(135deg,#e6efff,#e3f7f4)}
+    #scene-hook .eyebrow{position:absolute;left:112px;top:92px;font:700 18px/1 JetBrains Mono,monospace;letter-spacing:.16em;color:#2b62ea;text-transform:uppercase}
+    #scene-hook .generic{position:absolute;left:112px;top:225px;width:720px;height:560px;padding:44px;border:1px solid #a8b5cf;border-radius:28px;background:rgba(255,255,255,.72);box-shadow:0 28px 70px rgba(21,34,74,.09)}
+    #scene-hook .button{display:inline-flex;align-items:center;gap:12px;padding:16px 24px;border-radius:14px;background:#eef1f7;color:#68728b;font-size:20px;font-weight:700}
+    #scene-hook .spark{width:10px;height:10px;border-radius:50%;background:#9ba5bc}
+    #scene-hook .lines{margin-top:46px;display:grid;gap:22px}
+    #scene-hook .line{height:15px;border-radius:20px;background:#cbd2df}
+    #scene-hook .line:nth-child(2){width:88%} #scene-hook .line:nth-child(3){width:94%} #scene-hook .line:nth-child(4){width:72%}
+    #scene-hook h1{position:absolute;left:908px;top:238px;width:760px;font:600 82px/1.02 Lora,serif;letter-spacing:-.045em}
+    #scene-hook .underline{position:absolute;left:910px;top:625px;width:548px;height:8px;border-radius:8px;background:#16c2b3;transform-origin:left}
+    #scene-hook .sub{position:absolute;left:912px;top:678px;font-size:24px;font-weight:650;color:#51607c}
+    #scene-hook .mark{position:absolute;right:106px;bottom:86px;display:grid;place-items:center;width:86px;height:86px;border-radius:24px;background:#2f6bff;color:white;font:800 42px/1 Inter,sans-serif;box-shadow:0 20px 40px rgba(47,107,255,.25)}
+  </style>
+  <section id="scene-hook" data-composition-id="scene-hook" data-start="0" data-duration="2.7" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div class="wash" data-layout-ignore></div>
+    <div class="eyebrow">BlogForge / The writing workshop</div>
+    <div id="generic-generate" class="generic">
+      <div class="button"><span class="spark"></span>Generate article</div>
+      <div id="flat-prose" class="lines"><div class="line"></div><div class="line"></div><div class="line"></div><div class="line"></div></div>
+    </div>
+    <h1 id="hook-copy">A generate button makes text. A workshop makes writing.</h1>
+    <div class="underline"></div>
+    <div class="sub">Voice → Structure → Judgment → Publish</div>
+    <div id="hook-mark" class="mark">B</div>
+  </section>
+  <script>
+    (() => {
+      const tl = gsap.timeline({paused:true});
+      tl.fromTo("#scene-hook .eyebrow",{autoAlpha:0,y:-18},{autoAlpha:1,y:0,duration:.38,ease:"power3.out"},0)
+        .fromTo("#generic-generate",{autoAlpha:0,x:-90},{autoAlpha:1,x:0,duration:.55,ease:"power4.out"},.12)
+        .fromTo("#hook-copy",{autoAlpha:0,y:42},{autoAlpha:1,y:0,duration:.68,ease:"power4.out"},.25)
+        .fromTo("#scene-hook .underline",{scaleX:0},{scaleX:1,duration:.62,ease:"power3.out"},.58)
+        .fromTo("#scene-hook .sub",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.42,ease:"power3.out"},.78)
+        .fromTo("#hook-mark",{autoAlpha:0,x:110,rotation:8},{autoAlpha:1,x:0,rotation:0,duration:.5,ease:"back.out(1.5)"},.48)
+        .to("#generic-generate",{x:-120,opacity:.6,duration:.34,ease:"power2.in"},1.55)
+        .to("#hook-mark",{x:-34,duration:.34,ease:"power2.out"},1.55)
+        .to("#scene-hook .underline",{backgroundColor:"#2f6bff",duration:.3},1.86)
+        .to("#scene-hook",{xPercent:-10,duration:.32,ease:"power4.in"},2.38);
+      window.__timelines=window.__timelines||{};
+      window.__timelines["scene-hook"]=tl;
+    })();
+  </script>
+</template>

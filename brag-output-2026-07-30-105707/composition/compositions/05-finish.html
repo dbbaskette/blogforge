@@ -1,0 +1,38 @@
+<template>
+  <style>
+    #scene-finish{position:relative;width:1920px;height:1080px;overflow:hidden;background:linear-gradient(135deg,#fff4e0,#e3f7f4);color:#15224a;font-family:Inter,sans-serif}
+    #scene-finish .head{position:absolute;left:96px;top:62px}.kicker{font:700 16px JetBrains Mono,monospace;letter-spacing:.14em;color:#147d76;text-transform:uppercase}#scene-finish h2{font:600 58px/1 Lora,serif;margin-top:13px;letter-spacing:-.04em}
+    #scene-finish .article{position:absolute;left:96px;top:214px;width:760px;height:760px;border-radius:30px;background:#fff;border:1px solid rgba(21,34,74,.13);box-shadow:0 30px 74px rgba(21,34,74,.11);overflow:hidden}
+    #scene-finish .hero{height:265px;padding:32px;background:linear-gradient(135deg,#2f6bff,#16c2b3);position:relative;color:white}.hero .bars{position:absolute;right:34px;bottom:36px;display:flex;align-items:flex-end;gap:12px}.hero .bars i{display:block;width:28px;border-radius:14px;background:rgba(255,255,255,.7)}.hero .bars i:nth-child(1){height:60px}.hero .bars i:nth-child(2){height:110px}.hero .bars i:nth-child(3){height:160px}.hero .bars i:nth-child(4){height:126px}
+    #scene-finish .hero b{font:600 34px Lora,serif}.article-body{padding:34px}.article-body h3{font:600 38px/1.1 Lora,serif;margin-bottom:25px}.line{height:12px;border-radius:12px;background:#dce4ed;margin:15px 0}.line.short{width:70%}
+    #scene-finish .right{position:absolute;left:910px;right:96px;top:214px;height:760px}.atomize{display:inline-flex;padding:14px 20px;border-radius:13px;background:#2f6bff;color:white;font-weight:850;font-size:18px}
+    #scene-finish .channels{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.channel{height:126px;padding:20px;border-radius:18px;background:rgba(255,255,255,.86);border:1px solid rgba(21,34,74,.13);font-weight:800}.channel small{display:block;margin-top:12px;color:#66718a;font-weight:600}
+    #scene-finish .exports{display:flex;gap:12px;margin:20px 0 24px}.export{padding:11px 15px;border-radius:999px;background:#e9efff;color:#2b62ea;font:750 15px JetBrains Mono,monospace}
+    #scene-finish .publish{padding:24px;border-radius:22px;background:#fff;border:1px solid rgba(21,34,74,.14);box-shadow:0 20px 52px rgba(21,34,74,.09)}.publish h3{font-size:22px;margin-bottom:14px}.repo{padding:14px;border-radius:12px;background:#f2f5f8;font:650 15px JetBrains Mono,monospace;color:#4f5b75}.publish-button{display:inline-flex;margin-top:16px;padding:12px 18px;border-radius:11px;background:#15224a;color:#fff;font-weight:800}.published{display:inline-flex;margin-top:16px;padding:12px 18px;border-radius:11px;background:#d8f6ef;color:#176c64;font-weight:850}
+    #scene-finish .poster-label{position:absolute;right:98px;bottom:42px;font-size:22px;font-weight:800}
+  </style>
+  <section id="scene-finish" data-composition-id="scene-finish" data-start="0" data-duration="4.8" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <header class="head"><div class="kicker">04 / Finish & distribute</div><h2>One article. Every useful next step.</h2></header>
+    <article id="publish-artifact" class="article"><div class="hero"><b>BlogForge</b><div class="bars"><i></i><i></i><i></i><i></i></div></div><div class="article-body"><h3>Why AI writing needs a workshop</h3><div class="line"></div><div class="line"></div><div class="line short"></div><div class="line"></div><div class="line short"></div></div></article>
+    <div class="right"><div class="atomize">✦ Atomize all</div><div class="channels"><div class="channel">X thread<small>7 posts</small></div><div class="channel">LinkedIn<small>ready to review</small></div><div class="channel">Newsletter<small>subject + body</small></div><div class="channel">TL;DR<small>3 key points</small></div><div class="channel">SEO meta<small>title + description</small></div></div><div class="exports"><span class="export">Markdown</span><span class="export">HTML</span><span class="export">Word</span></div><div class="publish"><h3>Publish to GitHub</h3><div class="repo">dbbaskette/blog · posts/ai-writing-workshop.md</div><div id="publish-button" class="publish-button">Publish article</div><div id="published" class="published">Published to GitHub ✓</div></div></div>
+    <div class="poster-label">Draft → channels → export → publish</div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      gsap.set("#published",{autoAlpha:0});
+      tl.fromTo("#scene-finish",{xPercent:10},{xPercent:0,duration:.46,ease:"power4.out"},0)
+        .fromTo("#scene-finish .head",{autoAlpha:0,y:26},{autoAlpha:1,y:0,duration:.42,ease:"power3.out"},.08)
+        .fromTo("#publish-artifact",{autoAlpha:0,x:-52},{autoAlpha:1,x:0,duration:.5,ease:"power3.out"},.24)
+        .fromTo("#scene-finish .hero .bars i",{scaleY:0,transformOrigin:"bottom"},{scaleY:1,duration:.34,stagger:.08,ease:"power3.out"},.58)
+        .fromTo("#scene-finish .atomize",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.34,ease:"back.out(1.45)"},.78)
+        .fromTo("#scene-finish .channel",{autoAlpha:0,x:46,rotation:2},{autoAlpha:1,x:0,rotation:0,duration:.34,stagger:.1,ease:"power3.out"},1.08)
+        .fromTo("#scene-finish .export",{autoAlpha:0,y:14},{autoAlpha:1,y:0,duration:.28,stagger:.09,ease:"power3.out"},1.82)
+        .fromTo("#scene-finish .publish",{autoAlpha:0,y:28},{autoAlpha:1,y:0,duration:.4,ease:"power3.out"},2.18)
+        .to("#publish-button",{scale:.95,duration:.12,ease:"power2.in"},3.12)
+        .to("#publish-button",{autoAlpha:0,duration:.18},3.24)
+        .fromTo("#published",{autoAlpha:0,y:10},{autoAlpha:1,y:0,duration:.34,ease:"power3.out"},3.34)
+        .fromTo("#scene-finish .poster-label",{autoAlpha:0,y:14},{autoAlpha:1,y:0,duration:.3,ease:"power3.out"},3.68)
+        .to("#scene-finish",{xPercent:-10,duration:.36,ease:"power4.in"},4.44);
+      window.__timelines=window.__timelines||{};window.__timelines["scene-finish"]=tl;})();
+  </script>
+</template>

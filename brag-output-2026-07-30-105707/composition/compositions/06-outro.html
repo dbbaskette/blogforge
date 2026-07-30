@@ -1,0 +1,38 @@
+<template>
+  <style>
+    #scene-outro{position:relative;width:1920px;height:1080px;overflow:hidden;background:linear-gradient(145deg,#e6efff,#e3f7f4 58%,#fff4e0);color:#15224a;font-family:Inter,sans-serif}
+    #scene-outro .orbit{position:absolute;inset:0}.artifact{position:absolute;border-radius:22px;border:1px solid rgba(21,34,74,.12);background:rgba(255,255,255,.84);box-shadow:0 18px 50px rgba(21,34,74,.08)}
+    #scene-outro .voice{left:150px;top:175px;width:230px;height:230px;padding:28px}.voice svg{width:100%;height:100%}.voice polygon{fill:rgba(47,107,255,.2);stroke:#2f6bff;stroke-width:5}
+    #scene-outro .stages{left:144px;bottom:180px;width:390px;padding:22px;font-weight:800}.stages span{color:#2d67f6}
+    #scene-outro .review{right:154px;top:180px;width:300px;padding:24px}.review b{display:block;margin-bottom:14px}.review i{display:inline-block;width:10px;height:10px;border-radius:50%;background:#16c2b3;margin-right:10px}
+    #scene-outro .publish{right:154px;bottom:192px;width:340px;padding:24px;color:#176c64;font-weight:850}.publish em{font-style:normal;color:#0e8076;margin-right:8px}
+    #scene-outro .lockup{position:absolute;left:544px;top:130px;width:832px;height:820px;padding:76px 74px;border-radius:42px;background:rgba(255,255,255,.93);border:1px solid rgba(21,34,74,.14);box-shadow:0 38px 100px rgba(21,34,74,.14);text-align:center}
+    #scene-outro .logo{margin:0 auto 42px;width:92px;height:92px;display:grid;place-items:center;border-radius:26px;background:#2f6bff;color:white;font-size:43px;font-weight:900}
+    #scene-outro h2{font:600 72px/1.06 Lora,serif;letter-spacing:-.045em;margin:0 auto;max-width:680px}
+    #scene-outro .rule{width:110px;height:7px;border-radius:7px;background:#16c2b3;margin:40px auto}
+    #scene-outro .tag{font-size:25px;font-weight:750;color:#4f5c77}.version{margin-top:42px;font:700 16px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#2f6afd}
+  </style>
+  <section id="scene-outro" data-composition-id="scene-outro" data-start="0" data-duration="3.1" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div class="orbit">
+      <div class="artifact voice"><svg viewBox="0 0 160 160"><polygon points="80,12 142,48 142,112 80,148 18,112 18,48"/></svg></div>
+      <div class="artifact stages"><span>Talk it through</span> › Outline › Draft</div>
+      <div class="artifact review"><b>Review finding</b><i></i>Writer decision applied</div>
+      <div class="artifact publish"><em>✓</em>Published to GitHub</div>
+    </div>
+    <div id="final-lockup" class="lockup"><div class="logo">B</div><h2>Your voice.<br>One coherent argument.<br>Ready to publish.</h2><div class="rule"></div><div class="tag">A workshop for long-form writing</div><div class="version">BlogForge v0.10</div></div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#scene-outro",{xPercent:10},{xPercent:0,duration:.44,ease:"power4.out"},0)
+        .fromTo("#scene-outro .artifact",{autoAlpha:0,x:80},{autoAlpha:1,x:0,duration:.42,stagger:.1,ease:"power3.out"},.04)
+        .fromTo("#final-lockup",{autoAlpha:0,y:72,scale:.96},{autoAlpha:1,y:0,scale:1,duration:.62,ease:"power4.out"},.38)
+        .to("#scene-outro .artifact",{x:()=>0,y:()=>0,scale:.86,opacity:.55,duration:.5,ease:"power3.inOut"},1.02)
+        .fromTo("#scene-outro .logo",{scale:.7,rotation:-6},{scale:1,rotation:0,duration:.36,ease:"back.out(1.45)"},1.15)
+        .fromTo("#scene-outro h2",{autoAlpha:0,y:24},{autoAlpha:1,y:0,duration:.46,ease:"power3.out"},1.22)
+        .fromTo("#scene-outro .rule",{scaleX:0},{scaleX:1,duration:.34,ease:"power3.out"},1.52)
+        .fromTo("#scene-outro .tag, #scene-outro .version",{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:.34,stagger:.12,ease:"power3.out"},1.66)
+        .to("#final-lockup",{y:-8,duration:.28,ease:"power2.out"},2.15)
+        .to("#final-lockup",{y:0,duration:.24,ease:"power2.inOut"},2.43);
+      window.__timelines=window.__timelines||{};window.__timelines["scene-outro"]=tl;})();
+  </script>
+</template>

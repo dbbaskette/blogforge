@@ -1,0 +1,54 @@
+<template>
+  <style>
+    #scene-edit{position:relative;width:1920px;height:1080px;overflow:hidden;background:linear-gradient(135deg,#e3f7f4,#e6efff);color:#15224a;font-family:Inter,sans-serif}
+    #scene-edit .shell{position:absolute;inset:62px 78px;border:1px solid rgba(21,34,74,.14);border-radius:34px;background:rgba(255,255,255,.88);box-shadow:0 30px 80px rgba(21,34,74,.1);overflow:hidden}
+    #scene-edit .bar{height:92px;padding:0 32px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #dbe3ec}
+    #scene-edit .brand{display:flex;align-items:center;gap:14px;font-weight:850;font-size:22px}.brand i{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#2f6bff;color:#fff;font-style:normal}
+    #scene-edit .saved{font:700 15px JetBrains Mono,monospace;color:#277c71}
+    #scene-edit .workspace{display:grid;grid-template-columns:210px 1fr 360px;height:864px}
+    #scene-edit .stages{padding:34px 22px;border-right:1px solid #dbe3ec}.stage{padding:15px;border-radius:14px;margin-bottom:10px;font-weight:750;color:#64708a}.stage.active{background:#e9efff;color:#2b62ea}
+    #scene-edit .editor{position:relative;padding:46px 68px;background:#fffdf8}
+    #scene-edit .meta{font:700 14px JetBrains Mono,monospace;color:#2e6afc;text-transform:uppercase;letter-spacing:.1em}
+    #scene-edit h2{font:600 48px/1.08 Lora,serif;letter-spacing:-.035em;margin:18px 0 26px}
+    #scene-edit .body{max-width:790px;font:500 22px/1.55 Lora,serif;color:#34405b}
+    #scene-edit .body p{margin-bottom:20px}.selected{background:#dfe9ff;border-radius:5px;padding:2px 4px;color:#15224a}
+    #scene-edit .inline{position:absolute;left:204px;top:384px;display:flex;gap:6px;padding:9px;border-radius:14px;background:#15224a;color:#fff;box-shadow:0 18px 36px rgba(21,34,74,.25)}
+    #scene-edit .inline span{padding:9px 11px;border-radius:8px;font-size:14px;font-weight:750}.inline span:last-child{background:#2f6bff}
+    #scene-edit .review{padding:30px 24px;border-left:1px solid #dbe3ec;background:#f7fafc}
+    #scene-edit .review h3{font-size:21px;margin:4px 0 20px}.tool{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;margin-bottom:8px;font-weight:750}.tool i{width:10px;height:10px;border-radius:50%;background:#16c2b3}.tool.active{background:#e9efff;color:#2b62ea}.tool.active i{background:#2b62ea}
+    #scene-edit .compare{position:absolute;right:420px;bottom:96px;width:610px;padding:25px;border-radius:22px;border:1px solid rgba(21,34,74,.14);background:#fff;box-shadow:0 26px 70px rgba(21,34,74,.18)}
+    #scene-edit .compare h4{font-size:19px;margin-bottom:16px}.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}.compare-grid div{padding:15px;border-radius:12px;background:#f2f5f8;font-size:15px;line-height:1.35}.compare b{display:block;font:700 12px JetBrains Mono,monospace;color:#64708a;margin-bottom:7px}
+    #scene-edit .apply{float:right;margin-top:14px;padding:11px 18px;border-radius:10px;background:#2f6bff;color:#fff;font-weight:800}
+    #scene-edit .message{position:absolute;left:110px;bottom:24px;font-size:23px;font-weight:800}
+  </style>
+  <section id="scene-edit" data-composition-id="scene-edit" data-start="0" data-duration="5.8" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div class="shell">
+      <div class="bar"><div class="brand"><i>B</i>BlogForge</div><div class="saved">● All changes saved</div></div>
+      <div class="workspace">
+        <aside class="stages"><div class="stage">Talk it through</div><div class="stage">Outline</div><div class="stage active">Draft</div></aside>
+        <main id="edited-manuscript" class="editor"><div class="meta">Draft / long-form article</div><h2>Why AI writing needs a workshop</h2><div class="body"><p>Generation can get words onto a page. It cannot decide what the piece is really trying to say.</p><p><span class="selected">The best writing tools make their suggestions visible.</span> They leave the judgment with the writer.</p><p>A coherent draft is not a pile of sections. It is one argument, carried from opening to close.</p></div><div id="inline-menu" class="inline"><span>Rewrite</span><span>Shorter</span><span>Stronger</span><span>In my voice</span></div></main>
+        <aside class="review"><h3>Review</h3><div class="tool"><i></i>Proofreader</div><div class="tool active"><i></i>Humanization Check</div><div class="tool"><i></i>Fact-check</div><div class="tool"><i></i>GEO</div><div class="tool"><i></i>Shape</div><div class="tool"><i></i>Version history</div></aside>
+      </div>
+    </div>
+    <div id="compare-card" class="compare"><h4>One finding · writer decides</h4><div class="compare-grid"><div><b>Original</b>The best writing tools make suggestions visible.</div><div><b>Rewrite</b>Good tools show their work—and wait for your call.</div></div><div id="apply-fix" class="apply">Apply</div></div>
+    <div class="message">Suggestions are visible. Decisions stay yours.</div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#scene-edit",{xPercent:10},{xPercent:0,duration:.46,ease:"power4.out"},0)
+        .fromTo("#scene-edit .shell",{autoAlpha:0,y:34},{autoAlpha:1,y:0,duration:.52,ease:"power3.out"},.08)
+        .fromTo("#edited-manuscript",{autoAlpha:0,x:48},{autoAlpha:1,x:0,duration:.45,ease:"power3.out"},.34)
+        .fromTo("#scene-edit .review .tool",{autoAlpha:0,x:32},{autoAlpha:1,x:0,duration:.3,stagger:.08,ease:"power3.out"},.76)
+        .fromTo("#inline-menu",{autoAlpha:0,y:14,scale:.96},{autoAlpha:1,y:0,scale:1,duration:.34,ease:"back.out(1.45)"},1.34)
+        .to("#scene-edit .selected",{backgroundColor:"#fff1bd",duration:.32},1.86)
+        .fromTo("#compare-card",{autoAlpha:0,y:34,scale:.96},{autoAlpha:1,y:0,scale:1,duration:.45,ease:"power3.out"},2.22)
+        .to("#apply-fix",{scale:.94,duration:.12,ease:"power2.in"},3.18)
+        .to("#apply-fix",{scale:1,backgroundColor:"#16c2b3",duration:.22,ease:"power2.out"},3.31)
+        .to("#scene-edit .selected",{backgroundColor:"#c8f3e9",duration:.28},3.32)
+        .to("#compare-card",{autoAlpha:0,y:22,duration:.32,ease:"power2.in"},3.72)
+        .fromTo("#scene-edit .message",{autoAlpha:0,y:16},{autoAlpha:1,y:0,duration:.38,ease:"power3.out"},3.84)
+        .to("#scene-edit .saved",{color:"#2f6bff",duration:.25},4.38)
+        .to("#scene-edit",{xPercent:-10,duration:.38,ease:"power4.in"},5.42);
+      window.__timelines=window.__timelines||{};window.__timelines["scene-edit"]=tl;})();
+  </script>
+</template>

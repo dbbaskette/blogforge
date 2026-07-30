@@ -1,0 +1,9 @@
+{
+  "duration": 2.7,
+  "assertions": [
+    {"kind":"appearsBy","selector":"#hook-copy","bySec":0.95},
+    {"kind":"before","a":"#generic-generate","b":"#hook-mark"},
+    {"kind":"staysInFrame","selector":"#hook-copy"},
+    {"kind":"keepsMoving","withinSelector":"#scene-hook","maxStaticSec":0.9}
+  ]
+}

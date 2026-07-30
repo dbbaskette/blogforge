@@ -1,0 +1,77 @@
+<template>
+  <style>
+    #scene-voice{position:relative;width:1920px;height:1080px;overflow:hidden;background:linear-gradient(135deg,#e3f7f4,#e6efff);color:#15224a;font-family:Inter,sans-serif}
+    #scene-voice .head{position:absolute;left:108px;top:78px}
+    #scene-voice .kicker{font:700 17px/1 JetBrains Mono,monospace;letter-spacing:.15em;text-transform:uppercase;color:#147c75}
+    #scene-voice h2{margin-top:18px;font:600 70px/.98 Lora,serif;letter-spacing:-.04em}
+    #scene-voice .promise{margin-top:16px;font-size:24px;color:#51607c;font-weight:650}
+    #scene-voice .panel{position:absolute;border:1px solid rgba(21,34,74,.13);border-radius:30px;background:rgba(255,255,255,.85);box-shadow:0 24px 64px rgba(21,34,74,.08)}
+    #scene-voice .radar-panel{left:108px;top:300px;width:720px;height:650px}
+    #scene-voice .radar-title{position:absolute;left:40px;top:34px;font-weight:800;font-size:23px}
+    #scene-voice svg{position:absolute;left:94px;top:98px;width:530px;height:500px;overflow:visible}
+    #scene-voice .grid{fill:none;stroke:#a8b8ce;stroke-width:2}
+    #scene-voice .axis{stroke:#c1cedd;stroke-width:2}
+    #scene-voice .shape{fill:rgba(47,107,255,.20);stroke:#2f6bff;stroke-width:6;stroke-linejoin:round}
+    #scene-voice .dot{fill:#2f6bff}
+    #scene-voice .axis-label{font:700 20px Inter,sans-serif;fill:#15224a}
+    #scene-voice .chips{position:absolute;left:874px;top:300px;width:940px;height:244px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    #scene-voice .chipgroup{padding:24px;border-radius:22px;border:1px solid rgba(21,34,74,.13);background:rgba(255,255,255,.8)}
+    #scene-voice .chipgroup b{display:block;font:700 14px/1 JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:.09em;color:#2e69fb;margin-bottom:16px}
+    #scene-voice .pill{display:inline-block;padding:9px 12px;border-radius:999px;background:#e9efff;margin:0 6px 7px 0;font-size:16px;font-weight:700}
+    #scene-voice .audition{left:874px;top:575px;width:940px;height:375px;padding:34px}
+    #scene-voice .tabs{display:flex;gap:8px;margin-bottom:26px}
+    #scene-voice .tab{padding:9px 14px;border-radius:10px;background:#edf1f7;color:#626e88;font:700 15px JetBrains Mono,monospace}
+    #scene-voice .tab.active{background:#2457d0;color:white}
+    #scene-voice .sample{position:absolute;left:34px;top:108px;font:500 30px/1.35 Lora,serif;max-width:830px}
+    #scene-voice #sample-voice{opacity:0;visibility:hidden}
+    #scene-voice .strength{position:absolute;left:34px;right:34px;bottom:30px;height:8px;border-radius:8px;background:#dce5ee;overflow:hidden}
+    #scene-voice .strength span{display:block;width:84%;height:100%;background:linear-gradient(90deg,#16c2b3,#2f6bff);transform-origin:left}
+    #scene-voice .mark{position:absolute;right:38px;top:36px;width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:#15224a;color:white;font-weight:800}
+  </style>
+  <section id="scene-voice" data-composition-id="scene-voice" data-start="0" data-duration="3.7" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <header class="head"><div class="kicker">01 / Your Voice</div><h2>Your voice is an input,<br>not an afterthought.</h2><div class="promise">Fingerprint it. Audition it. Keep it.</div></header>
+    <div class="panel radar-panel">
+      <div class="radar-title">Voice fingerprint</div>
+      <svg viewBox="0 0 540 500" aria-label="Voice fingerprint chart">
+        <polygon class="grid" points="270,55 455,160 455,365 270,470 85,365 85,160"/>
+        <polygon class="grid" points="270,115 403,190 403,335 270,410 137,335 137,190"/>
+        <line class="axis" x1="270" y1="262" x2="270" y2="55"/><line class="axis" x1="270" y1="262" x2="455" y2="160"/><line class="axis" x1="270" y1="262" x2="455" y2="365"/><line class="axis" x1="270" y1="262" x2="270" y2="470"/><line class="axis" x1="270" y1="262" x2="85" y2="365"/><line class="axis" x1="270" y1="262" x2="85" y2="160"/>
+        <polygon id="voice-shape" class="shape" points="270,113 420,179 396,332 270,420 107,353 115,176"/>
+        <circle class="dot" cx="270" cy="113" r="7"/><circle class="dot" cx="420" cy="179" r="7"/><circle class="dot" cx="396" cy="332" r="7"/><circle class="dot" cx="270" cy="420" r="7"/><circle class="dot" cx="107" cy="353" r="7"/><circle class="dot" cx="115" cy="176" r="7"/>
+        <text class="axis-label" x="270" y="30" text-anchor="middle">Casual</text><text class="axis-label" x="477" y="158">Vivid</text><text class="axis-label" x="477" y="385">Punchy</text><text class="axis-label" x="270" y="498" text-anchor="middle">Warm</text><text class="axis-label" x="4" y="385">Concrete</text><text class="axis-label" x="24" y="158">Direct</text>
+      </svg>
+    </div>
+    <div class="chips">
+      <div class="chipgroup"><b>Signature phrases</b><span class="pill">here’s the thing</span><span class="pill">in practice</span></div>
+      <div class="chipgroup"><b>Sentence rhythm</b><span class="pill">short → long</span><span class="pill">clean turns</span></div>
+      <div class="chipgroup"><b>Banished</b><span class="pill">delve</span><span class="pill">game-changer</span></div>
+    </div>
+    <div class="panel audition">
+      <div class="tabs"><span id="tab-original" class="tab active">Original</span><span id="tab-voice" class="tab">In your voice</span></div>
+      <div id="sample-original" class="sample">AI can help teams communicate more effectively.</div>
+      <div id="sample-voice" class="sample">AI can get the first sentence moving. The judgment is still yours.</div>
+      <div class="strength"><span></span></div>
+    </div>
+    <div id="voice-mark" class="mark">B</div>
+  </section>
+  <script>
+    (() => {
+      const tl=gsap.timeline({paused:true});
+      tl.fromTo("#scene-voice",{xPercent:10},{xPercent:0,duration:.42,ease:"power4.out"},0)
+        .fromTo("#scene-voice .head",{autoAlpha:0,y:30},{autoAlpha:1,y:0,duration:.55,ease:"power3.out"},.08)
+        .fromTo(".radar-panel",{autoAlpha:0,y:42},{autoAlpha:1,y:0,duration:.55,ease:"power3.out"},.26)
+        .fromTo("#voice-shape",{scale:0,transformOrigin:"50% 50%"},{scale:1,duration:.8,ease:"power3.out"},.55)
+        .fromTo("#scene-voice .dot",{scale:0,transformOrigin:"50% 50%"},{scale:1,duration:.3,stagger:.05,ease:"back.out(1.5)"},.88)
+        .fromTo("#scene-voice .chipgroup",{autoAlpha:0,y:24},{autoAlpha:1,y:0,duration:.38,stagger:.12,ease:"power3.out"},.74)
+        .fromTo(".audition",{autoAlpha:0,y:30},{autoAlpha:1,y:0,duration:.48,ease:"power3.out"},1.16)
+        .fromTo("#scene-voice .strength span",{scaleX:0},{scaleX:1,duration:.72,ease:"power2.out"},1.28)
+        .to("#sample-original",{autoAlpha:0,y:-14,duration:.25,ease:"power2.in"},1.8)
+        .set("#tab-original",{className:"tab"},1.98)
+        .set("#tab-voice",{className:"tab active"},1.98)
+        .fromTo("#sample-voice",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.42,ease:"power3.out"},1.98)
+        .to("#voice-mark",{backgroundColor:"#2f6bff",rotation:4,duration:.28,ease:"power2.out"},2.62)
+        .to("#scene-voice",{xPercent:-10,duration:.34,ease:"power4.in"},3.36);
+      window.__timelines=window.__timelines||{};window.__timelines["scene-voice"]=tl;
+    })();
+  </script>
+</template>
