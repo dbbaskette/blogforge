@@ -1,0 +1,9 @@
+{
+  "duration": 4,
+  "assertions": [
+    {"kind":"appearsBy","selector":"#mode-grid","bySec":0.9},
+    {"kind":"before","a":"#mode-grid","b":"#draft-carrier"},
+    {"kind":"staysInFrame","selector":"#draft-carrier"},
+    {"kind":"keepsMoving","withinSelector":"#scene-compose","maxStaticSec":1.0}
+  ]
+}

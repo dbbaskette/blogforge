@@ -1,0 +1,66 @@
+<template>
+  <style>
+    #scene-compose{position:relative;width:1920px;height:1080px;overflow:hidden;background:linear-gradient(140deg,#e6efff,#fff4e0);color:#15224a;font-family:Inter,sans-serif}
+    #scene-compose .top{position:absolute;left:104px;right:104px;top:70px;display:flex;justify-content:space-between;align-items:flex-start}
+    #scene-compose .kicker{font:700 17px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#2f6bff}
+    #scene-compose h2{margin-top:13px;font:600 62px/1 Lora,serif;letter-spacing:-.04em}
+    #scene-compose .brand{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:#2f6bff;color:white;font-weight:800}
+    #scene-compose .modes{position:absolute;left:104px;top:248px;width:1712px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    #scene-compose .mode{position:relative;height:186px;padding:28px 30px;border-radius:22px;border:1px solid rgba(21,34,74,.13);background:rgba(255,255,255,.84)}
+    #scene-compose .mode b{display:block;font-size:23px;margin-bottom:12px}
+    #scene-compose .mode p{font-size:17px;line-height:1.35;color:#5f6980}
+    #scene-compose .mode i{font-style:normal;margin-right:8px}
+    #scene-compose .selection{position:absolute;left:104px;top:248px;width:558px;height:186px;border:5px solid #2f6bff;border-radius:24px;box-shadow:0 16px 40px rgba(47,107,255,.18);pointer-events:none}
+    #scene-compose .flow{position:absolute;left:104px;right:104px;top:278px;height:610px;display:flex;align-items:center;justify-content:center;gap:30px;opacity:0;visibility:hidden}
+    #scene-compose .stage{width:360px;padding:28px;border-radius:24px;background:white;border:1px solid rgba(21,34,74,.12);box-shadow:0 22px 56px rgba(21,34,74,.08)}
+    #scene-compose .stage small{font:700 14px JetBrains Mono,monospace;color:#2f6bff;text-transform:uppercase;letter-spacing:.1em}
+    #scene-compose .stage strong{display:block;font-size:28px;margin:14px 0 18px}
+    #scene-compose .row{height:10px;border-radius:10px;background:#dce5ef;margin:12px 0}
+    #scene-compose .row.short{width:68%}
+    #scene-compose .arrow{font-size:40px;color:#16c2b3}
+    #scene-compose .manuscript{width:470px;height:540px;padding:34px;border-radius:26px;background:#fffdf8;border:1px solid rgba(21,34,74,.14);box-shadow:0 30px 74px rgba(21,34,74,.11)}
+    #scene-compose .manuscript h3{font:600 35px/1.1 Lora,serif;margin:15px 0 30px}
+    #scene-compose .sourcechips{display:flex;gap:8px;margin-top:20px}
+    #scene-compose .sourcechips span{padding:8px 10px;border-radius:999px;background:#e3f7f4;color:#176a65;font-size:13px;font-weight:800}
+    #scene-compose .caption{position:absolute;left:104px;bottom:58px;font-size:24px;font-weight:750}
+  </style>
+  <section id="scene-compose" data-composition-id="scene-compose" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+    <div class="top"><div><div class="kicker">02 / Start where you are</div><h2>Six ways in. One coherent draft.</h2></div><div class="brand">B</div></div>
+    <div id="mode-grid" class="modes">
+      <div class="mode"><b><i>⚡</i>Just write it</b><p>A topic in, a full draft out — one shot.</p></div>
+      <div class="mode"><b><i>💬</i>Help me shape it</b><p>Describe the topic — get an outline to tweak.</p></div>
+      <div class="mode"><b><i>📋</i>I have an outline</b><p>Paste your structure — AI writes the full draft.</p></div>
+      <div class="mode"><b><i>📚</i>I have source material</b><p>Turn research into a real blog outline.</p></div>
+      <div class="mode"><b><i>📥</i>I already wrote it</b><p>Paste a finished draft and shape it.</p></div>
+      <div class="mode"><b><i>📝</i>Blank page</b><p>Start empty and write yourself, with inline AI.</p></div>
+    </div>
+    <div id="mode-selection" class="selection"></div>
+    <div id="compose-flow" class="flow">
+      <div class="stage"><small>Stage 1</small><strong>Talk it through</strong><div class="row"></div><div class="row short"></div><div class="sourcechips"><span>3 sources</span><span>voice notes</span></div></div>
+      <div class="arrow">›</div>
+      <div class="stage"><small>Stage 2</small><strong>Outline</strong><div class="row"></div><div class="row short"></div><div class="row"></div></div>
+      <div class="arrow">›</div>
+      <div id="draft-carrier" class="manuscript"><small>Stage 3 · Draft</small><h3>Why AI writing needs a workshop</h3><div class="row"></div><div class="row"></div><div class="row short"></div><div class="row"></div><div class="row"></div><div class="row short"></div><div class="sourcechips"><span>Composing the full draft</span></div></div>
+    </div>
+    <div class="caption">Research, outline, and one coherent draft.</div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#scene-compose",{xPercent:10},{xPercent:0,duration:.42,ease:"power4.out"},0)
+        .fromTo("#scene-compose .top",{autoAlpha:0,y:26},{autoAlpha:1,y:0,duration:.45,ease:"power3.out"},.06)
+        .fromTo("#scene-compose .mode",{autoAlpha:0,y:30},{autoAlpha:1,y:0,duration:.35,stagger:.06,ease:"power3.out"},.23)
+        .fromTo("#mode-selection",{autoAlpha:0,scale:.96},{autoAlpha:1,scale:1,duration:.3,ease:"power3.out"},.52)
+        .to("#mode-selection",{x:577,duration:.24,ease:"power3.inOut"},.82)
+        .to("#mode-selection",{x:1154,duration:.24,ease:"power3.inOut"},1.08)
+        .to("#mode-selection",{x:0,y:204,duration:.28,ease:"power3.inOut"},1.36)
+        .to("#mode-grid",{autoAlpha:0,y:-36,duration:.28,ease:"power2.in"},1.72)
+        .to("#mode-selection",{autoAlpha:0,duration:.2},1.72)
+        .set("#compose-flow",{autoAlpha:1},1.86)
+        .fromTo("#compose-flow .stage",{autoAlpha:0,x:60},{autoAlpha:1,x:0,duration:.42,stagger:.18,ease:"power3.out"},1.88)
+        .fromTo("#compose-flow .arrow",{autoAlpha:0,scale:.4},{autoAlpha:1,scale:1,duration:.26,stagger:.34,ease:"back.out(1.5)"},2.08)
+        .fromTo("#draft-carrier .row",{scaleX:0,transformOrigin:"left"},{scaleX:1,duration:.34,stagger:.07,ease:"power2.out"},2.48)
+        .fromTo("#scene-compose .caption",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.36,ease:"power3.out"},2.82)
+        .to("#scene-compose",{xPercent:-10,duration:.34,ease:"power4.in"},3.66);
+      window.__timelines=window.__timelines||{};window.__timelines["scene-compose"]=tl;})();
+  </script>
+</template>
