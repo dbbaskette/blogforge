@@ -1,0 +1,10 @@
+{
+  "fps": 30,
+  "seams": [
+    {"id":"hook-to-voice","cut":2.7,"technique":"cut-the-curve LEFT","exit":{"selector":"#slot-hook","axis":"x","dir":-1,"dur":0.32},"entry":{"selector":"#slot-voice","axis":"x","dir":-1,"dur":0.42,"travel":10}},
+    {"id":"voice-to-compose","cut":6.4,"technique":"cut-the-curve LEFT","exit":{"selector":"#slot-voice","axis":"x","dir":-1,"dur":0.34},"entry":{"selector":"#slot-compose","axis":"x","dir":-1,"dur":0.42,"travel":10}},
+    {"id":"compose-to-edit","cut":10.4,"technique":"cut-the-curve LEFT","exit":{"selector":"#slot-compose","axis":"x","dir":-1,"dur":0.34},"entry":{"selector":"#slot-edit","axis":"x","dir":-1,"dur":0.46,"travel":10}},
+    {"id":"edit-to-finish","cut":16.2,"technique":"cut-the-curve LEFT","exit":{"selector":"#slot-edit","axis":"x","dir":-1,"dur":0.38},"entry":{"selector":"#slot-finish","axis":"x","dir":-1,"dur":0.46,"travel":10}},
+    {"id":"finish-to-outro","cut":21,"technique":"cut-the-curve LEFT","exit":{"selector":"#slot-finish","axis":"x","dir":-1,"dur":0.36},"entry":{"selector":"#slot-outro","axis":"x","dir":-1,"dur":0.44,"travel":10}}
+  ]
+}
