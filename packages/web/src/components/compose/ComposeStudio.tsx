@@ -11,6 +11,7 @@ import {
   updateDraft,
 } from "../../api/drafts";
 import { getDefaultProvider, listProviderAvailability } from "../../api/providers";
+import { addTextReference } from "../../api/references";
 import { type Template, deleteTemplate, listTemplates } from "../../api/templates";
 import { loadDefaults, loadLastMode, saveDefaults, saveLastMode } from "../../lib/composeDefaults";
 import { parseOutline } from "../../lib/parseOutline";
@@ -23,6 +24,7 @@ import { type ComposeMode, ModePicker } from "./ModePicker";
 import { OutlineInPanel } from "./OutlineInPanel";
 import { PastePanel } from "./PastePanel";
 import { ProposePanel } from "./ProposePanel";
+import { SourceMaterialPanel } from "./SourceMaterialPanel";
 import { SetupSummary } from "./SetupSummary";
 import { SparkIdeas } from "./SparkIdeas";
 import { type Starter, StarterIdeas } from "./StarterIdeas";
@@ -43,8 +45,9 @@ function ideaFrom(
   bullets: string[] = [],
   notes = "",
   sourceUrls: string[] = [],
+  extra: Partial<IdeaInput> = {},
 ): IdeaInput {
-  return { topic, bullets, notes, source_urls: sourceUrls, ...settings };
+  return { topic, bullets, notes, source_urls: sourceUrls, ...settings, ...extra };
 }
 
 export function ComposeStudio(): JSX.Element {
@@ -71,6 +74,8 @@ export function ComposeStudio(): JSX.Element {
   const [sourceUrls, setSourceUrls] = useState<string[]>([]);
   const [outlineText, setOutlineText] = useState("");
   const [pasteText, setPasteText] = useState("");
+  const [sourceTitle, setSourceTitle] = useState("");
+  const [sourceText, setSourceText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // When a multi-step flow fails after the draft is created, offer a way into
@@ -292,6 +297,29 @@ export function ComposeStudio(): JSX.Element {
     }
   }
 
+  async function runSourceMaterial(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    setResumeDraftId(null);
+    let createdId: string | null = null;
+    try {
+      const draft = await createDraft(
+        ideaFrom(settings, sourceTitle.trim(), [], "", [], { source_material_mode: true }),
+      );
+      createdId = draft.id;
+      await addTextReference(draft.id, "Source material", sourceText.trim());
+      await generateOutline(draft.id);
+      saveDefaults(settings);
+      saveLastMode("source");
+      navigate(`/drafts/${draft.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      if (createdId) setResumeDraftId(createdId);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // PASTE — ingest an already-written draft into an editable, sections-stage
   // draft (no generation), then land in the editor where the shaping tools live.
   async function runPaste(): Promise<void> {
@@ -445,6 +473,17 @@ export function ComposeStudio(): JSX.Element {
               text={pasteText}
               onText={setPasteText}
               onRun={runPaste}
+              busy={busy}
+              disabled={!canRun}
+            />
+          )}
+          {mode === "source" && (
+            <SourceMaterialPanel
+              title={sourceTitle}
+              onTitle={setSourceTitle}
+              sourceText={sourceText}
+              onSourceText={setSourceText}
+              onRun={runSourceMaterial}
               busy={busy}
               disabled={!canRun}
             />

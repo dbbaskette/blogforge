@@ -46,7 +46,7 @@ export function saveDefaults({ provider: _provider, ...persisted }: ComposeSetti
 }
 
 const MODE_KEY = "bf.compose.lastMode";
-const VALID_MODES = ["outline", "propose", "express", "blank", "paste"] as const;
+const VALID_MODES = ["outline", "propose", "express", "blank", "paste", "source"] as const;
 export type StoredMode = (typeof VALID_MODES)[number];
 
 /** The mode the writer last composed with, so returning users skip re-picking. */
