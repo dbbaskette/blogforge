@@ -1,0 +1,34 @@
+<template>
+  <style>
+    #bf08{position:relative;width:1920px;height:1080px;overflow:hidden;color:#15224a;font-family:Inter,sans-serif}
+    #bf08 .fill{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.95),transparent 45%),radial-gradient(circle at 15% 20%,rgba(47,107,255,.17),transparent 30%),radial-gradient(circle at 84% 80%,rgba(22,194,179,.2),transparent 32%),#e6efff}
+    #bf08 .artifact{position:absolute;padding:18px 21px;border-radius:18px;background:rgba(255,255,255,.82);border:2px solid rgba(21,34,74,.1);box-shadow:0 18px 46px rgba(21,34,74,.08);font-weight:800}
+    #bf08 .topic{left:120px;top:170px}.outline{left:120px;bottom:170px}.voice{right:120px;top:170px}.review{right:120px;bottom:170px}
+    #bf08 .lockup{position:absolute;left:500px;top:100px;width:920px;height:880px;padding:72px 78px;border-radius:42px;background:rgba(255,255,255,.94);border:2px solid rgba(21,34,74,.12);box-shadow:0 38px 110px rgba(21,34,74,.14);text-align:center}
+    #bf08 .logo{display:grid;place-items:center;margin:0 auto 40px;width:96px;height:96px;border-radius:28px;background:#2f6bff;color:#fff;font-size:44px;font-weight:900}
+    #bf08 h2{font:600 74px/1.06 Lora,serif;letter-spacing:-.045em}
+    #bf08 .rule{width:120px;height:8px;margin:40px auto;border-radius:8px;background:#16c2b3;transform-origin:center}
+    #bf08 .tag{font-size:27px;font-weight:780;color:#4f5d77}
+    #bf08 .sub{margin-top:34px;font:700 15px JetBrains Mono,monospace;letter-spacing:.13em;text-transform:uppercase;color:#2f6afd}
+  </style>
+  <section data-hf-id="hf-26ua" id="bf08" data-composition-id="bf08" data-start="0" data-duration="4.6" data-width="1920" data-height="1080" data-layout-allow-overflow="">
+    <div data-hf-id="hf-k1m2" class="fill" data-layout-ignore=""></div>
+    <div data-hf-id="hf-maii" class="artifact topic">Topic · outline · notes · sources</div>
+    <div data-hf-id="hf-uffz" class="artifact outline">Talk it through → Outline → Draft</div>
+    <div data-hf-id="hf-2y4n" class="artifact voice">Voice Profile · In my voice</div>
+    <div data-hf-id="hf-62jt" class="artifact review">Humanization · Editorial · GEO</div>
+    <div data-hf-id="hf-6jvi" class="lockup"><div data-hf-id="hf-61xp" class="logo">B</div><h2 data-hf-id="hf-vjlv">From something to say, to something worth publishing.</h2><div data-hf-id="hf-a46i" class="rule"></div><div data-hf-id="hf-reai" class="tag">In your voice.</div><div data-hf-id="hf-ib2w" class="sub">BlogForge · a workshop for long-form writing</div></div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#bf08 .artifact",{autoAlpha:0,y:32},{autoAlpha:1,y:0,duration:.42,stagger:.12,ease:"power3.out"},0)
+        .fromTo("#bf08 .lockup",{autoAlpha:0,y:62,scale:.96},{autoAlpha:1,y:0,scale:1,duration:.68,ease:"power4.out"},.32)
+        .to("#bf08 .artifact",{opacity:.55,scale:.94,duration:.42,ease:"power2.inOut"},1.0)
+        .fromTo("#bf08 .logo",{scale:.72,rotation:-6},{scale:1,rotation:0,duration:.4,ease:"back.out(1.45)"},1.08)
+        .fromTo("#bf08 h2",{autoAlpha:0,y:26},{autoAlpha:1,y:0,duration:.52,ease:"power3.out"},1.25)
+        .fromTo("#bf08 .rule",{scaleX:0},{scaleX:1,duration:.38,ease:"power3.out"},1.7)
+        .fromTo("#bf08 .tag, #bf08 .sub",{autoAlpha:0,y:15},{autoAlpha:1,y:0,duration:.38,stagger:.18,ease:"power3.out"},1.88)
+        .to("#bf08 .logo",{backgroundColor:"#2457d0",duration:.35,ease:"power2.inOut"},3.2);
+      window.__timelines=window.__timelines||{};window.__timelines.bf08=tl;})();
+  </script>
+</template>

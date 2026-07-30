@@ -1,0 +1,45 @@
+<template>
+  <style>
+    #bf04{position:relative;width:1920px;height:1080px;overflow:hidden;color:#15224a;font-family:Inter,sans-serif}
+    #bf04 .fill{position:absolute;inset:0;background:radial-gradient(circle at 12% 82%,rgba(22,194,179,.16),transparent 34%),#fff4e0}
+    #bf04 .top{position:absolute;left:96px;right:96px;top:60px;display:flex;align-items:center;justify-content:space-between}
+    #bf04 .kicker{font:700 17px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#8b6420}
+    #bf04 h2{margin-top:12px;font:600 60px/1 Lora,serif;letter-spacing:-.04em}
+    #bf04 .compose{padding:16px 23px;border-radius:14px;background:#2f6bff;color:#fff;font-size:19px;font-weight:850;box-shadow:0 14px 35px rgba(47,107,255,.24)}
+    #bf04 .workspace{position:absolute;left:96px;right:96px;top:220px;bottom:64px;display:grid;grid-template-columns:560px 70px 1fr}
+    #bf04 .outline{padding:30px;border-radius:28px;background:rgba(255,255,255,.8);border:2px solid rgba(21,34,74,.1)}
+    #bf04 .outline h3{font-size:24px;margin-bottom:22px}
+    #bf04 .item{margin:12px 0;padding:17px;border-radius:14px;background:#fff;font-weight:750;border-left:5px solid #2f6bff}
+    #bf04 .item small{display:block;margin-top:6px;color:#6a758c;font-weight:600}
+    #bf04 .arrow{display:grid;place-items:center;font-size:44px;color:#2f6bff;font-weight:900}
+    #bf04 .paper{position:relative;padding:48px 64px;border-radius:28px;background:#fffdf8;border:2px solid rgba(21,34,74,.1);box-shadow:0 30px 80px rgba(21,34,74,.12)}
+    #bf04 .meta{font:700 14px JetBrains Mono,monospace;letter-spacing:.1em;text-transform:uppercase;color:#2e6afc}
+    #bf04 .paper h3{margin:19px 0 24px;font:600 48px/1.08 Lora,serif;letter-spacing:-.035em}
+    #bf04 .paragraph{margin:17px 0;font:500 20px/1.5 Lora,serif;color:#3f4b64}
+    #bf04 .thread{position:absolute;left:28px;top:154px;bottom:48px;width:7px;border-radius:7px;background:#16c2b3;transform-origin:top}
+    #bf04 .status{position:absolute;right:28px;bottom:25px;padding:10px 14px;border-radius:999px;background:#e3f7f4;color:#14756e;font:700 13px JetBrains Mono,monospace}
+  </style>
+  <section data-hf-id="hf-kkuq" id="bf04" data-composition-id="bf04" data-start="0" data-duration="5.3" data-width="1920" data-height="1080" data-layout-allow-overflow="">
+    <div data-hf-id="hf-k1m2" class="fill" data-layout-ignore=""></div>
+    <div data-hf-id="hf-sijt" class="top"><div data-hf-id="hf-yeow"><div data-hf-id="hf-i8d6" class="kicker">Outline → Draft</div><h2 data-hf-id="hf-1trr">One article. One connected argument.</h2></div><div data-hf-id="hf-9s6n" id="bf04-compose" class="compose">Compose full draft</div></div>
+    <div data-hf-id="hf-e8vj" class="workspace">
+      <div data-hf-id="hf-ennm" class="outline"><h3 data-hf-id="hf-e9q1">Approved outline</h3><div data-hf-id="hf-zal1" class="item">Opening tension<small data-hf-id="hf-458a">Text is easy. Authorship is harder.</small></div><div data-hf-id="hf-fxmg" class="item">Develop the thought<small data-hf-id="hf-w6dt">Angle, audience, claim, and evidence</small></div><div data-hf-id="hf-lhvg" class="item">Write as a whole<small data-hf-id="hf-h3qz">Carry one idea across every section</small></div><div data-hf-id="hf-aj52" class="item">Keep judgment visible<small data-hf-id="hf-2ntm">Voice and human-led review</small></div><div data-hf-id="hf-g54e" class="item">Finish deliberately<small data-hf-id="hf-97i6">Prepare the work for its real audience</small></div></div>
+      <div data-hf-id="hf-drib" class="arrow">→</div>
+      <article data-hf-id="hf-7a6x" class="paper"><div data-hf-id="hf-jyqg" class="thread"></div><div data-hf-id="hf-cymk" class="meta">Stage 3 / Draft</div><h3 data-hf-id="hf-yusv">Why AI writing needs a workshop</h3><div data-hf-id="hf-gc5g" class="paragraph">Generation can get words onto a page. It cannot decide what the piece is really trying to say.</div><div data-hf-id="hf-5p8q" class="paragraph">That work begins earlier—with an audience, a claim, useful evidence, and an outline that follows the argument rather than the input.</div><div data-hf-id="hf-5hdi" class="paragraph">A coherent draft is not a pile of sections. It is one idea, developed from opening to close.</div><div data-hf-id="hf-a4bw" class="paragraph">The best tools keep voice, suggestions, and decisions visible, so the finished article still belongs to the writer.</div><div data-hf-id="hf-02f8" class="status">Full draft composed</div></article>
+    </div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#bf04 .top",{autoAlpha:0,y:-24},{autoAlpha:1,y:0,duration:.5,ease:"power3.out"},0)
+        .fromTo("#bf04 .outline",{autoAlpha:0,x:-56},{autoAlpha:1,x:0,duration:.55,ease:"power4.out"},.18)
+        .fromTo("#bf04 .item",{autoAlpha:0,y:20},{autoAlpha:1,y:0,duration:.3,stagger:.15,ease:"power3.out"},.56)
+        .fromTo("#bf04 .arrow",{autoAlpha:0,scale:.5},{autoAlpha:1,scale:1,duration:.36,ease:"back.out(1.5)"},1.22)
+        .to("#bf04-compose",{scale:.95,duration:.12,ease:"power2.in"},1.42)
+        .to("#bf04-compose",{scale:1,backgroundColor:"#2457d0",duration:.24,ease:"power2.out"},1.54)
+        .fromTo("#bf04 .paper",{autoAlpha:0,x:72},{autoAlpha:1,x:0,duration:.62,ease:"power4.out"},1.7)
+        .fromTo("#bf04 .thread",{scaleY:0},{scaleY:1,duration:.85,ease:"power2.out"},2.25)
+        .fromTo("#bf04 .paragraph",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.36,stagger:.28,ease:"power3.out"},2.35)
+        .fromTo("#bf04 .status",{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:.34,ease:"power3.out"},3.82);
+      window.__timelines=window.__timelines||{};window.__timelines.bf04=tl;})();
+  </script>
+</template>

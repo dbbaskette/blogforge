@@ -1,0 +1,8 @@
+{
+  "duration": 45,
+  "assertions": [
+    { "kind": "appearsBy", "selector": "#slot-bf01", "bySec": 0.2 },
+    { "kind": "before", "a": "#slot-bf01", "b": "#slot-bf08" },
+    { "kind": "staysInFrame", "selector": "#slot-bf01" }
+  ]
+}

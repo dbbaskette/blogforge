@@ -1,0 +1,70 @@
+<template>
+  <style>
+    #bf06{position:relative;width:1920px;height:1080px;overflow:hidden;color:#15224a;font-family:Inter,sans-serif}
+    #bf06 .fill{position:absolute;inset:0;background:radial-gradient(circle at 14% 15%,rgba(22,194,179,.16),transparent 32%),#e6efff}
+    #bf06 .shell{position:absolute;inset:52px 72px;border-radius:32px;background:rgba(255,255,255,.9);border:2px solid rgba(21,34,74,.11);box-shadow:0 32px 90px rgba(21,34,74,.11);overflow:hidden}
+    #bf06 .bar{height:90px;padding:0 30px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #dfe6ee}
+    #bf06 .brand{display:flex;align-items:center;gap:13px;font-size:22px;font-weight:850}
+    #bf06 .brand i{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#2f6bff;color:#fff;font-style:normal}
+    #bf06 .saved{font:700 14px JetBrains Mono,monospace;color:#17766d}
+    #bf06 .body{display:grid;grid-template-columns:1fr 390px;height:886px}
+    #bf06 .editor{position:relative;padding:42px 58px;background:#fffdf8}
+    #bf06 .meta{font:700 14px JetBrains Mono,monospace;letter-spacing:.1em;text-transform:uppercase;color:#2e6afc}
+    #bf06 h2{margin:16px 0 23px;font:600 47px/1.08 Lora,serif;letter-spacing:-.035em}
+    #bf06 .prose{width:790px;font:500 21px/1.52 Lora,serif;color:#3f4b64}
+    #bf06 .prose p{margin:17px 0}
+    #bf06 .selected{padding:3px 5px;border-radius:6px;background:#fff0bf;color:#15224a}
+    #bf06 .rail{padding:28px 22px;background:#f6f9fb;border-left:2px solid #dfe6ee}
+    #bf06 .rail h3{font-size:22px;margin-bottom:17px}
+    #bf06 .tool{display:flex;align-items:center;gap:12px;margin:7px 0;padding:13px;border-radius:13px;font-weight:800}
+    #bf06 .tool i{width:10px;height:10px;border-radius:50%;background:#16c2b3}
+    #bf06 .tool.active{background:#e9efff;color:#2b62ea}
+    #bf06 .human,#bf06 .geo{position:absolute;right:426px;bottom:72px;width:670px;padding:24px;border-radius:22px;background:#fff;border:2px solid rgba(21,34,74,.13);box-shadow:0 26px 72px rgba(21,34,74,.18)}
+    #bf06 .human h3,#bf06 .geo h3{font-size:21px;margin-bottom:15px}
+    #bf06 .finding{display:flex;gap:13px;padding:14px;border-radius:14px;background:#fff7df}
+    #bf06 .finding i{display:grid;place-items:center;min-width:34px;height:34px;border-radius:10px;background:#f4c95d;font-style:normal;font-weight:900}
+    #bf06 .finding b{display:block;margin-bottom:5px}
+    #bf06 .finding span{font-size:15px;line-height:1.35;color:#665e4a}
+    #bf06 .rewrite{margin-top:13px;padding:14px;border-radius:13px;background:#e3f7f4;font:500 17px/1.4 Lora,serif}
+    #bf06 .apply{display:inline-block;float:right;margin-top:14px;padding:11px 17px;border-radius:10px;background:#2f6bff;color:#fff;font-weight:850}
+    #bf06 .geo{opacity:0;visibility:hidden}
+    #bf06 .geo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    #bf06 .geo-card{padding:16px;border-radius:14px;background:#f2f5f8;border:2px solid #e1e7ef}
+    #bf06 .geo-card b{display:block;font-size:16px;margin-bottom:7px}
+    #bf06 .geo-card span{font-size:14px;line-height:1.35;color:#657089}
+    #bf06 .geo-card strong{display:block;margin-top:12px;color:#14776f;font:700 13px JetBrains Mono,monospace}
+    #bf06 .caption{position:absolute;left:108px;bottom:34px;font-size:23px;font-weight:850}
+  </style>
+  <section data-hf-id="hf-3sy6" id="bf06" data-composition-id="bf06" data-start="0" data-duration="8.2" data-width="1920" data-height="1080" data-layout-allow-overflow="">
+    <div data-hf-id="hf-k1m2" class="fill" data-layout-ignore=""></div>
+    <div data-hf-id="hf-fh3a" class="shell">
+      <div data-hf-id="hf-ufsv" class="bar"><div data-hf-id="hf-bt0m" class="brand"><i data-hf-id="hf-w5i2">B</i>BlogForge</div><div data-hf-id="hf-fw4r" class="saved">● All changes saved</div></div>
+      <div data-hf-id="hf-2t3w" class="body">
+        <article data-hf-id="hf-opdq" class="editor"><div data-hf-id="hf-kesy" class="meta">Draft / human-led review</div><h2 data-hf-id="hf-wbm2">Why AI writing needs a workshop</h2><div data-hf-id="hf-1fl1" class="prose"><p data-hf-id="hf-mezh">Generation can get words onto a page. It cannot decide what the piece is really trying to say.</p><p data-hf-id="hf-q1an"><span data-hf-id="hf-ux6b" class="selected">In today's rapidly evolving digital landscape, it is important to note that AI-powered writing tools offer a wide range of powerful capabilities.</span></p><p data-hf-id="hf-cfod">A coherent draft is not a pile of sections. It is one argument, carried from opening to close.</p></div></article>
+        <aside data-hf-id="hf-4qv7" class="rail"><h3 data-hf-id="hf-4src">Review</h3><div data-hf-id="hf-p7mt" class="tool active human-tool"><i data-hf-id="hf-wt6k"></i>Humanization Check</div><div data-hf-id="hf-lfyj" class="tool"><i data-hf-id="hf-zeb8"></i>Proofreader</div><div data-hf-id="hf-tx4t" class="tool"><i data-hf-id="hf-y7e5"></i>Fact-check</div><div data-hf-id="hf-4ggr" class="tool"><i data-hf-id="hf-ylp6"></i>Shape</div><div data-hf-id="hf-xf4l" class="tool geo-tool"><i data-hf-id="hf-0l8b"></i>GEO</div><div data-hf-id="hf-6sby" class="tool"><i data-hf-id="hf-0zjc"></i>Version history</div></aside>
+      </div>
+    </div>
+    <div data-hf-id="hf-ocuj" class="human"><h3 data-hf-id="hf-lnqu">One pattern worth revisiting</h3><div data-hf-id="hf-gwn3" class="finding"><i data-hf-id="hf-2r6v">!</i><div data-hf-id="hf-yeow"><b data-hf-id="hf-tnj5">Generic framing + stacked intensifiers</b><span data-hf-id="hf-cvel">This can make AI-assisted prose sound less specific than the surrounding article.</span></div></div><div data-hf-id="hf-yw1s" class="rewrite">The tools are getting faster. The harder question is whether the finished piece still sounds like you.</div><div data-hf-id="hf-nz99" class="apply">Apply revision</div></div>
+    <div data-hf-id="hf-i5ov" class="geo"><h3 data-hf-id="hf-7fa1">GEO review · help answer engines understand the article</h3><div data-hf-id="hf-vzr4" class="geo-grid"><div data-hf-id="hf-2n4q" class="geo-card"><b data-hf-id="hf-dypz">Answer clarity</b><span data-hf-id="hf-w0ja">Lead key sections with a direct, useful answer.</span><strong data-hf-id="hf-dncj">Clear</strong></div><div data-hf-id="hf-pi2m" class="geo-card"><b data-hf-id="hf-gztp">Context &amp; entities</b><span data-hf-id="hf-q5a7">Name the concepts and relationships the piece depends on.</span><strong data-hf-id="hf-j84d">2 suggestions</strong></div><div data-hf-id="hf-pwdn" class="geo-card"><b data-hf-id="hf-grsk">Retrievability</b><span data-hf-id="hf-dv5j">Use descriptive headings and self-contained passages.</span><strong data-hf-id="hf-9mpp">Strong</strong></div></div></div>
+    <div data-hf-id="hf-7fal" class="caption">The tools surface the work. The writer makes the call.</div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#bf06 .shell",{autoAlpha:0,y:35},{autoAlpha:1,y:0,duration:.58,ease:"power4.out"},0)
+        .fromTo("#bf06 .editor",{autoAlpha:0,x:-35},{autoAlpha:1,x:0,duration:.48,ease:"power3.out"},.35)
+        .fromTo("#bf06 .tool",{autoAlpha:0,x:26},{autoAlpha:1,x:0,duration:.28,stagger:.1,ease:"power3.out"},.62)
+        .fromTo("#bf06 .human",{autoAlpha:0,y:34,scale:.97},{autoAlpha:1,y:0,scale:1,duration:.48,ease:"power3.out"},1.28)
+        .to("#bf06 .apply",{scale:.94,duration:.12,ease:"power2.in"},2.5)
+        .to("#bf06 .apply",{scale:1,backgroundColor:"#16c2b3",duration:.23,ease:"power2.out"},2.62)
+        .to("#bf06 .selected",{backgroundColor:"#c9f1e8",duration:.34,ease:"power2.inOut"},2.7)
+        .to("#bf06 .human",{autoAlpha:0,y:22,duration:.34,ease:"power2.in"},3.35)
+        .to("#bf06 .human-tool",{backgroundColor:"transparent",color:"#15224a",duration:.24},3.62)
+        .to("#bf06 .geo-tool",{backgroundColor:"#e9efff",color:"#2b62ea",duration:.24},3.62)
+        .fromTo("#bf06 .geo",{autoAlpha:0,y:28},{autoAlpha:1,y:0,duration:.48,ease:"power3.out"},3.78)
+        .fromTo("#bf06 .geo-card",{autoAlpha:0,y:22},{autoAlpha:1,y:0,duration:.35,stagger:.22,ease:"power3.out"},4.2)
+        .fromTo("#bf06 .caption",{autoAlpha:0,y:16},{autoAlpha:1,y:0,duration:.4,ease:"power3.out"},5.35)
+        .to("#bf06 .saved",{color:"#2f6bff",duration:.3,ease:"power2.inOut"},6.2)
+        .to("#bf06 .geo-card",{borderColor:"#16c2b3",duration:.35,stagger:.12,ease:"power2.inOut"},6.65);
+      window.__timelines=window.__timelines||{};window.__timelines.bf06=tl;})();
+  </script>
+</template>

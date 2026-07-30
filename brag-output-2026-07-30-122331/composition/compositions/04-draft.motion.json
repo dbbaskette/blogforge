@@ -1,0 +1,1 @@
+{"duration":5.3,"assertions":[{"kind":"appearsBy","selector":"#bf04-compose","bySec":0.8},{"kind":"before","a":"#bf04 .item","b":"#bf04 .paragraph"}]}

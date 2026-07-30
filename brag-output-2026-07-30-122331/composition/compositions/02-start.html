@@ -1,0 +1,44 @@
+<template>
+  <style>
+    #bf02{position:relative;width:1920px;height:1080px;overflow:hidden;color:#15224a;font-family:Inter,sans-serif}
+    #bf02 .fill{position:absolute;inset:0;background:radial-gradient(circle at 16% 20%,rgba(47,107,255,.14),transparent 30%),#e3f7f4}
+    #bf02 header{position:absolute;left:102px;right:102px;top:70px;display:flex;align-items:flex-start;justify-content:space-between}
+    #bf02 .kicker{font:700 17px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#137770}
+    #bf02 h2{margin-top:14px;font:600 68px/1 Lora,serif;letter-spacing:-.04em}
+    #bf02 .brand{display:grid;place-items:center;width:58px;height:58px;border-radius:18px;background:#2f6bff;color:#fff;font-size:27px;font-weight:900}
+    #bf02 .modes{position:absolute;left:102px;right:102px;top:280px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    #bf02 .mode{position:relative;height:220px;padding:30px;border-radius:24px;background:rgba(255,255,255,.88);border:2px solid rgba(21,34,74,.1);box-shadow:0 18px 50px rgba(21,34,74,.07)}
+    #bf02 .mode strong{display:block;margin-bottom:15px;font-size:25px}
+    #bf02 .mode p{font-size:18px;line-height:1.45;color:#5d6982}
+    #bf02 .mode .badge{position:absolute;right:18px;top:18px;padding:8px 11px;border-radius:999px;background:#e9efff;color:#2b62ea;font:700 12px JetBrains Mono,monospace;text-transform:uppercase}
+    #bf02 .mode.focus{border-color:#2f6bff;box-shadow:0 20px 52px rgba(47,107,255,.16)}
+    #bf02 .mode.source{border-color:#16c2b3}
+    #bf02 .path{position:absolute;left:102px;right:102px;bottom:52px;display:flex;align-items:center;justify-content:center;gap:18px;font-size:21px;font-weight:800}
+    #bf02 .path span{padding:15px 22px;border-radius:14px;background:rgba(255,255,255,.76)}
+    #bf02 .path i{font-style:normal;color:#2f6bff;font-size:30px}
+  </style>
+  <section data-hf-id="hf-rr12" id="bf02" data-composition-id="bf02" data-start="0" data-duration="5.3" data-width="1920" data-height="1080" data-layout-allow-overflow="">
+    <div data-hf-id="hf-k1m2" class="fill" data-layout-ignore=""></div>
+    <header data-hf-id="hf-0drs"><div data-hf-id="hf-yeow"><div data-hf-id="hf-aiva" class="kicker">Start with what you have</div><h2 data-hf-id="hf-dh3j">Six ways into the same workshop.</h2></div><div data-hf-id="hf-fcv3" class="brand">B</div></header>
+    <div data-hf-id="hf-d4u0" class="modes">
+      <div data-hf-id="hf-usix" class="mode"><strong data-hf-id="hf-nnfc">Just write it</strong><p data-hf-id="hf-k5kz">A topic in. A full draft out—one shot.</p></div>
+      <div data-hf-id="hf-lsph" class="mode focus"><span data-hf-id="hf-kdbj" class="badge">Develop</span><strong data-hf-id="hf-bqop">Help me shape it</strong><p data-hf-id="hf-04qq">Talk through the idea and build an outline worth writing.</p></div>
+      <div data-hf-id="hf-843t" class="mode focus"><span data-hf-id="hf-q2y3" class="badge">Structure</span><strong data-hf-id="hf-l322">I have an outline</strong><p data-hf-id="hf-e48k">Use your structure as a starting point for one full draft.</p></div>
+      <div data-hf-id="hf-sos4" class="mode source"><span data-hf-id="hf-mrdr" class="badge">Research</span><strong data-hf-id="hf-sbyj">I have source material</strong><p data-hf-id="hf-25fp">Develop notes and sources into a real blog outline.</p></div>
+      <div data-hf-id="hf-mjfh" class="mode"><strong data-hf-id="hf-k8al">I already wrote it</strong><p data-hf-id="hf-8bo0">Bring a finished draft into the editor and shape it.</p></div>
+      <div data-hf-id="hf-nqck" class="mode"><strong data-hf-id="hf-pi17">Blank page</strong><p data-hf-id="hf-6uee">Write it yourself, with inline AI when it helps.</p></div>
+    </div>
+    <div data-hf-id="hf-jnhx" class="path"><span data-hf-id="hf-1bk8">Topic</span><i data-hf-id="hf-5511">+</i><span data-hf-id="hf-l12p">Outline</span><i data-hf-id="hf-9hpl">+</i><span data-hf-id="hf-rcry">Notes &amp; sources</span><i data-hf-id="hf-9w8a">→</i><span data-hf-id="hf-k3zq">One writing process</span></div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#bf02 header",{autoAlpha:0,y:-26},{autoAlpha:1,y:0,duration:.55,ease:"power3.out"},0)
+        .fromTo("#bf02 .mode",{autoAlpha:0,y:38},{autoAlpha:1,y:0,duration:.44,stagger:.13,ease:"power3.out"},.32)
+        .fromTo("#bf02 .path span, #bf02 .path i",{autoAlpha:0,x:24},{autoAlpha:1,x:0,duration:.32,stagger:.09,ease:"power3.out"},1.45)
+        .to("#bf02 .mode.focus",{backgroundColor:"#f7f9ff",scale:1.025,duration:.38,stagger:.16,ease:"power2.out"},2.25)
+        .to("#bf02 .mode.source",{backgroundColor:"#f4fffc",scale:1.025,duration:.38,ease:"power2.out"},2.72)
+        .to("#bf02 .mode.focus, #bf02 .mode.source",{scale:1,duration:.4,ease:"power2.inOut"},3.35)
+        .to("#bf02 .brand",{backgroundColor:"#2457d0",duration:.35,ease:"power2.inOut"},4.2);
+      window.__timelines=window.__timelines||{};window.__timelines.bf02=tl;})();
+  </script>
+</template>

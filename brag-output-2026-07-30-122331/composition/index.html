@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face{font-family:Inter;src:url("assets/fonts/Inter-Variable.ttf")}
+      @font-face{font-family:Lora;src:url("assets/fonts/Lora-Variable.ttf")}
+      @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/JetBrainsMono-Variable.ttf")}
+      *{margin:0;padding:0;box-sizing:border-box}
+      html,body{width:1920px;height:1080px;overflow:hidden;background:#e6efff}
+      body{font-family:Inter,sans-serif}
+      #root{position:relative;width:1920px;height:1080px;overflow:hidden}
+      #master-fill{position:absolute;inset:0;background:#e6efff}
+      #master-ambient{position:absolute;inset:-130px;background:radial-gradient(circle at 18% 22%,rgba(47,107,255,.11),transparent 33%),radial-gradient(circle at 84% 78%,rgba(22,194,179,.12),transparent 34%);pointer-events:none}
+      .scene-slot{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden}
+      audio{display:none}
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-i657" id="root" data-composition-id="main" data-start="0" data-duration="45" data-width="1920" data-height="1080">
+      <div data-hf-id="hf-xqr8" id="master-fill" data-layout-ignore=""></div>
+      <div data-hf-id="hf-689p" id="master-ambient" data-layout-ignore=""></div>
+      <div data-hf-id="hf-s9fn" id="slot-bf01" class="clip scene-slot" data-composition-id="bf01" data-composition-src="compositions/01-hook.html" data-start="0" data-duration="4.4" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <div data-hf-id="hf-vo8f" id="slot-bf02" class="clip scene-slot" data-composition-id="bf02" data-composition-src="compositions/02-start.html" data-start="4.4" data-duration="5.3" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <div data-hf-id="hf-hehf" id="slot-bf03" class="clip scene-slot" data-composition-id="bf03" data-composition-src="compositions/03-develop.html" data-start="9.7" data-duration="6.4" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <div data-hf-id="hf-f4rm" id="slot-bf04" class="clip scene-slot" data-composition-id="bf04" data-composition-src="compositions/04-draft.html" data-start="16.1" data-duration="5.3" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <div data-hf-id="hf-fngd" id="slot-bf05" class="clip scene-slot" data-composition-id="bf05" data-composition-src="compositions/05-voice.html" data-start="21.4" data-duration="5.3" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <div data-hf-id="hf-rj7k" id="slot-bf06" class="clip scene-slot" data-composition-id="bf06" data-composition-src="compositions/06-review.html" data-start="26.7" data-duration="8.2" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <div data-hf-id="hf-kgb3" id="slot-bf07" class="clip scene-slot" data-composition-id="bf07" data-composition-src="compositions/07-finish.html" data-start="34.9" data-duration="5.5" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <div data-hf-id="hf-a8t6" id="slot-bf08" class="clip scene-slot" data-composition-id="bf08" data-composition-src="compositions/08-outro.html" data-start="40.4" data-duration="4.6" data-track-index="1" data-width="1920" data-height="1080" data-layout-allow-overflow=""></div>
+      <audio data-hf-id="hf-o4ok" id="bf-narration" src="assets/audio/narration.wav" data-start="0.18" data-duration="44.65" data-track-index="20" data-volume="1"></audio>
+      <audio data-hf-id="hf-1nbk" id="bf-music" src="assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3" data-start="0" data-duration="45" data-track-index="21" data-volume="0.08"></audio>
+      <audio data-hf-id="hf-7fs6" id="bf-sfx-shape" src="assets/sfx/interface/click_002.ogg" data-start="9.72" data-duration="0.01" data-track-index="22" data-volume="0.26"></audio>
+      <audio data-hf-id="hf-n0ph" id="bf-sfx-compose" src="assets/sfx/impact/impactSoft_medium_001.ogg" data-start="17.55" data-duration="0.2" data-track-index="23" data-volume="0.22"></audio>
+      <audio data-hf-id="hf-151m" id="bf-sfx-finish" src="assets/sfx/casino/card-fan-1.ogg" data-start="36.05" data-duration="0.72" data-track-index="24" data-volume="0.18"></audio>
+      <audio data-hf-id="hf-e3ry" id="bf-sfx-close" src="assets/sfx/interface/bong_001.ogg" data-start="42.25" data-duration="0.14" data-track-index="25" data-volume="0.24"></audio>
+    </div>
+    <script>
+      window.__timelines=window.__timelines||{};
+      const tl=gsap.timeline({paused:true});
+      tl.fromTo("#master-ambient",{x:-55,y:-20},{x:55,y:20,duration:45,ease:"none"},0)
+        .fromTo("#bf-music",{volume:0},{volume:.11,duration:.2,ease:"power2.out"},0)
+        .to("#bf-music",{volume:.075,duration:.35,ease:"power2.inOut"},.2)
+        .to("#bf-music",{volume:.11,duration:.5,ease:"power2.inOut"},43.7)
+        .to("#bf-music",{volume:0,duration:.7,ease:"power2.in"},44.3)
+        .fromTo("#bf-narration",{volume:0},{volume:1,duration:.18,ease:"power2.out"},.18);
+      window.__timelines.main=tl;
+    </script>
+  </body>
+</html>

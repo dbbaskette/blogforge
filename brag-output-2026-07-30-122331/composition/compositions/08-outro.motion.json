@@ -1,0 +1,1 @@
+{"duration":4.6,"assertions":[{"kind":"appearsBy","selector":"#bf08 .lockup","bySec":1.2},{"kind":"staysInFrame","selector":"#bf08 .lockup"}]}
