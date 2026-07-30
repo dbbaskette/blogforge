@@ -7,6 +7,21 @@ Supporting points the author wants to make (context):
 {% endfor %}
 {%- endif %}
 {% if idea.notes %}Author notes (context): {{ idea.notes }}{% endif %}
+{% if idea.source_material_mode %}
+Source material mode: Attached references include editorial source material for this post.
+
+Rule: Use that material to choose the strongest thesis and reader journey for the stated topic.
+Because: Source material is context for a new article, not a prewritten article structure.
+
+Rule: Select, combine, reframe, or leave out source details when that makes a stronger continuous argument.
+Because: A useful blog should serve the reader's journey rather than preserve every detail from a briefing.
+
+Rule: Do not mirror source-document headings, make one article section for every source heading, or treat source-document order as the article structure. Do not treat source-document order as the article structure.
+Because: The author needs an editorial outline, not a reformatted copy of the source document.
+
+Rule: Do not invent factual claims outside the attached references.
+Because: The supplied material is the factual boundary for this planning pass.
+{% endif %}
 Target length (context): ~{{ idea.target_words }} words total.
 
 Rule: Make the outline ONE continuous argument, not a list of standalone essays.

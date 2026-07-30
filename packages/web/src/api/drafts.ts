@@ -13,6 +13,7 @@ export interface IdeaInput {
   target_words?: number;
   notes?: string;
   use_voice_profile?: boolean;
+  source_material_mode?: boolean;
 }
 
 /** A source URL that couldn't be fetched at compose-start (non-fatal). */

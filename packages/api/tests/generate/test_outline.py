@@ -34,6 +34,31 @@ def test_render_outline_prompt_includes_topic_and_bullets() -> None:
     assert "Small wins survive" in rendered
 
 
+def test_source_material_mode_defaults_to_false() -> None:
+    idea = IdeaInput(topic="X", pack_slug="dan", provider="anthropic", model="m")
+    assert idea.source_material_mode is False
+
+
+def test_source_material_outline_prompt_synthesizes_instead_of_mirroring() -> None:
+    idea = IdeaInput(
+        topic="How BlogForge works",
+        pack_slug="dan",
+        provider="anthropic",
+        model="m",
+        source_material_mode=True,
+    )
+    rendered = _render_outline_prompt(idea)
+    assert "editorial source material" in rendered
+    assert "Do not mirror source-document headings" in rendered
+    assert "Do not treat source-document order as the article structure" in rendered
+
+
+def test_standard_outline_prompt_has_no_source_material_instruction() -> None:
+    idea = IdeaInput(topic="X", pack_slug="dan", provider="anthropic", model="m")
+    rendered = _render_outline_prompt(idea)
+    assert "Do not mirror source-document headings" not in rendered
+
+
 def test_section_budget_scales_to_length_and_stays_in_bounds() -> None:
     # Short post → few sections; long post → more, but clamped to <=7.
     assert _section_budget(800) == (3, 4, 267)

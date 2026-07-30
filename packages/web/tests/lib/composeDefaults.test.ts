@@ -59,6 +59,11 @@ describe("composeDefaults", () => {
     expect(loadLastMode()).toBe("outline");
   });
 
+  it("round-trips source as the last-used mode", () => {
+    saveLastMode("source");
+    expect(loadLastMode()).toBe("source");
+  });
+
   it("ignores an unknown stored mode", () => {
     localStorage.setItem("bf.compose.lastMode", "bogus");
     expect(loadLastMode()).toBeNull();
