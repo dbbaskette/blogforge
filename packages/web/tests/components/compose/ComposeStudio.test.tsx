@@ -21,6 +21,9 @@ vi.mock("../../../src/api/drafts", () => ({
   generateOutline: vi.fn().mockResolvedValue({}),
   importDraft: vi.fn().mockResolvedValue({ id: "d9" }),
 }));
+vi.mock("../../../src/api/references", () => ({
+  addTextReference: vi.fn().mockResolvedValue({ id: "ref1" }),
+}));
 vi.mock("../../../src/api/templates", () => ({
   listTemplates: vi.fn().mockResolvedValue([]),
   deleteTemplate: vi.fn(),
@@ -48,6 +51,7 @@ import {
 } from "../../../src/api/drafts";
 import { getDefaultProvider, listProviderAvailability } from "../../../src/api/providers";
 import { listModels } from "../../../src/api/providers";
+import { addTextReference } from "../../../src/api/references";
 import { listTemplates } from "../../../src/api/templates";
 import { ComposeStudio } from "../../../src/components/compose/ComposeStudio";
 
@@ -345,5 +349,58 @@ describe("ComposeStudio", () => {
     await waitFor(() => expect(importDraft).toHaveBeenCalled());
     // No ?shape=1 — import must not auto-run any shaping/analysis pass.
     expect(navigate).toHaveBeenCalledWith("/drafts/d9");
+  });
+
+  it("Source material saves the reference before generating an outline", async () => {
+    renderStudio();
+    fireEvent.click(screen.getByText(/I have source material/));
+    fireEvent.change(screen.getByLabelText(/blog title/i), {
+      target: { value: "BlogForge behind the scenes" },
+    });
+    fireEvent.change(screen.getByLabelText(/^source material$/i), {
+      target: { value: "# Product brief\n\n## Architecture" },
+    });
+    const btn = screen.getByRole("button", { name: /build outline/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(generateOutline).toHaveBeenCalledWith("d1"));
+    expect(createDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topic: "BlogForge behind the scenes",
+        source_material_mode: true,
+      }),
+    );
+    expect(addTextReference).toHaveBeenCalledWith(
+      "d1",
+      "Source material",
+      "# Product brief\n\n## Architecture",
+    );
+    expect(navigate).toHaveBeenCalledWith("/drafts/d1");
+    expect(vi.mocked(createDraft).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(addTextReference).mock.invocationCallOrder[0],
+    );
+    expect(vi.mocked(addTextReference).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(generateOutline).mock.invocationCallOrder[0],
+    );
+  });
+
+  it("Source material offers draft recovery when saving the reference fails", async () => {
+    vi.mocked(addTextReference).mockRejectedValueOnce(new Error("reference save failed"));
+    renderStudio();
+    fireEvent.click(screen.getByText(/I have source material/));
+    fireEvent.change(screen.getByLabelText(/blog title/i), {
+      target: { value: "BlogForge behind the scenes" },
+    });
+    fireEvent.change(screen.getByLabelText(/^source material$/i), {
+      target: { value: "# Product brief\n\n## Architecture" },
+    });
+    const btn = screen.getByRole("button", { name: /build outline/i });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+
+    await waitFor(() => expect(screen.getByText("reference save failed")).toBeInTheDocument());
+    expect(generateOutline).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Continue to your draft →" })).toBeInTheDocument();
   });
 });
