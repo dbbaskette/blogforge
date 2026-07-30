@@ -1,4 +1,4 @@
-export type ComposeMode = "outline" | "propose" | "express" | "blank" | "paste";
+export type ComposeMode = "outline" | "propose" | "express" | "blank" | "paste" | "source";
 
 const MODES: {
   id: ComposeMode;
@@ -29,6 +29,13 @@ const MODES: {
     icon: "📋",
     title: "I have an outline",
     blurb: "Paste your structure — AI writes the full draft from it.",
+  },
+  {
+    id: "source",
+    accent: "accent-teal",
+    icon: "📚",
+    title: "I have source material",
+    blurb: "Paste a Markdown brief — AI turns it into a blog outline.",
   },
   {
     id: "paste",
