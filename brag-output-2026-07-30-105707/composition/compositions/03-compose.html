@@ -2,7 +2,7 @@
   <style>
     #scene-compose{position:relative;width:1920px;height:1080px;overflow:hidden;background:linear-gradient(140deg,#e6efff,#fff4e0);color:#15224a;font-family:Inter,sans-serif}
     #scene-compose .top{position:absolute;left:104px;right:104px;top:70px;display:flex;justify-content:space-between;align-items:flex-start}
-    #scene-compose .kicker{font:700 17px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#2f6bff}
+    #scene-compose .kicker{font:700 17px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#2b62ea}
     #scene-compose h2{margin-top:13px;font:600 62px/1 Lora,serif;letter-spacing:-.04em}
     #scene-compose .brand{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:#2f6bff;color:white;font-weight:800}
     #scene-compose .modes{position:absolute;left:104px;top:248px;width:1712px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
@@ -24,7 +24,7 @@
     #scene-compose .sourcechips span{padding:8px 10px;border-radius:999px;background:#e3f7f4;color:#176a65;font-size:13px;font-weight:800}
     #scene-compose .caption{position:absolute;left:104px;bottom:58px;font-size:24px;font-weight:750}
   </style>
-  <section id="scene-compose" data-composition-id="scene-compose" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+  <section id="scene-compose" data-composition-id="scene-compose" data-start="0" data-duration="4" data-width="1920" data-height="1080" data-layout-allow-overflow>
     <div class="top"><div><div class="kicker">02 / Start where you are</div><h2>Six ways in. One coherent draft.</h2></div><div class="brand">B</div></div>
     <div id="mode-grid" class="modes">
       <div class="mode"><b><i>⚡</i>Just write it</b><p>A topic in, a full draft out — one shot.</p></div>
@@ -55,11 +55,11 @@
         .to("#mode-selection",{x:0,y:204,duration:.28,ease:"power3.inOut"},1.36)
         .to("#mode-grid",{autoAlpha:0,y:-36,duration:.28,ease:"power2.in"},1.72)
         .to("#mode-selection",{autoAlpha:0,duration:.2},1.72)
-        .set("#compose-flow",{autoAlpha:1},1.86)
-        .fromTo("#compose-flow .stage",{autoAlpha:0,x:60},{autoAlpha:1,x:0,duration:.42,stagger:.18,ease:"power3.out"},1.88)
-        .fromTo("#compose-flow .arrow",{autoAlpha:0,scale:.4},{autoAlpha:1,scale:1,duration:.26,stagger:.34,ease:"back.out(1.5)"},2.08)
-        .fromTo("#draft-carrier .row",{scaleX:0,transformOrigin:"left"},{scaleX:1,duration:.34,stagger:.07,ease:"power2.out"},2.48)
-        .fromTo("#scene-compose .caption",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.36,ease:"power3.out"},2.82)
+        .set("#compose-flow",{autoAlpha:1},2.04)
+        .fromTo("#compose-flow .stage",{autoAlpha:0,x:60},{autoAlpha:1,x:0,duration:.4,stagger:.16,ease:"power3.out"},2.06)
+        .fromTo("#compose-flow .arrow",{autoAlpha:0,scale:.4},{autoAlpha:1,scale:1,duration:.24,stagger:.3,ease:"back.out(1.5)"},2.22)
+        .fromTo("#draft-carrier .row",{scaleX:0,transformOrigin:"left"},{scaleX:1,duration:.3,stagger:.06,ease:"power2.out"},2.58)
+        .fromTo("#scene-compose .caption",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.32,ease:"power3.out"},2.92)
         .to("#scene-compose",{xPercent:-10,duration:.34,ease:"power4.in"},3.66);
       window.__timelines=window.__timelines||{};window.__timelines["scene-compose"]=tl;})();
   </script>

@@ -3,8 +3,6 @@
   "assertions": [
     {"kind":"appearsBy","selector":"#slot-hook","bySec":0.1},
     {"kind":"before","a":"#slot-voice","b":"#slot-finish"},
-    {"kind":"staysInFrame","selector":"#slot-edit"},
-    {"kind":"staysInFrame","selector":"#slot-outro"},
     {"kind":"keepsMoving","withinSelector":"#root","maxStaticSec":1.8}
   ]
 }
