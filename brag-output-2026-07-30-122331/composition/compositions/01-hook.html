@@ -1,0 +1,51 @@
+<template>
+  <style>
+    #bf01{position:relative;width:1920px;height:1080px;overflow:hidden;color:#15224a;font-family:Inter,sans-serif}
+    #bf01 .fill{position:absolute;inset:0;background:radial-gradient(circle at 82% 16%,rgba(255,244,224,.95),transparent 34%),radial-gradient(circle at 18% 85%,rgba(22,194,179,.18),transparent 34%),#e6efff}
+    #bf01 .brand{position:absolute;left:104px;top:78px;display:flex;align-items:center;gap:15px;font-size:22px;font-weight:850}
+    #bf01 .mark{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:#2f6bff;color:#fff;font-size:26px}
+    #bf01 .kicker{position:absolute;left:106px;top:192px;font:700 18px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#2b62ea}
+    #bf01 h1{position:absolute;left:104px;top:250px;width:900px;font:600 86px/1.02 Lora,serif;letter-spacing:-.045em}
+    #bf01 .rule{position:absolute;left:106px;top:642px;width:420px;height:8px;border-radius:8px;background:#16c2b3;transform-origin:left}
+    #bf01 .prompt{position:absolute;right:105px;top:142px;width:690px;height:680px;padding:36px;border-radius:32px;background:rgba(255,255,255,.83);border:2px solid rgba(21,34,74,.12);box-shadow:0 34px 90px rgba(21,34,74,.12)}
+    #bf01 .prompt-label{font:700 15px JetBrains Mono,monospace;color:#69758f;text-transform:uppercase;letter-spacing:.1em}
+    #bf01 .prompt-box{margin-top:18px;height:118px;padding:24px;border-radius:18px;background:#f1f4f8;color:#687080;font-size:23px}
+    #bf01 .inputs{position:absolute;left:34px;right:34px;bottom:34px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    #bf01 .input{height:154px;padding:22px;border-radius:18px;background:#fff;border:2px solid rgba(47,107,255,.16);box-shadow:0 12px 34px rgba(21,34,74,.07)}
+    #bf01 .input b{display:block;margin-bottom:12px;font-size:21px}
+    #bf01 .input span{font-size:17px;line-height:1.35;color:#596682}
+    #bf01 .input:nth-child(2),#bf01 .input:nth-child(4){border-color:rgba(22,194,179,.28)}
+    #bf01 .footer{position:absolute;left:106px;bottom:94px;font-size:26px;font-weight:750;color:#475673}
+  </style>
+  <section data-hf-id="hf-9m1s" id="bf01" data-composition-id="bf01" data-start="0" data-duration="4.4" data-width="1920" data-height="1080" data-layout-allow-overflow="">
+    <div data-hf-id="hf-k1m2" class="fill" data-layout-ignore=""></div>
+    <div data-hf-id="hf-bt0m" class="brand"><span data-hf-id="hf-v2to" class="mark">B</span>BlogForge</div>
+    <div data-hf-id="hf-kbqw" class="kicker">Long-form writing begins earlier</div>
+    <h1 data-hf-id="hf-yr5c" id="bf01-title">Good writing rarely starts with a perfect prompt.</h1>
+    <div data-hf-id="hf-a46i" class="rule"></div>
+    <div data-hf-id="hf-m0qi" class="footer">It starts with something worth saying.</div>
+    <div data-hf-id="hf-3k5u" class="prompt">
+      <div data-hf-id="hf-wf72" class="prompt-label">The blank prompt</div>
+      <div data-hf-id="hf-55db" class="prompt-box">Write an article about…</div>
+      <div data-hf-id="hf-tdrj" class="inputs">
+        <div data-hf-id="hf-sc8k" class="input"><b data-hf-id="hf-l9z8">Topic</b><span data-hf-id="hf-f33j">A question you cannot stop thinking about</span></div>
+        <div data-hf-id="hf-39qk" class="input"><b data-hf-id="hf-nhg4">Rough outline</b><span data-hf-id="hf-li5b">A structure that still needs an argument</span></div>
+        <div data-hf-id="hf-22th" class="input"><b data-hf-id="hf-jr9m">Notes</b><span data-hf-id="hf-nl9p">Fragments, observations, and working ideas</span></div>
+        <div data-hf-id="hf-2h4i" class="input"><b data-hf-id="hf-u6fl">Source material</b><span data-hf-id="hf-m7la">Research you trust and want to develop</span></div>
+      </div>
+    </div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#bf01 .brand",{autoAlpha:0,y:-20},{autoAlpha:1,y:0,duration:.45,ease:"power3.out"},0)
+        .fromTo("#bf01 .kicker",{autoAlpha:0,x:-28},{autoAlpha:1,x:0,duration:.42,ease:"power3.out"},.18)
+        .fromTo("#bf01-title",{autoAlpha:0,y:50},{autoAlpha:1,y:0,duration:.72,ease:"power4.out"},.38)
+        .fromTo("#bf01 .rule",{scaleX:0},{scaleX:1,duration:.64,ease:"power3.out"},.8)
+        .fromTo("#bf01 .prompt",{autoAlpha:0,x:90,rotation:1.5},{autoAlpha:1,x:0,rotation:0,duration:.7,ease:"power4.out"},.22)
+        .fromTo("#bf01 .input",{autoAlpha:0,y:32},{autoAlpha:1,y:0,duration:.42,stagger:.22,ease:"power3.out"},1.05)
+        .fromTo("#bf01 .footer",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.44,ease:"power3.out"},2.15)
+        .to("#bf01 .mark",{rotation:5,scale:1.08,duration:.28,ease:"power2.out"},3.2)
+        .to("#bf01 .mark",{rotation:0,scale:1,duration:.32,ease:"power2.inOut"},3.49);
+      window.__timelines=window.__timelines||{};window.__timelines.bf01=tl;})();
+  </script>
+</template>

@@ -1,0 +1,1 @@
+{"duration":5.3,"assertions":[{"kind":"appearsBy","selector":"#bf05 h2","bySec":0.8},{"kind":"before","a":"#bf05 .profile","b":"#bf05 .after"}]}

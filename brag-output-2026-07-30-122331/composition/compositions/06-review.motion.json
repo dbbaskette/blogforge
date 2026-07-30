@@ -1,0 +1,1 @@
+{"duration":8.2,"assertions":[{"kind":"appearsBy","selector":"#bf06 .shell","bySec":0.8},{"kind":"before","a":"#bf06 .human","b":"#bf06 .geo"}]}

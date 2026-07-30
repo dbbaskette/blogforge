@@ -1,0 +1,56 @@
+<template>
+  <style>
+    #bf05{position:relative;width:1920px;height:1080px;overflow:hidden;color:#15224a;font-family:Inter,sans-serif}
+    #bf05 .fill{position:absolute;inset:0;background:radial-gradient(circle at 80% 18%,rgba(47,107,255,.13),transparent 32%),#e3f7f4}
+    #bf05 .head{position:absolute;left:96px;top:58px}
+    #bf05 .kicker{font:700 17px JetBrains Mono,monospace;letter-spacing:.14em;text-transform:uppercase;color:#147d76}
+    #bf05 h2{margin-top:12px;font:600 60px/1 Lora,serif;letter-spacing:-.04em}
+    #bf05 .workspace{position:absolute;left:96px;right:96px;top:214px;bottom:62px;display:grid;grid-template-columns:620px 1fr;gap:30px}
+    #bf05 .profile,#bf05 .editor{position:relative;border-radius:28px;background:rgba(255,255,255,.89);border:2px solid rgba(21,34,74,.1);box-shadow:0 25px 72px rgba(21,34,74,.09)}
+    #bf05 .profile{padding:30px}
+    #bf05 .profile h3{font-size:24px}
+    #bf05 svg{position:absolute;left:65px;top:108px;width:490px;height:430px}
+    #bf05 .grid{fill:none;stroke:#b9c8d5;stroke-width:2}
+    #bf05 .shape{fill:rgba(47,107,255,.2);stroke:#2f6bff;stroke-width:6;stroke-linejoin:round}
+    #bf05 .axis{font:700 19px Inter,sans-serif;fill:#15224a}
+    #bf05 .traits{position:absolute;left:30px;right:30px;bottom:28px;display:flex;gap:9px;flex-wrap:wrap}
+    #bf05 .trait{padding:10px 13px;border-radius:999px;background:#e9efff;color:#2b62ea;font-size:15px;font-weight:800}
+    #bf05 .editor{padding:42px 52px;background:#fffdf8}
+    #bf05 .meta{font:700 14px JetBrains Mono,monospace;letter-spacing:.1em;text-transform:uppercase;color:#2f6bff}
+    #bf05 .editor h3{margin:18px 0 26px;font:600 46px/1.08 Lora,serif;letter-spacing:-.035em}
+    #bf05 .copy{font:500 23px/1.55 Lora,serif;color:#3f4b64}
+    #bf05 .copy p{margin:20px 0}
+    #bf05 .selected{padding:3px 5px;border-radius:6px;background:#dfe9ff;color:#15224a}
+    #bf05 .menu{position:absolute;left:52px;top:365px;display:flex;gap:7px;padding:10px;border-radius:14px;background:#15224a;color:white;box-shadow:0 18px 40px rgba(21,34,74,.24)}
+    #bf05 .menu span{padding:9px 12px;border-radius:8px;font-size:14px;font-weight:800}
+    #bf05 .menu .active{background:#2f6bff}
+    #bf05 .before,#bf05 .after{position:absolute;left:52px;right:52px;bottom:54px;padding:20px 22px;border-radius:16px;background:#f2f5f8;font:500 20px/1.42 Lora,serif}
+    #bf05 .after{background:#e3f7f4;border:2px solid rgba(22,194,179,.34)}
+    #bf05 .before b,#bf05 .after b{display:block;margin-bottom:8px;font:700 12px JetBrains Mono,monospace;text-transform:uppercase;color:#68738a}
+    #bf05 .after{opacity:0;visibility:hidden}
+  </style>
+  <section data-hf-id="hf-3gae" id="bf05" data-composition-id="bf05" data-start="0" data-duration="5.3" data-width="1920" data-height="1080" data-layout-allow-overflow="">
+    <div data-hf-id="hf-k1m2" class="fill" data-layout-ignore=""></div>
+    <div data-hf-id="hf-z992" class="head"><div data-hf-id="hf-nthi" class="kicker">Voice Profile + inline AI</div><h2 data-hf-id="hf-yxwr">Help write it. Then make it sound like you.</h2></div>
+    <div data-hf-id="hf-e8vj" class="workspace">
+      <section data-hf-id="hf-guc3" class="profile"><h3 data-hf-id="hf-1uwc">Your Voice Profile</h3><svg data-hf-id="hf-wnac" viewBox="0 0 520 440" aria-label="Voice profile chart"><polygon data-hf-id="hf-uhwd" class="grid" points="260,42 448,148 448,334 260,440 72,334 72,148" /><polygon data-hf-id="hf-bp2v" class="grid" points="260,102 394,178 394,304 260,380 126,304 126,178" /><polygon data-hf-id="hf-mpzh" class="shape" points="260,93 414,166 385,292 260,395 100,316 112,170" /><text data-hf-id="hf-9duz" class="axis" x="260" y="25" text-anchor="middle">Casual</text><text data-hf-id="hf-gs47" class="axis" x="458" y="150">Vivid</text><text data-hf-id="hf-cg7s" class="axis" x="458" y="347">Punchy</text><text data-hf-id="hf-tp8z" class="axis" x="260" y="438" text-anchor="middle">Warm</text><text data-hf-id="hf-jmxn" class="axis" x="0" y="347">Concrete</text><text data-hf-id="hf-osei" class="axis" x="12" y="150">Direct</text></svg><div data-hf-id="hf-j653" class="traits"><span data-hf-id="hf-g2gj" class="trait">short → long rhythm</span><span data-hf-id="hf-c5km" class="trait">concrete language</span><span data-hf-id="hf-g157" class="trait">no “delve”</span><span data-hf-id="hf-qh7k" class="trait">clean turns</span></div></section>
+      <article data-hf-id="hf-opdq" class="editor"><div data-hf-id="hf-bz0g" class="meta">Draft / selected passage</div><h3 data-hf-id="hf-yusv">Why AI writing needs a workshop</h3><div data-hf-id="hf-bdx3" class="copy"><p data-hf-id="hf-mezh">Generation can get words onto a page. It cannot decide what the piece is really trying to say.</p><p data-hf-id="hf-q1an"><span data-hf-id="hf-rifi" class="selected">AI tools can help users improve the quality of written communication.</span></p></div><div data-hf-id="hf-upnx" class="menu"><span data-hf-id="hf-snzn">Rewrite</span><span data-hf-id="hf-2iiq">Shorter</span><span data-hf-id="hf-7xdd">Stronger</span><span data-hf-id="hf-rmnc" class="active">In my voice</span></div><div data-hf-id="hf-6ajj" class="before"><b data-hf-id="hf-3rle">Original</b>AI tools can help users improve the quality of written communication.</div><div data-hf-id="hf-0az1" class="after"><b data-hf-id="hf-tg1v">In your voice</b>AI can get the first sentence moving. The judgment is still yours.</div></article>
+    </div>
+  </section>
+  <script>
+    (()=>{const tl=gsap.timeline({paused:true});
+      tl.fromTo("#bf05 .head",{autoAlpha:0,y:-22},{autoAlpha:1,y:0,duration:.5,ease:"power3.out"},0)
+        .fromTo("#bf05 .profile",{autoAlpha:0,x:-58},{autoAlpha:1,x:0,duration:.58,ease:"power4.out"},.2)
+        .fromTo("#bf05 .shape",{scale:0,transformOrigin:"50% 50%"},{scale:1,duration:.72,ease:"power3.out"},.62)
+        .fromTo("#bf05 .trait",{autoAlpha:0,y:15},{autoAlpha:1,y:0,duration:.28,stagger:.1,ease:"power3.out"},1.02)
+        .fromTo("#bf05 .editor",{autoAlpha:0,x:64},{autoAlpha:1,x:0,duration:.6,ease:"power4.out"},.3)
+        .fromTo("#bf05 .menu",{autoAlpha:0,y:15,scale:.96},{autoAlpha:1,y:0,scale:1,duration:.36,ease:"back.out(1.4)"},1.45)
+        .to("#bf05 .menu .active",{scale:.94,duration:.12,ease:"power2.in"},2.08)
+        .to("#bf05 .menu .active",{scale:1,backgroundColor:"#16c2b3",duration:.23,ease:"power2.out"},2.2)
+        .to("#bf05 .before",{autoAlpha:0,y:-14,duration:.3,ease:"power2.in"},2.5)
+        .fromTo("#bf05 .after",{autoAlpha:0,y:18},{autoAlpha:1,y:0,duration:.46,ease:"power3.out"},2.78)
+        .to("#bf05 .selected",{backgroundColor:"#c9f1e8",duration:.38,ease:"power2.inOut"},3.25)
+        .to("#bf05 .shape",{rotation:2,transformOrigin:"50% 50%",duration:.35,yoyo:true,repeat:1,ease:"power2.inOut"},4.05);
+      window.__timelines=window.__timelines||{};window.__timelines.bf05=tl;})();
+  </script>
+</template>
