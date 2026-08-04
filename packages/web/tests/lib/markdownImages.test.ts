@@ -13,6 +13,17 @@ describe("stripEmbeddedImages", () => {
     });
   });
 
+  it("replaces an inline data image that spans multiple lines", () => {
+    const image = "![two\nlines](data:image/png;base64,QQ==)";
+    const markdown = `Before ${image} after.`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "Before [Image omitted during import: two\nlines] after.",
+      removedImages: 1,
+      removedCharacters: image.length,
+    });
+  });
+
   it("replaces every image use of a data-image reference without recounting its definition", () => {
     const definition = '[Hero Image]: data:image/jpeg;base64,QUJDRA== "launch art"';
     const markdown = `![First caption][hero image]\n![Second caption][ HERO   IMAGE ]\n${definition}\nClosing prose.`;
@@ -53,6 +64,17 @@ describe("stripEmbeddedImages", () => {
 
     expect(stripEmbeddedImages(markdown)).toEqual({
       text: "Intro [Image omitted during import: Product shot] outro",
+      removedImages: 1,
+      removedCharacters: image.length,
+    });
+  });
+
+  it("replaces an HTML data image whose attributes and closing bracket span lines", () => {
+    const image = '<img\n  alt="diagram"\n  src="data:image/png;base64,QQ=="\n>';
+    const markdown = `Before ${image} after.`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "Before [Image omitted during import: diagram] after.",
       removedImages: 1,
       removedCharacters: image.length,
     });
@@ -107,7 +129,13 @@ describe("stripEmbeddedImages", () => {
     const markdown = [
       "````markdown",
       "![inside](data:image/png;base64,QQ==)",
+      "![inside across",
+      "lines](data:image/png;base64,Qg==)",
       '<img alt="inside > html" src="data:image/png;base64,Qg==">',
+      "<img",
+      '  alt="inside across lines"',
+      '  src="data:image/png;base64,Qw=="',
+      ">",
       "```",
       "still fenced",
       "``````",

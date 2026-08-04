@@ -11,6 +11,17 @@ def test_replaces_inline_data_image_with_alt_placeholder_and_source_size() -> No
     )
 
 
+def test_replaces_inline_data_image_that_spans_multiple_lines() -> None:
+    image = "![two\nlines](data:image/png;base64,QQ==)"
+    markdown = f"Before {image} after."
+
+    assert strip_embedded_images(markdown) == EmbeddedImageCleanup(
+        text="Before [Image omitted during import: two\nlines] after.",
+        removed_images=1,
+        removed_characters=len(image),
+    )
+
+
 def test_replaces_reference_uses_without_recounting_data_image_definition() -> None:
     definition = '[Hero Image]: data:image/jpeg;base64,QUJDRA== "launch art"'
     markdown = f"![First caption][hero image]\n![Second caption][ HERO   IMAGE ]\n{definition}\n"
@@ -55,6 +66,17 @@ def test_replaces_quoted_html_data_image_with_alt_placeholder() -> None:
 
     assert strip_embedded_images(markdown) == EmbeddedImageCleanup(
         text="Intro [Image omitted during import: Product shot] outro",
+        removed_images=1,
+        removed_characters=len(image),
+    )
+
+
+def test_replaces_html_data_image_with_attributes_and_closing_bracket_across_lines() -> None:
+    image = '<img\n  alt="diagram"\n  src="data:image/png;base64,QQ=="\n>'
+    markdown = f"Before {image} after."
+
+    assert strip_embedded_images(markdown) == EmbeddedImageCleanup(
+        text="Before [Image omitted during import: diagram] after.",
         removed_images=1,
         removed_characters=len(image),
     )
@@ -111,7 +133,13 @@ def test_preserves_embedded_image_syntax_inside_backtick_and_tilde_fences() -> N
         [
             "````markdown",
             "![inside](data:image/png;base64,QQ==)",
+            "![inside across",
+            "lines](data:image/png;base64,Qg==)",
             '<img alt="inside > html" src="data:image/png;base64,Qg==">',
+            "<img",
+            '  alt="inside across lines"',
+            '  src="data:image/png;base64,Qw=="',
+            ">",
             "```",
             "still fenced",
             "``````",

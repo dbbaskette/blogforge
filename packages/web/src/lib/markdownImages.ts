@@ -284,8 +284,8 @@ function htmlImageAttributes(image: string): { alt?: string; hasDataSource: bool
   return { alt, hasDataSource };
 }
 
-function replaceImagesOnLine(
-  line: string,
+function replaceImagesInText(
+  text: string,
   embeddedReferenceLabels: Set<string>,
 ): EmbeddedImageCleanup {
   const parts: string[] = [];
@@ -293,21 +293,21 @@ function replaceImagesOnLine(
   let removedCharacters = 0;
   let position = 0;
 
-  while (position < line.length) {
-    if (line.startsWith("![", position)) {
+  while (position < text.length) {
+    if (text.startsWith("![", position)) {
       const altStart = position + 2;
-      const altEnd = findClosingBracket(line, altStart, line.length);
+      const altEnd = findClosingBracket(text, altStart, text.length);
       if (altEnd === undefined) {
-        parts.push(line.slice(position));
+        parts.push(text.slice(position));
         break;
       }
-      const readable = readableAlt(line.slice(altStart, altEnd));
+      const readable = readableAlt(text.slice(altStart, altEnd));
       const afterAlt = altEnd + 1;
 
-      if (afterAlt < line.length && line[afterAlt] === "(") {
-        const inline = inlineDataImageEnd(line, afterAlt, line.length);
+      if (afterAlt < text.length && text[afterAlt] === "(") {
+        const inline = inlineDataImageEnd(text, afterAlt, text.length);
         if (inline.isData && inline.imageEnd === undefined) {
-          parts.push(line.slice(position));
+          parts.push(text.slice(position));
           break;
         }
         if (inline.isData && inline.imageEnd !== undefined) {
@@ -317,19 +317,19 @@ function replaceImagesOnLine(
           position = inline.imageEnd;
           continue;
         }
-      } else if (afterAlt < line.length && line[afterAlt] === "[") {
+      } else if (afterAlt < text.length && text[afterAlt] === "[") {
         const labelStart = afterAlt + 1;
-        const labelEnd = findClosingBracket(line, labelStart, line.length);
+        const labelEnd = findClosingBracket(text, labelStart, text.length);
         if (labelEnd === undefined) {
-          parts.push(line.slice(position));
+          parts.push(text.slice(position));
           break;
         }
-        const label = line.slice(labelStart, labelEnd) || readable;
+        const label = text.slice(labelStart, labelEnd) || readable;
         const imageEnd = labelEnd + 1;
         if (embeddedReferenceLabels.has(normalizeReferenceLabel(readableAlt(label)))) {
           parts.push(placeholder(readable));
         } else {
-          parts.push(line.slice(position, imageEnd));
+          parts.push(text.slice(position, imageEnd));
         }
         position = imageEnd;
         continue;
@@ -339,22 +339,22 @@ function replaceImagesOnLine(
         continue;
       }
 
-      parts.push(line.slice(position, afterAlt));
+      parts.push(text.slice(position, afterAlt));
       position = afterAlt;
       continue;
     }
 
     if (
-      startsWithCaseInsensitive(line, "<img", position) &&
-      position + 4 < line.length &&
-      (/\s/.test(line[position + 4]) || "/>".includes(line[position + 4]))
+      startsWithCaseInsensitive(text, "<img", position) &&
+      position + 4 < text.length &&
+      (/\s/.test(text[position + 4]) || "/>".includes(text[position + 4]))
     ) {
-      const imageEnd = htmlImageEnd(line, position, line.length);
+      const imageEnd = htmlImageEnd(text, position, text.length);
       if (imageEnd === undefined) {
-        parts.push(line.slice(position));
+        parts.push(text.slice(position));
         break;
       }
-      const image = line.slice(position, imageEnd);
+      const image = text.slice(position, imageEnd);
       const { alt, hasDataSource } = htmlImageAttributes(image);
       if (hasDataSource) {
         parts.push(placeholder(alt ?? ""));
@@ -367,7 +367,7 @@ function replaceImagesOnLine(
       continue;
     }
 
-    parts.push(line[position]);
+    parts.push(text[position]);
     position += 1;
   }
 
@@ -380,6 +380,15 @@ function replaceImages(markdown: string, labels: Set<string>): EmbeddedImageClea
   let removedCharacters = 0;
   let fence: Fence | undefined;
   let lineStart = 0;
+  let outsideStart = 0;
+
+  const appendOutside = (end: number): void => {
+    if (outsideStart >= end) return;
+    const replaced = replaceImagesInText(markdown.slice(outsideStart, end), labels);
+    parts.push(replaced.text);
+    removedImages += replaced.removedImages;
+    removedCharacters += replaced.removedCharacters;
+  };
 
   while (lineStart < markdown.length) {
     const newline = markdown.indexOf("\n", lineStart);
@@ -389,21 +398,22 @@ function replaceImages(markdown: string, labels: Set<string>): EmbeddedImageClea
 
     if (fence) {
       parts.push(line);
-      if (isClosingFence(content, fence)) fence = undefined;
+      if (isClosingFence(content, fence)) {
+        fence = undefined;
+        outsideStart = lineEnd;
+      }
     } else {
       const opening = fenceRun(content);
       if (opening) {
+        appendOutside(lineStart);
         fence = opening;
         parts.push(line);
-      } else {
-        const replaced = replaceImagesOnLine(line, labels);
-        parts.push(replaced.text);
-        removedImages += replaced.removedImages;
-        removedCharacters += replaced.removedCharacters;
       }
     }
     lineStart = lineEnd;
   }
+
+  if (!fence) appendOutside(markdown.length);
 
   return { text: parts.join(""), removedImages, removedCharacters };
 }

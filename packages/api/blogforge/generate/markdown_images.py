@@ -271,27 +271,27 @@ def _html_image_attributes(image: str) -> tuple[str | None, bool]:
     return alt, has_data_source
 
 
-def _replace_images_on_line(line: str, embedded_reference_labels: set[str]) -> tuple[str, int, int]:
+def _replace_images_in_text(text: str, embedded_reference_labels: set[str]) -> tuple[str, int, int]:
     parts: list[str] = []
     removed_images = 0
     removed_characters = 0
     position = 0
 
-    while position < len(line):
-        if line.startswith("![", position):
+    while position < len(text):
+        if text.startswith("![", position):
             alt_start = position + 2
-            alt_end = _find_closing_bracket(line, alt_start, len(line))
+            alt_end = _find_closing_bracket(text, alt_start, len(text))
             if alt_end is None:
-                parts.append(line[position:])
+                parts.append(text[position:])
                 break
-            raw_alt = line[alt_start:alt_end]
+            raw_alt = text[alt_start:alt_end]
             readable_alt = _readable_alt(raw_alt)
             after_alt = alt_end + 1
 
-            if after_alt < len(line) and line[after_alt] == "(":
-                is_data, image_end = _inline_data_image_end(line, after_alt, len(line))
+            if after_alt < len(text) and text[after_alt] == "(":
+                is_data, image_end = _inline_data_image_end(text, after_alt, len(text))
                 if is_data and image_end is None:
-                    parts.append(line[position:])
+                    parts.append(text[position:])
                     break
                 if is_data and image_end is not None:
                     parts.append(_placeholder(readable_alt))
@@ -299,18 +299,18 @@ def _replace_images_on_line(line: str, embedded_reference_labels: set[str]) -> t
                     removed_characters += image_end - position
                     position = image_end
                     continue
-            elif after_alt < len(line) and line[after_alt] == "[":
+            elif after_alt < len(text) and text[after_alt] == "[":
                 label_start = after_alt + 1
-                label_end = _find_closing_bracket(line, label_start, len(line))
+                label_end = _find_closing_bracket(text, label_start, len(text))
                 if label_end is None:
-                    parts.append(line[position:])
+                    parts.append(text[position:])
                     break
-                label = line[label_start:label_end] or readable_alt
+                label = text[label_start:label_end] or readable_alt
                 image_end = label_end + 1
                 if _normalize_reference_label(_readable_alt(label)) in embedded_reference_labels:
                     parts.append(_placeholder(readable_alt))
                 else:
-                    parts.append(line[position:image_end])
+                    parts.append(text[position:image_end])
                 position = image_end
                 continue
             elif (
@@ -321,20 +321,20 @@ def _replace_images_on_line(line: str, embedded_reference_labels: set[str]) -> t
                 position = after_alt
                 continue
 
-            parts.append(line[position:after_alt])
+            parts.append(text[position:after_alt])
             position = after_alt
             continue
 
         if (
-            _starts_with_case_insensitive(line, "<img", position)
-            and position + 4 < len(line)
-            and (line[position + 4].isspace() or line[position + 4] in "/>")
+            _starts_with_case_insensitive(text, "<img", position)
+            and position + 4 < len(text)
+            and (text[position + 4].isspace() or text[position + 4] in "/>")
         ):
-            image_end = _html_image_end(line, position, len(line))
+            image_end = _html_image_end(text, position, len(text))
             if image_end is None:
-                parts.append(line[position:])
+                parts.append(text[position:])
                 break
-            image = line[position:image_end]
+            image = text[position:image_end]
             alt, has_data_source = _html_image_attributes(image)
             if has_data_source:
                 parts.append(_placeholder(alt or ""))
@@ -345,7 +345,7 @@ def _replace_images_on_line(line: str, embedded_reference_labels: set[str]) -> t
             position = image_end
             continue
 
-        parts.append(line[position])
+        parts.append(text[position])
         position += 1
 
     return "".join(parts), removed_images, removed_characters
@@ -357,6 +357,18 @@ def _replace_images(markdown: str, labels: set[str]) -> tuple[str, int, int]:
     removed_characters = 0
     fence: tuple[str, int] | None = None
     line_start = 0
+    outside_start = 0
+
+    def append_outside(end: int) -> None:
+        nonlocal removed_images, removed_characters
+        if outside_start >= end:
+            return
+        replaced, region_images, region_characters = _replace_images_in_text(
+            markdown[outside_start:end], labels
+        )
+        parts.append(replaced)
+        removed_images += region_images
+        removed_characters += region_characters
 
     while line_start < len(markdown):
         newline = markdown.find("\n", line_start)
@@ -368,17 +380,17 @@ def _replace_images(markdown: str, labels: set[str]) -> tuple[str, int, int]:
             parts.append(line)
             if _is_closing_fence(content, fence):
                 fence = None
+                outside_start = line_end
         else:
             opening = _fence_run(content)
             if opening is not None:
+                append_outside(line_start)
                 fence = opening
                 parts.append(line)
-            else:
-                replaced, line_images, line_characters = _replace_images_on_line(line, labels)
-                parts.append(replaced)
-                removed_images += line_images
-                removed_characters += line_characters
         line_start = line_end
+
+    if fence is None:
+        append_outside(len(markdown))
 
     return "".join(parts), removed_images, removed_characters
 

@@ -202,6 +202,25 @@ async def test_import_draft_replaces_embedded_data_image(authed_client) -> None:
     assert "data:image" not in content
 
 
+async def test_import_draft_does_not_store_multiline_embedded_images(authed_client) -> None:
+    """Multiline Markdown and HTML data images must not persist in imported drafts."""
+    client, _ = authed_client
+    r = client.post(
+        "/api/drafts/import",
+        json=_import_body(
+            "# Image Post\n\n## Body\n\n"
+            "Before ![two\nlines](data:image/png;base64,QQ==) between.\n\n"
+            '<img\n  alt="diagram"\n  src="data:image/png;base64,Qg=="\n>\n\nAfter.'
+        ),
+    )
+
+    assert r.status_code == 201
+    content = r.json()["sections"][0]["content_md"]
+    assert "[Image omitted during import: two\nlines]" in content
+    assert "[Image omitted during import: diagram]" in content
+    assert "data:image" not in content
+
+
 async def test_import_draft_accepts_raw_text_over_clean_limit_when_image_cleanup_reduces_it(
     authed_client,
 ) -> None:
