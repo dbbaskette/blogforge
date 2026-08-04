@@ -185,6 +185,13 @@ export function LintPanel({
     [violations, repetitions],
   );
   const apply = useMemo(() => makeProofreadApply({ draft, onSectionSave }), [draft, onSectionSave]);
+  // ReviewRail's third save argument identifies the edited field. DraftPage's
+  // third argument instead controls version creation, so keep that field value
+  // from crossing this callback boundary and becoming an invalid boolean.
+  const saveContent = useCallback(
+    (sectionId: string, content: string) => onSectionSave(sectionId, content),
+    [onSectionSave],
+  );
   const groups = useMemo<ReviewGroup[]>(() => {
     const keys = [...new Set(issues.map((i) => i.lever))];
     return keys.map((k) => ({ key: k, label: k }));
@@ -275,7 +282,7 @@ export function LintPanel({
               groups={groups}
               draftId={draftId}
               apply={apply}
-              save={onSectionSave}
+              save={saveContent}
               onHighlight={jumpToSection}
               onApplied={(issue, applied) => {
                 onTrackChange?.(applied.sectionId, applied.before, applied.after, "proofread");

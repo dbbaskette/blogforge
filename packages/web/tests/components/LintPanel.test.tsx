@@ -4,10 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/api/drafts", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("../../src/api/drafts");
-  return { ...actual, lintDraft: vi.fn(), checkClaims: vi.fn() };
+  return { ...actual, lintDraft: vi.fn(), checkClaims: vi.fn(), inlineEdit: vi.fn() };
 });
 
-import { lintDraft } from "../../src/api/drafts";
+import { inlineEdit, lintDraft } from "../../src/api/drafts";
 import { LintPanel } from "../../src/components/draft/LintPanel";
 
 const draft = {
@@ -41,6 +41,7 @@ function renderPanel() {
 beforeEach(() => {
   localStorage.clear();
   vi.mocked(lintDraft).mockReset();
+  vi.mocked(inlineEdit).mockReset();
 });
 
 describe("LintPanel on the shared rail", () => {
@@ -73,6 +74,30 @@ describe("LintPanel on the shared rail", () => {
     vi.mocked(lintDraft).mockResolvedValue({ violations: [], repetitions: [], hits: [] } as never);
     renderPanel();
     expect(await screen.findByText(/Nothing flagged — clean copy/)).toBeInTheDocument();
+  });
+
+  it("saves an AI fix without forwarding the lifecycle field as createVersion", async () => {
+    vi.mocked(lintDraft).mockResolvedValue({
+      violations: [finding()],
+      repetitions: [],
+      hits: [],
+    } as never);
+    vi.mocked(inlineEdit).mockResolvedValue({ text: "It is unusual." } as never);
+    const onSectionSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <LintPanel draft={draft} onSectionSave={onSectionSave} onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
+    await screen.findByText("Avoid “very unique”");
+
+    screen.getByRole("button", { name: "AI fix" }).click();
+    await screen.findByRole("dialog", { name: "Avoid “very unique”" });
+    expect(onSectionSave).not.toHaveBeenCalled();
+
+    screen.getByRole("button", { name: "Apply" }).click();
+    await waitFor(() => expect(onSectionSave).toHaveBeenCalledTimes(1));
+    expect(onSectionSave.mock.calls[0]).toEqual(["s1", "It is unusual."]);
   });
 
   it("does NOT improve the Humanity Score when a finding is merely dismissed", async () => {
