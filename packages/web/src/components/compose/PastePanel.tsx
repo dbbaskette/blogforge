@@ -47,8 +47,12 @@ export function PastePanel({
     }
     const raw = await file.text();
     const cleaned = stripEmbeddedImages(raw);
-    if (cleaned.text.length > CLEAN_TEXT_MAX_CHARS) {
-      setNote("That file is too long to import.");
+    if (Array.from(cleaned.text).length > CLEAN_TEXT_MAX_CHARS) {
+      setNote(
+        cleaned.removedImages > 0
+          ? "The article text remains too long after embedded images were removed."
+          : "That file is too long to import.",
+      );
       return;
     }
     onText(normalizeMarkdown(cleaned.text));

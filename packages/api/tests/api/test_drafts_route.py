@@ -1,4 +1,5 @@
 """CRUD route tests for /api/drafts."""
+
 from __future__ import annotations
 
 
@@ -125,11 +126,17 @@ async def test_put_does_not_regress_stage_or_clobber_outline(authed_client) -> N
         "sections": [{"id": "s1", "title": "First", "brief": "b1"}],
         "estimated_words": 800,
     }
-    promoted["sections"] = [{
-        "id": "s1", "title": "First", "brief": "b1",
-        "content_md": "", "status": "empty",
-        "last_generated_at": None, "word_count": 0,
-    }]
+    promoted["sections"] = [
+        {
+            "id": "s1",
+            "title": "First",
+            "brief": "b1",
+            "content_md": "",
+            "status": "empty",
+            "last_generated_at": None,
+            "word_count": 0,
+        }
+    ]
     r = client.put(f"/api/drafts/{created['id']}", json=promoted)
     assert r.status_code == 200
     assert r.json()["stage"] == "outline"
@@ -192,6 +199,25 @@ async def test_import_draft_replaces_embedded_data_image(authed_client) -> None:
     assert r.status_code == 201
     content = r.json()["sections"][0]["content_md"]
     assert "[Image omitted during import: architecture diagram]" in content
+    assert "data:image" not in content
+
+
+async def test_import_draft_accepts_raw_text_over_clean_limit_when_image_cleanup_reduces_it(
+    authed_client,
+) -> None:
+    client, _ = authed_client
+    payload = "A" * 200_100
+    r = client.post(
+        "/api/drafts/import",
+        json=_import_body(
+            "# Image Post\n\n## Body\n\n"
+            rf"Preserved before. ![a\]b](data:image/png;base64,{payload}) Preserved after."
+        ),
+    )
+
+    assert r.status_code == 201
+    content = r.json()["sections"][0]["content_md"]
+    assert content == "Preserved before. [Image omitted during import: a]b] Preserved after."
     assert "data:image" not in content
 
 

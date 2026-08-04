@@ -83,6 +83,60 @@ describe("stripEmbeddedImages", () => {
     });
   });
 
+  it("replaces an inline data image with an escaped closing bracket in its alt text", () => {
+    const image = String.raw`![a\]b](data:image/png;base64,QQ==)`;
+
+    expect(stripEmbeddedImages(image)).toEqual({
+      text: "[Image omitted during import: a]b]",
+      removedImages: 1,
+      removedCharacters: image.length,
+    });
+  });
+
+  it("replaces an HTML data image when a quoted attribute contains a greater-than sign", () => {
+    const image = '<img alt="a > b" src="data:image/png;base64,QQ==">';
+
+    expect(stripEmbeddedImages(image)).toEqual({
+      text: "[Image omitted during import: a > b]",
+      removedImages: 1,
+      removedCharacters: image.length,
+    });
+  });
+
+  it("preserves embedded image syntax inside backtick and tilde fences", () => {
+    const markdown = [
+      "````markdown",
+      "![inside](data:image/png;base64,QQ==)",
+      '<img alt="inside > html" src="data:image/png;base64,Qg==">',
+      "```",
+      "still fenced",
+      "``````",
+      "~~~",
+      "![also inside](data:image/png;base64,Qw==)",
+      "~~~~",
+      "![outside](data:image/png;base64,RA==)",
+    ].join("\n");
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: markdown.replace(
+        "![outside](data:image/png;base64,RA==)",
+        "[Image omitted during import: outside]",
+      ),
+      removedImages: 1,
+      removedCharacters: "![outside](data:image/png;base64,RA==)".length,
+    });
+  });
+
+  it("preserves large unterminated image syntax unchanged", () => {
+    const markdown = `${"![unterminated ".repeat(4_000)}retained prose`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: markdown,
+      removedImages: 0,
+      removedCharacters: 0,
+    });
+  });
+
   it("leaves HTTP, relative, attachment, and non-image data destinations unchanged", () => {
     const markdown = [
       "![HTTP](https://example.com/image.png)",

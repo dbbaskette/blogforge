@@ -85,4 +85,36 @@ describe("PastePanel file imports", () => {
     });
     expect(onText).not.toHaveBeenCalled();
   });
+
+  it("explains when article text remains too long after embedded images are removed", async () => {
+    const onText = vi.fn();
+    renderPastePanel(onText);
+    const file = fileWithText(
+      "long-with-image.md",
+      `${"a".repeat(200_001)}![chart](data:image/png;base64,QQ==)`,
+    );
+
+    importFile(file);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/article text remains too long after embedded images were removed/i),
+      ).toBeInTheDocument();
+    });
+    expect(onText).not.toHaveBeenCalled();
+  });
+
+  it("counts non-BMP characters as Unicode code points at the cleaned-length boundary", async () => {
+    const onText = vi.fn();
+    renderPastePanel(onText);
+    const text = `${"a".repeat(199_999)}😀`;
+    const file = fileWithText("unicode-boundary.md", text);
+
+    importFile(file);
+
+    await waitFor(() => {
+      expect(onText).toHaveBeenCalledWith(text);
+    });
+    expect(screen.queryByText(/too long to import/i)).not.toBeInTheDocument();
+  });
 });
