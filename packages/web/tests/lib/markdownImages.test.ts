@@ -165,6 +165,45 @@ describe("stripEmbeddedImages", () => {
     });
   });
 
+  it("continues after malformed Markdown and removes a later HTML data image", () => {
+    const image = '<img alt="later" src="data:image/png;base64,QQ==">';
+    const markdown = `broken ![\n${image}`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "broken ![\n[Image omitted during import: later]",
+      removedImages: 1,
+      removedCharacters: image.length,
+    });
+  });
+
+  it("continues after malformed HTML and removes a later Markdown data image", () => {
+    const image = "![later](data:image/png;base64,QQ==)";
+    const markdown = `<img\n${image}`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "<img\n[Image omitted during import: later]",
+      removedImages: 1,
+      removedCharacters: image.length,
+    });
+  });
+
+  it("continues after malformed data destinations and reference labels", () => {
+    const html = '<img alt="html" src="data:image/png;base64,QQ==">';
+    const inline = `![broken](data:image/png;base64,AAAA\n${html}`;
+    const markdownImage = "![markdown](data:image/png;base64,Qg==)";
+    const reference = `![broken][missing\n${markdownImage}`;
+
+    expect(stripEmbeddedImages(`${inline}\n${reference}`)).toEqual({
+      text:
+        "![broken](data:image/png;base64,AAAA\n" +
+        "[Image omitted during import: html]\n" +
+        "![broken][missing\n" +
+        "[Image omitted during import: markdown]",
+      removedImages: 2,
+      removedCharacters: html.length + markdownImage.length,
+    });
+  });
+
   it("leaves HTTP, relative, attachment, and non-image data destinations unchanged", () => {
     const markdown = [
       "![HTTP](https://example.com/image.png)",

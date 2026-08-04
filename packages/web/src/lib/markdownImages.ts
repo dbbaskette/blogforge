@@ -25,6 +25,37 @@ function startsWithCaseInsensitive(text: string, prefix: string, start: number):
   return text.slice(start, start + prefix.length).toLowerCase() === prefix;
 }
 
+function isImageCandidate(text: string, position: number): boolean {
+  if (text.startsWith("![", position)) return true;
+  return (
+    startsWithCaseInsensitive(text, "<img", position) &&
+    position + 4 < text.length &&
+    (/\s/.test(text[position + 4]) || "/>".includes(text[position + 4]))
+  );
+}
+
+interface ScanEnd {
+  end?: number;
+  recovery?: number;
+}
+
+function findImageClosingBracket(text: string, start: number, end: number): ScanEnd {
+  let position = start;
+  let crossedLine = false;
+  while (position < end) {
+    if (crossedLine && isImageCandidate(text, position)) return { recovery: position };
+    if (text[position] === "\\" && position + 1 < end) {
+      position += 2;
+    } else if (text[position] === "]") {
+      return { end: position };
+    } else {
+      if (text[position] === "\n") crossedLine = true;
+      position += 1;
+    }
+  }
+  return {};
+}
+
 function findClosingBracket(text: string, start: number, end: number): number | undefined {
   let position = start;
   while (position < end) {
@@ -165,9 +196,16 @@ function inlineDataImageEnd(
   text: string,
   openParen: number,
   end: number,
-): { isData: boolean; imageEnd?: number } {
+): { isData: boolean; imageEnd?: number; recovery?: number } {
   let position = openParen + 1;
-  while (position < end && /\s/.test(text[position])) position += 1;
+  let crossedLine = false;
+  while (position < end && /\s/.test(text[position])) {
+    if (text[position] === "\n") crossedLine = true;
+    position += 1;
+  }
+  if (crossedLine && isImageCandidate(text, position)) {
+    return { isData: false, recovery: position };
+  }
   if (position < end && text[position] === "<") position += 1;
   if (!startsWithCaseInsensitive(text, DATA_IMAGE_PREFIX, position)) return { isData: false };
 
@@ -185,7 +223,13 @@ function inlineDataImageEnd(
   if (position < end && text[position] === ">") position += 1;
   if (position < end && text[position] === ")") return { isData: true, imageEnd: position + 1 };
 
-  while (position < end && /\s/.test(text[position])) position += 1;
+  while (position < end && /\s/.test(text[position])) {
+    if (text[position] === "\n") crossedLine = true;
+    position += 1;
+  }
+  if (crossedLine && isImageCandidate(text, position)) {
+    return { isData: true, recovery: position };
+  }
   if (position >= end) return { isData: true };
 
   const delimiter = text[position];
@@ -193,6 +237,9 @@ function inlineDataImageEnd(
     position += 1;
     let closed = false;
     while (position < end) {
+      if (crossedLine && isImageCandidate(text, position)) {
+        return { isData: true, recovery: position };
+      }
       if (text[position] === "\\" && position + 1 < end) {
         position += 2;
       } else if (text[position] === delimiter) {
@@ -200,39 +247,58 @@ function inlineDataImageEnd(
         closed = true;
         break;
       } else {
+        if (text[position] === "\n") crossedLine = true;
         position += 1;
       }
     }
     if (!closed) return { isData: true };
   } else if (delimiter === "(") {
-    const titleEnd = text.indexOf(")", position + 1);
-    if (titleEnd === -1 || titleEnd >= end) return { isData: true };
-    position = titleEnd + 1;
+    position += 1;
+    while (position < end && text[position] !== ")") {
+      if (crossedLine && isImageCandidate(text, position)) {
+        return { isData: true, recovery: position };
+      }
+      if (text[position] === "\n") crossedLine = true;
+      position += 1;
+    }
+    if (position >= end) return { isData: true };
+    position += 1;
   } else {
-    return { isData: true };
+    return crossedLine && isImageCandidate(text, position)
+      ? { isData: true, recovery: position }
+      : { isData: true };
   }
 
-  while (position < end && /\s/.test(text[position])) position += 1;
+  while (position < end && /\s/.test(text[position])) {
+    if (text[position] === "\n") crossedLine = true;
+    position += 1;
+  }
+  if (crossedLine && isImageCandidate(text, position)) {
+    return { isData: true, recovery: position };
+  }
   return position < end && text[position] === ")"
     ? { isData: true, imageEnd: position + 1 }
     : { isData: true };
 }
 
-function htmlImageEnd(text: string, start: number, end: number): number | undefined {
+function htmlImageEnd(text: string, start: number, end: number): ScanEnd {
   let position = start + 4;
   let quote: string | undefined;
+  let crossedLine = false;
   while (position < end) {
+    if (crossedLine && isImageCandidate(text, position)) return { recovery: position };
     const character = text[position];
     if (quote) {
       if (character === quote) quote = undefined;
     } else if (character === '"' || character === "'") {
       quote = character;
     } else if (character === ">") {
-      return position + 1;
+      return { end: position + 1 };
     }
+    if (character === "\n") crossedLine = true;
     position += 1;
   }
-  return undefined;
+  return {};
 }
 
 function htmlImageAttributes(image: string): { alt?: string; hasDataSource: boolean } {
@@ -296,16 +362,27 @@ function replaceImagesInText(
   while (position < text.length) {
     if (text.startsWith("![", position)) {
       const altStart = position + 2;
-      const altEnd = findClosingBracket(text, altStart, text.length);
-      if (altEnd === undefined) {
+      const altScan = findImageClosingBracket(text, altStart, text.length);
+      if (altScan.end === undefined) {
+        if (altScan.recovery !== undefined) {
+          parts.push(text.slice(position, altScan.recovery));
+          position = altScan.recovery;
+          continue;
+        }
         parts.push(text.slice(position));
         break;
       }
+      const altEnd = altScan.end;
       const readable = readableAlt(text.slice(altStart, altEnd));
       const afterAlt = altEnd + 1;
 
       if (afterAlt < text.length && text[afterAlt] === "(") {
         const inline = inlineDataImageEnd(text, afterAlt, text.length);
+        if (inline.recovery !== undefined) {
+          parts.push(text.slice(position, inline.recovery));
+          position = inline.recovery;
+          continue;
+        }
         if (inline.isData && inline.imageEnd === undefined) {
           parts.push(text.slice(position));
           break;
@@ -319,11 +396,17 @@ function replaceImagesInText(
         }
       } else if (afterAlt < text.length && text[afterAlt] === "[") {
         const labelStart = afterAlt + 1;
-        const labelEnd = findClosingBracket(text, labelStart, text.length);
-        if (labelEnd === undefined) {
+        const labelScan = findImageClosingBracket(text, labelStart, text.length);
+        if (labelScan.end === undefined) {
+          if (labelScan.recovery !== undefined) {
+            parts.push(text.slice(position, labelScan.recovery));
+            position = labelScan.recovery;
+            continue;
+          }
           parts.push(text.slice(position));
           break;
         }
+        const labelEnd = labelScan.end;
         const label = text.slice(labelStart, labelEnd) || readable;
         const imageEnd = labelEnd + 1;
         if (embeddedReferenceLabels.has(normalizeReferenceLabel(readableAlt(label)))) {
@@ -349,11 +432,17 @@ function replaceImagesInText(
       position + 4 < text.length &&
       (/\s/.test(text[position + 4]) || "/>".includes(text[position + 4]))
     ) {
-      const imageEnd = htmlImageEnd(text, position, text.length);
-      if (imageEnd === undefined) {
+      const imageScan = htmlImageEnd(text, position, text.length);
+      if (imageScan.end === undefined) {
+        if (imageScan.recovery !== undefined) {
+          parts.push(text.slice(position, imageScan.recovery));
+          position = imageScan.recovery;
+          continue;
+        }
         parts.push(text.slice(position));
         break;
       }
+      const imageEnd = imageScan.end;
       const image = text.slice(position, imageEnd);
       const { alt, hasDataSource } = htmlImageAttributes(image);
       if (hasDataSource) {

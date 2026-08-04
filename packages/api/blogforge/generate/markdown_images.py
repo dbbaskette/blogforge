@@ -27,6 +27,34 @@ def _starts_with_case_insensitive(text: str, prefix: str, start: int) -> bool:
     return text[start : start + len(prefix)].lower() == prefix
 
 
+def _is_image_candidate(text: str, position: int) -> bool:
+    if text.startswith("![", position):
+        return True
+    return (
+        _starts_with_case_insensitive(text, "<img", position)
+        and position + 4 < len(text)
+        and (text[position + 4].isspace() or text[position + 4] in "/>")
+    )
+
+
+def _find_image_closing_bracket(text: str, start: int, end: int) -> tuple[int | None, int | None]:
+    """Return a close or a later-line image candidate for bounded recovery."""
+    position = start
+    crossed_line = False
+    while position < end:
+        if crossed_line and _is_image_candidate(text, position):
+            return None, position
+        if text[position] == "\\" and position + 1 < end:
+            position += 2
+        elif text[position] == "]":
+            return position, None
+        else:
+            if text[position] == "\n":
+                crossed_line = True
+            position += 1
+    return None, None
+
+
 def _find_closing_bracket(text: str, start: int, end: int) -> int | None:
     """Find an unescaped closing bracket without revisiting scanned characters."""
     position = start
@@ -156,62 +184,95 @@ def _remove_reference_definitions(markdown: str) -> tuple[str, set[str], int, in
     return "".join(parts), labels, removed_images, removed_characters
 
 
-def _inline_data_image_end(text: str, open_paren: int, end: int) -> tuple[bool, int | None]:
-    """Return (is_data_image, end position); ``None`` marks malformed data syntax."""
+def _inline_data_image_end(
+    text: str, open_paren: int, end: int
+) -> tuple[bool, int | None, int | None]:
+    """Return data status, end, and an optional later candidate for recovery."""
     position = open_paren + 1
+    crossed_line = False
     while position < end and text[position].isspace():
+        if text[position] == "\n":
+            crossed_line = True
         position += 1
+    if crossed_line and _is_image_candidate(text, position):
+        return False, None, position
     if position < end and text[position] == "<":
         position += 1
     if not _starts_with_case_insensitive(text, _DATA_IMAGE_PREFIX, position):
-        return False, None
+        return False, None, None
 
     position += len(_DATA_IMAGE_PREFIX)
     payload_start = position
     while position < end and not text[position].isspace() and text[position] not in ")>":
         position += 1
     if position == payload_start:
-        return False, None
+        return False, None, None
     if position < end and text[position] == ">":
         position += 1
     if position < end and text[position] == ")":
-        return True, position + 1
+        return True, position + 1, None
 
     while position < end and text[position].isspace():
+        if text[position] == "\n":
+            crossed_line = True
         position += 1
+    if crossed_line and _is_image_candidate(text, position):
+        return True, None, position
     if position >= end:
-        return True, None
+        return True, None, None
 
     delimiter = text[position]
     if delimiter in ('"', "'"):
         position += 1
         while position < end:
+            if crossed_line and _is_image_candidate(text, position):
+                return True, None, position
             if text[position] == "\\" and position + 1 < end:
                 position += 2
             elif text[position] == delimiter:
                 position += 1
                 break
             else:
+                if text[position] == "\n":
+                    crossed_line = True
                 position += 1
         else:
-            return True, None
+            return True, None, None
     elif delimiter == "(":
-        title_end = text.find(")", position + 1, end)
-        if title_end == -1:
-            return True, None
-        position = title_end + 1
+        position += 1
+        while position < end and text[position] != ")":
+            if crossed_line and _is_image_candidate(text, position):
+                return True, None, position
+            if text[position] == "\n":
+                crossed_line = True
+            position += 1
+        if position >= end:
+            return True, None, None
+        position += 1
     else:
-        return True, None
+        recovery = position if crossed_line and _is_image_candidate(text, position) else None
+        return True, None, recovery
 
     while position < end and text[position].isspace():
+        if text[position] == "\n":
+            crossed_line = True
         position += 1
-    return (True, position + 1) if position < end and text[position] == ")" else (True, None)
+    if crossed_line and _is_image_candidate(text, position):
+        return True, None, position
+    return (
+        (True, position + 1, None)
+        if position < end and text[position] == ")"
+        else (True, None, None)
+    )
 
 
-def _html_image_end(text: str, start: int, end: int) -> int | None:
+def _html_image_end(text: str, start: int, end: int) -> tuple[int | None, int | None]:
     position = start + 4
     quote: str | None = None
+    crossed_line = False
     while position < end:
+        if crossed_line and _is_image_candidate(text, position):
+            return None, position
         character = text[position]
         if quote is not None:
             if character == quote:
@@ -219,9 +280,11 @@ def _html_image_end(text: str, start: int, end: int) -> int | None:
         elif character in ('"', "'"):
             quote = character
         elif character == ">":
-            return position + 1
+            return position + 1, None
+        if character == "\n":
+            crossed_line = True
         position += 1
-    return None
+    return None, None
 
 
 def _html_image_attributes(image: str) -> tuple[str | None, bool]:
@@ -280,8 +343,12 @@ def _replace_images_in_text(text: str, embedded_reference_labels: set[str]) -> t
     while position < len(text):
         if text.startswith("![", position):
             alt_start = position + 2
-            alt_end = _find_closing_bracket(text, alt_start, len(text))
+            alt_end, recovery = _find_image_closing_bracket(text, alt_start, len(text))
             if alt_end is None:
+                if recovery is not None:
+                    parts.append(text[position:recovery])
+                    position = recovery
+                    continue
                 parts.append(text[position:])
                 break
             raw_alt = text[alt_start:alt_end]
@@ -289,7 +356,11 @@ def _replace_images_in_text(text: str, embedded_reference_labels: set[str]) -> t
             after_alt = alt_end + 1
 
             if after_alt < len(text) and text[after_alt] == "(":
-                is_data, image_end = _inline_data_image_end(text, after_alt, len(text))
+                is_data, image_end, recovery = _inline_data_image_end(text, after_alt, len(text))
+                if recovery is not None:
+                    parts.append(text[position:recovery])
+                    position = recovery
+                    continue
                 if is_data and image_end is None:
                     parts.append(text[position:])
                     break
@@ -301,8 +372,12 @@ def _replace_images_in_text(text: str, embedded_reference_labels: set[str]) -> t
                     continue
             elif after_alt < len(text) and text[after_alt] == "[":
                 label_start = after_alt + 1
-                label_end = _find_closing_bracket(text, label_start, len(text))
+                label_end, recovery = _find_image_closing_bracket(text, label_start, len(text))
                 if label_end is None:
+                    if recovery is not None:
+                        parts.append(text[position:recovery])
+                        position = recovery
+                        continue
                     parts.append(text[position:])
                     break
                 label = text[label_start:label_end] or readable_alt
@@ -330,8 +405,12 @@ def _replace_images_in_text(text: str, embedded_reference_labels: set[str]) -> t
             and position + 4 < len(text)
             and (text[position + 4].isspace() or text[position + 4] in "/>")
         ):
-            image_end = _html_image_end(text, position, len(text))
+            image_end, recovery = _html_image_end(text, position, len(text))
             if image_end is None:
+                if recovery is not None:
+                    parts.append(text[position:recovery])
+                    position = recovery
+                    continue
                 parts.append(text[position:])
                 break
             image = text[position:image_end]

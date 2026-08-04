@@ -16,6 +16,15 @@ const ACCEPT = ".md,.markdown,.mdown,.txt,.text,text/markdown,text/plain";
 const RAW_FILE_MAX_BYTES = 25_000_000;
 const CLEAN_TEXT_MAX_CHARS = 200_000;
 
+function exceedsCodePointLimit(text: string, limit: number): boolean {
+  let count = 0;
+  for (const _character of text) {
+    count += 1;
+    if (count > limit) return true;
+  }
+  return false;
+}
+
 function formatRemovedSize(characters: number): string {
   if (characters >= 1_000_000) return `${(characters / 1_000_000).toFixed(1)} MB`;
   if (characters >= 1_000) return `${Math.round(characters / 1_000)} KB`;
@@ -47,7 +56,7 @@ export function PastePanel({
     }
     const raw = await file.text();
     const cleaned = stripEmbeddedImages(raw);
-    if (Array.from(cleaned.text).length > CLEAN_TEXT_MAX_CHARS) {
+    if (exceedsCodePointLimit(cleaned.text, CLEAN_TEXT_MAX_CHARS)) {
       setNote(
         cleaned.removedImages > 0
           ? "The article text remains too long after embedded images were removed."
