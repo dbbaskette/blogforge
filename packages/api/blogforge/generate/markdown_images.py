@@ -55,6 +55,20 @@ def _find_image_closing_bracket(text: str, start: int, end: int) -> tuple[int | 
     return None, None
 
 
+def _find_later_line_image_candidate(
+    text: str, start: int, end: int, crossed_line: bool
+) -> int | None:
+    position = start
+    can_recover = crossed_line
+    while position < end:
+        if can_recover and _is_image_candidate(text, position):
+            return position
+        if text[position] == "\n":
+            can_recover = True
+        position += 1
+    return None
+
+
 def _find_closing_bracket(text: str, start: int, end: int) -> int | None:
     """Find an unescaped closing bracket without revisiting scanned characters."""
     position = start
@@ -250,7 +264,7 @@ def _inline_data_image_end(
             return True, None, None
         position += 1
     else:
-        recovery = position if crossed_line and _is_image_candidate(text, position) else None
+        recovery = _find_later_line_image_candidate(text, position, end, crossed_line)
         return True, None, recovery
 
     while position < end and text[position].isspace():
@@ -262,7 +276,11 @@ def _inline_data_image_end(
     return (
         (True, position + 1, None)
         if position < end and text[position] == ")"
-        else (True, None, None)
+        else (
+            True,
+            None,
+            _find_later_line_image_candidate(text, position, end, crossed_line),
+        )
     )
 
 

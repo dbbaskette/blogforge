@@ -189,18 +189,30 @@ describe("stripEmbeddedImages", () => {
 
   it("continues after malformed data destinations and reference labels", () => {
     const html = '<img alt="html" src="data:image/png;base64,QQ==">';
-    const inline = `![broken](data:image/png;base64,AAAA\n${html}`;
+    const inline = `![broken](data:image/png;base64,AAAA\nsome prose\n${html}`;
     const markdownImage = "![markdown](data:image/png;base64,Qg==)";
-    const reference = `![broken][missing\n${markdownImage}`;
+    const reference = `![broken][missing\nintervening prose\n${markdownImage}`;
 
     expect(stripEmbeddedImages(`${inline}\n${reference}`)).toEqual({
       text:
-        "![broken](data:image/png;base64,AAAA\n" +
+        "![broken](data:image/png;base64,AAAA\nsome prose\n" +
         "[Image omitted during import: html]\n" +
-        "![broken][missing\n" +
+        "![broken][missing\nintervening prose\n" +
         "[Image omitted during import: markdown]",
       removedImages: 2,
       removedCharacters: html.length + markdownImage.length,
+    });
+  });
+
+  it("continues after same-line garbage in a malformed data destination", () => {
+    const image = "![later](data:image/png;base64,QQ==)";
+    const markdown = `![broken](data:image/png;base64,AAAA garbage\n${image}`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text:
+        "![broken](data:image/png;base64,AAAA garbage\n" + "[Image omitted during import: later]",
+      removedImages: 1,
+      removedCharacters: image.length,
     });
   });
 

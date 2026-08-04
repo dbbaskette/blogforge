@@ -56,6 +56,22 @@ function findImageClosingBracket(text: string, start: number, end: number): Scan
   return {};
 }
 
+function findLaterLineImageCandidate(
+  text: string,
+  start: number,
+  end: number,
+  crossedLine: boolean,
+): number | undefined {
+  let position = start;
+  let canRecover = crossedLine;
+  while (position < end) {
+    if (canRecover && isImageCandidate(text, position)) return position;
+    if (text[position] === "\n") canRecover = true;
+    position += 1;
+  }
+  return undefined;
+}
+
 function findClosingBracket(text: string, start: number, end: number): number | undefined {
   let position = start;
   while (position < end) {
@@ -264,9 +280,10 @@ function inlineDataImageEnd(
     if (position >= end) return { isData: true };
     position += 1;
   } else {
-    return crossedLine && isImageCandidate(text, position)
-      ? { isData: true, recovery: position }
-      : { isData: true };
+    return {
+      isData: true,
+      recovery: findLaterLineImageCandidate(text, position, end, crossedLine),
+    };
   }
 
   while (position < end && /\s/.test(text[position])) {
@@ -278,7 +295,10 @@ function inlineDataImageEnd(
   }
   return position < end && text[position] === ")"
     ? { isData: true, imageEnd: position + 1 }
-    : { isData: true };
+    : {
+        isData: true,
+        recovery: findLaterLineImageCandidate(text, position, end, crossedLine),
+      };
 }
 
 function htmlImageEnd(text: string, start: number, end: number): ScanEnd {

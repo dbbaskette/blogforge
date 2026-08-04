@@ -195,19 +195,33 @@ def test_continues_after_malformed_html_and_removes_later_markdown_data_image() 
 
 def test_continues_after_malformed_data_destinations_and_reference_labels() -> None:
     html = '<img alt="html" src="data:image/png;base64,QQ==">'
-    inline = f"![broken](data:image/png;base64,AAAA\n{html}"
+    inline = f"![broken](data:image/png;base64,AAAA\nsome prose\n{html}"
     markdown_image = "![markdown](data:image/png;base64,Qg==)"
-    reference = f"![broken][missing\n{markdown_image}"
+    reference = f"![broken][missing\nintervening prose\n{markdown_image}"
 
     assert strip_embedded_images(f"{inline}\n{reference}") == EmbeddedImageCleanup(
         text=(
-            "![broken](data:image/png;base64,AAAA\n"
+            "![broken](data:image/png;base64,AAAA\nsome prose\n"
             "[Image omitted during import: html]\n"
-            "![broken][missing\n"
+            "![broken][missing\nintervening prose\n"
             "[Image omitted during import: markdown]"
         ),
         removed_images=2,
         removed_characters=len(html) + len(markdown_image),
+    )
+
+
+def test_continues_after_same_line_garbage_in_malformed_data_destination() -> None:
+    image = "![later](data:image/png;base64,QQ==)"
+    markdown = f"![broken](data:image/png;base64,AAAA garbage\n{image}"
+
+    assert strip_embedded_images(markdown) == EmbeddedImageCleanup(
+        text=(
+            "![broken](data:image/png;base64,AAAA garbage\n"
+            "[Image omitted during import: later]"
+        ),
+        removed_images=1,
+        removed_characters=len(image),
     )
 
 
