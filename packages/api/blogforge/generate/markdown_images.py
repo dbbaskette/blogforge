@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 _FALLBACK_ALT = "embedded image"
 _REFERENCE_DEFINITION_RE = re.compile(
     r"^ {0,3}\[([^\]]+)\]:[ \t]*<?data:image/[^\s>]+>?(?:[ \t]+.*)?(?:\r?\n|$)",
@@ -59,13 +58,21 @@ def strip_embedded_images(markdown: str) -> EmbeddedImageCleanup:
 
     def replace_reference_image(match: re.Match[str]) -> str:
         alt, label = match.groups()
-        return _placeholder(alt) if _normalize_reference_label(label or alt) in embedded_reference_labels else match.group(0)
+        return (
+            _placeholder(alt)
+            if _normalize_reference_label(label or alt) in embedded_reference_labels
+            else match.group(0)
+        )
 
     text = _REFERENCE_IMAGE_RE.sub(replace_reference_image, text)
 
     def replace_shortcut_reference_image(match: re.Match[str]) -> str:
         alt = match.group(1)
-        return _placeholder(alt) if _normalize_reference_label(alt) in embedded_reference_labels else match.group(0)
+        return (
+            _placeholder(alt)
+            if _normalize_reference_label(alt) in embedded_reference_labels
+            else match.group(0)
+        )
 
     text = _SHORTCUT_REFERENCE_IMAGE_RE.sub(replace_shortcut_reference_image, text)
 

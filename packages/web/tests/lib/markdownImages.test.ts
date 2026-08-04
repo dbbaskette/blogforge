@@ -14,7 +14,7 @@ describe("stripEmbeddedImages", () => {
   });
 
   it("replaces every image use of a data-image reference without recounting its definition", () => {
-    const definition = "[Hero Image]: data:image/jpeg;base64,QUJDRA== \"launch art\"";
+    const definition = '[Hero Image]: data:image/jpeg;base64,QUJDRA== "launch art"';
     const markdown = `![First caption][hero image]\n![Second caption][ HERO   IMAGE ]\n${definition}\nClosing prose.`;
 
     expect(stripEmbeddedImages(markdown)).toEqual({
@@ -47,7 +47,8 @@ describe("stripEmbeddedImages", () => {
   });
 
   it("replaces a quoted HTML data image and preserves surrounding attributes", () => {
-    const image = '<img class="hero" alt="Product shot" src="data:image/webp;base64,QUJDRA==" loading="lazy">';
+    const image =
+      '<img class="hero" alt="Product shot" src="data:image/webp;base64,QUJDRA==" loading="lazy">';
     const markdown = `Intro ${image} outro`;
 
     expect(stripEmbeddedImages(markdown)).toEqual({
@@ -70,7 +71,8 @@ describe("stripEmbeddedImages", () => {
   });
 
   it("uses the embedded-image fallback for empty markdown and HTML alt text", () => {
-    const markdown = "![](data:image/gif;base64,QQ==) <img alt='' src='data:image/gif;base64,Qg=='>";
+    const markdown =
+      "![](data:image/gif;base64,QQ==) <img alt='' src='data:image/gif;base64,Qg=='>";
 
     expect(stripEmbeddedImages(markdown)).toEqual({
       text: "[Image omitted during import: embedded image] [Image omitted during import: embedded image]",
