@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 
+import { stripEmbeddedImages } from "../../lib/markdownImages";
 import { needsNormalizing, normalizeMarkdown } from "../../lib/markdownNormalize";
 
 /** Count the sections a paste will split into: one per H2 heading, or a single
@@ -12,7 +13,23 @@ export function countSections(text: string): number {
 }
 
 const ACCEPT = ".md,.markdown,.mdown,.txt,.text,text/markdown,text/plain";
-const MAX_BYTES = 1_000_000; // 1 MB — a very long post; guards against a stray big file
+const RAW_FILE_MAX_BYTES = 25_000_000;
+const CLEAN_TEXT_MAX_CHARS = 200_000;
+
+function exceedsCodePointLimit(text: string, limit: number): boolean {
+  let count = 0;
+  for (const _character of text) {
+    count += 1;
+    if (count > limit) return true;
+  }
+  return false;
+}
+
+function formatRemovedSize(characters: number): string {
+  if (characters >= 1_000_000) return `${(characters / 1_000_000).toFixed(1)} MB`;
+  if (characters >= 1_000) return `${Math.round(characters / 1_000)} KB`;
+  return `${characters} characters`;
+}
 
 export function PastePanel({
   text,
@@ -33,13 +50,28 @@ export function PastePanel({
   const [note, setNote] = useState<string | null>(null);
 
   async function loadFile(file: File): Promise<void> {
-    if (file.size > MAX_BYTES) {
+    if (file.size > RAW_FILE_MAX_BYTES) {
       setNote("That file is too large to import.");
       return;
     }
     const raw = await file.text();
-    onText(normalizeMarkdown(raw));
-    setNote(`Loaded ${file.name}`);
+    const cleaned = stripEmbeddedImages(raw);
+    if (exceedsCodePointLimit(cleaned.text, CLEAN_TEXT_MAX_CHARS)) {
+      setNote(
+        cleaned.removedImages > 0
+          ? "The article text remains too long after embedded images were removed."
+          : "That file is too long to import.",
+      );
+      return;
+    }
+    onText(normalizeMarkdown(cleaned.text));
+    setNote(
+      cleaned.removedImages > 0
+        ? `Loaded ${file.name}; removed ${cleaned.removedImages} embedded image${
+            cleaned.removedImages === 1 ? "" : "s"
+          } (${formatRemovedSize(cleaned.removedCharacters)}).`
+        : `Loaded ${file.name}`,
+    );
   }
 
   const onDrop = (e: React.DragEvent): void => {

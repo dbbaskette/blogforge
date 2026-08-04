@@ -21,6 +21,7 @@ from blogforge.drafts.models import (
 )
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.ingest import ingest_document
+from blogforge.generate.markdown_images import strip_embedded_images
 from blogforge.llm.types import TextProvider
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
@@ -141,7 +142,7 @@ class _ImportBody(BaseModel):
     + provider setup travels alongside the text.
     """
 
-    text: str = Field(min_length=1, max_length=200_000)
+    text: str = Field(min_length=1, max_length=25_000_000)
     pack_slug: str = ""
     format: str | None = None
     provider: TextProvider
@@ -165,7 +166,18 @@ async def import_draft(
     normal draft so every shaping tool works on it unchanged. Nothing is
     rewritten and no tool is auto-run — the writer's words are preserved verbatim.
     """
-    ingested = ingest_document(body.text)
+    cleaned_text = strip_embedded_images(body.text).text
+    if len(cleaned_text) > 200_000:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "error": {
+                    "code": "import_text_too_large",
+                    "message": "Imported text exceeds 200,000 characters after image cleanup.",
+                }
+            },
+        )
+    ingested = ingest_document(cleaned_text)
     if not ingested.sections:
         raise HTTPException(
             422,
