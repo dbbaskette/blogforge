@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+
+import { stripEmbeddedImages } from "../../src/lib/markdownImages";
+
+describe("stripEmbeddedImages", () => {
+  it("replaces an inline data image with its alt-text placeholder and records its source size", () => {
+    const markdown = "Before ![Quarterly chart](data:image/png;base64,QUJDRA==) after.";
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "Before [Image omitted during import: Quarterly chart] after.",
+      removedImages: 1,
+      removedCharacters: "![Quarterly chart](data:image/png;base64,QUJDRA==)".length,
+    });
+  });
+
+  it("replaces every image use of a data-image reference without recounting its definition", () => {
+    const definition = "[Hero Image]: data:image/jpeg;base64,QUJDRA== \"launch art\"";
+    const markdown = `![First caption][hero image]\n![Second caption][ HERO   IMAGE ]\n${definition}\nClosing prose.`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "[Image omitted during import: First caption]\n[Image omitted during import: Second caption]\nClosing prose.",
+      removedImages: 1,
+      removedCharacters: definition.length,
+    });
+  });
+
+  it("does not consume prose after a data-image reference without metadata", () => {
+    const definition = "[Diagram]: data:image/png;base64,QUJDRA==";
+    const markdown = `![Architecture][diagram]\n${definition}\nKeep this paragraph.`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "[Image omitted during import: Architecture]\nKeep this paragraph.",
+      removedImages: 1,
+      removedCharacters: definition.length,
+    });
+  });
+
+  it("replaces a quoted HTML data image and preserves surrounding attributes", () => {
+    const image = '<img class="hero" alt="Product shot" src="data:image/webp;base64,QUJDRA==" loading="lazy">';
+    const markdown = `Intro ${image} outro`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "Intro [Image omitted during import: Product shot] outro",
+      removedImages: 1,
+      removedCharacters: image.length,
+    });
+  });
+
+  it("uses the embedded-image fallback for empty markdown and HTML alt text", () => {
+    const markdown = "![](data:image/gif;base64,QQ==) <img alt='' src='data:image/gif;base64,Qg=='>";
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "[Image omitted during import: embedded image] [Image omitted during import: embedded image]",
+      removedImages: 2,
+      removedCharacters:
+        "![](data:image/gif;base64,QQ==)".length +
+        "<img alt='' src='data:image/gif;base64,Qg=='>".length,
+    });
+  });
+
+  it("leaves HTTP, relative, attachment, and non-image data destinations unchanged", () => {
+    const markdown = [
+      "![HTTP](https://example.com/image.png)",
+      "![Relative](./images/chart.png)",
+      "![Attachment](attachment:hero.png)",
+      "[Download](data:application/pdf;base64,QUJDRA==)",
+      '<img alt="Remote" src="https://example.com/image.png">',
+    ].join("\n");
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: markdown,
+      removedImages: 0,
+      removedCharacters: 0,
+    });
+  });
+});
