@@ -179,6 +179,43 @@ async def test_import_draft_persists_codex_cli_provider(authed_client) -> None:
     assert r.json()["idea"]["model"] == "codex-default"
 
 
+async def test_import_draft_replaces_embedded_data_image(authed_client) -> None:
+    """Embedded image data must never persist in a newly imported draft."""
+    client, _ = authed_client
+    r = client.post(
+        "/api/drafts/import",
+        json=_import_body(
+            "# Image Post\n\n## Body\n\n"
+            "Before ![architecture diagram](data:image/png;base64,aGVsbG8=) after."
+        ),
+    )
+    assert r.status_code == 201
+    content = r.json()["sections"][0]["content_md"]
+    assert "[Image omitted during import: architecture diagram]" in content
+    assert "data:image" not in content
+
+
+async def test_import_draft_preserves_normal_image(authed_client) -> None:
+    client, _ = authed_client
+    image = "![Product screen](https://cdn.example.com/product.png)"
+    r = client.post(
+        "/api/drafts/import",
+        json=_import_body(f"# Image Post\n\n## Body\n\n{image}"),
+    )
+    assert r.status_code == 201
+    assert r.json()["sections"][0]["content_md"] == image
+
+
+async def test_import_draft_rejects_text_over_limit_after_sanitization(authed_client) -> None:
+    client, _ = authed_client
+    r = client.post(
+        "/api/drafts/import",
+        json=_import_body("# Long Post\n\n## Body\n\n" + "x" * 200_001),
+    )
+    assert r.status_code == 413
+    assert r.json()["detail"]["error"]["code"] == "import_text_too_large"
+
+
 async def test_import_draft_no_headings_single_section(authed_client) -> None:
     client, _ = authed_client
     r = client.post("/api/drafts/import", json=_import_body("Just prose, no headings here."))
