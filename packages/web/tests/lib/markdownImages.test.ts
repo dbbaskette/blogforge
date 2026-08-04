@@ -35,6 +35,17 @@ describe("stripEmbeddedImages", () => {
     });
   });
 
+  it("replaces a shortcut image reference backed by an embedded data-image definition", () => {
+    const definition = "[Logo]: data:image/png;base64,QUJDRA==";
+    const markdown = `![Logo]\n${definition}`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "[Image omitted during import: Logo]\n",
+      removedImages: 1,
+      removedCharacters: definition.length,
+    });
+  });
+
   it("replaces a quoted HTML data image and preserves surrounding attributes", () => {
     const image = '<img class="hero" alt="Product shot" src="data:image/webp;base64,QUJDRA==" loading="lazy">';
     const markdown = `Intro ${image} outro`;
@@ -43,6 +54,18 @@ describe("stripEmbeddedImages", () => {
       text: "Intro [Image omitted during import: Product shot] outro",
       removedImages: 1,
       removedCharacters: image.length,
+    });
+  });
+
+  it("strips unquoted HTML data sources without treating data-alt as alt text", () => {
+    const withAlt = "<img alt=Logo src=data:image/png;base64,QQ==>";
+    const dataAltOnly = '<img data-alt="not an alt attribute" src=data:image/png;base64,Qg==>';
+    const markdown = `${withAlt} ${dataAltOnly}`;
+
+    expect(stripEmbeddedImages(markdown)).toEqual({
+      text: "[Image omitted during import: Logo] [Image omitted during import: embedded image]",
+      removedImages: 2,
+      removedCharacters: withAlt.length + dataAltOnly.length,
     });
   });
 

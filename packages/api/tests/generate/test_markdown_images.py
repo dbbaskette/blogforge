@@ -33,6 +33,17 @@ def test_does_not_consume_prose_after_data_image_reference_without_metadata() ->
     )
 
 
+def test_replaces_shortcut_image_reference_backed_by_data_image_definition() -> None:
+    definition = "[Logo]: data:image/png;base64,QUJDRA=="
+    markdown = f"![Logo]\n{definition}"
+
+    assert strip_embedded_images(markdown) == EmbeddedImageCleanup(
+        text="[Image omitted during import: Logo]\n",
+        removed_images=1,
+        removed_characters=len(definition),
+    )
+
+
 def test_replaces_quoted_html_data_image_with_alt_placeholder() -> None:
     image = '<img class="hero" alt="Product shot" src="data:image/webp;base64,QUJDRA==" loading="lazy">'
     markdown = f"Intro {image} outro"
@@ -41,6 +52,18 @@ def test_replaces_quoted_html_data_image_with_alt_placeholder() -> None:
         text="Intro [Image omitted during import: Product shot] outro",
         removed_images=1,
         removed_characters=len(image),
+    )
+
+
+def test_strips_unquoted_html_data_source_without_using_data_alt_as_alt_text() -> None:
+    with_alt = "<img alt=Logo src=data:image/png;base64,QQ==>"
+    data_alt_only = '<img data-alt="not an alt attribute" src=data:image/png;base64,Qg==>'
+    markdown = f"{with_alt} {data_alt_only}"
+
+    assert strip_embedded_images(markdown) == EmbeddedImageCleanup(
+        text="[Image omitted during import: Logo] [Image omitted during import: embedded image]",
+        removed_images=2,
+        removed_characters=len(with_alt) + len(data_alt_only),
     )
 
 

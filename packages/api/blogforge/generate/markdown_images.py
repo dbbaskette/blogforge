@@ -12,14 +12,18 @@ _REFERENCE_DEFINITION_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 _REFERENCE_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\[([^\]]*)\]")
+_SHORTCUT_REFERENCE_IMAGE_RE = re.compile(r"!\[([^\]]+)\](?![\[(])")
 _INLINE_IMAGE_RE = re.compile(
     r"!\[([^\]]*)\]\(\s*<?data:image/[^)\s>]+>?(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^)]*\)))?\s*\)",
     re.IGNORECASE,
 )
-_HTML_IMAGE_RE = re.compile(
-    r"<img\b(?=[^>]*\bsrc\s*=\s*(['\"])data:image/)[^>]*>", re.IGNORECASE
+_HTML_IMAGE_RE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+_HTML_DATA_IMAGE_SRC_RE = re.compile(
+    r"(?:^|\s)src\s*=\s*(?:['\"]data:image/|data:image/[^\s>]+)", re.IGNORECASE
 )
-_ALT_ATTRIBUTE_RE = re.compile(r"\balt\s*=\s*(['\"])(.*?)\1", re.IGNORECASE)
+_ALT_ATTRIBUTE_RE = re.compile(
+    r"(?:^|\s)alt\s*=\s*(?:['\"]([^'\"]*)['\"]|([^\s>]+))", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -59,6 +63,12 @@ def strip_embedded_images(markdown: str) -> EmbeddedImageCleanup:
 
     text = _REFERENCE_IMAGE_RE.sub(replace_reference_image, text)
 
+    def replace_shortcut_reference_image(match: re.Match[str]) -> str:
+        alt = match.group(1)
+        return _placeholder(alt) if _normalize_reference_label(alt) in embedded_reference_labels else match.group(0)
+
+    text = _SHORTCUT_REFERENCE_IMAGE_RE.sub(replace_shortcut_reference_image, text)
+
     def replace_inline_image(match: re.Match[str]) -> str:
         nonlocal removed_images, removed_characters
         removed_images += 1
@@ -70,10 +80,12 @@ def strip_embedded_images(markdown: str) -> EmbeddedImageCleanup:
     def replace_html_image(match: re.Match[str]) -> str:
         nonlocal removed_images, removed_characters
         image = match.group(0)
+        if not _HTML_DATA_IMAGE_SRC_RE.search(image):
+            return image
         alt_match = _ALT_ATTRIBUTE_RE.search(image)
         removed_images += 1
         removed_characters += len(image)
-        return _placeholder(alt_match.group(2) if alt_match else "")
+        return _placeholder((alt_match.group(1) or alt_match.group(2) or "") if alt_match else "")
 
     text = _HTML_IMAGE_RE.sub(replace_html_image, text)
 
