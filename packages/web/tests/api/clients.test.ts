@@ -38,6 +38,8 @@ describe("API errors", () => {
               error: {
                 code: "github_branch_not_found",
                 message: "Branch 'release' was not found.",
+                repository_url: "https://github.com/blogforge/example",
+                path: "content/release.md",
               },
             },
           }),
@@ -50,6 +52,8 @@ describe("API errors", () => {
       status: 404,
       code: "github_branch_not_found",
       message: "Branch 'release' was not found.",
+      repositoryUrl: "https://github.com/blogforge/example",
+      path: "content/release.md",
     });
   });
 
@@ -71,6 +75,35 @@ describe("API errors", () => {
       message: "The request could not be completed.",
     });
     await expect(api("/api/test")).rejects.not.toThrow(/\[\{|\"loc\"/);
+  });
+
+  it("keeps an opaque session detail as metadata without forcing navigation", async () => {
+    const originalLocation = window.location;
+    const assign = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, pathname: "/drafts/d1", assign },
+    });
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ detail: "session_revoked" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      );
+
+      await expect(api("/api/test")).rejects.toMatchObject({
+        status: 401,
+        detail: "session_revoked",
+        message: "Your session has expired. Please sign in again.",
+      });
+      expect(assign).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+    }
   });
 });
 

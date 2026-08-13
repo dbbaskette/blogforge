@@ -35,19 +35,6 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     credentials: "include",
   });
   if (!res.ok) {
-    if (
-      res.status === 401 &&
-      typeof window !== "undefined" &&
-      window.location?.pathname !== "/login"
-    ) {
-      // Session expired or never signed in — bounce to the login screen
-      // instead of letting callers render a raw "HTTP 401" banner mid-page.
-      try {
-        window.location.assign("/login");
-      } catch {
-        /* jsdom (tests) has no navigation — ignore */
-      }
-    }
     let detail: unknown;
     let message: string | undefined;
     let code: string | undefined;
@@ -59,10 +46,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
       const detailObject = isJsonObject(detail) ? detail : undefined;
       const structured =
         detailObject?.error ?? detailObject ?? (isJsonObject(j) ? j.error : undefined);
-      message =
-        stringProperty(structured, "message") ??
-        (typeof detail === "string" ? detail : undefined) ??
-        stringProperty(j, "message");
+      message = stringProperty(structured, "message");
       code = stringProperty(structured, "code");
       repositoryUrl = stringProperty(structured, "repository_url");
       errorPath = stringProperty(structured, "path");
@@ -70,7 +54,12 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
       /* fall through */
     }
     const err: ApiError = Object.assign(
-      new Error(message ?? "The request could not be completed."),
+      new Error(
+        message ??
+          (res.status === 401
+            ? "Your session has expired. Please sign in again."
+            : "The request could not be completed."),
+      ),
       {
         status: res.status,
         code,
