@@ -9,8 +9,19 @@ const BASE = import.meta.env.VITE_API_URL ?? "";
 export interface ApiError extends Error {
   status: number;
   code?: string;
+  detail?: unknown;
   repositoryUrl?: string;
   path?: string;
+}
+
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringProperty(value: unknown, key: string): string | undefined {
+  return isJsonObject(value) && typeof value[key] === "string" ? value[key] : undefined;
 }
 
 export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
@@ -37,31 +48,33 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
         /* jsdom (tests) has no navigation — ignore */
       }
     }
-    let detail: string | undefined;
+    let detail: unknown;
+    let message: string | undefined;
     let code: string | undefined;
     let repositoryUrl: string | undefined;
     let errorPath: string | undefined;
     try {
       const j = await res.json();
-      const structured = j?.detail?.error ?? j?.error;
-      detail =
-        typeof j?.detail === "string"
-          ? j.detail
-          : typeof structured?.message === "string"
-            ? structured.message
-            : JSON.stringify(j);
-      code = typeof structured?.code === "string" ? structured.code : undefined;
-      repositoryUrl =
-        typeof structured?.repository_url === "string" ? structured.repository_url : undefined;
-      errorPath = typeof structured?.path === "string" ? structured.path : undefined;
+      detail = isJsonObject(j) && "detail" in j ? j.detail : j;
+      const detailObject = isJsonObject(detail) ? detail : undefined;
+      const structured =
+        detailObject?.error ?? detailObject ?? (isJsonObject(j) ? j.error : undefined);
+      message =
+        stringProperty(structured, "message") ??
+        (typeof detail === "string" ? detail : undefined) ??
+        stringProperty(j, "message");
+      code = stringProperty(structured, "code");
+      repositoryUrl = stringProperty(structured, "repository_url");
+      errorPath = stringProperty(structured, "path");
     } catch {
       /* fall through */
     }
     const err: ApiError = Object.assign(
-      new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`),
+      new Error(message ?? "The request could not be completed."),
       {
         status: res.status,
         code,
+        detail,
         repositoryUrl,
         path: errorPath,
       },

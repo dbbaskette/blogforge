@@ -49,8 +49,28 @@ describe("API errors", () => {
     await expect(api("/api/test")).rejects.toMatchObject({
       status: 404,
       code: "github_branch_not_found",
-      message: "HTTP 404: Branch 'release' was not found.",
+      message: "Branch 'release' was not found.",
     });
+  });
+
+  it("keeps validation detail available without using its JSON as the message", async () => {
+    const validation = [{ loc: ["body", "title"], msg: "Field required", type: "missing" }];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: validation }), {
+          status: 422,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(api("/api/test")).rejects.toMatchObject({
+      status: 422,
+      detail: validation,
+      message: "The request could not be completed.",
+    });
+    await expect(api("/api/test")).rejects.not.toThrow(/\[\{|\"loc\"/);
   });
 });
 
