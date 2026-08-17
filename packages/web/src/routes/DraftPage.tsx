@@ -200,7 +200,8 @@ export function DraftPage(): JSX.Element {
         <ErrorNotice error={error} operation="loading your draft" onRetry={loadDraft} />
       </div>
     );
-  if (!draft) return <p className="text-center text-muted text-sm py-16">Loading…</p>;
+  if (!draft || draft.id !== id)
+    return <p className="text-center text-muted text-sm py-16">Loading…</p>;
 
   return (
     <DraftWorkspace

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { useLayoutEffect } from "react";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiError } from "../../src/api/client";
@@ -20,8 +21,12 @@ function deferred<T>(): {
   return { promise, resolve, reject };
 }
 
-function RouteSwitcher(): JSX.Element {
+function RouteSwitcher({ onDraftBLayout }: { onDraftBLayout?: () => void }): JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
+  useLayoutEffect(() => {
+    if (location.pathname === "/drafts/draft-b") onDraftBLayout?.();
+  }, [location.pathname, onDraftBLayout]);
   return (
     <button type="button" onClick={() => navigate("/drafts/draft-b")}>
       Open draft B
@@ -381,6 +386,94 @@ describe("DraftPage", () => {
     expect(vi.mocked(updateDraft).mock.calls[2]?.[1].outline?.opening_hook).toBe(
       "Draft B failed snapshot",
     );
+  });
+
+  it("never binds draft A's pending title save to draft B while B loads", async () => {
+    const draftA: Draft = {
+      id: "draft-a",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      title: "Draft A",
+      stage: "outline",
+      idea: { topic: "Draft A", pack_slug: "dan", provider: "anthropic", model: "m" },
+      outline: { opening_hook: "A opening", sections: [], estimated_words: 500 },
+      sections: [],
+      tags: [],
+      hero_image_key: null,
+    };
+    const draftB: Draft = {
+      ...structuredClone(draftA),
+      id: "draft-b",
+      title: "Draft B",
+      idea: { ...draftA.idea, topic: "Draft B" },
+      outline: { opening_hook: "B opening", sections: [], estimated_words: 500 },
+    };
+    const pendingB = deferred<Draft>();
+    vi.mocked(getDraft).mockReset();
+    vi.mocked(getDraft)
+      .mockResolvedValueOnce(draftA)
+      .mockImplementationOnce(() => pendingB.promise)
+      .mockResolvedValue({
+        id: "abc123",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        title: "My Test Draft",
+        stage: "research",
+        idea: {
+          topic: "My Test Draft",
+          pack_slug: "dan",
+          provider: "anthropic",
+          model: "claude-3-5-sonnet",
+          target_words: 1500,
+        },
+        outline: null,
+        sections: [],
+        tags: [],
+        hero_image_key: null,
+      });
+    vi.mocked(updateDraft).mockReset();
+    vi.mocked(updateDraft).mockResolvedValue(undefined as never);
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/draft-a"]}>
+        <RouteSwitcher onDraftBLayout={() => vi.advanceTimersByTime(601)} />
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Draft A" }));
+    vi.useFakeTimers();
+    try {
+      fireEvent.change(screen.getByLabelText("Draft title"), {
+        target: { value: "Draft A pending title" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Open draft B" }));
+
+      expect(
+        vi
+          .mocked(updateDraft)
+          .mock.calls.some(
+            ([draftId, snapshot]) =>
+              draftId === "draft-b" && snapshot.title === "Draft A pending title",
+          ),
+      ).toBe(false);
+
+      await act(async () => pendingB.resolve(draftB));
+      fireEvent.click(screen.getByRole("button", { name: "Draft B" }));
+      fireEvent.change(screen.getByLabelText("Draft title"), {
+        target: { value: "Draft B own title" },
+      });
+      await act(async () => vi.advanceTimersByTime(601));
+
+      expect(updateDraft).toHaveBeenCalledWith(
+        "draft-b",
+        expect.objectContaining({ id: "draft-b", title: "Draft B own title" }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("renders the ResearchPanel once a draft loads at the research stage", async () => {

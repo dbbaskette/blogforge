@@ -132,3 +132,34 @@ Complete and self-reviewed.
 
 - The full frontend suite still emits pre-existing React Router future-flag, React `act(...)`, and jsdom navigation warnings.
 - The successful Vite build retains the existing HeadlineLab static/dynamic import chunk warning.
+
+## Fix round 3: synchronous workspace ownership
+
+### Changes
+
+- Gated `DraftWorkspace` rendering on `draft.id === route id`. The old workspace now unmounts during the first render for the new route instead of waiting for the load effect to clear draft state.
+- Retained the existing sequence and active-draft result guards for pending loads and saves.
+- Added a route-commit regression that arms draft A's title debounce, navigates while draft B remains pending, advances the debounce during B's layout commit, and proves A data is never sent to B. The same test resolves B and verifies B's own title save uses B's endpoint and snapshot.
+
+### Test-first evidence
+
+- Before the ownership gate, the new regression failed because `updateDraft` received draft A's pending title under the draft B endpoint. After the gate, the old workspace no longer re-renders with B-bound callbacks and the test passes.
+
+### Commands and results
+
+- `pnpm exec vitest run tests/routes/DraftPage.test.tsx`: 1 file passed, 10 tests passed.
+- `pnpm test`: 92 files passed, 485 tests passed.
+- `pnpm build`: TypeScript and Vite production build passed; the existing HeadlineLab chunk warning remains.
+- `pnpm exec biome check src/routes/DraftPage.tsx tests/routes/DraftPage.test.tsx`: passed with no diagnostics.
+- `git diff --check`: passed.
+
+### Self-review
+
+- Confirmed a route ID mismatch renders only the loading state, synchronously removing the prior workspace and its route-sensitive callbacks.
+- Confirmed draft B remains loading until its own object resolves, then renders and saves normally.
+- Confirmed stale async save/load results remain rejected by sequence and active-draft ownership checks.
+
+### Fix-round 3 concerns
+
+- The full frontend suite still emits pre-existing React Router future-flag, React `act(...)`, and jsdom navigation warnings.
+- The successful Vite build retains the existing HeadlineLab static/dynamic import chunk warning.
