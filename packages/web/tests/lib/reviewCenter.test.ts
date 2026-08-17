@@ -8,6 +8,7 @@ import {
   type LintResult,
   type ReviewCheck,
   type ReviewResults,
+  isCurrentReviewSummary,
   markReviewStale,
   summarizeReview,
 } from "../../src/lib/reviewCenter";
@@ -164,5 +165,13 @@ describe("markReviewStale", () => {
       "stale",
     ]);
     expect(stale.totalOpen).toBe(summary.totalOpen);
+  });
+});
+
+describe("isCurrentReviewSummary", () => {
+  it("rejects summaries from the content-only cache version", () => {
+    const legacy = { ...summarizeReview(completeResults()), version: 1 };
+
+    expect(isCurrentReviewSummary(legacy)).toBe(false);
   });
 });

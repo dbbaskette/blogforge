@@ -1,7 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Draft, Section } from "../../src/api/drafts";
-import { formatAgo, getCached, hashDraftContent, setCached } from "../../src/lib/panelCache";
+import type { Reference } from "../../src/api/references";
+import {
+  combineAnalysisHash,
+  formatAgo,
+  getCached,
+  hashDraftContent,
+  hashReferenceFingerprint,
+  setCached,
+} from "../../src/lib/panelCache";
 
 function sec(id: string, title: string, content: string): Section {
   return {
@@ -42,6 +50,42 @@ describe("hashDraftContent", () => {
 
     const retitled = draft([sec("s1", "One", "Body")], "Different");
     expect(hashDraftContent(retitled)).not.toBe(hashDraftContent(a));
+  });
+});
+
+describe("reference-aware hashes", () => {
+  const first: Reference = {
+    id: "r1",
+    kind: "url",
+    name: "Primary source",
+    url: "https://example.com/source",
+    original_filename: null,
+    extracted_chars: 1200,
+    added_at: "2026-08-12T10:00:00Z",
+  };
+  const second: Reference = {
+    id: "r2",
+    kind: "file",
+    name: "Research paper",
+    url: null,
+    original_filename: "paper.pdf",
+    extracted_chars: 8400,
+    added_at: "2026-08-12T11:00:00Z",
+  };
+
+  it("is stable across array order and changes with stable reference fields", () => {
+    expect(hashReferenceFingerprint([first, second])).toBe(
+      hashReferenceFingerprint([second, first]),
+    );
+    expect(hashReferenceFingerprint([{ ...first, extracted_chars: 1201 }, second])).not.toBe(
+      hashReferenceFingerprint([first, second]),
+    );
+  });
+
+  it("combines draft content and references without collisions between the parts", () => {
+    expect(combineAnalysisHash("content-a", "references-b")).not.toBe(
+      combineAnalysisHash("content", "a-references-b"),
+    );
   });
 });
 

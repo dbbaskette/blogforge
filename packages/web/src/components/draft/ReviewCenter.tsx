@@ -3,8 +3,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Draft, checkClaims, lintDraft } from "../../api/drafts";
 import { type GeoReport, analyzeGeo } from "../../api/geo";
 import { type HumanizeReport, analyzeHumanize } from "../../api/humanize";
+import { listReferences } from "../../api/references";
 import { type SuggestResult, suggestImprovements } from "../../api/suggest";
-import { getCached, hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
+import {
+  analysisHashUsesContent,
+  combineAnalysisHash,
+  getCached,
+  hashDraftContent,
+  hashReferenceFingerprint,
+  peekCached,
+  setCached,
+} from "../../lib/panelCache";
 import {
   type FactualSupportResult,
   type LintResult,
@@ -14,6 +23,7 @@ import {
   type ReviewSeverity,
   type ReviewSummary,
   isCurrentReviewSummary,
+  markReferenceSensitiveReviewStale,
   markReviewStale,
   summarizeReview,
 } from "../../lib/reviewCenter";
@@ -22,6 +32,18 @@ import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
 const REVIEW_KEYS: ReviewKey[] = ["proofread", "factual-support", "shape", "humanization", "geo"];
+
+const inFlightChecks = new Map<string, Promise<unknown>>();
+
+function joinInFlight<T>(key: string, start: () => Promise<T>): Promise<T> {
+  const existing = inFlightChecks.get(key);
+  if (existing) return existing as Promise<T>;
+  const request = start().finally(() => {
+    if (inFlightChecks.get(key) === request) inFlightChecks.delete(key);
+  });
+  inFlightChecks.set(key, request);
+  return request;
+}
 
 const STATUS_LABEL: Record<ReviewRow["status"], string> = {
   running: "Running",
@@ -141,6 +163,7 @@ export function ReviewCenter({
 }: ReviewCenterProps): JSX.Element {
   const panelRef = useDialogA11y(true, onClose);
   const hash = useMemo(() => hashDraftContent(draft), [draft]);
+  const analysisHashRef = useRef<string | null>(null);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const summaryRef = useRef<ReviewSummary | null>(null);
   const [runningKeys, setRunningKeys] = useState<Set<ReviewKey>>(new Set());
@@ -156,33 +179,58 @@ export function ReviewCenter({
   );
 
   const executeCheck = useCallback(
-    async (key: ReviewKey): Promise<ReviewCheck<unknown>> => {
+    async (
+      key: ReviewKey,
+      analysisHash: string | null,
+      bypassCache: boolean,
+    ): Promise<ReviewCheck<unknown>> => {
       try {
+        const requestKey = `${draft.id}\u0000${analysisHash ?? `${hash}:references-unknown`}\u0000${key}`;
         switch (key) {
           case "proofread":
-            return { status: "current", data: await lintDraft(draft.id) };
+            return {
+              status: "current",
+              data: await joinInFlight(requestKey, () => lintDraft(draft.id)),
+            };
           case "factual-support":
-            return { status: "current", data: await checkClaims(draft.id) };
+            return {
+              status: "current",
+              data: await joinInFlight(requestKey, () => checkClaims(draft.id)),
+            };
           case "shape": {
-            const hit = getCached<SuggestResult>("shape", draft.id, hash);
+            const hit = bypassCache ? null : getCached<SuggestResult>("shape", draft.id, hash);
             if (hit) return { status: "current", data: hit.data };
-            const data = await suggestImprovements(draft.id);
-            setCached("shape", draft.id, hash, data);
+            const data = await joinInFlight(requestKey, async () => {
+              const fresh = await suggestImprovements(draft.id);
+              setCached("shape", draft.id, hash, fresh);
+              return fresh;
+            });
             return { status: "current", data };
           }
           case "humanization": {
             const cacheHash = `${hash}:medium`;
-            const hit = getCached<HumanizeReport>("humanize", draft.id, cacheHash);
+            const hit = bypassCache
+              ? null
+              : getCached<HumanizeReport>("humanize", draft.id, cacheHash);
             if (hit) return { status: "current", data: hit.data };
-            const data = await analyzeHumanize(draft.id, "medium");
-            setCached("humanize", draft.id, cacheHash, data);
+            const data = await joinInFlight(requestKey, async () => {
+              const fresh = await analyzeHumanize(draft.id, "medium");
+              setCached("humanize", draft.id, cacheHash, fresh);
+              return fresh;
+            });
             return { status: "current", data };
           }
           case "geo": {
-            const hit = getCached<GeoReport>("geo", draft.id, hash);
+            const hit =
+              bypassCache || !analysisHash
+                ? null
+                : getCached<GeoReport>("geo", draft.id, analysisHash);
             if (hit) return { status: "current", data: hit.data };
-            const data = await analyzeGeo(draft.id);
-            setCached("geo", draft.id, hash, data);
+            const data = await joinInFlight(requestKey, async () => {
+              const fresh = await analyzeGeo(draft.id);
+              if (analysisHash) setCached("geo", draft.id, analysisHash, fresh);
+              return fresh;
+            });
             return { status: "current", data };
           }
         }
@@ -194,7 +242,8 @@ export function ReviewCenter({
   );
 
   const run = useCallback(
-    async (keys: ReviewKey[] = REVIEW_KEYS): Promise<void> => {
+    async (keys: ReviewKey[] = REVIEW_KEYS, bypassCache = false): Promise<void> => {
+      const analysisHash = analysisHashRef.current;
       setRunningKeys((previous) => new Set([...previous, ...keys]));
       const runningRows = new Map(
         keys.map((key) => [key, rowFor(key, { status: "running" })] as const),
@@ -205,7 +254,7 @@ export function ReviewCenter({
 
       await Promise.all(
         keys.map(async (key) => {
-          const result = await executeCheck(key);
+          const result = await executeCheck(key, analysisHash, bypassCache);
           const replacement = new Map([[key, rowFor(key, result)]]);
           updateSummary((previous) =>
             replaceRows(previous ?? summarizeReview(initialResults()), replacement),
@@ -219,20 +268,37 @@ export function ReviewCenter({
       );
 
       const finished = summaryRef.current;
-      if (finished) setCached("review-center", draft.id, hash, finished);
+      if (finished && analysisHash) {
+        setCached("review-center", draft.id, analysisHash, finished);
+      }
     },
     [draft.id, executeCheck, hash, updateSummary],
   );
 
   useEffect(() => {
-    const saved = peekCached<ReviewSummary>("review-center", draft.id);
-    if (saved && isCurrentReviewSummary(saved.data)) {
-      const restored = saved.hash === hash ? saved.data : markReviewStale(saved.data);
-      summaryRef.current = restored;
-      setSummary(restored);
-      return;
-    }
-    void run();
+    void listReferences(draft.id)
+      .then((references) => {
+        const referenceHash = hashReferenceFingerprint(references);
+        const analysisHash = combineAnalysisHash(hash, referenceHash);
+        analysisHashRef.current = analysisHash;
+        const saved = peekCached<ReviewSummary>("review-center", draft.id);
+        if (saved && isCurrentReviewSummary(saved.data)) {
+          const restored =
+            saved.hash === analysisHash
+              ? saved.data
+              : analysisHashUsesContent(saved.hash, hash)
+                ? markReferenceSensitiveReviewStale(saved.data)
+                : markReviewStale(saved.data);
+          summaryRef.current = restored;
+          setSummary(restored);
+          return;
+        }
+        void run();
+      })
+      .catch(() => {
+        analysisHashRef.current = null;
+        void run();
+      });
   }, [draft.id, hash, run]);
 
   const open: Record<ReviewKey, OpenCheck> = {
@@ -263,7 +329,7 @@ export function ReviewCenter({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => void run(failedKeys.length > 0 ? failedKeys : REVIEW_KEYS)}
+              onClick={() => void run(failedKeys.length > 0 ? failedKeys : REVIEW_KEYS, true)}
               className="nb-btn nb-btn-ghost nb-btn-sm"
               disabled={isBusy}
             >
@@ -330,7 +396,7 @@ export function ReviewCenter({
                 <ErrorNotice
                   error={row.error}
                   operation={`${row.label.toLowerCase()} review`}
-                  onRetry={() => void run([row.key])}
+                  onRetry={() => void run([row.key], true)}
                 />
               )}
             </section>

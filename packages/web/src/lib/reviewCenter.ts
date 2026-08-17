@@ -3,7 +3,7 @@ import type { GeoReport } from "../api/geo";
 import type { HumanizeReport } from "../api/humanize";
 import type { SuggestResult } from "../api/suggest";
 
-export const REVIEW_CENTER_CACHE_VERSION = 1;
+export const REVIEW_CENTER_CACHE_VERSION = 2;
 
 export type ReviewKey = "proofread" | "factual-support" | "shape" | "humanization" | "geo";
 export type ReviewStatus = "running" | "current" | "stale" | "failed" | "unavailable";
@@ -222,6 +222,29 @@ export function markReviewStale(summary: ReviewSummary): ReviewSummary {
     rows: summary.rows.map((row) =>
       row.status === "current" ? { ...row, status: "stale", severity: "warn" } : row,
     ),
+  };
+}
+
+/** Reference changes invalidate only checks whose answers depend on sources.
+ * An unavailable factual-support result becomes stale because newly attached
+ * references may now make the check available. */
+export function markReferenceSensitiveReviewStale(summary: ReviewSummary): ReviewSummary {
+  return {
+    ...summary,
+    headline: "Review results need a refresh",
+    rows: summary.rows.map((row) => {
+      if (row.key !== "factual-support" && row.key !== "geo") return row;
+      if (row.status === "failed" || row.status === "running") return row;
+      return {
+        ...row,
+        status: "stale",
+        severity: "warn",
+        detail:
+          row.key === "factual-support"
+            ? "References changed. Re-run factual support."
+            : row.detail,
+      };
+    }),
   };
 }
 
