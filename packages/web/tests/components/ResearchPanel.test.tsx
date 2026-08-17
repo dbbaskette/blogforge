@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ApiError } from "../../src/api/client";
 import type { Draft } from "../../src/api/drafts";
 import { ResearchPanel } from "../../src/components/draft/ResearchPanel";
 
@@ -51,6 +52,60 @@ const sampleOutline = {
 };
 
 describe("ResearchPanel", () => {
+  it("keeps the research workspace available and links Settings for provider failures", async () => {
+    const ide = await import("../../src/api/ideation");
+    (ide.listIdeation as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      Object.assign(new Error("provider_missing_key"), {
+        status: 400,
+        code: "provider_missing_key",
+        detail: { code: "provider_missing_key" },
+      }) as ApiError,
+    );
+
+    render(<ResearchPanel draft={draft} onJobComplete={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Check your AI provider");
+    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+    expect(screen.getByLabelText(/Message BlogForge/i)).toBeInTheDocument();
+    expect(screen.getByText("Details").closest("details")).not.toHaveAttribute("open");
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Message BlogForge/i)).toBeInTheDocument();
+  });
+
+  it("retries a failed message without showing its technical response as primary copy", async () => {
+    const ide = await import("../../src/api/ideation");
+    (ide.listIdeation as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (ide.postIdeationMessage as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(
+        Object.assign(new Error('HTTP 502: {"provider":"offline"}'), {
+          status: 502,
+          detail: { provider: "offline" },
+        }) as ApiError,
+      )
+      .mockResolvedValueOnce({ job_id: "j2" });
+
+    render(<ResearchPanel draft={draft} onJobComplete={vi.fn()} />);
+
+    const composer = await screen.findByLabelText(/Message BlogForge/i);
+    fireEvent.change(composer, { target: { value: "Try this angle" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Send$/ }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The service is unavailable");
+    const details = screen.getByText("Details").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toHaveTextContent("HTTP 502");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(ide.postIdeationMessage).toHaveBeenCalledTimes(2));
+    expect(ide.postIdeationMessage).toHaveBeenLastCalledWith("d1", "Try this angle", "ideate");
+  });
+
   it("keeps conversational actions visually secondary", async () => {
     const ide = await import("../../src/api/ideation");
     (ide.listIdeation as ReturnType<typeof vi.fn>).mockResolvedValue([]);

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ApiError } from "../../src/api/client";
 import type { Section } from "../../src/api/drafts";
 import { SectionCard } from "../../src/components/draft/SectionCard";
 
@@ -82,5 +83,48 @@ describe("SectionCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /^regenerate$/i }));
     await waitFor(() => expect(onRegenerate).toHaveBeenCalledWith(undefined));
+  });
+
+  it("keeps a persisted section failure technical message behind Details", () => {
+    render(
+      <SectionCard
+        {...baseProps}
+        section={makeSection({
+          status: "failed",
+          last_error: 'HTTP 502: {"provider":"offline"}',
+        })}
+        isGenerating={false}
+        defaultOpen
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Something went wrong");
+    const details = screen.getByText("Details").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toHaveTextContent("HTTP 502");
+  });
+
+  it("offers Retry when a section regeneration request fails", async () => {
+    const onRegenerate = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error("upstream response"), { status: 503 }) as ApiError,
+      )
+      .mockResolvedValueOnce(undefined);
+    render(
+      <SectionCard
+        {...baseProps}
+        section={makeSection({ status: "ready", content_md: "Existing prose.", word_count: 2 })}
+        isGenerating={false}
+        defaultOpen
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^regenerate$/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The service is unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onRegenerate).toHaveBeenCalledTimes(2));
   });
 });

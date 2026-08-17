@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-import { expandSections, getDraft } from "../../src/api/drafts";
+import type { ApiError } from "../../src/api/client";
+import { expandSections, getDraft, updateDraft } from "../../src/api/drafts";
 import { DraftPage } from "../../src/routes/DraftPage";
 
 vi.mock("../../src/hooks/useMe", () => ({
@@ -76,6 +77,108 @@ vi.mock("../../src/api/providers", () => ({
 }));
 
 describe("DraftPage", () => {
+  it("offers Retry after a load failure and opens the draft without exposing raw details", async () => {
+    const failure = Object.assign(new Error('HTTP 503: {"upstream":"offline"}'), {
+      status: 503,
+      detail: { upstream: "offline" },
+    }) as ApiError;
+    vi.mocked(getDraft).mockRejectedValueOnce(failure);
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/abc123"]}>
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The service is unavailable");
+    const details = screen.getByText("Details").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toHaveTextContent("HTTP 503");
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText(/All drafts/i)).toBeInTheDocument();
+    expect(getDraft).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers Sign in for an expired session without navigating automatically", async () => {
+    vi.mocked(getDraft).mockRejectedValueOnce(
+      Object.assign(new Error("session_revoked"), {
+        status: 401,
+        code: "session_revoked",
+        detail: "session_revoked",
+      }) as ApiError,
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/abc123"]}>
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sign in again");
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    expect(window.location.pathname).not.toBe("/login");
+  });
+
+  it("keeps edited workspace content after a failed save and retries the same draft", async () => {
+    vi.mocked(getDraft).mockResolvedValueOnce({
+      id: "abc123",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      title: "Saved locally",
+      stage: "outline",
+      idea: {
+        topic: "Saved locally",
+        pack_slug: "dan",
+        provider: "anthropic",
+        model: "claude-3-5-sonnet",
+        target_words: 1500,
+      },
+      outline: {
+        opening_hook: "Original opening",
+        sections: [{ id: "s1", title: "First", brief: "A brief" }],
+        estimated_words: 1500,
+      },
+      sections: [],
+      tags: [],
+      hero_image_key: null,
+    });
+    vi.mocked(updateDraft).mockRejectedValueOnce(
+      Object.assign(new Error("raw database response"), { status: 503 }) as ApiError,
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/abc123"]}>
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const opening = await screen.findByLabelText("Opening hook");
+    fireEvent.change(opening, { target: { value: "My unsaved opening" } });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The service is unavailable");
+    expect(opening).toHaveValue("My unsaved opening");
+    const details = screen.getByText("Details").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toHaveTextContent("raw database response");
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(updateDraft).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(updateDraft).mock.calls[1]?.[1].outline?.opening_hook).toBe(
+      "My unsaved opening",
+    );
+  });
+
   it("renders the ResearchPanel once a draft loads at the research stage", async () => {
     render(
       <MemoryRouter initialEntries={["/drafts/abc123"]}>

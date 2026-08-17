@@ -1,8 +1,9 @@
 import { useState } from "react";
 
 import type { Draft, OutlineProposal, OutlineSection } from "../../api/drafts";
-import { HeadlineLab } from "./HeadlineLab";
+import { ErrorNotice } from "../ui/ErrorNotice";
 import { Icon } from "../ui/Icon";
+import { HeadlineLab } from "./HeadlineLab";
 
 function newSection(): OutlineSection {
   return {
@@ -30,7 +31,7 @@ export function OutlinePanel({
 }: OutlinePanelProps): JSX.Element {
   const outline = draft.outline ?? { opening_hook: "", sections: [], estimated_words: 0 };
   const [regenerating, setRegenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [labOpen, setLabOpen] = useState(false);
 
   const updateSection = (idx: number, patch: Partial<OutlineSection>): void => {
@@ -59,7 +60,7 @@ export function OutlinePanel({
     try {
       await onRegenerate();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e);
     } finally {
       setRegenerating(false);
     }
@@ -194,22 +195,17 @@ export function OutlinePanel({
         </div>
       </div>
 
-      {error && (
-        <p
-          className="text-sm px-3 py-2 rounded-nb-sm"
-          style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-        >
-          {error}
-        </p>
+      {Boolean(error) && (
+        <ErrorNotice
+          error={error}
+          operation="regenerating your outline"
+          onRetry={() => void handleRegenerate()}
+          onDismiss={() => setError(null)}
+        />
       )}
 
       <div className="flex items-center gap-3 pt-4 border-t border-rule">
-        <button
-          type="button"
-          onClick={handleRegenerate}
-          disabled={regenerating}
-          className="nb-btn"
-        >
+        <button type="button" onClick={handleRegenerate} disabled={regenerating} className="nb-btn">
           {regenerating ? "Regenerating…" : "Regenerate outline"}
         </button>
       </div>

@@ -18,6 +18,7 @@ vi.mock("../../src/api/providers", () => ({
   listModels: vi.fn().mockResolvedValue([]),
 }));
 
+import type { ApiError } from "../../src/api/client";
 import type { Draft } from "../../src/api/drafts";
 import { listModels } from "../../src/api/providers";
 import {
@@ -112,6 +113,20 @@ beforeEach(() => {
 });
 
 describe("DraftWorkspace next actions", () => {
+  it("offers Reload when a save conflicts with a newer draft", async () => {
+    renderWorkspace(
+      props(makeDraft("ready"), {
+        saveError: Object.assign(new Error("version mismatch"), {
+          status: 409,
+          code: "draft_conflict",
+        }) as ApiError,
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This changed somewhere else");
+    expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+  });
+
   it.each([
     ["failed", "Retry remaining sections"],
     ["empty", "Finish remaining sections"],
@@ -133,10 +148,10 @@ describe("DraftWorkspace next actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Retry remaining sections" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Your work is still here");
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Retry remaining sections" })).toBeEnabled(),
-    );
+    expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Retry remaining sections" }),
+    ).not.toBeInTheDocument();
     expect(await screen.findByText("Completed prose stays here.")).toBeInTheDocument();
   });
 
@@ -150,9 +165,8 @@ describe("DraftWorkspace next actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Compose draft" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Your work is still here");
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Compose draft" })).toBeEnabled(),
-    );
+    expect(screen.queryByRole("button", { name: "Compose draft" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
     expect(onExpandAll).toHaveBeenCalledOnce();
     expect(onExpandUnfilled).not.toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DraftNextAction as DraftNextActionModel } from "../../lib/draftNextAction";
 import { ErrorNotice } from "../ui/ErrorNotice";
@@ -26,7 +26,16 @@ export function NextDraftAction({
 }: NextDraftActionProps): JSX.Element {
   const inFlight = useRef(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<unknown>(null);
+  const [failure, setFailure] = useState<{
+    kind: DraftNextActionModel["kind"];
+    error: unknown;
+  } | null>(null);
+  const error = failure?.kind === action.kind ? failure.error : null;
+
+  useEffect(() => {
+    setFailure((current) => (current?.kind === action.kind ? current : null));
+  }, [action.kind]);
+
   const callbacks = {
     "create-outline": onCreateOutline,
     "compose-draft": onComposeDraft,
@@ -42,11 +51,11 @@ export function NextDraftAction({
     if (!callback) return;
     inFlight.current = true;
     setPending(true);
-    setError(null);
+    setFailure(null);
     try {
       await callback();
     } catch (nextError) {
-      setError(nextError);
+      setFailure({ kind: action.kind, error: nextError });
     } finally {
       inFlight.current = false;
       setPending(false);
@@ -94,14 +103,16 @@ export function NextDraftAction({
             )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void runAction()}
-          disabled={action.disabled || pending}
-          className="nb-btn nb-btn-primary nb-btn-sm mt-3 sm:mt-0 shrink-0"
-        >
-          {pending ? "Working…" : action.label}
-        </button>
+        {error === null && (
+          <button
+            type="button"
+            onClick={() => void runAction()}
+            disabled={action.disabled || pending}
+            className="nb-btn nb-btn-primary nb-btn-sm mt-3 sm:mt-0 shrink-0"
+          >
+            {pending ? "Working…" : action.label}
+          </button>
+        )}
       </div>
       {error !== null && (
         <div className="mt-3">
@@ -109,7 +120,7 @@ export function NextDraftAction({
             error={error}
             operation={operation}
             onRetry={() => void runAction()}
-            onDismiss={() => setError(null)}
+            onDismiss={() => setFailure(null)}
           />
         </div>
       )}

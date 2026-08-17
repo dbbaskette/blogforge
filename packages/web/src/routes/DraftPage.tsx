@@ -17,21 +17,31 @@ import {
   updateDraft,
 } from "../api/drafts";
 import { DraftWorkspace } from "../components/draft/DraftWorkspace";
+import { ErrorNotice } from "../components/ui/ErrorNotice";
 
 export function DraftPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<unknown>(null);
+  const [failedSave, setFailedSave] = useState<Draft | null>(null);
+
+  const loadDraft = useCallback(async (): Promise<void> => {
+    if (!id) return;
+    setError(null);
+    try {
+      setDraft(await getDraft(id));
+    } catch (nextError) {
+      setError(nextError);
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
-    getDraft(id)
-      .then(setDraft)
-      .catch((e: Error) => setError(e.message));
+    void loadDraft();
     // Resume-watching: if a compose/revise is in flight (e.g. after a page
     // reload), re-attach to its SSE stream so progress keeps streaming.
     getActiveJob(id)
@@ -39,24 +49,38 @@ export function DraftPage(): JSX.Element {
         if (job_id) setJobId(job_id);
       })
       .catch(() => {});
-  }, [id]);
+  }, [id, loadDraft]);
 
-  const onChange = useCallback(
-    async (next: Draft) => {
-      setDraft(next);
+  const saveDraft = useCallback(
+    async (next: Draft): Promise<void> => {
       if (!id) return;
       setSaving(true);
       setSaveError(null);
       try {
         await updateDraft(id, next);
-      } catch (e) {
-        setSaveError(e instanceof Error ? e.message : String(e));
+        setFailedSave(null);
+      } catch (nextError) {
+        setSaveError(nextError);
+        setFailedSave(next);
       } finally {
         setSaving(false);
       }
     },
     [id],
   );
+
+  const onChange = useCallback(
+    async (next: Draft) => {
+      setDraft(next);
+      await saveDraft(next);
+    },
+    [saveDraft],
+  );
+
+  const retrySave = useCallback(async (): Promise<void> => {
+    if (!failedSave) return;
+    await saveDraft(failedSave);
+  }, [failedSave, saveDraft]);
 
   const onGenerateOutline = useCallback(async () => {
     if (!id) return;
@@ -145,13 +169,7 @@ export function DraftPage(): JSX.Element {
   if (error)
     return (
       <div className="max-w-3xl mx-auto px-6 py-10">
-        <div
-          className="px-4 py-3 rounded-nb"
-          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wider">Error</p>
-          <p className="text-sm mt-1">{error}</p>
-        </div>
+        <ErrorNotice error={error} operation="loading your draft" onRetry={loadDraft} />
       </div>
     );
   if (!draft) return <p className="text-center text-muted text-sm py-16">Loading…</p>;
@@ -162,6 +180,8 @@ export function DraftPage(): JSX.Element {
       jobId={jobId}
       saving={saving}
       saveError={saveError}
+      onRetrySave={retrySave}
+      onDismissSaveError={() => setSaveError(null)}
       onChange={onChange}
       onGenerateOutline={onGenerateOutline}
       onExpandAll={onExpandAll}

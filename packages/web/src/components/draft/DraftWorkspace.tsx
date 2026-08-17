@@ -7,6 +7,7 @@ import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { deriveNextDraftAction } from "../../lib/draftNextAction";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
+import { ErrorNotice } from "../ui/ErrorNotice";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { HeroImage } from "./HeroImage";
 import { NextDraftAction } from "./NextDraftAction";
@@ -52,7 +53,9 @@ export interface DraftWorkspaceProps {
   draft: Draft;
   jobId: string | null;
   saving: boolean;
-  saveError: string | null;
+  saveError: unknown;
+  onRetrySave?: () => Promise<void>;
+  onDismissSaveError?: () => void;
   onChange: (next: Draft) => Promise<void>;
   onGenerateOutline: () => Promise<void>;
   onExpandAll: () => Promise<void>;
@@ -71,6 +74,8 @@ export function DraftWorkspace({
   jobId,
   saving,
   saveError,
+  onRetrySave,
+  onDismissSaveError,
   onChange,
   onGenerateOutline,
   onExpandAll,
@@ -103,7 +108,7 @@ export function DraftWorkspace({
   }, []);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
-  const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
+  const [jobError, setJobError] = useState<unknown>(null);
   // True from the instant Compose fires until the job completes/errors —
   // independent of generatingIds, which stays empty during the latency
   // window before the first SSE section:start event arrives.
@@ -148,9 +153,14 @@ export function DraftWorkspace({
         setComposingWholeDraft(false);
         onJobComplete();
       },
-      onError: (_code, message, hint) => {
+      onError: (code, message, hint) => {
         setGeneratingIds(new Set());
-        setJobError({ message, hint });
+        setJobError(
+          Object.assign(new Error(message), {
+            code,
+            detail: hint ? { hint } : undefined,
+          }),
+        );
         setJobActive(false);
         setLiveSectionId(null);
         setLiveText("");
@@ -416,6 +426,7 @@ export function DraftWorkspace({
   // on — not only on the Draft tab. (Resuming a draft on its outline stage, or
   // flipping back to Outline, used to make every tool disappear.)
   const showFooter = shouldShowDraftTools(draft.stage, draft.sections);
+  const currentSaveError = saveError ?? titleSave.error;
 
   return (
     <div className="max-w-6xl mx-auto px-4 lg:px-8 py-8 grid lg:grid-cols-[220px_minmax(0,1fr)] gap-8">
@@ -450,8 +461,8 @@ export function DraftWorkspace({
                 />
                 Saving…
               </>
-            ) : saveError || titleSave.error ? (
-              <span className="text-rose-ink">Save error: {saveError ?? titleSave.error}</span>
+            ) : currentSaveError !== null ? (
+              <span className="text-rose-ink">Changes not saved</span>
             ) : (
               <>
                 <span aria-hidden className="inline-block w-2 h-2 rounded-full bg-leaf" />
@@ -460,6 +471,17 @@ export function DraftWorkspace({
             )}
           </span>
         </div>
+
+        {currentSaveError !== null && (
+          <div className="mb-5">
+            <ErrorNotice
+              error={currentSaveError}
+              operation="saving your draft"
+              onRetry={onRetrySave ? () => void onRetrySave() : undefined}
+              onDismiss={onDismissSaveError}
+            />
+          </div>
+        )}
 
         <StageNav draft={draft} onJump={onJumpStage} />
 

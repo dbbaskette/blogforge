@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ApiError } from "../../src/api/client";
 import type { Draft } from "../../src/api/drafts";
 import { SectionsPanel } from "../../src/components/draft/SectionsPanel";
 
@@ -62,18 +63,30 @@ describe("SectionsPanel", () => {
     expect(screen.queryByRole("button", { name: /compose draft/i })).not.toBeInTheDocument();
   });
 
-  it("keeps generation failure context without a duplicate primary retry", () => {
+  it("keeps completed sections and links Settings after a provider generation failure", () => {
+    const providerError = Object.assign(new Error("Provider stopped responding"), {
+      status: 502,
+      code: "provider_rejected_request",
+      detail: { upstream: "rejected" },
+    }) as ApiError;
     render(
       <SectionsPanel
         {...baseProps}
         draft={makeDraft()}
         unfilledCount={1}
-        jobError={{ message: "Provider stopped responding" }}
+        jobError={providerError}
       />,
     );
 
-    expect(screen.getByText(/generation failed/i)).toBeInTheDocument();
-    expect(screen.getByText(/provider stopped responding/i)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Check your AI provider");
+    expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
+    const details = screen.getByText("Details").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toHaveTextContent("Provider stopped responding");
+    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
     expect(screen.queryByRole("button", { name: /compose remaining/i })).not.toBeInTheDocument();
   });
 
@@ -104,5 +117,54 @@ describe("SectionsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /revise 1 section/i }));
 
     await waitFor(() => expect(onReviseDraft).toHaveBeenCalledWith("smooth the transitions"));
+  });
+
+  it("keeps completed sections and retries a failed whole-draft revision", async () => {
+    const onReviseDraft = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("gateway payload"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    render(<SectionsPanel {...baseProps} draft={makeDraft()} onReviseDraft={onReviseDraft} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /revise whole draft/i }));
+    fireEvent.change(screen.getByLabelText(/revise the whole draft/i), {
+      target: { value: "smooth the transitions" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /revise 1 section/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The service is unavailable");
+    expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReviseDraft).toHaveBeenCalledTimes(2));
+    expect(onReviseDraft).toHaveBeenLastCalledWith("smooth the transitions");
+  });
+
+  it("rolls back and retries a failed section reorder", async () => {
+    const draft = makeDraft();
+    draft.sections.push({
+      id: "s2",
+      title: "Second Section",
+      brief: "",
+      content_md: "The second section prose.",
+      status: "ready",
+      last_generated_at: null,
+      last_error: null,
+      word_count: 4,
+    });
+    const onReorder = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("database response"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    render(<SectionsPanel {...baseProps} draft={draft} onReorder={onReorder} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move section down" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The service is unavailable");
+    expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent("First Section");
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReorder).toHaveBeenCalledTimes(2));
+    expect(onReorder).toHaveBeenLastCalledWith(["s2", "s1"]);
   });
 });

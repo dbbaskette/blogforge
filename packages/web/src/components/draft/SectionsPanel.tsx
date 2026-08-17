@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Draft, Section } from "../../api/drafts";
+import { ErrorNotice } from "../ui/ErrorNotice";
 import { DraftReadView } from "./DraftReadView";
 import { SectionCard } from "./SectionCard";
 
 interface SectionsPanelProps {
   draft: Draft;
   generatingIds: Set<string>;
-  jobError: { message: string; hint?: string } | null;
+  jobError: unknown;
   onDismissJobError: () => void;
   unfilledCount: number;
   jobRunning: boolean;
@@ -56,11 +57,12 @@ export function SectionsPanel({
   const [reviseOpen, setReviseOpen] = useState(false);
   const [reviseNote, setReviseNote] = useState("");
   const [revising, setRevising] = useState(false);
-  const [reviseError, setReviseError] = useState<string | null>(null);
+  const [reviseError, setReviseError] = useState<unknown>(null);
   // Optimistic section order, applied immediately on reorder and reconciled
   // when the server-backed `draft` prop updates. `null` = use the server order.
   const [optimisticSections, setOptimisticSections] = useState<Section[] | null>(null);
-  const [reorderError, setReorderError] = useState<string | null>(null);
+  const [reorderError, setReorderError] = useState<unknown>(null);
+  const [reorderRetry, setReorderRetry] = useState<{ idx: number; dir: -1 | 1 } | null>(null);
   // Reset the optimistic override whenever the server order changes so we never
   // show stale local state once the parent re-renders with fresh sections.
   const serverOrderKey = draft.sections.map((s) => s.id).join(",");
@@ -93,10 +95,12 @@ export function SectionsPanel({
         await onReorder(next.map((s) => s.id));
         // Success: drop the override; the parent prop carries the server truth.
         setOptimisticSections(null);
+        setReorderRetry(null);
       } catch (e) {
         // Reject: roll back to the server order and surface the failure.
         setOptimisticSections(null);
-        setReorderError(e instanceof Error ? e.message : String(e));
+        setReorderError(e);
+        setReorderRetry({ idx, dir });
       }
     },
     [onReorder],
@@ -116,7 +120,14 @@ export function SectionsPanel({
         onMoveUp: () => moveSection(i, -1),
         onMoveDown: () => moveSection(i, 1),
       })),
-    [sections, pendingTextsForSection, onSectionSave, onRegenerateSection, onRevertSection, moveSection],
+    [
+      sections,
+      pendingTextsForSection,
+      onSectionSave,
+      onRegenerateSection,
+      onRevertSection,
+      moveSection,
+    ],
   );
 
   const total = sections.length;
@@ -140,7 +151,7 @@ export function SectionsPanel({
       setReviseOpen(false);
       setReviseNote("");
     } catch (e) {
-      setReviseError(e instanceof Error ? e.message : String(e));
+      setReviseError(e);
     } finally {
       setRevising(false);
     }
@@ -201,8 +212,9 @@ export function SectionsPanel({
             Revise the whole draft
           </label>
           <p className="text-xs text-muted mb-2">
-            One instruction, applied across every written section with the full draft as context —
-            e.g. “smooth the transitions”, “tighten throughout”, “make the tone more casual”.
+            One instruction, applied across every written section with the full draft as context.
+            For example: “smooth the transitions”, “tighten throughout”, or “make the tone more
+            casual”.
           </p>
           <textarea
             id="revise-note"
@@ -212,7 +224,16 @@ export function SectionsPanel({
             placeholder="How should I revise the whole piece?"
             className="w-full bg-canvas border border-rule rounded-nb-sm px-3 py-2 text-sm text-ink placeholder:text-muted-2 focus:outline-none focus:border-cobalt-300 resize-y"
           />
-          {reviseError && <p className="mt-2 text-xs text-rose-ink">{reviseError}</p>}
+          {Boolean(reviseError) && (
+            <div className="mt-3">
+              <ErrorNotice
+                error={reviseError}
+                operation="revising your draft"
+                onRetry={() => void submitRevise()}
+                onDismiss={() => setReviseError(null)}
+              />
+            </div>
+          )}
           <div className="mt-3 flex items-center justify-end gap-2">
             <button
               type="button"
@@ -315,45 +336,31 @@ export function SectionsPanel({
         </div>
       )}
 
-      {jobError && (
-        <div
-          className="px-4 py-3 rounded-nb"
-          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wider">Generation failed</p>
-          <p className="text-sm mt-1">
-            {writtenCount > 0
-              ? `Composed ${writtenCount} of ${total} section${total === 1 ? "" : "s"}, then failed: ${jobError.message}`
-              : jobError.message}
-          </p>
-          {jobError.hint && <p className="text-xs mt-1 opacity-80">{jobError.hint}</p>}
-          <div className="mt-2 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onDismissJobError}
-              className="text-xs font-medium underline underline-offset-2 hover:no-underline"
-            >
-              dismiss
-            </button>
-          </div>
+      {Boolean(jobError) && (
+        <div className="space-y-2">
+          {writtenCount > 0 && (
+            <p className="text-sm text-ink-2">
+              Completed {writtenCount} of {total} section{total === 1 ? "" : "s"} before generation
+              stopped.
+            </p>
+          )}
+          <ErrorNotice
+            error={jobError}
+            operation="generating your draft"
+            onDismiss={onDismissJobError}
+          />
         </div>
       )}
 
-      {reorderError && (
-        <div
-          className="px-4 py-3 rounded-nb"
-          style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-wider">Reorder failed</p>
-          <p className="text-sm mt-1">{reorderError}</p>
-          <button
-            type="button"
-            onClick={() => setReorderError(null)}
-            className="mt-2 text-xs font-medium underline underline-offset-2 hover:no-underline"
-          >
-            dismiss
-          </button>
-        </div>
+      {Boolean(reorderError) && (
+        <ErrorNotice
+          error={reorderError}
+          operation="reordering your sections"
+          onRetry={
+            reorderRetry ? () => void moveSection(reorderRetry.idx, reorderRetry.dir) : undefined
+          }
+          onDismiss={() => setReorderError(null)}
+        />
       )}
 
       {sections.length === 0 && !composingWholeDraft && (

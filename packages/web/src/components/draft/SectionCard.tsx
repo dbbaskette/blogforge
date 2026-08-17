@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 
 import type { Section } from "../../api/drafts";
+import { ErrorNotice } from "../ui/ErrorNotice";
 import { Icon } from "../ui/Icon";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { MarkdownEditor } from "./MarkdownEditor";
@@ -100,7 +101,7 @@ export const SectionCard = memo(function SectionCard({
 
   const [open, setOpen] = useState(initialOpen);
   const [regenerating, setRegenerating] = useState(false);
-  const [regenError, setRegenError] = useState<string | null>(null);
+  const [regenError, setRegenError] = useState<unknown>(null);
   const [note, setNote] = useState("");
   const [showHistory, setShowHistory] = useState(false);
 
@@ -111,7 +112,7 @@ export const SectionCard = memo(function SectionCard({
       await onRegenerate(note.trim() || undefined);
       setNote("");
     } catch (e) {
-      setRegenError(e instanceof Error ? e.message : String(e));
+      setRegenError(e);
     } finally {
       setRegenerating(false);
     }
@@ -192,10 +193,7 @@ export const SectionCard = memo(function SectionCard({
       </div>
 
       {open && (
-        <div
-          id={`section-body-${section.id}`}
-          className="px-5 pb-5 pt-1 border-t border-rule"
-        >
+        <div id={`section-body-${section.id}`} className="px-5 pb-5 pt-1 border-t border-rule">
           {section.brief && (
             <p className="font-serif italic text-[14px] text-muted px-3 py-2 mt-3 mb-4 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200">
               {section.brief}
@@ -203,14 +201,11 @@ export const SectionCard = memo(function SectionCard({
           )}
 
           {isFailed && section.last_error && (
-            <div
-              className="mb-4 px-3 py-2.5 rounded-nb-sm text-sm leading-snug"
-              style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-wider mb-0.5">
-                Last attempt failed
-              </p>
-              {section.last_error}
+            <div className="mb-4">
+              <ErrorNotice
+                error={new Error(section.last_error)}
+                operation="composing this section"
+              />
             </div>
           )}
 
@@ -260,13 +255,15 @@ export const SectionCard = memo(function SectionCard({
             </div>
           )}
 
-          {regenError && (
-            <p
-              className="mt-3 text-xs px-3 py-2 rounded-nb-sm"
-              style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-            >
-              {regenError}
-            </p>
+          {Boolean(regenError) && (
+            <div className="mt-3">
+              <ErrorNotice
+                error={regenError}
+                operation="regenerating this section"
+                onRetry={() => void handleRegenerate()}
+                onDismiss={() => setRegenError(null)}
+              />
+            </div>
           )}
 
           {section.content_md.trim() && !effectiveGenerating && (

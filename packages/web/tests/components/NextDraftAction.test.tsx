@@ -68,7 +68,7 @@ describe("NextDraftAction", () => {
 
   it("catches a rejected action, prevents double clicks, and offers recovery", async () => {
     const onComposeDraft = vi.fn().mockRejectedValue(new Error("Request failed before streaming"));
-    render(
+    const { container } = render(
       <NextDraftAction
         action={{
           kind: "compose-draft",
@@ -87,7 +87,37 @@ describe("NextDraftAction", () => {
     expect(onComposeDraft).toHaveBeenCalledOnce();
     expect(compose).toBeDisabled();
     expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong");
-    await waitFor(() => expect(compose).toBeEnabled());
+    expect(screen.queryByRole("button", { name: "Compose draft" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(container.querySelectorAll(".nb-btn-primary")).toHaveLength(1);
+  });
+
+  it("clears a failed action when the workspace advances to a different action kind", async () => {
+    const onCreateOutline = vi.fn().mockRejectedValue(new Error("Could not create outline"));
+    const { rerender } = render(
+      <NextDraftAction action={createOutline} onCreateOutline={onCreateOutline} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create outline" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+    rerender(
+      <NextDraftAction
+        action={{
+          kind: "compose-draft",
+          label: "Compose draft",
+          copy: "The outline is ready for prose.",
+          disabled: false,
+        }}
+        onComposeDraft={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Compose draft" })).toBeInTheDocument();
+
+    rerender(<NextDraftAction action={createOutline} onCreateOutline={vi.fn()} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create outline" })).toBeInTheDocument();
   });
 });
