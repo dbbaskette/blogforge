@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiError } from "../../src/api/client";
-import { expandSections, getDraft, updateDraft } from "../../src/api/drafts";
+import { type Draft, expandSections, getDraft, updateDraft } from "../../src/api/drafts";
 import { DraftPage } from "../../src/routes/DraftPage";
 
 function deferred<T>(): {
@@ -18,6 +18,15 @@ function deferred<T>(): {
     reject = nextReject;
   });
   return { promise, resolve, reject };
+}
+
+function RouteSwitcher(): JSX.Element {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate("/drafts/draft-b")}>
+      Open draft B
+    </button>
+  );
 }
 
 vi.mock("../../src/hooks/useMe", () => ({
@@ -281,6 +290,97 @@ describe("DraftPage", () => {
 
     await waitFor(() => expect(updateDraft).toHaveBeenCalledTimes(2));
     expect(vi.mocked(updateDraft).mock.calls[1]?.[1]).toEqual(failedPayload);
+  });
+
+  it("discards draft A save state after navigating to draft B", async () => {
+    const draftA: Draft = {
+      id: "draft-a",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      title: "Draft A",
+      stage: "outline" as const,
+      idea: { topic: "Draft A", pack_slug: "dan", provider: "anthropic", model: "m" },
+      outline: {
+        opening_hook: "Draft A opening",
+        sections: [{ id: "s1", title: "First", brief: "Brief" }],
+        estimated_words: 500,
+      },
+      sections: [],
+      tags: [],
+      hero_image_key: null,
+    };
+    const draftB: Draft = {
+      ...structuredClone(draftA),
+      id: "draft-b",
+      title: "Draft B",
+      idea: { ...draftA.idea, topic: "Draft B" },
+      outline: {
+        opening_hook: "Draft B opening",
+        sections: [{ id: "s1", title: "First", brief: "Brief" }],
+        estimated_words: 500,
+      },
+    };
+    const saveA = deferred<unknown>();
+    vi.mocked(getDraft).mockReset();
+    vi.mocked(getDraft)
+      .mockResolvedValueOnce(draftA)
+      .mockResolvedValueOnce(draftB)
+      .mockResolvedValue({
+        id: "abc123",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        title: "My Test Draft",
+        stage: "research",
+        idea: {
+          topic: "My Test Draft",
+          pack_slug: "dan",
+          provider: "anthropic",
+          model: "claude-3-5-sonnet",
+          target_words: 1500,
+        },
+        outline: null,
+        sections: [],
+        tags: [],
+        hero_image_key: null,
+      });
+    vi.mocked(updateDraft).mockReset();
+    vi.mocked(updateDraft)
+      .mockImplementationOnce(() => saveA.promise as Promise<never>)
+      .mockRejectedValueOnce(Object.assign(new Error("draft B failure"), { status: 503 }))
+      .mockResolvedValueOnce(undefined as never);
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/draft-a"]}>
+        <RouteSwitcher />
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByLabelText("Opening hook"), {
+      target: { value: "Draft A unsaved edit" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open draft B" }));
+    const opening = await screen.findByDisplayValue("Draft B opening");
+
+    await act(async () =>
+      saveA.reject(Object.assign(new Error("late draft A failure"), { status: 503 })),
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(opening).toHaveValue("Draft B opening");
+
+    fireEvent.change(opening, { target: { value: "Draft B failed snapshot" } });
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(updateDraft).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(updateDraft).mock.calls[0]?.[0]).toBe("draft-a");
+    expect(vi.mocked(updateDraft).mock.calls[1]?.[0]).toBe("draft-b");
+    expect(vi.mocked(updateDraft).mock.calls[2]?.[0]).toBe("draft-b");
+    expect(vi.mocked(updateDraft).mock.calls[2]?.[1].outline?.opening_hook).toBe(
+      "Draft B failed snapshot",
+    );
   });
 
   it("renders the ResearchPanel once a draft loads at the research stage", async () => {

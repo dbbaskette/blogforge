@@ -130,16 +130,25 @@ async def _run_revise(
             await reg.fail(job_id, "draft_not_found", f"Draft {draft_id} gone")
             return
 
-        manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
-        provider = await build_provider_for(user_id, provider_name)
-        base_ref = await get_reference_context(draft.id, draft.references)
-
         # Document order; only sections that already hold prose.
         targets = [
             i
             for i, s in enumerate(draft.sections)
             if s.content_md.strip() and s.status in ("ready", "edited")
         ]
+        manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
+        try:
+            provider = await build_provider_for(user_id, provider_name)
+        except (ProviderMissingKey, ProviderError) as e:
+            persisted_error = encode_section_error(e.code, e.message, e.hint)
+            for idx in targets:
+                draft.sections[idx].status = "failed"
+                draft.sections[idx].last_error = persisted_error
+            await store.update(draft.id, draft, user_id=user_id)
+            await reg.fail(job_id, e.code, e.message, e.hint)
+            return
+        base_ref = await get_reference_context(draft.id, draft.references)
+
         section_errors: list[tuple[str, str, str | None]] = []
         revised = 0
 

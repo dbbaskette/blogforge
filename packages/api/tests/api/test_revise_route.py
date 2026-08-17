@@ -105,46 +105,48 @@ async def test_revise_snapshots_prior_prose(revise_client) -> None:
 
 
 async def test_revise_persists_provider_recovery_metadata(revise_client, monkeypatch) -> None:
-    async def fail_stream(*args, **kwargs):
+    async def fail_provider_resolution(*args, **kwargs):
         raise ProviderMissingKey("anthropic")
-        yield
 
-    monkeypatch.setattr("blogforge.api.revise.stream_section", fail_stream)
+    monkeypatch.setattr("blogforge.api.revise.build_provider_for", fail_provider_resolution)
     did = _seed_written_draft(revise_client)
 
     response = revise_client.post(
         f"/api/drafts/{did}/revise", json={"instruction": "tighten throughout"}
     )
-    _drain(revise_client, response.json()["job_id"])
+    body = _drain(revise_client, response.json()["job_id"])
 
     final = revise_client.get(f"/api/drafts/{did}").json()
     persisted = json.loads(final["sections"][0]["last_error"])
+    assert all(s["content_md"] == "Original prose for the section." for s in final["sections"])
     assert persisted["version"] == 1
     assert persisted["code"] == "provider_missing_key"
     assert persisted["message"].startswith("No API key configured")
+    assert '"code":"provider_missing_key"' in body
 
 
 async def test_section_regenerate_persists_provider_recovery_metadata(
     revise_client, monkeypatch
 ) -> None:
-    async def fail_stream(*args, **kwargs):
+    async def fail_provider_resolution(*args, **kwargs):
         raise ProviderMissingKey("anthropic")
-        yield
 
-    monkeypatch.setattr("blogforge.api.section.stream_section", fail_stream)
+    monkeypatch.setattr("blogforge.api.section.build_provider_for", fail_provider_resolution)
     did = _seed_written_draft(revise_client)
 
     response = revise_client.post(
         f"/api/drafts/{did}/sections/s1/regenerate",
         json={"instruction": "tighten this section"},
     )
-    _drain(revise_client, response.json()["job_id"])
+    body = _drain(revise_client, response.json()["job_id"])
 
     final = revise_client.get(f"/api/drafts/{did}").json()
     persisted = json.loads(final["sections"][0]["last_error"])
+    assert final["sections"][0]["content_md"] == "Original prose for the section."
     assert persisted["version"] == 1
     assert persisted["code"] == "provider_missing_key"
     assert persisted["hint"] == "Add the key in Settings."
+    assert '"code":"provider_missing_key"' in body
 
 
 async def test_revise_nothing_written_409(revise_client) -> None:

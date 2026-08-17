@@ -254,7 +254,14 @@ async def _run_regenerate(
             return
 
         manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
-        provider = await build_provider_for(user_id, provider_name)
+        try:
+            provider = await build_provider_for(user_id, provider_name)
+        except (ProviderMissingKey, ProviderError) as e:
+            section.status = "failed"
+            section.last_error = encode_section_error(e.code, e.message, e.hint)
+            await store.update(draft.id, draft, user_id=user_id)
+            await reg.fail(job_id, e.code, e.message, e.hint)
+            return
 
         # Snapshot the prior content before it's overwritten so the author
         # can compare against — or revert to — the pre-regeneration version.

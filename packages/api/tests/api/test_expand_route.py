@@ -100,22 +100,33 @@ async def test_expand_returns_job_and_runs_sections(expand_client) -> None:
 
 
 async def test_expand_persists_provider_recovery_metadata(expand_client, monkeypatch) -> None:
-    async def fail_generation(*args, **kwargs):
+    async def fail_provider_resolution(*args, **kwargs):
         raise ProviderMissingKey("anthropic")
 
-    monkeypatch.setattr("blogforge.api.expand.generate_document", fail_generation)
+    monkeypatch.setattr("blogforge.api.expand.build_provider_for", fail_provider_resolution)
     did = _seed_outlined_draft(expand_client)
+    seeded = expand_client.get(f"/api/drafts/{did}").json()
+    seeded["stage"] = "sections"
+    seeded["sections"][0].update(
+        content_md="Completed prose stays intact.\n",
+        status="ready",
+        word_count=4,
+    )
+    assert expand_client.put(f"/api/drafts/{did}", json=seeded).status_code == 200
 
-    response = expand_client.post(f"/api/drafts/{did}/expand")
+    response = expand_client.post(f"/api/drafts/{did}/expand?remaining_only=true")
     job_id = response.json()["job_id"]
     with expand_client.stream("GET", f"/api/jobs/{job_id}/events") as events:
-        b"".join(events.iter_bytes())
+        body = b"".join(events.iter_bytes()).decode()
 
     final = expand_client.get(f"/api/drafts/{did}").json()
-    persisted = json.loads(final["sections"][0]["last_error"])
+    assert final["sections"][0]["content_md"] == "Completed prose stays intact.\n"
+    assert final["sections"][0]["status"] == "ready"
+    persisted = json.loads(final["sections"][1]["last_error"])
     assert persisted["version"] == 1
     assert persisted["code"] == "provider_missing_key"
     assert persisted["hint"] == "Add the key in Settings."
+    assert '"code":"provider_missing_key"' in body
 
 
 async def test_expand_single_pass_composes_all_ignoring_limit(expand_client) -> None:

@@ -162,8 +162,20 @@ async def _run_expand(
             )
             return
 
+        async def _fail_targets(code: str, message: str, hint: str | None = None) -> None:
+            persisted_error = encode_section_error(code, message, hint)
+            for s in targets:
+                s.status = "failed"
+                s.last_error = persisted_error
+            await store.update(draft.id, draft, user_id=user_id)
+
         manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
-        provider = await build_provider_for(user_id, provider_name)
+        try:
+            provider = await build_provider_for(user_id, provider_name)
+        except (ProviderMissingKey, ProviderError) as e:
+            await _fail_targets(e.code, e.message, e.hint)
+            await reg.fail(job_id, e.code, e.message, e.hint)
+            return
         # Build reference context once per expand job (every section in this
         # draft sees the same materials), not per-section.
         reference_context = await get_reference_context(draft.id, draft.references)
@@ -174,13 +186,6 @@ async def _run_expand(
         bg = await build_background_context(user_id)
         if bg:
             reference_context = f"{bg}\n\n{reference_context}" if reference_context else bg
-
-        async def _fail_targets(code: str, message: str, hint: str | None = None) -> None:
-            persisted_error = encode_section_error(code, message, hint)
-            for s in targets:
-                s.status = "failed"
-                s.last_error = persisted_error
-            await store.update(draft.id, draft, user_id=user_id)
 
         # Single-pass: compose the ENTIRE post in one LLM call from the outline.
         # `limit` is accepted for API compatibility but ignored — single-pass

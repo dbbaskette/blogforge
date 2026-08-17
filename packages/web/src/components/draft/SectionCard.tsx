@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import type { ApiError } from "../../api/client";
 import type { Section } from "../../api/drafts";
@@ -136,6 +136,10 @@ export const SectionCard = memo(function SectionCard({
   const persistedMetadata = persistedError as Partial<ApiError> | null;
   const persistedCanRetry =
     typeof persistedMetadata?.status === "number" || typeof persistedMetadata?.code === "string";
+
+  useEffect(() => {
+    if (effectiveGenerating || !section.last_error) setDismissedPersistedError(null);
+  }, [effectiveGenerating, section.last_error]);
 
   return (
     <article

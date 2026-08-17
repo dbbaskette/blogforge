@@ -92,3 +92,43 @@ Complete and self-reviewed.
 
 - The full frontend suite still emits its existing React Router future-flag, React `act(...)`, and jsdom navigation warnings.
 - Repository-wide Biome and Ruff remain red on unrelated baseline debt; every changed file passes the corresponding focused check.
+
+## Fix round 2: cross-draft ownership and provider setup failures
+
+### Changes
+
+- Scoped save completion ownership to both a monotonic request sequence and the active draft ID. Route changes synchronously invalidate outstanding saves and clear draft-specific saving, error, and Retry state. A Retry can only replay the immutable failed snapshot against the draft that owns it.
+- Applied the same route ownership check to draft loading and active-job discovery so late draft A work cannot attach to draft B.
+- Moved provider construction inside typed provider-error handling for expand, whole-draft revise, and single-section regeneration. A real `ProviderMissingKey` from `build_provider_for` now persists the structured envelope on the affected sections, fails the job with the same metadata, and preserves completed prose.
+- Reset a dismissed persisted section error when generation starts or the server clears the error. If the retry fails with byte-for-byte identical metadata, the new failure is visible again while the prior failure remains hidden during the active retry.
+
+### Test-first evidence
+
+1. The new route-change test failed because a late draft A save rejection rendered recovery inside draft B. It also proves a later draft B failure retries only B's exact snapshot at B's endpoint.
+2. The realistic backend tests failed in expand, revise, and regeneration when `build_provider_for` raised `ProviderMissingKey`; no section envelope had been persisted before the fix.
+3. The repeated-error lifecycle test failed because the second identical persisted envelope remained dismissed after the generating transition.
+
+### Commands and results
+
+- `pnpm exec vitest run tests/routes/DraftPage.test.tsx tests/components/SectionCard.test.tsx tests/components/NextDraftAction.test.tsx tests/components/SectionsPanel.test.tsx tests/components/DraftWorkspace.nextAction.test.tsx`: 5 files passed, 46 tests passed.
+- `UV_CACHE_DIR=/tmp/blogforge-uv-cache uv run pytest packages/api/tests/api/test_expand_route.py packages/api/tests/api/test_revise_route.py packages/api/tests/api/test_section_save_route.py packages/api/tests/drafts/test_section_errors.py -q`: 17 tests passed.
+- `pnpm test`: 92 files passed, 484 tests passed.
+- `pnpm build`: TypeScript and Vite production build passed; the existing HeadlineLab chunk warning remains.
+- Focused `pnpm exec biome check` for all changed frontend source and test files: passed with no diagnostics.
+- Focused `uv run ruff check` for all changed backend source and test files: passed with no diagnostics.
+- `git diff --check`: passed.
+
+### Self-review
+
+- Confirmed a route transition invalidates a pending old save before effects run, and late load, save, and active-job outcomes cannot publish into the new draft.
+- Confirmed Retry requires the failed operation's draft ID to match the route and reuses its cloned snapshot.
+- Confirmed expand remaining-only leaves completed sections ready and unchanged while persisting the provider failure only on targets.
+- Confirmed revise and single-section regeneration retain existing content while persisting provider recovery metadata and emitting the same code through the job stream.
+- Confirmed the existing parser-driven SectionCard behavior maps a reopened `provider_missing_key` envelope to Settings without displaying encoded JSON.
+- Confirmed identical retried failures become visible after a real generation lifecycle, with the stale notice hidden while generation is active.
+- Confirmed the prior exact retry payload and late Next-action ownership tests remain green.
+
+### Fix-round 2 concerns
+
+- The full frontend suite still emits pre-existing React Router future-flag, React `act(...)`, and jsdom navigation warnings.
+- The successful Vite build retains the existing HeadlineLab static/dynamic import chunk warning.

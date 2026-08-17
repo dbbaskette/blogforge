@@ -19,6 +19,11 @@ import {
 import { DraftWorkspace } from "../components/draft/DraftWorkspace";
 import { ErrorNotice } from "../components/ui/ErrorNotice";
 
+interface FailedSave {
+  draftId: string;
+  snapshot: Draft;
+}
+
 export function DraftPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -27,27 +32,42 @@ export function DraftPage(): JSX.Element {
   const [jobId, setJobId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
-  const [failedSave, setFailedSave] = useState<Draft | null>(null);
+  const [failedSave, setFailedSave] = useState<FailedSave | null>(null);
   const saveSequence = useRef(0);
+  const activeDraftId = useRef(id);
+
+  if (activeDraftId.current !== id) {
+    activeDraftId.current = id;
+    saveSequence.current += 1;
+  }
 
   const loadDraft = useCallback(async (): Promise<void> => {
     if (!id) return;
+    const draftId = id;
     setError(null);
     try {
-      setDraft(await getDraft(id));
+      const loaded = await getDraft(draftId);
+      if (activeDraftId.current === draftId) setDraft(loaded);
     } catch (nextError) {
-      setError(nextError);
+      if (activeDraftId.current === draftId) setError(nextError);
     }
   }, [id]);
 
   useEffect(() => {
+    setDraft(null);
+    setError(null);
+    setJobId(null);
+    setSaving(false);
+    setSaveError(null);
+    setFailedSave(null);
     if (!id) return;
+    const draftId = id;
     void loadDraft();
     // Resume-watching: if a compose/revise is in flight (e.g. after a page
     // reload), re-attach to its SSE stream so progress keeps streaming.
-    getActiveJob(id)
+    getActiveJob(draftId)
       .then(({ job_id }) => {
-        if (job_id) setJobId(job_id);
+        if (job_id && activeDraftId.current === draftId) setJobId(job_id);
       })
       .catch(() => {});
   }, [id, loadDraft]);
@@ -55,20 +75,23 @@ export function DraftPage(): JSX.Element {
   const saveDraft = useCallback(
     async (next: Draft): Promise<void> => {
       if (!id) return;
+      const draftId = id;
       const sequence = ++saveSequence.current;
       const snapshot = structuredClone(next);
       setSaving(true);
       setSaveError(null);
       try {
-        await updateDraft(id, snapshot);
-        if (sequence !== saveSequence.current) return;
+        await updateDraft(draftId, snapshot);
+        if (sequence !== saveSequence.current || activeDraftId.current !== draftId) return;
         setFailedSave(null);
       } catch (nextError) {
-        if (sequence !== saveSequence.current) return;
+        if (sequence !== saveSequence.current || activeDraftId.current !== draftId) return;
         setSaveError(nextError);
-        setFailedSave(snapshot);
+        setFailedSave({ draftId, snapshot });
       } finally {
-        if (sequence === saveSequence.current) setSaving(false);
+        if (sequence === saveSequence.current && activeDraftId.current === draftId) {
+          setSaving(false);
+        }
       }
     },
     [id],
@@ -83,9 +106,9 @@ export function DraftPage(): JSX.Element {
   );
 
   const retrySave = useCallback(async (): Promise<void> => {
-    if (!failedSave) return;
-    await saveDraft(failedSave);
-  }, [failedSave, saveDraft]);
+    if (!id || !failedSave || failedSave.draftId !== id) return;
+    await saveDraft(failedSave.snapshot);
+  }, [failedSave, id, saveDraft]);
 
   const onGenerateOutline = useCallback(async () => {
     if (!id) return;

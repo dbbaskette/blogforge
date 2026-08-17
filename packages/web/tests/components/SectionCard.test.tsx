@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiError } from "../../src/api/client";
@@ -17,6 +17,14 @@ function makeSection(over: Partial<Section> = {}): Section {
     word_count: 0,
     ...over,
   };
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
 
 const noop = async (): Promise<void> => {};
@@ -169,6 +177,50 @@ describe("SectionCard", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+  });
+
+  it("shows an identical persisted failure again after a retry generation cycle", async () => {
+    const persisted = JSON.stringify({
+      version: 1,
+      code: "generation_interrupted",
+      message: "Generation was interrupted before it finished. Please retry.",
+    });
+    const retry = deferred();
+    const onRegenerate = vi.fn(() => retry.promise);
+    const { rerender } = render(
+      <SectionCard
+        {...baseProps}
+        section={makeSection({ status: "failed", last_error: persisted })}
+        isGenerating={false}
+        defaultOpen
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    rerender(
+      <SectionCard
+        {...baseProps}
+        section={makeSection({ status: "generating", last_error: null })}
+        isGenerating
+        defaultOpen
+        onRegenerate={onRegenerate}
+      />,
+    );
+    await act(async () => retry.resolve());
+    rerender(
+      <SectionCard
+        {...baseProps}
+        section={makeSection({ status: "failed", last_error: persisted })}
+        isGenerating={false}
+        defaultOpen
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
   it("lets the writer dismiss a generic persisted failure and continue editing", () => {
