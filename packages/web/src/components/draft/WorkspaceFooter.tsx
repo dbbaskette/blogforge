@@ -10,13 +10,8 @@ interface WorkspaceFooterProps {
   totalWords: number;
   draftedCount: number;
   sectionCount: number;
-  onLint: () => void;
+  onReview: () => void;
   onRepurpose: () => void;
-  onHeadlines: () => void;
-  onShape: () => void;
-  onGeo: () => void;
-  onHumanize: () => void;
-  onCheckup: () => void;
   /**
    * Optional hook fired when the reading preview opens. The footer owns the
    * preview's open/close state locally (DraftWorkspace can't host it), so this
@@ -97,13 +92,8 @@ export function WorkspaceFooter({
   totalWords,
   draftedCount,
   sectionCount,
-  onLint,
+  onReview,
   onRepurpose,
-  onHeadlines,
-  onShape,
-  onGeo,
-  onHumanize,
-  onCheckup,
   onPreview,
 }: WorkspaceFooterProps): JSX.Element {
   const draftId = draft.id;
@@ -160,34 +150,6 @@ export function WorkspaceFooter({
     }
   };
 
-  const improveItems: MenuItem[] = [
-    {
-      label: "🔎 Proofread & fact-check",
-      hint: "Voice-rule violations, repetition, and AI-tells",
-      onClick: onLint,
-    },
-    {
-      label: "✨ Shape assistant",
-      hint: "Claims worth verifying, sharper wordings, and where to expand",
-      onClick: onShape,
-    },
-    {
-      label: "🌐 GEO optimizer",
-      hint: "Score & optimize for AI answer engines",
-      onClick: onGeo,
-    },
-    {
-      label: "🫶 Humanize",
-      hint: "Make it read like a person",
-      onClick: onHumanize,
-    },
-    {
-      label: "✒️ Headlines & hooks",
-      hint: "Generate alternative titles and opening hooks",
-      onClick: onHeadlines,
-    },
-  ];
-
   const exportItems: MenuItem[] = [
     {
       label: "🐙 Publish to GitHub…",
@@ -224,7 +186,14 @@ export function WorkspaceFooter({
         </div>
         <div className="flex-1" />
 
-        <FooterMenu label="✨ Improve" items={improveItems} />
+        <button
+          type="button"
+          onClick={onReview}
+          className="nb-btn nb-btn-sm"
+          title="Review your draft and open the right improvement tool"
+        >
+          Review
+        </button>
         <FooterMenu label="Export" status={exportStatus} items={exportItems} />
         <button
           type="button"
@@ -233,14 +202,6 @@ export function WorkspaceFooter({
           title="See the finished post as a typeset, publish-ready article"
         >
           Preview
-        </button>
-        <button
-          type="button"
-          onClick={onCheckup}
-          className="nb-btn nb-btn-primary nb-btn-sm"
-          title="Run Review + GEO + Shape together and see a prioritized summary"
-        >
-          ✨ Checkup
         </button>
       </footer>
       {previewOpen && <ReadingPreview draft={draft} onClose={() => setPreviewOpen(false)} />}

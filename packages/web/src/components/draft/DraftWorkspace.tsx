@@ -28,7 +28,6 @@ const SectionsPanel = lazy(() =>
 // The review/improve overlays are on-demand — lazy-load them so their code
 // (and heavyweight deps) stays out of the initial chunk. Each opens from an
 // explicit click, so the fetch hides inside the open animation.
-const CheckupPanel = lazy(() => import("./CheckupPanel").then((m) => ({ default: m.CheckupPanel })));
 const HeadlineLab = lazy(() => import("./HeadlineLab").then((m) => ({ default: m.HeadlineLab })));
 const HumanizePanel = lazy(() =>
   import("./HumanizePanel").then((m) => ({ default: m.HumanizePanel })),
@@ -41,6 +40,9 @@ const RepurposePanel = lazy(() =>
   import("./RepurposePanel").then((m) => ({ default: m.RepurposePanel })),
 );
 const ShapePanel = lazy(() => import("./ShapePanel").then((m) => ({ default: m.ShapePanel })));
+const ReviewCenter = lazy(() =>
+  import("./ReviewCenter").then((m) => ({ default: m.ReviewCenter })),
+);
 
 const INLINE_AI_HINT_KEY = "bf.inlineai.hint.dismissed";
 
@@ -85,7 +87,7 @@ export function DraftWorkspace({
   const [shapeOpen, setShapeOpen] = useState(false);
   const [geoOpen, setGeoOpen] = useState(false);
   const [humanizeOpen, setHumanizeOpen] = useState(false);
-  const [checkupOpen, setCheckupOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   // Import lands here verbatim — no tool runs and nothing is edited until the
   // writer asks for it (Improve ▾ → Shape/GEO/Proofread). The shaping pass is
   // never auto-run on an imported draft.
@@ -354,6 +356,23 @@ export function DraftWorkspace({
     setTimeout(() => setTemplateMsg(null), 2800);
   }, [draft.id, draft.title]);
 
+  const scrollToReviewSection = useCallback((sectionId?: string): void => {
+    if (!sectionId) return;
+    const element = document.getElementById(
+      sectionId === "opening" ? "opening" : `section-${sectionId}`,
+    );
+    element?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const openReviewTool = useCallback(
+    (open: (value: boolean) => void, sectionId?: string): void => {
+      scrollToReviewSection(sectionId);
+      setReviewOpen(false);
+      open(true);
+    },
+    [scrollToReviewSection],
+  );
+
   // Show the review/improve/export bar whenever there's composed prose to work
   // on — not only on the Draft tab. (Resuming a draft on its outline stage, or
   // flipping back to Outline, used to make every tool disappear.)
@@ -559,13 +578,8 @@ export function DraftWorkspace({
           totalWords={totalWords}
           draftedCount={draftedCount}
           sectionCount={draft.sections.length}
-          onLint={() => setLintOpen(true)}
+          onReview={() => setReviewOpen(true)}
           onRepurpose={() => setRepurposeOpen(true)}
-          onHeadlines={() => setHeadlinesOpen(true)}
-          onShape={() => setShapeOpen(true)}
-          onGeo={() => setGeoOpen(true)}
-          onHumanize={() => setHumanizeOpen(true)}
-          onCheckup={() => setCheckupOpen(true)}
         />
       )}
 
@@ -601,26 +615,16 @@ export function DraftWorkspace({
           onClose={() => setHumanizeOpen(false)}
         />
       )}
-      {checkupOpen && (
-        <CheckupPanel
+      {reviewOpen && (
+        <ReviewCenter
           draft={draft}
-          onOpenReview={() => {
-            setCheckupOpen(false);
-            setLintOpen(true);
-          }}
-          onOpenGeo={() => {
-            setCheckupOpen(false);
-            setGeoOpen(true);
-          }}
-          onOpenShape={() => {
-            setCheckupOpen(false);
-            setShapeOpen(true);
-          }}
-          onOpenHumanize={() => {
-            setCheckupOpen(false);
-            setHumanizeOpen(true);
-          }}
-          onClose={() => setCheckupOpen(false)}
+          onOpenProofread={(sectionId) => openReviewTool(setLintOpen, sectionId)}
+          onOpenFactualSupport={(sectionId) => openReviewTool(setLintOpen, sectionId)}
+          onOpenShape={(sectionId) => openReviewTool(setShapeOpen, sectionId)}
+          onOpenHumanization={(sectionId) => openReviewTool(setHumanizeOpen, sectionId)}
+          onOpenGeo={(sectionId) => openReviewTool(setGeoOpen, sectionId)}
+          onOpenHeadlines={() => openReviewTool(setHeadlinesOpen)}
+          onClose={() => setReviewOpen(false)}
         />
       )}
       {repurposeOpen && (
