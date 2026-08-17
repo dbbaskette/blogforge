@@ -16,7 +16,6 @@ interface OutlinePanelProps {
   draft: Draft;
   onChange: (outline: OutlineProposal) => void;
   onApplyTitle: (title: string) => void;
-  onAdvance: () => Promise<void>;
   onRegenerate: () => Promise<void>;
   /** Optional right-rail block, typically a collapsible ReferencesList. */
   references?: React.ReactNode;
@@ -26,12 +25,10 @@ export function OutlinePanel({
   draft,
   onChange,
   onApplyTitle,
-  onAdvance,
   onRegenerate,
   references,
 }: OutlinePanelProps): JSX.Element {
   const outline = draft.outline ?? { opening_hook: "", sections: [], estimated_words: 0 };
-  const [advancing, setAdvancing] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [labOpen, setLabOpen] = useState(false);
@@ -54,18 +51,6 @@ export function OutlinePanel({
   };
   const addSection = (): void => {
     onChange({ ...outline, sections: [...outline.sections, newSection()] });
-  };
-
-  const handleAdvance = async (): Promise<void> => {
-    setAdvancing(true);
-    setError(null);
-    try {
-      await onAdvance();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAdvancing(false);
-    }
   };
 
   const handleRegenerate = async (): Promise<void> => {
@@ -222,19 +207,10 @@ export function OutlinePanel({
         <button
           type="button"
           onClick={handleRegenerate}
-          disabled={regenerating || advancing}
+          disabled={regenerating}
           className="nb-btn"
         >
           {regenerating ? "Regenerating…" : "Regenerate outline"}
-        </button>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={handleAdvance}
-          disabled={outline.sections.length === 0 || advancing || regenerating}
-          className="nb-btn nb-btn-primary"
-        >
-          {advancing ? "Starting…" : `Compose ${outline.sections.length} sections →`}
         </button>
       </div>
     </section>

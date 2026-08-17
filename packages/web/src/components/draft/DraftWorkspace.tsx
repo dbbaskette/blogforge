@@ -5,9 +5,11 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { deriveNextDraftAction } from "../../lib/draftNextAction";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { HeroImage } from "./HeroImage";
+import { NextDraftAction } from "./NextDraftAction";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
@@ -291,6 +293,21 @@ export function DraftWorkspace({
     return o.some((os, i) => norm(os.title) !== norm(draft.sections[i]?.title ?? ""));
   }, [draft.stage, draft.outline, draft.sections]);
   const jobRunning = jobActive || generatingIds.size > 0;
+  const nextAction = useMemo(
+    () =>
+      deriveNextDraftAction({
+        stage: draft.stage,
+        hasModel: (draft.idea.model?.trim().length ?? 0) > 0,
+        outlineCount: draft.outline?.sections.length ?? 0,
+        unwrittenCount: unfilledCount,
+        totalSections: draft.sections.length,
+        generationRunning:
+          jobRunning || composingWholeDraft || draft.sections.some((s) => s.status === "generating"),
+        generationFailed: Boolean(jobError) || draft.sections.some((s) => s.status === "failed"),
+        outlineDrift,
+      }),
+    [composingWholeDraft, draft, jobError, jobRunning, outlineDrift, unfilledCount],
+  );
 
   const handleGenerate = useCallback(async () => {
     setAdvancing(true);
@@ -317,9 +334,18 @@ export function DraftWorkspace({
   const handleExpandUnfilled = useCallback(async () => {
     setLiveSectionId(null);
     setLiveText("");
+    setJobError(null);
     setComposingWholeDraft(true);
     await onExpandUnfilled();
   }, [onExpandUnfilled]);
+
+  const focusSetup = useCallback((): void => {
+    const toggle = document.getElementById("draft-setup-toggle") as HTMLButtonElement | null;
+    if (!toggle) return;
+    toggle.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    if (toggle.getAttribute("aria-expanded") !== "true") toggle.click();
+    toggle.focus();
+  }, []);
 
   // Holistic revise touches many sections — clear any single-section live
   // buffer so tokens aren't misattributed to one card.
@@ -424,6 +450,17 @@ export function DraftWorkspace({
 
         <StageNav draft={draft} onJump={onJumpStage} />
 
+        <NextDraftAction
+          action={advancing ? { ...nextAction, disabled: true } : nextAction}
+          onCreateOutline={handleGenerate}
+          onComposeDraft={handleExpandAll}
+          onRetryRemaining={handleExpandUnfilled}
+          onFinishRemaining={handleExpandUnfilled}
+          onReviewOutline={() => onJumpStage("outline")}
+          onReviewDraft={() => setReviewOpen(true)}
+          onSetup={focusSetup}
+        />
+
         {outlineDrift && (
           <div className="mt-3 flex items-center gap-2 text-xs text-amber-ink bg-amber-soft border border-amber/30 rounded-nb-sm px-3 py-1.5 w-fit">
             <span aria-hidden>▵</span>
@@ -485,7 +522,6 @@ export function DraftWorkspace({
             draft={draft}
             onChange={handleOutlineChange}
             onApplyTitle={(title) => onChange({ ...draft, title })}
-            onAdvance={handleExpandAll}
             onRegenerate={handleGenerate}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
@@ -564,8 +600,6 @@ export function DraftWorkspace({
             onRevertSection={onRevertSection}
             onReviseDraft={handleReviseDraft}
             onReorder={onReorder}
-            onExpandUnfilled={handleExpandUnfilled}
-            onComposeRemaining={handleExpandUnfilled}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
         </Suspense>

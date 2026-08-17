@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/api/packs", () => ({
@@ -43,5 +43,21 @@ describe("SetupDisclosure", () => {
     await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("openai"));
     await waitFor(() => expect(screen.getByText(/No API key for openai/)).toBeInTheDocument());
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("exposes stable DOM targets that can reveal and focus Setup", async () => {
+    render(<SetupDisclosure draft={draft} onChange={vi.fn()} />);
+
+    const setup = document.getElementById("draft-setup");
+    const toggle = document.getElementById("draft-setup-toggle");
+    expect(setup).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle as HTMLElement);
+    (toggle as HTMLElement).focus();
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveFocus();
+    await waitFor(() => expect(screen.getByLabelText("Provider")).toHaveValue("openai"));
   });
 });

@@ -38,8 +38,9 @@ export function SetupDisclosure({
   };
 
   return (
-    <section className="nb-card overflow-hidden mb-5">
+    <section id="draft-setup" className="nb-card overflow-hidden mb-5">
       <button
+        id="draft-setup-toggle"
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-card-2 transition-colors"

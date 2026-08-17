@@ -37,7 +37,11 @@ const draft: Draft = {
   title: "Review routing",
   stage: "sections",
   idea: { topic: "Review routing", pack_slug: "dan", provider: "anthropic", model: "model" },
-  outline: { opening_hook: "", sections: [], estimated_words: 400 },
+  outline: {
+    opening_hook: "",
+    sections: [{ id: "s1", title: "First section", brief: "Explain the point" }],
+    estimated_words: 400,
+  },
   sections: [
     {
       id: "s1",
@@ -112,11 +116,42 @@ describe("DraftWorkspace Review routing", () => {
     vi.mocked(listReferences).mockResolvedValue([]);
   });
 
+  it("places the next action below the stage nav and opens Review Center from it", async () => {
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <DraftWorkspace
+          draft={draft}
+          jobId={null}
+          saving={false}
+          saveError={null}
+          onChange={vi.fn().mockResolvedValue(undefined)}
+          onGenerateOutline={vi.fn().mockResolvedValue(undefined)}
+          onExpandAll={vi.fn().mockResolvedValue(undefined)}
+          onExpandUnfilled={vi.fn().mockResolvedValue(undefined)}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onRegenerateSection={vi.fn().mockResolvedValue(undefined)}
+          onRevertSection={vi.fn().mockResolvedValue(undefined)}
+          onReviseDraft={vi.fn().mockResolvedValue(undefined)}
+          onJumpStage={vi.fn().mockResolvedValue(undefined)}
+          onReorder={vi.fn().mockResolvedValue(undefined)}
+          onJobComplete={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const stageNav = screen.getByRole("navigation", { name: "Writing stage" });
+    const next = screen.getByRole("region", { name: "NEXT" });
+    expect(stageNav.nextElementSibling).toBe(next);
+
+    fireEvent.click(screen.getByRole("button", { name: "Review draft" }));
+    expect(await screen.findByRole("dialog", { name: "Review Center" })).toBeInTheDocument();
+  });
+
   it("opens proofread from a section-aware review row, scrolls its section, and saves a fix", async () => {
     const onSectionSave = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <MemoryRouter>
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <DraftWorkspace
           draft={draft}
           jobId={null}

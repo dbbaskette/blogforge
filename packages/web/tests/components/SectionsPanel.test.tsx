@@ -42,8 +42,6 @@ const baseProps = {
   onRegenerateSection: noop,
   onRevertSection: noop,
   onReorder: noop,
-  onExpandUnfilled: noop,
-  onComposeRemaining: noop,
   onReviseDraft: noop,
 };
 
@@ -56,21 +54,27 @@ describe("SectionsPanel", () => {
     expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
   });
 
-  it("composes the whole draft in one pass", () => {
-    const onExpandUnfilled = vi.fn(async (): Promise<void> => {});
+  it("leaves draft progression to the workspace next action", () => {
+    render(
+      <SectionsPanel {...baseProps} draft={makeDraft()} unfilledCount={5} onReviseDraft={noop} />,
+    );
+    expect(screen.getByText(/5 sections unwritten/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /compose draft/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps generation failure context without a duplicate primary retry", () => {
     render(
       <SectionsPanel
         {...baseProps}
         draft={makeDraft()}
-        unfilledCount={5}
-        onExpandUnfilled={onExpandUnfilled}
-        onReviseDraft={noop}
+        unfilledCount={1}
+        jobError={{ message: "Provider stopped responding" }}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /compose draft/i }));
-    expect(onExpandUnfilled).toHaveBeenCalled();
-    // The incremental "draft next N" button is gone — single-pass is whole-doc.
-    expect(screen.queryByRole("button", { name: /draft next/i })).not.toBeInTheDocument();
+
+    expect(screen.getByText(/generation failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/provider stopped responding/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /compose remaining/i })).not.toBeInTheDocument();
   });
 
   it("shows one unified composing state (not per-section) during a single-pass compose", () => {

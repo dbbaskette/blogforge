@@ -51,6 +51,24 @@ const sampleOutline = {
 };
 
 describe("ResearchPanel", () => {
+  it("keeps conversational actions visually secondary", async () => {
+    const ide = await import("../../src/api/ideation");
+    (ide.listIdeation as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    render(<ResearchPanel draft={draft} onJobComplete={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument());
+
+    expect(screen.getByRole("button", { name: "Send" })).not.toHaveClass("nb-btn-primary");
+    expect(screen.getByRole("button", { name: /Accept this outline/i })).not.toHaveClass(
+      "nb-btn-primary",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Interview me" }));
+    expect(screen.getByRole("button", { name: /Start the interview/i })).not.toHaveClass(
+      "nb-btn-primary",
+    );
+  });
+
   it("renders chat history and the seed prompt input", async () => {
     const ide = await import("../../src/api/ideation");
     (ide.listIdeation as ReturnType<typeof vi.fn>).mockResolvedValue([

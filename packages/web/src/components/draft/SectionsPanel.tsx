@@ -27,11 +27,6 @@ interface SectionsPanelProps {
   onRegenerateSection: (sectionId: string, instruction?: string) => Promise<void>;
   onRevertSection: (sectionId: string, versionId: string) => Promise<void>;
   onReorder: (section_ids: string[]) => Promise<void>;
-  /** Compose the whole post in a single pass from the outline. */
-  onExpandUnfilled: () => Promise<void>;
-  /** Fill only the still-unwritten sections — used to recover from a partial
-   * compose failure without re-composing (and re-paying for) the whole draft. */
-  onComposeRemaining: () => Promise<void>;
   /** Holistic, whole-draft revision against a single author instruction. */
   onReviseDraft: (instruction: string) => Promise<void>;
   /** Optional right-rail block, typically a collapsible ReferencesList. */
@@ -54,8 +49,6 @@ export function SectionsPanel({
   onRegenerateSection,
   onRevertSection,
   onReorder,
-  onExpandUnfilled,
-  onComposeRemaining,
   onReviseDraft,
   references,
 }: SectionsPanelProps): JSX.Element {
@@ -319,17 +312,6 @@ export function SectionsPanel({
             </strong>{" "}
             Compose the whole post in one pass.
           </div>
-          {!jobRunning && (
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => onExpandUnfilled()}
-                className="nb-btn nb-btn-primary nb-btn-sm"
-              >
-                Compose draft →
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -346,15 +328,6 @@ export function SectionsPanel({
           </p>
           {jobError.hint && <p className="text-xs mt-1 opacity-80">{jobError.hint}</p>}
           <div className="mt-2 flex items-center gap-3">
-            {unfilledCount > 0 && !jobRunning && (
-              <button
-                type="button"
-                onClick={() => onComposeRemaining()}
-                className="nb-btn nb-btn-primary nb-btn-sm"
-              >
-                Compose remaining →
-              </button>
-            )}
             <button
               type="button"
               onClick={onDismissJobError}

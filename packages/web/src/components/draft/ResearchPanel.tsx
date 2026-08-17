@@ -213,7 +213,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
                     type="button"
                     onClick={startInterview}
                     disabled={streaming}
-                    className="nb-btn nb-btn-primary nb-btn-sm"
+                    className="nb-btn nb-btn-sm"
                   >
                     Start the interview →
                   </button>
@@ -280,7 +280,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
                 type="button"
                 onClick={() => void handleSend()}
                 disabled={streaming || !composer.trim()}
-                className="nb-btn nb-btn-sm nb-btn-primary"
+                className="nb-btn nb-btn-sm"
               >
                 {streaming ? "Streaming…" : "Send"}
               </button>
@@ -326,7 +326,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
                 type="button"
                 onClick={() => void handleAccept()}
                 disabled={!latestOutline || accepting || streaming}
-                className="nb-btn nb-btn-sm nb-btn-primary"
+                className="nb-btn nb-btn-sm"
               >
                 {accepting ? "Accepting…" : "Accept this outline →"}
               </button>
