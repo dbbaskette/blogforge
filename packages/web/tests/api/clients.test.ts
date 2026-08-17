@@ -105,6 +105,76 @@ describe("API errors", () => {
       Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
     }
   });
+
+  it("retains a plain-text response only as technical detail", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("upstream gateway reset: request 7f8a", {
+          status: 503,
+          headers: { "Content-Type": "text/plain" },
+        }),
+      ),
+    );
+
+    await expect(api("/api/test")).rejects.toMatchObject({
+      status: 503,
+      detail: "upstream gateway reset: request 7f8a",
+      message: "The request could not be completed.",
+    });
+    await expect(api("/api/test")).rejects.not.toThrow(/gateway reset/);
+  });
+
+  it.each([
+    {
+      name: "structured upload validation",
+      response: () =>
+        new Response(
+          JSON.stringify({
+            detail: {
+              error: {
+                code: "reference_file_too_large",
+                message: "The reference file is too large.",
+              },
+            },
+          }),
+          { status: 422, headers: { "Content-Type": "application/json" } },
+        ),
+      expected: {
+        status: 422,
+        code: "reference_file_too_large",
+        message: "The reference file is too large.",
+      },
+    },
+    {
+      name: "expired upload session",
+      response: () =>
+        new Response(JSON.stringify({ detail: "session_revoked" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      expected: {
+        status: 401,
+        detail: "session_revoked",
+        message: "Your session has expired. Please sign in again.",
+      },
+    },
+    {
+      name: "plain-text upload failure",
+      response: () => new Response("storage temporarily offline", { status: 503 }),
+      expected: {
+        status: 503,
+        detail: "storage temporarily offline",
+        message: "The request could not be completed.",
+      },
+    },
+  ])("uses the shared safe parser for $name", async ({ response, expected }) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response()));
+
+    await expect(
+      references.addFileReference("d1", new File(["source"], "source.txt")),
+    ).rejects.toMatchObject(expected);
+  });
 });
 
 describe("ideation API module", () => {

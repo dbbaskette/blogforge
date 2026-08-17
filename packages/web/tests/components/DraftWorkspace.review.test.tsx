@@ -193,4 +193,63 @@ describe("DraftWorkspace Review routing", () => {
 
     await waitFor(() => expect(onSectionSave).toHaveBeenCalledWith("s1", "Rewritten sentence."));
   });
+
+  it("reuses Review Center factual results when opening the specialist", async () => {
+    vi.mocked(listReferences).mockResolvedValue([
+      {
+        id: "r1",
+        kind: "url",
+        name: "Primary source",
+        url: "https://example.com/source",
+        original_filename: null,
+        extracted_chars: 500,
+        added_at: "2026-08-17T00:00:00Z",
+      },
+    ]);
+    vi.mocked(checkClaims).mockResolvedValue({
+      has_references: true,
+      claims: [
+        {
+          text: "The launch happened in 2024.",
+          status: "unsupported",
+          note: "The attached source does not give a launch date.",
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <DraftWorkspace
+          draft={draft}
+          jobId={null}
+          saving={false}
+          saveError={null}
+          onChange={vi.fn().mockResolvedValue(undefined)}
+          onGenerateOutline={vi.fn().mockResolvedValue(undefined)}
+          onExpandAll={vi.fn().mockResolvedValue(undefined)}
+          onExpandUnfilled={vi.fn().mockResolvedValue(undefined)}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onRegenerateSection={vi.fn().mockResolvedValue(undefined)}
+          onRevertSection={vi.fn().mockResolvedValue(undefined)}
+          onReviseDraft={vi.fn().mockResolvedValue(undefined)}
+          onJumpStage={vi.fn().mockResolvedValue(undefined)}
+          onReorder={vi.fn().mockResolvedValue(undefined)}
+          onJobComplete={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^review$/i }));
+    const reviewCenter = await screen.findByRole("dialog", { name: "Review Center" });
+    const factual = await within(reviewCenter).findByRole("region", {
+      name: "Factual support review",
+    });
+    fireEvent.click(within(factual).getByRole("button", { name: "Open Factual support" }));
+
+    const proofreader = await screen.findByRole("dialog", { name: "Proofreader" });
+    expect(
+      await within(proofreader).findByText("The launch happened in 2024."),
+    ).toBeInTheDocument();
+    expect(checkClaims).toHaveBeenCalledTimes(1);
+  });
 });

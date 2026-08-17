@@ -6,6 +6,7 @@ import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { deriveNextDraftAction } from "../../lib/draftNextAction";
+import type { FactualSupportResult } from "../../lib/reviewCenter";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
 import { ErrorNotice } from "../ui/ErrorNotice";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
@@ -89,6 +90,9 @@ export function DraftWorkspace({
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
   const [lintOpen, setLintOpen] = useState(false);
+  const [initialFactualSupport, setInitialFactualSupport] = useState<FactualSupportResult | null>(
+    null,
+  );
   const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [headlinesOpen, setHeadlinesOpen] = useState(false);
   const [shapeOpen, setShapeOpen] = useState(false);
@@ -654,9 +658,13 @@ export function DraftWorkspace({
         {lintOpen && (
           <LintPanel
             draft={draft}
+            initialFactualSupport={initialFactualSupport ?? undefined}
             onSectionSave={onSectionSave}
             onTrackChange={handleTrackChange}
-            onClose={() => setLintOpen(false)}
+            onClose={() => {
+              setLintOpen(false);
+              setInitialFactualSupport(null);
+            }}
           />
         )}
         {shapeOpen && (
@@ -684,8 +692,14 @@ export function DraftWorkspace({
         {reviewOpen && (
           <ReviewCenter
             draft={draft}
-            onOpenProofread={(sectionId) => openReviewTool(setLintOpen, sectionId)}
-            onOpenFactualSupport={(sectionId) => openReviewTool(setLintOpen, sectionId)}
+            onOpenProofread={(sectionId) => {
+              setInitialFactualSupport(null);
+              openReviewTool(setLintOpen, sectionId);
+            }}
+            onOpenFactualSupport={(sectionId, result) => {
+              setInitialFactualSupport(result ?? null);
+              openReviewTool(setLintOpen, sectionId);
+            }}
             onOpenShape={(sectionId) => openReviewTool(setShapeOpen, sectionId)}
             onOpenHumanization={(sectionId) => openReviewTool(setHumanizeOpen, sectionId)}
             onOpenGeo={(sectionId) => openReviewTool(setGeoOpen, sectionId)}

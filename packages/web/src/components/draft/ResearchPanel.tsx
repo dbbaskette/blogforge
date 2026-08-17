@@ -55,14 +55,19 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
   // "ideate": you lead the chat. "interview": the AI asks you questions.
   const [mode, setMode] = useState<IdeationMode>("ideate");
 
-  const reload = useCallback(async (): Promise<void> => {
-    try {
-      const hist = await listIdeation(draft.id);
-      setMessages(hist.map(fromServer));
-    } catch (e) {
-      setFailure({ error: e, operation: "loading your research", retry: "reload" });
-    }
-  }, [draft.id]);
+  const reload = useCallback(
+    async (publishFailure = true): Promise<void> => {
+      try {
+        const hist = await listIdeation(draft.id);
+        setMessages(hist.map(fromServer));
+      } catch (e) {
+        if (publishFailure) {
+          setFailure({ error: e, operation: "loading your research", retry: "reload" });
+        }
+      }
+    },
+    [draft.id],
+  );
 
   useEffect(() => {
     void reload();
@@ -153,7 +158,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
         });
         setStreaming(false);
         // Roll back: refetch from server so optimistic state is replaced with truth.
-        void reload();
+        void reload(false);
       }
     },
     [draft.id, reload, streaming],

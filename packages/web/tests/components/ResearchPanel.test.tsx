@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiError } from "../../src/api/client";
 import type { Draft } from "../../src/api/drafts";
@@ -52,6 +52,8 @@ const sampleOutline = {
 };
 
 describe("ResearchPanel", () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it("keeps the research workspace available and links Settings for provider failures", async () => {
     const ide = await import("../../src/api/ideation");
     (ide.listIdeation as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
@@ -104,6 +106,33 @@ describe("ResearchPanel", () => {
 
     await waitFor(() => expect(ide.postIdeationMessage).toHaveBeenCalledTimes(2));
     expect(ide.postIdeationMessage).toHaveBeenLastCalledWith("d1", "Try this angle", "ideate");
+  });
+
+  it("preserves the exact failed send when the recovery reload also fails", async () => {
+    const ide = await import("../../src/api/ideation");
+    (ide.listIdeation as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("history unavailable"));
+    (ide.postIdeationMessage as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("send unavailable"))
+      .mockResolvedValueOnce({ job_id: "j2" });
+
+    render(<ResearchPanel draft={draft} onJobComplete={vi.fn()} />);
+
+    const composer = await screen.findByLabelText(/Message BlogForge/i);
+    fireEvent.click(screen.getByRole("button", { name: "Interview me" }));
+    fireEvent.change(composer, { target: { value: "Keep this exact answer" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Send$/ }));
+
+    await waitFor(() => expect(ide.listIdeation).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(ide.postIdeationMessage).toHaveBeenCalledTimes(2));
+    expect(ide.postIdeationMessage).toHaveBeenLastCalledWith(
+      "d1",
+      "Keep this exact answer",
+      "interview",
+    );
   });
 
   it("keeps conversational actions visually secondary", async () => {

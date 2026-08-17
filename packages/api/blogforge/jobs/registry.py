@@ -1,4 +1,5 @@
 """In-process JobRegistry: LRU eviction, cancellation events, live listeners."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,6 +10,14 @@ from typing import Any
 from blogforge.jobs.models import Job, JobType
 
 _TERMINAL = frozenset({"succeeded", "failed", "cancelled"})
+
+
+class ActiveDraftJobError(RuntimeError):
+    """Raised when a draft already owns a non-terminal generation job."""
+
+    def __init__(self, active_job: Job) -> None:
+        super().__init__(f"Draft {active_job.draft_id} already has active job {active_job.id}")
+        self.active_job = active_job
 
 
 class JobRegistry:
@@ -35,6 +44,19 @@ class JobRegistry:
             self._evict_if_full()
         return job
 
+    async def create_for_draft(self, type_: JobType, draft_id: str) -> Job:
+        """Atomically reserve the only active generation slot for a draft."""
+        job = Job(type=type_, draft_id=draft_id)
+        async with self._lock:
+            active = self._active_for_draft(draft_id)
+            if active is not None:
+                raise ActiveDraftJobError(active)
+            self._jobs[job.id] = job
+            self._cancellation[job.id] = asyncio.Event()
+            self._listeners[job.id] = []
+            self._evict_if_full()
+        return job
+
     async def get(self, job_id: str) -> Job | None:
         """Return the job or None if evicted/unknown."""
         return self._jobs.get(job_id)
@@ -44,6 +66,9 @@ class JobRegistry:
 
         Lets a reloaded client re-attach to an in-flight compose/revise so
         progress keeps streaming after a refresh."""
+        return self._active_for_draft(draft_id)
+
+    def _active_for_draft(self, draft_id: str) -> Job | None:
         found: Job | None = None
         for job in self._jobs.values():  # insertion order: oldest → newest
             if job.draft_id == draft_id and job.status not in _TERMINAL:
@@ -81,9 +106,7 @@ class JobRegistry:
             job.partial_text += delta
         await self._broadcast(job_id, {"type": "token", "delta": delta})
 
-    async def set_stage(
-        self, job_id: str, stage: str, progress: float | None = None
-    ) -> None:
+    async def set_stage(self, job_id: str, stage: str, progress: float | None = None) -> None:
         """Update the current stage (and optionally progress) for a job."""
         async with self._lock:
             job = self._jobs.get(job_id)
@@ -111,9 +134,7 @@ class JobRegistry:
             job.progress = 1.0
         await self._broadcast(job_id, {"type": "complete", "result": result})
 
-    async def fail(
-        self, job_id: str, code: str, message: str, hint: str | None = None
-    ) -> None:
+    async def fail(self, job_id: str, code: str, message: str, hint: str | None = None) -> None:
         """Mark a job failed and broadcast the error event."""
         async with self._lock:
             job = self._jobs.get(job_id)
@@ -152,9 +173,7 @@ class JobRegistry:
         elif job.status == "failed":
             events.append({"type": "error", **(job.error or {})})
         elif job.status == "cancelled":
-            events.append(
-                {"type": "error", "code": "cancelled", "message": "Cancelled."}
-            )
+            events.append({"type": "error", "code": "cancelled", "message": "Cancelled."})
         return events
 
     # ------------------------------------------------------------------

@@ -38,6 +38,15 @@ describe("presentError", () => {
     });
   });
 
+  it("keeps transient provider throttling and timeouts retryable", () => {
+    expect(presentError(apiError(429, "provider_rate_limit"), "checking claims")).toMatchObject({
+      action: "retry",
+    });
+    expect(presentError(apiError(504, "provider_timeout"), "checking claims")).toMatchObject({
+      action: "retry",
+    });
+  });
+
   it("recommends reloading after a conflict", () => {
     expect(presentError(apiError(409, "publish_conflict"), "publishing your draft")).toMatchObject({
       title: "This changed somewhere else",

@@ -8,7 +8,7 @@ None or skip) rather than 403, to avoid leaking ID existence.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blogforge.db.engine import get_sessionmaker
@@ -302,6 +302,66 @@ class SqlDraftStore:
             await session.commit()
             await session.refresh(row, ["sections", "references", "ideation_messages"])
             return _draft_from_row(row)
+
+    async def update_section(
+        self,
+        draft_id: str,
+        section: Section,
+        *,
+        user_id: UUID,
+        expected_statuses: tuple[str, ...] | None = None,
+    ) -> bool:
+        """Persist one owned section without rewriting sibling rows.
+
+        When ``expected_statuses`` is supplied, the write is a compare-and-set.
+        This lets background generation yield to prose the writer saved while
+        the provider request was in flight.
+        """
+        try:
+            draft_uuid = UUID(draft_id)
+        except ValueError:
+            return False
+
+        conditions = [
+            SectionRow.draft_id == draft_uuid,
+            SectionRow.id == section.id,
+            SectionRow.draft_id.in_(
+                select(DraftRow.id).where(
+                    DraftRow.id == draft_uuid,
+                    DraftRow.user_id == user_id,
+                    DraftRow.deleted_at.is_(None),
+                )
+            ),
+        ]
+        if expected_statuses is not None:
+            conditions.append(SectionRow.status.in_(expected_statuses))
+
+        async with get_sessionmaker()() as session:
+            updated_id = (
+                await session.execute(
+                    update(SectionRow)
+                    .where(*conditions)
+                    .values(
+                        title=section.title,
+                        brief=section.brief,
+                        content_md=section.content_md,
+                        status=section.status,
+                        last_generated_at=section.last_generated_at,
+                        last_error=section.last_error,
+                        word_count=section.word_count,
+                    )
+                    .returning(SectionRow.id)
+                )
+            ).scalar_one_or_none()
+            if updated_id is None:
+                return False
+            await session.execute(
+                update(DraftRow)
+                .where(DraftRow.id == draft_uuid, DraftRow.user_id == user_id)
+                .values(updated_at=datetime.now(UTC))
+            )
+            await session.commit()
+            return True
 
     async def record_publication(
         self,

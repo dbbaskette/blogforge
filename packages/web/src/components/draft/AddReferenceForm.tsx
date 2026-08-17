@@ -6,6 +6,7 @@ import {
   addTextReference,
   addUrlReference,
 } from "../../api/references";
+import { ErrorNotice } from "../ui/ErrorNotice";
 
 interface AddReferenceFormProps {
   draftId: string;
@@ -17,7 +18,7 @@ type Mode = "url" | "text" | "file";
 export function AddReferenceForm({ draftId, onAdded }: AddReferenceFormProps): JSX.Element {
   const [mode, setMode] = useState<Mode>("url");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
 
   // URL fields
   const [url, setUrl] = useState("");
@@ -59,7 +60,7 @@ export function AddReferenceForm({ draftId, onAdded }: AddReferenceFormProps): J
       onAdded(added);
       resetAll();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e);
     } finally {
       setSubmitting(false);
     }
@@ -162,13 +163,15 @@ export function AddReferenceForm({ draftId, onAdded }: AddReferenceFormProps): J
         </div>
       )}
 
-      {error && (
-        <p
-          className="text-xs px-2 py-1.5 rounded-nb-sm mt-2"
-          style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-        >
-          {error}
-        </p>
+      {error !== null && (
+        <div className="mt-2">
+          <ErrorNotice
+            error={error}
+            operation="adding this reference"
+            onRetry={() => void handleSubmit()}
+            onDismiss={() => setError(null)}
+          />
+        </div>
       )}
 
       <div className="mt-3 flex justify-end">

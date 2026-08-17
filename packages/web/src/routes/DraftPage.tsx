@@ -76,6 +76,7 @@ export function DraftPage(): JSX.Element {
     async (next: Draft): Promise<void> => {
       if (!id) return;
       const draftId = id;
+      if (activeDraftId.current !== draftId) return;
       const sequence = ++saveSequence.current;
       const snapshot = structuredClone(next);
       setSaving(true);
@@ -99,6 +100,7 @@ export function DraftPage(): JSX.Element {
 
   const onChange = useCallback(
     async (next: Draft) => {
+      if (activeDraftId.current !== next.id) return;
       setDraft(next);
       await saveDraft(next);
     },
@@ -112,38 +114,53 @@ export function DraftPage(): JSX.Element {
 
   const onGenerateOutline = useCallback(async () => {
     if (!id) return;
-    const updated = await generateOutline(id);
-    setDraft(updated);
+    const draftId = id;
+    const updated = await generateOutline(draftId);
+    if (activeDraftId.current === draftId) setDraft(updated);
   }, [id]);
 
   const onExpandAll = useCallback(async () => {
     if (!id) return;
-    const { job_id } = await expandSections(id);
+    const draftId = id;
+    const { job_id } = await expandSections(draftId);
+    if (activeDraftId.current !== draftId) return;
     setJobId(job_id);
     // The compose runs as a background job. The draft has already advanced to the
     // "sections" stage server-side (see /expand), so pull it now to swap the
     // outline for the live composing view — otherwise the writer sits on a
     // frozen outline with no feedback until the whole job finishes.
-    setDraft(await getDraft(id));
+    try {
+      const updated = await getDraft(draftId);
+      if (activeDraftId.current === draftId) setDraft(updated);
+    } catch {
+      // Receipt of job_id committed the compose. A best-effort refresh cannot
+      // turn that accepted job into a failed start or invite a duplicate POST.
+    }
   }, [id]);
 
   const onExpandUnfilled = useCallback(async () => {
     if (!id) return;
-    const { job_id } = await expandSections(id, { remainingOnly: true });
-    setJobId(job_id);
+    const draftId = id;
+    const { job_id } = await expandSections(draftId, { remainingOnly: true });
+    if (activeDraftId.current === draftId) setJobId(job_id);
   }, [id]);
 
   const onJobComplete = useCallback(() => {
     if (!id) return;
-    getDraft(id)
-      .then(setDraft)
+    const draftId = id;
+    getDraft(draftId)
+      .then((updated) => {
+        if (activeDraftId.current === draftId) setDraft(updated);
+      })
       .catch(() => {});
   }, [id]);
 
   const onSectionSave = useCallback(
     async (sectionId: string, content_md: string, createVersion = true) => {
       if (!id) return;
-      setDraft(await saveSection(id, sectionId, content_md, createVersion));
+      const draftId = id;
+      const updated = await saveSection(draftId, sectionId, content_md, createVersion);
+      if (activeDraftId.current === draftId) setDraft(updated);
     },
     [id],
   );
@@ -151,8 +168,9 @@ export function DraftPage(): JSX.Element {
   const onRegenerateSection = useCallback(
     async (sectionId: string, instruction?: string) => {
       if (!id) return;
-      const { job_id } = await regenerateSection(id, sectionId, instruction ?? "");
-      setJobId(job_id);
+      const draftId = id;
+      const { job_id } = await regenerateSection(draftId, sectionId, instruction ?? "");
+      if (activeDraftId.current === draftId) setJobId(job_id);
     },
     [id],
   );
@@ -160,7 +178,9 @@ export function DraftPage(): JSX.Element {
   const onRevertSection = useCallback(
     async (sectionId: string, versionId: string) => {
       if (!id) return;
-      setDraft(await revertSectionVersion(id, sectionId, versionId));
+      const draftId = id;
+      const updated = await revertSectionVersion(draftId, sectionId, versionId);
+      if (activeDraftId.current === draftId) setDraft(updated);
     },
     [id],
   );
@@ -168,8 +188,9 @@ export function DraftPage(): JSX.Element {
   const onReviseDraft = useCallback(
     async (instruction: string) => {
       if (!id) return;
-      const { job_id } = await reviseDraft(id, instruction);
-      setJobId(job_id);
+      const draftId = id;
+      const { job_id } = await reviseDraft(draftId, instruction);
+      if (activeDraftId.current === draftId) setJobId(job_id);
     },
     [id],
   );
@@ -177,7 +198,9 @@ export function DraftPage(): JSX.Element {
   const onJumpStage = useCallback(
     async (stage: DraftStage) => {
       if (!id) return;
-      setDraft(await setDraftStage(id, stage));
+      const draftId = id;
+      const updated = await setDraftStage(draftId, stage);
+      if (activeDraftId.current === draftId) setDraft(updated);
     },
     [id],
   );
@@ -185,7 +208,9 @@ export function DraftPage(): JSX.Element {
   const onReorder = useCallback(
     async (section_ids: string[]) => {
       if (!id) return;
-      setDraft(await reorderSections(id, section_ids));
+      const draftId = id;
+      const updated = await reorderSections(draftId, section_ids);
+      if (activeDraftId.current === draftId) setDraft(updated);
     },
     [id],
   );

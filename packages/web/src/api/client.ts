@@ -24,6 +24,50 @@ function stringProperty(value: unknown, key: string): string | undefined {
   return isJsonObject(value) && typeof value[key] === "string" ? value[key] : undefined;
 }
 
+/** Parse one failed response into a safe, metadata-rich API error.
+ * The body is read exactly once so JSON and multipart callers behave alike. */
+export async function parseResponseError(res: Response): Promise<ApiError> {
+  const raw = await res.text();
+  let payload: unknown;
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = undefined;
+    }
+  }
+
+  const payloadObject = isJsonObject(payload) ? payload : undefined;
+  const detail = payloadObject
+    ? "detail" in payloadObject
+      ? payloadObject.detail
+      : payload
+    : raw || undefined;
+  const detailObject = isJsonObject(detail) ? detail : undefined;
+  const structured =
+    detailObject?.error ?? detailObject ?? (payloadObject ? payloadObject.error : undefined);
+  const message = stringProperty(structured, "message");
+  const code = stringProperty(structured, "code");
+  const repositoryUrl = stringProperty(structured, "repository_url");
+  const errorPath = stringProperty(structured, "path");
+
+  return Object.assign(
+    new Error(
+      message ??
+        (res.status === 401
+          ? "Your session has expired. Please sign in again."
+          : "The request could not be completed."),
+    ),
+    {
+      status: res.status,
+      code,
+      detail,
+      repositoryUrl,
+      path: errorPath,
+    },
+  );
+}
+
 export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) {
@@ -35,40 +79,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     credentials: "include",
   });
   if (!res.ok) {
-    let detail: unknown;
-    let message: string | undefined;
-    let code: string | undefined;
-    let repositoryUrl: string | undefined;
-    let errorPath: string | undefined;
-    try {
-      const j = await res.json();
-      detail = isJsonObject(j) && "detail" in j ? j.detail : j;
-      const detailObject = isJsonObject(detail) ? detail : undefined;
-      const structured =
-        detailObject?.error ?? detailObject ?? (isJsonObject(j) ? j.error : undefined);
-      message = stringProperty(structured, "message");
-      code = stringProperty(structured, "code");
-      repositoryUrl = stringProperty(structured, "repository_url");
-      errorPath = stringProperty(structured, "path");
-    } catch {
-      /* fall through */
-    }
-    const err: ApiError = Object.assign(
-      new Error(
-        message ??
-          (res.status === 401
-            ? "Your session has expired. Please sign in again."
-            : "The request could not be completed."),
-      ),
-      {
-        status: res.status,
-        code,
-        detail,
-        repositoryUrl,
-        path: errorPath,
-      },
-    );
-    throw err;
+    throw await parseResponseError(res);
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get("Content-Type") ?? "";

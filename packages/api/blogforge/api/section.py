@@ -22,7 +22,7 @@ from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.references import get_reference_context
 from blogforge.generate.section import stream_section
 from blogforge.jobs.models import JobType
-from blogforge.jobs.registry import JobRegistry
+from blogforge.jobs.registry import ActiveDraftJobError, JobRegistry
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.compose import ComposeError
@@ -108,7 +108,9 @@ async def save_section(
     section.status = "edited"
     section.last_error = None
     section.word_count = len(body.content_md.split())
-    updated = await store.update(draft.id, draft, user_id=current.id)
+    if not await store.update_section(draft.id, section, user_id=current.id):
+        return draft
+    updated = await store.get(draft.id, user_id=current.id)
     return updated if updated is not None else draft
 
 
@@ -172,7 +174,19 @@ async def regenerate_section(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    job = await reg.create(JobType.REGEN_SECTION, draft_id=draft_id)
+    try:
+        job = await reg.create_for_draft(JobType.REGEN_SECTION, draft_id)
+    except ActiveDraftJobError as error:
+        raise HTTPException(
+            409,
+            detail={
+                "error": {
+                    "code": "generation_already_active",
+                    "message": "A generation job is already active for this draft.",
+                    "job_id": error.active_job.id,
+                }
+            },
+        ) from error
     background_tasks.add_task(
         _run_regenerate,
         reg,

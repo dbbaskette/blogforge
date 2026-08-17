@@ -38,9 +38,7 @@ function apiErrorCode(error: unknown): string | undefined {
 }
 
 function isProviderError(code: string | undefined): boolean {
-  return Boolean(
-    code && (PROVIDER_CODES.has(code) || code.startsWith("provider_") || code.includes("api_key")),
-  );
+  return Boolean(code && (PROVIDER_CODES.has(code) || code.includes("api_key")));
 }
 
 function isPersistedSectionError(value: unknown): value is PersistedSectionError {

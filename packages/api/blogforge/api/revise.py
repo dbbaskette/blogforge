@@ -28,7 +28,7 @@ from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.references import get_reference_context
 from blogforge.generate.section import stream_section
 from blogforge.jobs.models import JobType
-from blogforge.jobs.registry import JobRegistry
+from blogforge.jobs.registry import ActiveDraftJobError, JobRegistry
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.compose import ComposeError
@@ -95,7 +95,19 @@ async def revise_draft(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    job = await reg.create(JobType.REVISE_DRAFT, draft_id=draft_id)
+    try:
+        job = await reg.create_for_draft(JobType.REVISE_DRAFT, draft_id)
+    except ActiveDraftJobError as error:
+        raise HTTPException(
+            409,
+            detail={
+                "error": {
+                    "code": "generation_already_active",
+                    "message": "A generation job is already active for this draft.",
+                    "job_id": error.active_job.id,
+                }
+            },
+        ) from error
     background_tasks.add_task(
         _run_revise,
         reg,

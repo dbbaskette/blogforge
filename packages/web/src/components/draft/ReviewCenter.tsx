@@ -61,11 +61,25 @@ const SEVERITY: Record<ReviewSeverity, { dot: string; text: string }> = {
 };
 
 type OpenCheck = (sectionId?: string) => void;
+type OpenFactualSupport = (sectionId?: string, result?: FactualSupportResult) => void;
+
+interface ReviewIdentity {
+  draftId: string;
+  contentHash: string;
+  analysisHash: string | null;
+  referenceCount: number | null;
+  generation: number;
+}
+
+interface ReviewRunOwner {
+  identity: ReviewIdentity;
+  sequence: number;
+}
 
 export interface ReviewCenterProps {
   draft: Draft;
   onOpenProofread: OpenCheck;
-  onOpenFactualSupport?: OpenCheck;
+  onOpenFactualSupport?: OpenFactualSupport;
   onOpenShape: OpenCheck;
   onOpenHumanization: OpenCheck;
   onOpenGeo: OpenCheck;
@@ -163,74 +177,135 @@ export function ReviewCenter({
 }: ReviewCenterProps): JSX.Element {
   const panelRef = useDialogA11y(true, onClose);
   const hash = useMemo(() => hashDraftContent(draft), [draft]);
-  const analysisHashRef = useRef<string | null>(null);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
   const summaryRef = useRef<ReviewSummary | null>(null);
   const [runningKeys, setRunningKeys] = useState<Set<ReviewKey>>(new Set());
+  const runningKeysRef = useRef<Set<ReviewKey>>(new Set());
+  const factualSupportRef = useRef<FactualSupportResult | null>(null);
+  const mountedRef = useRef(false);
+  const runSequenceRef = useRef(0);
+  const identityRef = useRef<ReviewIdentity>({
+    draftId: draft.id,
+    contentHash: hash,
+    analysisHash: null,
+    referenceCount: null,
+    generation: 0,
+  });
+
+  if (identityRef.current.draftId !== draft.id || identityRef.current.contentHash !== hash) {
+    identityRef.current = {
+      draftId: draft.id,
+      contentHash: hash,
+      analysisHash: null,
+      referenceCount: null,
+      generation: identityRef.current.generation + 1,
+    };
+    runSequenceRef.current += 1;
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      runSequenceRef.current += 1;
+      identityRef.current = {
+        ...identityRef.current,
+        generation: identityRef.current.generation + 1,
+      };
+    };
+  }, []);
+
+  const ownsIdentity = useCallback(
+    (identity: ReviewIdentity): boolean => mountedRef.current && identityRef.current === identity,
+    [],
+  );
+
+  const ownsRun = useCallback(
+    (owner: ReviewRunOwner): boolean =>
+      ownsIdentity(owner.identity) && runSequenceRef.current === owner.sequence,
+    [ownsIdentity],
+  );
 
   const updateSummary = useCallback(
-    (updater: (previous: ReviewSummary | null) => ReviewSummary): ReviewSummary => {
+    (
+      owner: ReviewRunOwner,
+      updater: (previous: ReviewSummary | null) => ReviewSummary,
+    ): ReviewSummary | null => {
+      if (!ownsRun(owner)) return null;
       const next = updater(summaryRef.current);
       summaryRef.current = next;
       setSummary(next);
       return next;
     },
-    [],
+    [ownsRun],
   );
 
   const executeCheck = useCallback(
     async (
+      identity: ReviewIdentity,
       key: ReviewKey,
-      analysisHash: string | null,
       bypassCache: boolean,
     ): Promise<ReviewCheck<unknown>> => {
       try {
-        const requestKey = `${draft.id}\u0000${analysisHash ?? `${hash}:references-unknown`}\u0000${key}`;
+        const requestKey = `${identity.draftId}\u0000${
+          identity.analysisHash ??
+          `${identity.contentHash}:references-${identity.referenceCount ?? "unknown"}`
+        }\u0000${key}`;
         switch (key) {
           case "proofread":
             return {
               status: "current",
-              data: await joinInFlight(requestKey, () => lintDraft(draft.id)),
+              data: await joinInFlight(requestKey, () => lintDraft(identity.draftId)),
             };
-          case "factual-support":
+          case "factual-support": {
+            if (identity.referenceCount === 0) {
+              return {
+                status: "current",
+                data: { claims: [], has_references: false },
+              };
+            }
+            const hit =
+              bypassCache || !identity.analysisHash
+                ? null
+                : getCached<FactualSupportResult>(
+                    "factual-support",
+                    identity.draftId,
+                    identity.analysisHash,
+                  );
+            if (hit) return { status: "current", data: hit.data };
             return {
               status: "current",
-              data: await joinInFlight(requestKey, () => checkClaims(draft.id)),
+              data: await joinInFlight(requestKey, () => checkClaims(identity.draftId)),
             };
+          }
           case "shape": {
-            const hit = bypassCache ? null : getCached<SuggestResult>("shape", draft.id, hash);
+            const hit = bypassCache
+              ? null
+              : getCached<SuggestResult>("shape", identity.draftId, identity.contentHash);
             if (hit) return { status: "current", data: hit.data };
-            const data = await joinInFlight(requestKey, async () => {
-              const fresh = await suggestImprovements(draft.id);
-              setCached("shape", draft.id, hash, fresh);
-              return fresh;
-            });
+            const data = await joinInFlight(requestKey, () =>
+              suggestImprovements(identity.draftId),
+            );
             return { status: "current", data };
           }
           case "humanization": {
-            const cacheHash = `${hash}:medium`;
+            const cacheHash = `${identity.contentHash}:medium`;
             const hit = bypassCache
               ? null
-              : getCached<HumanizeReport>("humanize", draft.id, cacheHash);
+              : getCached<HumanizeReport>("humanize", identity.draftId, cacheHash);
             if (hit) return { status: "current", data: hit.data };
-            const data = await joinInFlight(requestKey, async () => {
-              const fresh = await analyzeHumanize(draft.id, "medium");
-              setCached("humanize", draft.id, cacheHash, fresh);
-              return fresh;
-            });
+            const data = await joinInFlight(requestKey, () =>
+              analyzeHumanize(identity.draftId, "medium"),
+            );
             return { status: "current", data };
           }
           case "geo": {
             const hit =
-              bypassCache || !analysisHash
+              bypassCache || !identity.analysisHash
                 ? null
-                : getCached<GeoReport>("geo", draft.id, analysisHash);
+                : getCached<GeoReport>("geo", identity.draftId, identity.analysisHash);
             if (hit) return { status: "current", data: hit.data };
-            const data = await joinInFlight(requestKey, async () => {
-              const fresh = await analyzeGeo(draft.id);
-              if (analysisHash) setCached("geo", draft.id, analysisHash, fresh);
-              return fresh;
-            });
+            const data = await joinInFlight(requestKey, () => analyzeGeo(identity.draftId));
             return { status: "current", data };
           }
         }
@@ -238,75 +313,137 @@ export function ReviewCenter({
         return { status: "failed", error };
       }
     },
-    [draft.id, hash],
+    [],
   );
 
   const run = useCallback(
-    async (keys: ReviewKey[] = REVIEW_KEYS, bypassCache = false): Promise<void> => {
-      const analysisHash = analysisHashRef.current;
-      setRunningKeys((previous) => new Set([...previous, ...keys]));
+    async (
+      keys: ReviewKey[] = REVIEW_KEYS,
+      bypassCache = false,
+      identity: ReviewIdentity = identityRef.current,
+    ): Promise<void> => {
+      if (!ownsIdentity(identity)) return;
+      const owner = { identity, sequence: ++runSequenceRef.current };
+      const nextRunning = new Set([...runningKeysRef.current, ...keys]);
+      runningKeysRef.current = nextRunning;
+      setRunningKeys(nextRunning);
       const runningRows = new Map(
         keys.map((key) => [key, rowFor(key, { status: "running" })] as const),
       );
-      updateSummary((previous) =>
+      updateSummary(owner, (previous) =>
         previous ? replaceRows(previous, runningRows) : summarizeReview(initialResults()),
       );
 
       await Promise.all(
         keys.map(async (key) => {
-          const result = await executeCheck(key, analysisHash, bypassCache);
+          const result = await executeCheck(identity, key, bypassCache);
+          if (!ownsRun(owner)) return;
+          if (result.status === "current") {
+            if (key === "shape") {
+              setCached("shape", identity.draftId, identity.contentHash, result.data);
+            } else if (key === "humanization") {
+              setCached(
+                "humanize",
+                identity.draftId,
+                `${identity.contentHash}:medium`,
+                result.data,
+              );
+            } else if (key === "geo" && identity.analysisHash) {
+              setCached("geo", identity.draftId, identity.analysisHash, result.data);
+            } else if (key === "factual-support") {
+              const factual = result.data as FactualSupportResult;
+              factualSupportRef.current = factual;
+              if (identity.analysisHash) {
+                setCached("factual-support", identity.draftId, identity.analysisHash, factual);
+              }
+            }
+          }
           const replacement = new Map([[key, rowFor(key, result)]]);
-          updateSummary((previous) =>
+          updateSummary(owner, (previous) =>
             replaceRows(previous ?? summarizeReview(initialResults()), replacement),
           );
-          setRunningKeys((previous) => {
-            const next = new Set(previous);
-            next.delete(key);
-            return next;
-          });
+          if (!ownsRun(owner)) return;
+          const next = new Set(runningKeysRef.current);
+          next.delete(key);
+          runningKeysRef.current = next;
+          setRunningKeys(next);
         }),
       );
 
+      if (!ownsRun(owner)) return;
       const finished = summaryRef.current;
-      if (finished && analysisHash) {
-        setCached("review-center", draft.id, analysisHash, finished);
+      if (finished && identity.analysisHash) {
+        setCached("review-center", identity.draftId, identity.analysisHash, finished);
       }
     },
-    [draft.id, executeCheck, updateSummary],
+    [executeCheck, ownsIdentity, ownsRun, updateSummary],
   );
 
   useEffect(() => {
-    void listReferences(draft.id)
+    const identity = identityRef.current;
+    if (identity.draftId !== draft.id || identity.contentHash !== hash) return;
+    let cancelled = false;
+    runSequenceRef.current += 1;
+    summaryRef.current = null;
+    factualSupportRef.current = null;
+    runningKeysRef.current = new Set();
+    setSummary(null);
+    setRunningKeys(new Set());
+
+    const stillOwned = (): boolean => !cancelled && ownsIdentity(identity);
+    void listReferences(identity.draftId)
       .then((references) => {
+        if (!stillOwned()) return;
         const referenceHash = hashReferenceFingerprint(references);
-        const analysisHash = combineAnalysisHash(hash, referenceHash);
-        analysisHashRef.current = analysisHash;
-        const saved = peekCached<ReviewSummary>("review-center", draft.id);
+        const analysisHash = combineAnalysisHash(identity.contentHash, referenceHash);
+        identity.analysisHash = analysisHash;
+        identity.referenceCount = references.length;
+        const saved = peekCached<ReviewSummary>("review-center", identity.draftId);
         if (saved && isCurrentReviewSummary(saved.data)) {
           const restored =
             saved.hash === analysisHash
               ? saved.data
-              : analysisHashUsesContent(saved.hash, hash)
+              : analysisHashUsesContent(saved.hash, identity.contentHash)
                 ? markReferenceSensitiveReviewStale(saved.data)
                 : markReviewStale(saved.data);
+          if (!stillOwned()) return;
+          factualSupportRef.current =
+            getCached<FactualSupportResult>("factual-support", identity.draftId, analysisHash)
+              ?.data ?? null;
           summaryRef.current = restored;
           setSummary(restored);
           return;
         }
-        void run();
+        void run(REVIEW_KEYS, false, identity);
       })
       .catch(() => {
-        analysisHashRef.current = null;
-        void run();
+        if (!stillOwned()) return;
+        identity.analysisHash = null;
+        identity.referenceCount = null;
+        void run(REVIEW_KEYS, false, identity);
       });
-  }, [draft.id, hash, run]);
+    return () => {
+      cancelled = true;
+      runSequenceRef.current += 1;
+    };
+  }, [draft.id, hash, ownsIdentity, run]);
 
-  const open: Record<ReviewKey, OpenCheck> = {
+  const open: Record<Exclude<ReviewKey, "factual-support">, OpenCheck> = {
     proofread: onOpenProofread,
-    "factual-support": onOpenFactualSupport ?? onOpenProofread,
     shape: onOpenShape,
     humanization: onOpenHumanization,
     geo: onOpenGeo,
+  };
+  const openCheck = (key: ReviewKey, sectionId?: string): void => {
+    if (key === "factual-support") {
+      if (onOpenFactualSupport) {
+        onOpenFactualSupport(sectionId, factualSupportRef.current ?? undefined);
+      } else {
+        onOpenProofread(sectionId);
+      }
+      return;
+    }
+    open[key](sectionId);
   };
   const failedKeys =
     summary?.rows.filter((row) => row.status === "failed").map((row) => row.key) ?? [];
@@ -384,7 +521,7 @@ export function ReviewCenter({
                 {canOpen && (
                   <button
                     type="button"
-                    onClick={() => open[row.key](row.sectionId)}
+                    onClick={() => openCheck(row.key, row.sectionId)}
                     className="nb-btn nb-btn-sm shrink-0"
                     aria-label={`Open ${row.label}`}
                   >

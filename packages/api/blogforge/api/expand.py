@@ -19,7 +19,7 @@ from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.document import generate_document, split_document
 from blogforge.generate.references import get_reference_context
 from blogforge.jobs.models import JobType
-from blogforge.jobs.registry import JobRegistry
+from blogforge.jobs.registry import ActiveDraftJobError, JobRegistry
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.compose import ComposeError
@@ -28,6 +28,8 @@ from blogforge.voice.packs.manifest import Manifest
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["expand"])
+
+_REMAINING_TARGET_STATUSES = ("empty", "generating", "failed")
 
 
 @router.post("/api/drafts/{draft_id}/expand", status_code=202)
@@ -81,9 +83,6 @@ async def expand_draft(
     if draft.stage != "sections":
         draft.stage = "sections"
         persist = True
-    if persist:
-        await store.update(draft.id, draft, user_id=current.id)
-
     if remaining_only and not any(
         section.status not in ("ready", "edited") for section in draft.sections
     ):
@@ -107,7 +106,30 @@ async def expand_draft(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    job = await reg.create(JobType.EXPAND, draft_id=draft_id)
+    try:
+        job = await reg.create_for_draft(JobType.EXPAND, draft_id)
+    except ActiveDraftJobError as error:
+        raise HTTPException(
+            409,
+            detail={
+                "error": {
+                    "code": "generation_already_active",
+                    "message": "A generation job is already active for this draft.",
+                    "job_id": error.active_job.id,
+                }
+            },
+        ) from error
+
+    if persist:
+        try:
+            await store.update(draft.id, draft, user_id=current.id)
+        except Exception:
+            await reg.fail(
+                job.id,
+                "draft_update_failed",
+                "The draft could not enter the composing stage.",
+            )
+            raise
     background_tasks.add_task(
         _run_expand,
         reg,
@@ -162,12 +184,27 @@ async def _run_expand(
             )
             return
 
-        async def _fail_targets(code: str, message: str, hint: str | None = None) -> None:
+        async def _fail_targets(
+            code: str,
+            message: str,
+            hint: str | None = None,
+            *,
+            expected_statuses: tuple[str, ...] = _REMAINING_TARGET_STATUSES,
+        ) -> None:
             persisted_error = encode_section_error(code, message, hint)
             for s in targets:
                 s.status = "failed"
                 s.last_error = persisted_error
-            await store.update(draft.id, draft, user_id=user_id)
+            if remaining_only:
+                for section in targets:
+                    await store.update_section(
+                        draft.id,
+                        section,
+                        user_id=user_id,
+                        expected_statuses=expected_statuses,
+                    )
+            else:
+                await store.update(draft.id, draft, user_id=user_id)
 
         manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
         try:
@@ -192,26 +229,65 @@ async def _run_expand(
         # always writes the whole draft (the model holds the full argument at
         # once, which is what stops it restating itself section by section).
 
-        # Snapshot only sections this job may replace. In remaining-only mode,
-        # completed sections and their version history are never touched.
+        # Claim only target sections up front. Remaining-only writes are
+        # compare-and-set updates, so a manual save that lands during provider
+        # setup wins and that section is removed from this job.
+        prior = {
+            section.id: (
+                section.title,
+                section.content_md,
+                section.word_count,
+                section.status,
+            )
+            for section in targets
+        }
+        if remaining_only:
+            claimed = []
+            for section in targets:
+                section.status = "generating"
+                section.last_error = None
+                if await store.update_section(
+                    draft.id,
+                    section,
+                    user_id=user_id,
+                    expected_statuses=_REMAINING_TARGET_STATUSES,
+                ):
+                    claimed.append(section)
+            targets = claimed
+        else:
+            for section in targets:
+                section.status = "generating"
+                section.last_error = None
+            await store.update(draft.id, draft, user_id=user_id)
+
+        if not targets:
+            await reg.complete(
+                job_id,
+                {
+                    "draft_id": draft.id,
+                    "sections_done": 0,
+                    "sections_failed": 0,
+                    "elapsed_seconds": time.monotonic() - started,
+                },
+            )
+            return
+
+        # Snapshot only sections this job successfully claimed. Completed
+        # sibling sections and their version history are never touched.
         for section in targets:
-            if section.content_md.strip():
+            title, content_md, word_count, status = prior[section.id]
+            if content_md.strip():
                 await store.add_section_version(
                     draft.id,
                     section.id,
                     user_id=user_id,
-                    title=section.title,
-                    content_md=section.content_md,
-                    word_count=section.word_count,
-                    status=section.status,
+                    title=title,
+                    content_md=content_md,
+                    word_count=word_count,
+                    status=status,
                     source="regenerate",
                 )
 
-        # Mark only target sections composing up front.
-        for section in targets:
-            section.status = "generating"
-            section.last_error = None
-        await store.update(draft.id, draft, user_id=user_id)
         for section in targets:
             await reg.set_stage(job_id, f"section:start:{section.id}")
 
@@ -225,12 +301,22 @@ async def _run_expand(
                 reference_context=reference_context,
             )
         except (ProviderMissingKey, ProviderError) as e:
-            await _fail_targets(e.code, e.message, e.hint)
+            await _fail_targets(
+                e.code,
+                e.message,
+                e.hint,
+                expected_statuses=("generating",),
+            )
             await reg.fail(job_id, e.code, e.message, e.hint)
             return
         except ComposeError as e:
             hint = "Check the draft's format/samples against the pack manifest."
-            await _fail_targets("compose_error", str(e), hint)
+            await _fail_targets(
+                "compose_error",
+                str(e),
+                hint,
+                expected_statuses=("generating",),
+            )
             await reg.fail(
                 job_id,
                 "compose_error",
@@ -265,6 +351,9 @@ async def _run_expand(
         enforced = await asyncio.gather(*(_enforce(bodies[s.id]) for s in targets if bodies[s.id]))
         enforced_by_id = dict(zip([s.id for s in targets if bodies[s.id]], enforced, strict=True))
 
+        done = 0
+        failed = 0
+        completed_targets = []
         for section in targets:
             body = enforced_by_id.get(section.id, "")
             if body:
@@ -280,15 +369,31 @@ async def _run_expand(
                     "No content mapped to this section from the single-pass draft.",
                     "Try composing this section again.",
                 )
-            await reg.set_stage(job_id, f"section:done:{section.id}")
+            if remaining_only:
+                persisted = await store.update_section(
+                    draft.id,
+                    section,
+                    user_id=user_id,
+                    expected_statuses=("generating",),
+                )
+                if not persisted:
+                    continue
+            completed_targets.append(section)
+            if section.status == "ready":
+                done += 1
+            else:
+                failed += 1
 
         draft.stage = "sections"
-        await store.update(draft.id, draft, user_id=user_id)
+        if remaining_only:
+            await store.set_stage(draft.id, "sections", user_id=user_id)
+        else:
+            await store.update(draft.id, draft, user_id=user_id)
+        for section in completed_targets:
+            await reg.set_stage(job_id, f"section:done:{section.id}")
 
         elapsed = time.monotonic() - started
-        done = sum(1 for s in targets if s.status == "ready")
-        failed = sum(1 for s in targets if s.status == "failed")
-        if done == 0:
+        if done == 0 and failed > 0:
             await reg.fail(
                 job_id,
                 "empty_generation",
@@ -323,6 +428,15 @@ async def _run_expand(
                         )
                     )
                 try:
-                    await store.update(draft.id, draft, user_id=user_id)
+                    if remaining_only:
+                        for section in stranded:
+                            await store.update_section(
+                                draft.id,
+                                section,
+                                user_id=user_id,
+                                expected_statuses=("generating",),
+                            )
+                    else:
+                        await store.update(draft.id, draft, user_id=user_id)
                 except Exception:
                     pass

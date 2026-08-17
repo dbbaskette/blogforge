@@ -10,6 +10,7 @@ import {
 } from "../../api/drafts";
 import { useElapsed } from "../../hooks/useElapsed";
 import { proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
+import type { FactualSupportResult } from "../../lib/reviewCenter";
 import { type ReviewGroup, ReviewRail } from "../review/ReviewRail";
 import { Icon } from "../ui/Icon";
 import { useDialogA11y } from "../ui/useDialogA11y";
@@ -17,6 +18,7 @@ import { makeProofreadApply } from "./proofreadApply";
 
 interface LintPanelProps {
   draft: Draft;
+  initialFactualSupport?: FactualSupportResult;
   /** Persist a section's new markdown (applies an accepted fix). */
   onSectionSave: (sectionId: string, content_md: string) => Promise<void>;
   /** Record an applied fix so the editor colors the change until approved. */
@@ -145,6 +147,7 @@ function HumanityRing({
 
 export function LintPanel({
   draft,
+  initialFactualSupport,
   onSectionSave,
   onTrackChange,
   onClose,
@@ -156,10 +159,10 @@ export function LintPanel({
   const [hits, setHits] = useState<LintFinding[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [claims, setClaims] = useState<ClaimResult[] | null>(null);
+  const [claims, setClaims] = useState<ClaimResult[] | null>(initialFactualSupport?.claims ?? null);
   const [claimsLoading, setClaimsLoading] = useState(false);
   const [claimsError, setClaimsError] = useState<string | null>(null);
-  const [hasRefs, setHasRefs] = useState(true);
+  const [hasRefs, setHasRefs] = useState(initialFactualSupport?.has_references ?? true);
   // Findings whose text we just rewrote — the fix has landed but this lint run
   // predates it, so they'd otherwise keep counting against the score until a
   // manual re-lint. Cleared whenever a fresh lint replaces the truth.
@@ -223,6 +226,7 @@ export function LintPanel({
   return (
     <div
       ref={panelRef}
+      // biome-ignore lint/a11y/useSemanticElements: shared slide-in modal panel behavior
       role="dialog"
       aria-modal="true"
       className="fixed right-0 top-0 z-30 h-full w-[420px] max-w-full overflow-y-auto glass-card border-l border-rule shadow-glass-lg animate-slide-in-right"

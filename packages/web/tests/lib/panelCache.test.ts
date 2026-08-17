@@ -51,6 +51,15 @@ describe("hashDraftContent", () => {
     const retitled = draft([sec("s1", "One", "Body")], "Different");
     expect(hashDraftContent(retitled)).not.toBe(hashDraftContent(a));
   });
+
+  it("changes when opening-hook prose changes", () => {
+    const original = draft([sec("s1", "One", "Body")]);
+    original.outline = { opening_hook: "Original opening", sections: [], estimated_words: 500 };
+    const edited = structuredClone(original);
+    if (edited.outline) edited.outline.opening_hook = "Edited opening";
+
+    expect(hashDraftContent(edited)).not.toBe(hashDraftContent(original));
+  });
 });
 
 describe("reference-aware hashes", () => {

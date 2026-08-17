@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -33,9 +33,18 @@ import {
   combineAnalysisHash,
   hashDraftContent,
   hashReferenceFingerprint,
+  peekCached,
   setCached,
 } from "../../src/lib/panelCache";
-import { summarizeReview } from "../../src/lib/reviewCenter";
+import { type ReviewSummary, summarizeReview } from "../../src/lib/reviewCenter";
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
 
 const draft: Draft = {
   id: "d1",
@@ -107,6 +116,16 @@ const humanizeResult = {
   lenses: [{ key: "flow", label: "Flow", findings: [] }],
 };
 
+const reference = {
+  id: "r1",
+  kind: "url" as const,
+  name: "Primary source",
+  url: "https://example.com/source",
+  original_filename: null,
+  extracted_chars: 1200,
+  added_at: "2026-08-17T10:00:00Z",
+};
+
 function props() {
   return {
     draft,
@@ -129,7 +148,21 @@ describe("ReviewCenter", () => {
     vi.mocked(analyzeGeo).mockResolvedValue(geoResult);
     vi.mocked(suggestImprovements).mockResolvedValue(shapeResult);
     vi.mocked(analyzeHumanize).mockResolvedValue(humanizeResult);
+    vi.mocked(listReferences).mockResolvedValue([reference]);
+  });
+
+  it("short-circuits factual support when the reference count is zero", async () => {
     vi.mocked(listReferences).mockResolvedValue([]);
+    vi.mocked(checkClaims).mockRejectedValue(
+      Object.assign(new Error("provider unavailable"), { code: "provider_rate_limit" }),
+    );
+
+    render(<ReviewCenter {...props()} />);
+
+    const factual = await screen.findByRole("region", { name: "Factual support review" });
+    expect(within(factual).getByText("Unavailable")).toBeInTheDocument();
+    expect(within(factual).getByText(/attach references/i)).toBeInTheDocument();
+    expect(checkClaims).not.toHaveBeenCalled();
   });
 
   it("runs every check, keeps a failed row visible, and opens successful tools", async () => {
@@ -231,6 +264,7 @@ describe("ReviewCenter", () => {
       cached,
     );
 
+    vi.mocked(listReferences).mockResolvedValueOnce([]);
     const view = render(<ReviewCenter {...props()} />);
     expect(await screen.findByText("Unavailable")).toBeInTheDocument();
     expect(screen.queryByText("Stale")).not.toBeInTheDocument();
@@ -271,5 +305,39 @@ describe("ReviewCenter", () => {
     expect(analyzeGeo).toHaveBeenCalledTimes(1);
     expect(suggestImprovements).toHaveBeenCalledTimes(1);
     expect(analyzeHumanize).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a fast new identity when a slow old review finishes later", async () => {
+    const oldReferences = deferred<(typeof reference)[]>();
+    vi.mocked(listReferences)
+      .mockImplementationOnce(() => oldReferences.promise)
+      .mockResolvedValueOnce([reference]);
+    vi.mocked(lintDraft).mockResolvedValueOnce({ violations: [], repetitions: [], hits: [] });
+    const editedDraft: Draft = {
+      ...structuredClone(draft),
+      outline: {
+        opening_hook: "A newly edited opening",
+        sections: [],
+        estimated_words: 500,
+      },
+      sections: [{ ...draft.sections[0], content_md: "Fast new content" }],
+    };
+    const view = render(<ReviewCenter {...props()} />);
+
+    view.rerender(<ReviewCenter {...props()} draft={editedDraft} />);
+    const proofread = await screen.findByRole("region", { name: "Proofread review" });
+    expect(await within(proofread).findByText("No voice-rule issues")).toBeInTheDocument();
+
+    await act(async () => oldReferences.resolve([reference]));
+    await waitFor(() => expect(listReferences).toHaveBeenCalledTimes(2));
+
+    expect(within(proofread).getByText("No voice-rule issues")).toBeInTheDocument();
+    expect(within(proofread).queryByText("1 voice-rule issue")).not.toBeInTheDocument();
+    expect(within(proofread).getByText("Current")).toBeInTheDocument();
+    expect(screen.queryByText("Stale")).not.toBeInTheDocument();
+    const cached = peekCached<ReviewSummary>("review-center", draft.id);
+    expect(cached?.hash).toBe(
+      combineAnalysisHash(hashDraftContent(editedDraft), hashReferenceFingerprint([reference])),
+    );
   });
 });
