@@ -302,7 +302,9 @@ export function DraftWorkspace({
         unwrittenCount: unfilledCount,
         totalSections: draft.sections.length,
         generationRunning:
-          jobRunning || composingWholeDraft || draft.sections.some((s) => s.status === "generating"),
+          jobRunning ||
+          composingWholeDraft ||
+          draft.sections.some((s) => s.status === "generating"),
         generationFailed: Boolean(jobError) || draft.sections.some((s) => s.status === "failed"),
         outlineDrift,
       }),
@@ -326,17 +328,28 @@ export function DraftWorkspace({
     setComposingWholeDraft(true);
     try {
       await onExpandAll();
+    } catch (error) {
+      setComposingWholeDraft(false);
+      throw error;
     } finally {
       setAdvancing(false);
     }
   }, [onExpandAll]);
 
   const handleExpandUnfilled = useCallback(async () => {
+    setAdvancing(true);
     setLiveSectionId(null);
     setLiveText("");
     setJobError(null);
     setComposingWholeDraft(true);
-    await onExpandUnfilled();
+    try {
+      await onExpandUnfilled();
+    } catch (error) {
+      setComposingWholeDraft(false);
+      throw error;
+    } finally {
+      setAdvancing(false);
+    }
   }, [onExpandUnfilled]);
 
   const focusSetup = useCallback((): void => {
@@ -568,41 +581,41 @@ export function DraftWorkspace({
         )}
 
         {draft.stage === "sections" && (
-        <Suspense
-          fallback={
-            <p className="text-center text-muted text-sm py-16 animate-fade-in">
-              Opening the editor…
-            </p>
-          }
-        >
-        {hasOpening && (
-          <OpeningCard
-            value={draft.outline?.opening_hook ?? ""}
-            draftId={draft.id}
-            pendingTexts={pendingTextsForSection("opening")}
-            onSave={handleOpeningChange}
-          />
-        )}
-          <SectionsPanel
-            draft={draft}
-            generatingIds={generatingIds}
-            jobError={jobError}
-            onDismissJobError={() => setJobError(null)}
-            unfilledCount={unfilledCount}
-            jobRunning={jobRunning}
-            composingWholeDraft={composingWholeDraft}
-            liveWords={totalWords}
-            liveSectionId={liveSectionId}
-            liveText={liveText}
-            onSectionSave={onSectionSave}
-            pendingTextsForSection={pendingTextsForSection}
-            onRegenerateSection={handleRegenerateSection}
-            onRevertSection={onRevertSection}
-            onReviseDraft={handleReviseDraft}
-            onReorder={onReorder}
-            references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
-          />
-        </Suspense>
+          <Suspense
+            fallback={
+              <p className="text-center text-muted text-sm py-16 animate-fade-in">
+                Opening the editor…
+              </p>
+            }
+          >
+            {hasOpening && (
+              <OpeningCard
+                value={draft.outline?.opening_hook ?? ""}
+                draftId={draft.id}
+                pendingTexts={pendingTextsForSection("opening")}
+                onSave={handleOpeningChange}
+              />
+            )}
+            <SectionsPanel
+              draft={draft}
+              generatingIds={generatingIds}
+              jobError={jobError}
+              onDismissJobError={() => setJobError(null)}
+              unfilledCount={unfilledCount}
+              jobRunning={jobRunning}
+              composingWholeDraft={composingWholeDraft}
+              liveWords={totalWords}
+              liveSectionId={liveSectionId}
+              liveText={liveText}
+              onSectionSave={onSectionSave}
+              pendingTextsForSection={pendingTextsForSection}
+              onRegenerateSection={handleRegenerateSection}
+              onRevertSection={onRevertSection}
+              onReviseDraft={handleReviseDraft}
+              onReorder={onReorder}
+              references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -619,65 +632,65 @@ export function DraftWorkspace({
 
       {/* Lazy overlay panels: null fallback — each pops in when its chunk lands. */}
       <Suspense fallback={null}>
-      {lintOpen && (
-        <LintPanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onTrackChange={handleTrackChange}
-          onClose={() => setLintOpen(false)}
-        />
-      )}
-      {shapeOpen && (
-        <ShapePanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onClose={() => setShapeOpen(false)}
-        />
-      )}
-      {geoOpen && (
-        <OptimizePanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onChange={onChange}
-          onClose={() => setGeoOpen(false)}
-        />
-      )}
-      {humanizeOpen && (
-        <HumanizePanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onClose={() => setHumanizeOpen(false)}
-        />
-      )}
-      {reviewOpen && (
-        <ReviewCenter
-          draft={draft}
-          onOpenProofread={(sectionId) => openReviewTool(setLintOpen, sectionId)}
-          onOpenFactualSupport={(sectionId) => openReviewTool(setLintOpen, sectionId)}
-          onOpenShape={(sectionId) => openReviewTool(setShapeOpen, sectionId)}
-          onOpenHumanization={(sectionId) => openReviewTool(setHumanizeOpen, sectionId)}
-          onOpenGeo={(sectionId) => openReviewTool(setGeoOpen, sectionId)}
-          onOpenHeadlines={() => openReviewTool(setHeadlinesOpen)}
-          onClose={() => setReviewOpen(false)}
-        />
-      )}
-      {repurposeOpen && (
-        <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
-      )}
-      {headlinesOpen && (
-        <HeadlineLab
-          draftId={draft.id}
-          onApplyTitle={(title) => onChange({ ...draft, title })}
-          onApplyHook={(hook) =>
-            onChange(
-              draft.outline
-                ? { ...draft, outline: { ...draft.outline, opening_hook: hook } }
-                : draft,
-            )
-          }
-          onClose={() => setHeadlinesOpen(false)}
-        />
-      )}
+        {lintOpen && (
+          <LintPanel
+            draft={draft}
+            onSectionSave={onSectionSave}
+            onTrackChange={handleTrackChange}
+            onClose={() => setLintOpen(false)}
+          />
+        )}
+        {shapeOpen && (
+          <ShapePanel
+            draft={draft}
+            onSectionSave={onSectionSave}
+            onClose={() => setShapeOpen(false)}
+          />
+        )}
+        {geoOpen && (
+          <OptimizePanel
+            draft={draft}
+            onSectionSave={onSectionSave}
+            onChange={onChange}
+            onClose={() => setGeoOpen(false)}
+          />
+        )}
+        {humanizeOpen && (
+          <HumanizePanel
+            draft={draft}
+            onSectionSave={onSectionSave}
+            onClose={() => setHumanizeOpen(false)}
+          />
+        )}
+        {reviewOpen && (
+          <ReviewCenter
+            draft={draft}
+            onOpenProofread={(sectionId) => openReviewTool(setLintOpen, sectionId)}
+            onOpenFactualSupport={(sectionId) => openReviewTool(setLintOpen, sectionId)}
+            onOpenShape={(sectionId) => openReviewTool(setShapeOpen, sectionId)}
+            onOpenHumanization={(sectionId) => openReviewTool(setHumanizeOpen, sectionId)}
+            onOpenGeo={(sectionId) => openReviewTool(setGeoOpen, sectionId)}
+            onOpenHeadlines={() => openReviewTool(setHeadlinesOpen)}
+            onClose={() => setReviewOpen(false)}
+          />
+        )}
+        {repurposeOpen && (
+          <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
+        )}
+        {headlinesOpen && (
+          <HeadlineLab
+            draftId={draft.id}
+            onApplyTitle={(title) => onChange({ ...draft, title })}
+            onApplyHook={(hook) =>
+              onChange(
+                draft.outline
+                  ? { ...draft, outline: { ...draft.outline, opening_hook: hook } }
+                  : draft,
+              )
+            }
+            onClose={() => setHeadlinesOpen(false)}
+          />
+        )}
       </Suspense>
     </div>
   );

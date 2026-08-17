@@ -1,4 +1,7 @@
+import { useRef, useState } from "react";
+
 import type { DraftNextAction as DraftNextActionModel } from "../../lib/draftNextAction";
+import { ErrorNotice } from "../ui/ErrorNotice";
 
 interface NextDraftActionProps {
   action: DraftNextActionModel;
@@ -21,6 +24,9 @@ export function NextDraftAction({
   onReviewDraft,
   onSetup,
 }: NextDraftActionProps): JSX.Element {
+  const inFlight = useRef(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<unknown>(null);
   const callbacks = {
     "create-outline": onCreateOutline,
     "compose-draft": onComposeDraft,
@@ -30,40 +36,83 @@ export function NextDraftAction({
     "review-draft": onReviewDraft,
   };
 
+  const runAction = async (): Promise<void> => {
+    if (action.disabled || inFlight.current) return;
+    const callback = callbacks[action.kind];
+    if (!callback) return;
+    inFlight.current = true;
+    setPending(true);
+    setError(null);
+    try {
+      await callback();
+    } catch (nextError) {
+      setError(nextError);
+    } finally {
+      inFlight.current = false;
+      setPending(false);
+    }
+  };
+
+  const operation =
+    action.kind === "create-outline"
+      ? "creating an outline"
+      : action.kind === "review-outline"
+        ? "opening the outline"
+        : action.kind === "review-draft"
+          ? "opening Review Center"
+          : action.kind === "retry-remaining"
+            ? "retrying the remaining sections"
+            : action.kind === "finish-remaining"
+              ? "finishing the remaining sections"
+              : "composing the draft";
+
   return (
     <section
       aria-labelledby="next-draft-action-label"
-      className="mt-4 mb-6 border-l-[3px] border-cobalt-500 pl-4 py-1 sm:flex sm:items-center sm:justify-between sm:gap-5"
+      aria-busy={pending || undefined}
+      className="mt-4 mb-6 border-l-[3px] border-cobalt-500 pl-4 py-1"
     >
-      <div className="min-w-0">
-        <p
-          id="next-draft-action-label"
-          className="font-mono text-[10px] font-semibold tracking-[0.18em] text-cobalt-600"
+      <div className="sm:flex sm:items-center sm:justify-between sm:gap-5">
+        <div className="min-w-0">
+          <p
+            id="next-draft-action-label"
+            className="font-mono text-[10px] font-semibold tracking-[0.18em] text-cobalt-600"
+          >
+            NEXT
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-ink-2">
+            {action.copy}{" "}
+            {action.blocker === "setup" && (
+              // biome-ignore lint/a11y/useValidAnchor: this navigates to and reveals the in-page Setup section
+              <a
+                href="#draft-setup"
+                onClick={onSetup}
+                className="font-medium text-cobalt-700 underline underline-offset-2 hover:no-underline"
+              >
+                Open Setup
+              </a>
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void runAction()}
+          disabled={action.disabled || pending}
+          className="nb-btn nb-btn-primary nb-btn-sm mt-3 sm:mt-0 shrink-0"
         >
-          NEXT
-        </p>
-        <p className="mt-1 text-sm leading-relaxed text-ink-2">
-          {action.copy}{" "}
-          {action.blocker === "setup" && (
-            // biome-ignore lint/a11y/useValidAnchor: this navigates to and reveals the in-page Setup section
-            <a
-              href="#draft-setup"
-              onClick={onSetup}
-              className="font-medium text-cobalt-700 underline underline-offset-2 hover:no-underline"
-            >
-              Open Setup
-            </a>
-          )}
-        </p>
+          {pending ? "Working…" : action.label}
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={() => void callbacks[action.kind]?.()}
-        disabled={action.disabled}
-        className="nb-btn nb-btn-primary nb-btn-sm mt-3 sm:mt-0 shrink-0"
-      >
-        {action.label}
-      </button>
+      {error !== null && (
+        <div className="mt-3">
+          <ErrorNotice
+            error={error}
+            operation={operation}
+            onRetry={() => void runAction()}
+            onDismiss={() => setError(null)}
+          />
+        </div>
+      )}
     </section>
   );
 }

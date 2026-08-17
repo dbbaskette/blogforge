@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
+import { expandSections, getDraft } from "../../src/api/drafts";
 import { DraftPage } from "../../src/routes/DraftPage";
 
 vi.mock("../../src/hooks/useMe", () => ({
@@ -43,6 +44,8 @@ vi.mock("../../src/api/drafts", async (importOriginal) => {
       sections: [],
     }),
     updateDraft: vi.fn().mockImplementation((_, d) => Promise.resolve(d)),
+    getActiveJob: vi.fn().mockResolvedValue({ job_id: null }),
+    expandSections: vi.fn().mockResolvedValue({ job_id: "job-1" }),
   };
 });
 
@@ -97,5 +100,69 @@ describe("DraftPage", () => {
     );
     await waitFor(() => expect(screen.getByText(/All drafts/i)).toBeInTheDocument());
     expect(screen.getByText(/All changes saved/i)).toBeInTheDocument();
+  });
+
+  it("requests remaining-only expansion when retrying a failed draft", async () => {
+    vi.mocked(getDraft).mockResolvedValueOnce({
+      id: "abc123",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      title: "Interrupted draft",
+      stage: "sections",
+      idea: {
+        topic: "Interrupted draft",
+        pack_slug: "dan",
+        provider: "anthropic",
+        model: "claude-3-5-sonnet",
+        target_words: 1500,
+      },
+      outline: {
+        opening_hook: "A hook",
+        sections: [
+          { id: "s1", title: "Completed", brief: "Keep it" },
+          { id: "s2", title: "Remaining", brief: "Finish it" },
+        ],
+        estimated_words: 1500,
+      },
+      sections: [
+        {
+          id: "s1",
+          title: "Completed",
+          brief: "Keep it",
+          content_md: "Completed prose remains visible.",
+          status: "ready",
+          last_generated_at: null,
+          last_error: null,
+          word_count: 4,
+        },
+        {
+          id: "s2",
+          title: "Remaining",
+          brief: "Finish it",
+          content_md: "",
+          status: "failed",
+          last_generated_at: null,
+          last_error: "Interrupted",
+          word_count: 0,
+        },
+      ],
+      tags: [],
+      hero_image_key: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/abc123"]}>
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const retryButton = await screen.findByRole("button", { name: "Retry remaining sections" });
+    fireEvent.click(retryButton);
+
+    await waitFor(() =>
+      expect(expandSections).toHaveBeenCalledWith("abc123", { remainingOnly: true }),
+    );
   });
 });

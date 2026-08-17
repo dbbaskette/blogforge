@@ -77,7 +77,7 @@ export function DraftPage(): JSX.Element {
 
   const onExpandUnfilled = useCallback(async () => {
     if (!id) return;
-    const { job_id } = await expandSections(id);
+    const { job_id } = await expandSections(id, { remainingOnly: true });
     setJobId(job_id);
   }, [id]);
 

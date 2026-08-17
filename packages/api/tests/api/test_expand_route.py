@@ -1,4 +1,5 @@
 """POST /api/drafts/{id}/expand."""
+
 from __future__ import annotations
 
 import shutil
@@ -60,12 +61,20 @@ def _seed_outlined_draft(client) -> str:
     }
     created["sections"] = [
         {
-            "id": "s1", "title": "First", "brief": "b1",
-            "content_md": "", "status": "empty", "word_count": 0,
+            "id": "s1",
+            "title": "First",
+            "brief": "b1",
+            "content_md": "",
+            "status": "empty",
+            "word_count": 0,
         },
         {
-            "id": "s2", "title": "Second", "brief": "b2",
-            "content_md": "", "status": "empty", "word_count": 0,
+            "id": "s2",
+            "title": "Second",
+            "brief": "b2",
+            "content_md": "",
+            "status": "empty",
+            "word_count": 0,
         },
     ]
     created["stage"] = "outline"
@@ -103,6 +112,57 @@ async def test_expand_single_pass_composes_all_ignoring_limit(expand_client) -> 
     # Both sections filled from the single-pass split, despite limit=1.
     assert secs["s1"]["content_md"].strip() and secs["s1"]["status"] == "ready"
     assert secs["s2"]["content_md"].strip() and secs["s2"]["status"] == "ready"
+
+
+async def test_expand_remaining_preserves_completed_section_and_version_history(
+    expand_client,
+) -> None:
+    did = _seed_outlined_draft(expand_client)
+    seeded = expand_client.get(f"/api/drafts/{did}").json()
+    seeded["stage"] = "sections"
+    seeded["sections"][0].update(
+        content_md="Historical baseline.\n",
+        status="ready",
+        word_count=2,
+    )
+    seeded["sections"][1].update(
+        content_md="Partial failed prose.\n",
+        status="failed",
+        last_error="Previous provider failure",
+        word_count=3,
+    )
+    assert expand_client.put(f"/api/drafts/{did}", json=seeded).status_code == 200
+    # Create an existing completed-section history entry, then prove the
+    # remaining-only compose neither adds to nor mutates that history.
+    assert (
+        expand_client.post(
+            f"/api/drafts/{did}/sections/s1/save",
+            json={"content_md": "Keep this exact.\n", "create_version": True},
+        ).status_code
+        == 200
+    )
+    before = expand_client.get(f"/api/drafts/{did}").json()
+    completed_before = next(s for s in before["sections"] if s["id"] == "s1")
+    completed_versions_before = expand_client.get(f"/api/drafts/{did}/sections/s1/versions").json()
+
+    r = expand_client.post(f"/api/drafts/{did}/expand?remaining_only=true")
+    assert r.status_code == 202
+    with expand_client.stream("GET", f"/api/jobs/{r.json()['job_id']}/events") as resp:
+        events = b"".join(resp.iter_bytes()).decode()
+
+    final = expand_client.get(f"/api/drafts/{did}").json()
+    sections = {s["id"]: s for s in final["sections"]}
+    assert sections["s1"] == completed_before
+    assert (
+        expand_client.get(f"/api/drafts/{did}/sections/s1/versions").json()
+        == completed_versions_before
+    )
+    assert sections["s2"]["content_md"].strip() == "Second section body."
+    assert sections["s2"]["status"] == "ready"
+    target_versions = expand_client.get(f"/api/drafts/{did}/sections/s2/versions").json()
+    assert target_versions[0]["content_md"] == "Partial failed prose.\n"
+    assert "section:done:s2" in events
+    assert "section:done:s1" not in events
 
 
 async def test_expand_outline_missing_409(expand_client) -> None:
