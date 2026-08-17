@@ -140,6 +140,25 @@ describe("SectionsPanel", () => {
     expect(onReviseDraft).toHaveBeenLastCalledWith("smooth the transitions");
   });
 
+  it("retries the exact failed whole-draft note after the textarea changes", async () => {
+    const onReviseDraft = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("gateway payload"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    render(<SectionsPanel {...baseProps} draft={makeDraft()} onReviseDraft={onReviseDraft} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /revise whole draft/i }));
+    const note = screen.getByLabelText(/revise the whole draft/i);
+    fireEvent.change(note, { target: { value: "smooth the transitions" } });
+    fireEvent.click(screen.getByRole("button", { name: /revise 1 section/i }));
+    await screen.findByRole("alert");
+    fireEvent.change(note, { target: { value: "replace every example" } });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReviseDraft).toHaveBeenCalledTimes(2));
+    expect(onReviseDraft).toHaveBeenLastCalledWith("smooth the transitions");
+  });
+
   it("rolls back and retries a failed section reorder", async () => {
     const draft = makeDraft();
     draft.sections.push({
@@ -166,5 +185,48 @@ describe("SectionsPanel", () => {
 
     await waitFor(() => expect(onReorder).toHaveBeenCalledTimes(2));
     expect(onReorder).toHaveBeenLastCalledWith(["s2", "s1"]);
+  });
+
+  it("replays the exact failed section order after the server order changes", async () => {
+    const draft = makeDraft();
+    draft.sections.push({
+      id: "s2",
+      title: "Second Section",
+      brief: "",
+      content_md: "Second prose.",
+      status: "ready",
+      last_generated_at: null,
+      last_error: null,
+      word_count: 2,
+    });
+    draft.sections.push({
+      id: "s3",
+      title: "Third Section",
+      brief: "",
+      content_md: "Third prose.",
+      status: "ready",
+      last_generated_at: null,
+      last_error: null,
+      word_count: 2,
+    });
+    const onReorder = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("database response"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    const { rerender } = render(
+      <SectionsPanel {...baseProps} draft={draft} onReorder={onReorder} />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Move section down" })[0]);
+    await screen.findByRole("alert");
+    const serverChanged = {
+      ...draft,
+      sections: [draft.sections[2], draft.sections[0], draft.sections[1]],
+    };
+    rerender(<SectionsPanel {...baseProps} draft={serverChanged} onReorder={onReorder} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReorder).toHaveBeenCalledTimes(2));
+    expect(onReorder).toHaveBeenLastCalledWith(["s2", "s1", "s3"]);
   });
 });

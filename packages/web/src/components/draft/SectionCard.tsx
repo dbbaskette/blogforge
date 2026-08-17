@@ -1,6 +1,8 @@
 import { memo, useState } from "react";
 
+import type { ApiError } from "../../api/client";
 import type { Section } from "../../api/drafts";
+import { parsePersistedSectionError } from "../../lib/errors";
 import { ErrorNotice } from "../ui/ErrorNotice";
 import { Icon } from "../ui/Icon";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
@@ -101,24 +103,39 @@ export const SectionCard = memo(function SectionCard({
 
   const [open, setOpen] = useState(initialOpen);
   const [regenerating, setRegenerating] = useState(false);
-  const [regenError, setRegenError] = useState<unknown>(null);
+  const [regenFailure, setRegenFailure] = useState<{
+    error: unknown;
+    instruction: string | undefined;
+  } | null>(null);
   const [note, setNote] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [dismissedPersistedError, setDismissedPersistedError] = useState<string | null>(null);
 
-  const handleRegenerate = async (): Promise<void> => {
+  const runRegenerate = async (instruction: string | undefined): Promise<void> => {
     setRegenerating(true);
-    setRegenError(null);
+    setRegenFailure(null);
+    if (section.last_error) setDismissedPersistedError(section.last_error);
     try {
-      await onRegenerate(note.trim() || undefined);
+      await onRegenerate(instruction);
       setNote("");
     } catch (e) {
-      setRegenError(e);
+      setRegenFailure({ error: e, instruction });
     } finally {
       setRegenerating(false);
     }
   };
 
+  const handleRegenerate = (): void => {
+    void runRegenerate(note.trim() || undefined);
+  };
+
   const isFailed = displayStatus === "failed";
+  const persistedError = section.last_error ? parsePersistedSectionError(section.last_error) : null;
+  const showPersistedError =
+    isFailed && persistedError !== null && section.last_error !== dismissedPersistedError;
+  const persistedMetadata = persistedError as Partial<ApiError> | null;
+  const persistedCanRetry =
+    typeof persistedMetadata?.status === "number" || typeof persistedMetadata?.code === "string";
 
   return (
     <article
@@ -200,11 +217,14 @@ export const SectionCard = memo(function SectionCard({
             </p>
           )}
 
-          {isFailed && section.last_error && (
+          {showPersistedError && (
             <div className="mb-4">
               <ErrorNotice
-                error={new Error(section.last_error)}
+                error={persistedError}
                 operation="composing this section"
+                onRetry={persistedCanRetry ? () => void runRegenerate(undefined) : undefined}
+                onDismiss={() => setDismissedPersistedError(section.last_error ?? null)}
+                dismissLabel="Continue editing"
               />
             </div>
           )}
@@ -238,7 +258,7 @@ export const SectionCard = memo(function SectionCard({
               draftId={draftId}
               pendingTexts={pendingTexts}
             />
-          ) : (
+          ) : showPersistedError ? null : (
             <div
               className="nb-card p-6 text-center border-dashed"
               style={{ background: "#fafbfc" }}
@@ -255,13 +275,13 @@ export const SectionCard = memo(function SectionCard({
             </div>
           )}
 
-          {Boolean(regenError) && (
+          {regenFailure !== null && (
             <div className="mt-3">
               <ErrorNotice
-                error={regenError}
+                error={regenFailure.error}
                 operation="regenerating this section"
-                onRetry={() => void handleRegenerate()}
-                onDismiss={() => setRegenError(null)}
+                onRetry={() => void runRegenerate(regenFailure.instruction)}
+                onDismiss={() => setRegenFailure(null)}
               />
             </div>
           )}
@@ -274,7 +294,7 @@ export const SectionCard = memo(function SectionCard({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !regenerating) void handleRegenerate();
+                    if (e.key === "Enter" && !regenerating) handleRegenerate();
                   }}
                   placeholder="Optional: how should I revise this? e.g. “tighten”, “add an example”"
                   aria-label="Revision note"

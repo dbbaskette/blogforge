@@ -57,12 +57,17 @@ export function SectionsPanel({
   const [reviseOpen, setReviseOpen] = useState(false);
   const [reviseNote, setReviseNote] = useState("");
   const [revising, setRevising] = useState(false);
-  const [reviseError, setReviseError] = useState<unknown>(null);
+  const [reviseFailure, setReviseFailure] = useState<{
+    error: unknown;
+    instruction: string;
+  } | null>(null);
   // Optimistic section order, applied immediately on reorder and reconciled
   // when the server-backed `draft` prop updates. `null` = use the server order.
   const [optimisticSections, setOptimisticSections] = useState<Section[] | null>(null);
-  const [reorderError, setReorderError] = useState<unknown>(null);
-  const [reorderRetry, setReorderRetry] = useState<{ idx: number; dir: -1 | 1 } | null>(null);
+  const [reorderFailure, setReorderFailure] = useState<{
+    error: unknown;
+    sectionIds: string[];
+  } | null>(null);
   // Reset the optimistic override whenever the server order changes so we never
   // show stale local state once the parent re-renders with fresh sections.
   const serverOrderKey = draft.sections.map((s) => s.id).join(",");
@@ -81,29 +86,34 @@ export function SectionsPanel({
   // token-streaming state changes don't re-render every memoized SectionCard.
   const sectionsRef = useRef(sections);
   sectionsRef.current = sections;
+  const persistOrder = useCallback(
+    async (sectionIds: string[], optimisticOrder: Section[] | null): Promise<void> => {
+      setOptimisticSections(optimisticOrder);
+      setReorderFailure(null);
+      try {
+        await onReorder([...sectionIds]);
+        setOptimisticSections(null);
+      } catch (e) {
+        setOptimisticSections(null);
+        setReorderFailure({ error: e, sectionIds: [...sectionIds] });
+      }
+    },
+    [onReorder],
+  );
+
   const moveSection = useCallback(
-    async (idx: number, dir: -1 | 1): Promise<void> => {
+    (idx: number, dir: -1 | 1): void => {
       const cur = sectionsRef.current;
       const swap = idx + dir;
       if (swap < 0 || swap >= cur.length) return;
       const next = [...cur];
       [next[idx], next[swap]] = [next[swap], next[idx]];
-      // Optimistic: reorder locally now so the list responds instantly.
-      setOptimisticSections(next);
-      setReorderError(null);
-      try {
-        await onReorder(next.map((s) => s.id));
-        // Success: drop the override; the parent prop carries the server truth.
-        setOptimisticSections(null);
-        setReorderRetry(null);
-      } catch (e) {
-        // Reject: roll back to the server order and surface the failure.
-        setOptimisticSections(null);
-        setReorderError(e);
-        setReorderRetry({ idx, dir });
-      }
+      void persistOrder(
+        next.map((s) => s.id),
+        next,
+      );
     },
-    [onReorder],
+    [persistOrder],
   );
 
   // Per-section handler bundle, recreated only when the section list itself
@@ -139,22 +149,25 @@ export function SectionsPanel({
   // the workspace-owned total (matches the footer) when supplied.
   const liveWords = liveWordsProp ?? sections.reduce((acc, s) => acc + s.word_count, 0);
 
-  const submitRevise = async (): Promise<void> => {
-    const note = reviseNote.trim();
-    if (!note) return;
+  const runRevise = async (instruction: string): Promise<void> => {
     setRevising(true);
-    setReviseError(null);
+    setReviseFailure(null);
     // Switch to the section view so per-section streaming is visible.
     setView("edit");
     try {
-      await onReviseDraft(note);
+      await onReviseDraft(instruction);
       setReviseOpen(false);
       setReviseNote("");
     } catch (e) {
-      setReviseError(e);
+      setReviseFailure({ error: e, instruction });
     } finally {
       setRevising(false);
     }
+  };
+
+  const submitRevise = (): void => {
+    const instruction = reviseNote.trim();
+    if (instruction) void runRevise(instruction);
   };
 
   return (
@@ -224,13 +237,13 @@ export function SectionsPanel({
             placeholder="How should I revise the whole piece?"
             className="w-full bg-canvas border border-rule rounded-nb-sm px-3 py-2 text-sm text-ink placeholder:text-muted-2 focus:outline-none focus:border-cobalt-300 resize-y"
           />
-          {Boolean(reviseError) && (
+          {reviseFailure !== null && (
             <div className="mt-3">
               <ErrorNotice
-                error={reviseError}
+                error={reviseFailure.error}
                 operation="revising your draft"
-                onRetry={() => void submitRevise()}
-                onDismiss={() => setReviseError(null)}
+                onRetry={() => void runRevise(reviseFailure.instruction)}
+                onDismiss={() => setReviseFailure(null)}
               />
             </div>
           )}
@@ -352,14 +365,12 @@ export function SectionsPanel({
         </div>
       )}
 
-      {Boolean(reorderError) && (
+      {reorderFailure !== null && (
         <ErrorNotice
-          error={reorderError}
+          error={reorderFailure.error}
           operation="reordering your sections"
-          onRetry={
-            reorderRetry ? () => void moveSection(reorderRetry.idx, reorderRetry.dir) : undefined
-          }
-          onDismiss={() => setReorderError(null)}
+          onRetry={() => void persistOrder(reorderFailure.sectionIds, null)}
+          onDismiss={() => setReorderFailure(null)}
         />
       )}
 

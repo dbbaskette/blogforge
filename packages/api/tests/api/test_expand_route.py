@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import pytest
 import pytest_asyncio
 import yaml
 
+from blogforge.llm.exceptions import ProviderMissingKey
 from tests.conftest import _seed_approved_user, _signed_client
 
 _MYVOICE_DAN = Path("/Users/dbbaskette/Projects/myvoice/packs/dan")
@@ -95,6 +97,25 @@ async def test_expand_returns_job_and_runs_sections(expand_client) -> None:
     assert final["stage"] == "sections"
     assert all(s["status"] in ("ready", "edited") for s in final["sections"])
     assert all(s["content_md"].strip() for s in final["sections"])
+
+
+async def test_expand_persists_provider_recovery_metadata(expand_client, monkeypatch) -> None:
+    async def fail_generation(*args, **kwargs):
+        raise ProviderMissingKey("anthropic")
+
+    monkeypatch.setattr("blogforge.api.expand.generate_document", fail_generation)
+    did = _seed_outlined_draft(expand_client)
+
+    response = expand_client.post(f"/api/drafts/{did}/expand")
+    job_id = response.json()["job_id"]
+    with expand_client.stream("GET", f"/api/jobs/{job_id}/events") as events:
+        b"".join(events.iter_bytes())
+
+    final = expand_client.get(f"/api/drafts/{did}").json()
+    persisted = json.loads(final["sections"][0]["last_error"])
+    assert persisted["version"] == 1
+    assert persisted["code"] == "provider_missing_key"
+    assert persisted["hint"] == "Add the key in Settings."
 
 
 async def test_expand_single_pass_composes_all_ignoring_limit(expand_client) -> None:

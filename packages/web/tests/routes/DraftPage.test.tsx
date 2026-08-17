@@ -1,10 +1,24 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiError } from "../../src/api/client";
 import { expandSections, getDraft, updateDraft } from "../../src/api/drafts";
 import { DraftPage } from "../../src/routes/DraftPage";
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  return { promise, resolve, reject };
+}
 
 vi.mock("../../src/hooks/useMe", () => ({
   useMe: () => ({
@@ -177,6 +191,96 @@ describe("DraftPage", () => {
     expect(vi.mocked(updateDraft).mock.calls[1]?.[1].outline?.opening_hook).toBe(
       "My unsaved opening",
     );
+  });
+
+  it("ignores an older save failure after a newer save succeeds", async () => {
+    vi.mocked(updateDraft).mockReset();
+    const firstSave = deferred<unknown>();
+    const secondSave = deferred<unknown>();
+    vi.mocked(getDraft).mockResolvedValueOnce({
+      id: "abc123",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      title: "Race test",
+      stage: "outline",
+      idea: { topic: "Race test", pack_slug: "dan", provider: "anthropic", model: "m" },
+      outline: {
+        opening_hook: "Original",
+        sections: [{ id: "s1", title: "First", brief: "Brief" }],
+        estimated_words: 500,
+      },
+      sections: [],
+      tags: [],
+      hero_image_key: null,
+    });
+    vi.mocked(updateDraft)
+      .mockImplementationOnce(() => firstSave.promise as Promise<never>)
+      .mockImplementationOnce(() => secondSave.promise as Promise<never>);
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/abc123"]}>
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const opening = await screen.findByLabelText("Opening hook");
+    fireEvent.change(opening, { target: { value: "Older edit" } });
+    fireEvent.change(opening, { target: { value: "Newest edit" } });
+    expect(updateDraft).toHaveBeenCalledTimes(2);
+
+    await act(async () => secondSave.resolve(undefined));
+    await waitFor(() => expect(screen.getByText(/All changes saved/i)).toBeInTheDocument());
+    await act(async () =>
+      firstSave.reject(Object.assign(new Error("stale failure"), { status: 503 })),
+    );
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+    expect(opening).toHaveValue("Newest edit");
+  });
+
+  it("retries the exact snapshot from the latest failed save", async () => {
+    vi.mocked(updateDraft).mockReset();
+    vi.mocked(getDraft).mockResolvedValueOnce({
+      id: "abc123",
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-01T00:00:00Z",
+      title: "Snapshot test",
+      stage: "outline",
+      idea: { topic: "Snapshot test", pack_slug: "dan", provider: "anthropic", model: "m" },
+      outline: {
+        opening_hook: "Original",
+        sections: [{ id: "s1", title: "First", brief: "Brief" }],
+        estimated_words: 500,
+      },
+      sections: [],
+      tags: [],
+      hero_image_key: null,
+    });
+    vi.mocked(updateDraft)
+      .mockRejectedValueOnce(Object.assign(new Error("latest failure"), { status: 503 }))
+      .mockResolvedValueOnce(undefined as never);
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/abc123"]}>
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(await screen.findByLabelText("Opening hook"), {
+      target: { value: "Failed snapshot" },
+    });
+    await screen.findByRole("alert");
+    const failedPayload = structuredClone(vi.mocked(updateDraft).mock.calls[0]?.[1]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(updateDraft).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(updateDraft).mock.calls[1]?.[1]).toEqual(failedPayload);
   });
 
   it("renders the ResearchPanel once a draft loads at the research stage", async () => {

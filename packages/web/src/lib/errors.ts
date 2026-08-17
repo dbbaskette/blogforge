@@ -9,6 +9,14 @@ export interface ErrorPresentation {
   action: ErrorRecoveryAction;
 }
 
+type PersistedSectionError = {
+  version: 1;
+  message: string;
+  code?: string;
+  hint?: string;
+  status?: number;
+};
+
 const PROVIDER_CODES = new Set([
   "empty_key",
   "invalid_key",
@@ -33,6 +41,50 @@ function isProviderError(code: string | undefined): boolean {
   return Boolean(
     code && (PROVIDER_CODES.has(code) || code.startsWith("provider_") || code.includes("api_key")),
   );
+}
+
+function isPersistedSectionError(value: unknown): value is PersistedSectionError {
+  return (
+    isJsonObject(value) &&
+    value.version === 1 &&
+    typeof value.message === "string" &&
+    (value.code === undefined || typeof value.code === "string") &&
+    (value.hint === undefined || typeof value.hint === "string") &&
+    (value.status === undefined || typeof value.status === "number")
+  );
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Restore API-style metadata from the section last_error text column. */
+export function parsePersistedSectionError(raw: string): Error & Partial<ApiError> {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (isPersistedSectionError(parsed)) {
+      return Object.assign(new Error(parsed.message), {
+        status: parsed.status,
+        code: parsed.code,
+        detail: {
+          message: parsed.message,
+          hint: parsed.hint,
+        },
+      });
+    }
+  } catch {
+    // Legacy values are parsed below.
+  }
+
+  const http = raw.match(/^HTTP(?:\s+status\s*:\s*|\s+)(\d{3})(?::\s*|\s+)?([\s\S]*)$/i);
+  if (http) {
+    return Object.assign(new Error("A previous section request failed."), {
+      status: Number(http[1]),
+      detail: raw,
+    });
+  }
+
+  return Object.assign(new Error(raw), { detail: raw });
 }
 
 /**

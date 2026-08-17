@@ -311,14 +311,11 @@ export function DraftWorkspace({
         outlineCount: draft.outline?.sections.length ?? 0,
         unwrittenCount: unfilledCount,
         totalSections: draft.sections.length,
-        generationRunning:
-          jobRunning ||
-          composingWholeDraft ||
-          draft.sections.some((s) => s.status === "generating"),
+        generationRunning: jobRunning || draft.sections.some((s) => s.status === "generating"),
         generationFailed: Boolean(jobError) || draft.sections.some((s) => s.status === "failed"),
         outlineDrift,
       }),
-    [composingWholeDraft, draft, jobError, jobRunning, outlineDrift, unfilledCount],
+    [draft, jobError, jobRunning, outlineDrift, unfilledCount],
   );
 
   const handleGenerate = useCallback(async () => {

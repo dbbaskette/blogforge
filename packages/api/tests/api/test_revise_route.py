@@ -1,6 +1,8 @@
 """POST /api/drafts/{id}/revise — holistic whole-draft revision."""
+
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
@@ -8,6 +10,7 @@ import pytest
 import pytest_asyncio
 import yaml
 
+from blogforge.llm.exceptions import ProviderMissingKey
 from tests.conftest import _seed_approved_user, _signed_client
 
 _MYVOICE_DAN = Path("/Users/dbbaskette/Projects/myvoice/packs/dan")
@@ -35,7 +38,13 @@ async def revise_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def _seed_written_draft(client, *, write: bool = True) -> str:
     created = client.post(
         "/api/drafts",
-        json={"topic": "AI", "pack_slug": "dan", "provider": "anthropic", "model": "mock-1", "use_voice_profile": False},
+        json={
+            "topic": "AI",
+            "pack_slug": "dan",
+            "provider": "anthropic",
+            "model": "mock-1",
+            "use_voice_profile": False,
+        },
     ).json()
     created["outline"] = {
         "opening_hook": "Hook.",
@@ -49,12 +58,20 @@ def _seed_written_draft(client, *, write: bool = True) -> str:
     body = "Original prose for the section." if write else ""
     created["sections"] = [
         {
-            "id": "s1", "title": "First", "brief": "b1",
-            "content_md": body, "status": status, "word_count": len(body.split()),
+            "id": "s1",
+            "title": "First",
+            "brief": "b1",
+            "content_md": body,
+            "status": status,
+            "word_count": len(body.split()),
         },
         {
-            "id": "s2", "title": "Second", "brief": "b2",
-            "content_md": body, "status": status, "word_count": len(body.split()),
+            "id": "s2",
+            "title": "Second",
+            "brief": "b2",
+            "content_md": body,
+            "status": status,
+            "word_count": len(body.split()),
         },
     ]
     created["stage"] = "sections"
@@ -85,6 +102,49 @@ async def test_revise_snapshots_prior_prose(revise_client) -> None:
 
     versions = revise_client.get(f"/api/drafts/{did}/sections/s1/versions").json()
     assert any(v["content_md"] == "Original prose for the section." for v in versions)
+
+
+async def test_revise_persists_provider_recovery_metadata(revise_client, monkeypatch) -> None:
+    async def fail_stream(*args, **kwargs):
+        raise ProviderMissingKey("anthropic")
+        yield
+
+    monkeypatch.setattr("blogforge.api.revise.stream_section", fail_stream)
+    did = _seed_written_draft(revise_client)
+
+    response = revise_client.post(
+        f"/api/drafts/{did}/revise", json={"instruction": "tighten throughout"}
+    )
+    _drain(revise_client, response.json()["job_id"])
+
+    final = revise_client.get(f"/api/drafts/{did}").json()
+    persisted = json.loads(final["sections"][0]["last_error"])
+    assert persisted["version"] == 1
+    assert persisted["code"] == "provider_missing_key"
+    assert persisted["message"].startswith("No API key configured")
+
+
+async def test_section_regenerate_persists_provider_recovery_metadata(
+    revise_client, monkeypatch
+) -> None:
+    async def fail_stream(*args, **kwargs):
+        raise ProviderMissingKey("anthropic")
+        yield
+
+    monkeypatch.setattr("blogforge.api.section.stream_section", fail_stream)
+    did = _seed_written_draft(revise_client)
+
+    response = revise_client.post(
+        f"/api/drafts/{did}/sections/s1/regenerate",
+        json={"instruction": "tighten this section"},
+    )
+    _drain(revise_client, response.json()["job_id"])
+
+    final = revise_client.get(f"/api/drafts/{did}").json()
+    persisted = json.loads(final["sections"][0]["last_error"])
+    assert persisted["version"] == 1
+    assert persisted["code"] == "provider_missing_key"
+    assert persisted["hint"] == "Add the key in Settings."
 
 
 async def test_revise_nothing_written_409(revise_client) -> None:

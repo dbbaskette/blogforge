@@ -4,6 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 import { NextDraftAction } from "../../src/components/draft/NextDraftAction";
 import type { DraftNextAction } from "../../src/lib/draftNextAction";
 
+function deferred(): { promise: Promise<void>; reject: (reason: unknown) => void } {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<void>((_, nextReject) => {
+    reject = nextReject;
+  });
+  return { promise, reject };
+}
+
 const createOutline: DraftNextAction = {
   kind: "create-outline",
   label: "Create outline",
@@ -115,6 +123,36 @@ describe("NextDraftAction", () => {
 
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Compose draft" })).toBeInTheDocument();
+
+    rerender(<NextDraftAction action={createOutline} onCreateOutline={vi.fn()} />);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create outline" })).toBeInTheDocument();
+  });
+
+  it("discards a late rejection after the action kind changes", async () => {
+    const pendingCreate = deferred();
+    const { rerender } = render(
+      <NextDraftAction action={createOutline} onCreateOutline={() => pendingCreate.promise} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create outline" }));
+    rerender(
+      <NextDraftAction
+        action={{
+          kind: "compose-draft",
+          label: "Compose draft",
+          copy: "The outline is ready for prose.",
+          disabled: false,
+        }}
+        onComposeDraft={vi.fn()}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Compose draft" })).toBeEnabled(),
+    );
+
+    pendingCreate.reject(new Error("late create failure"));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
 
     rerender(<NextDraftAction action={createOutline} onCreateOutline={vi.fn()} />);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

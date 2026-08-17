@@ -25,6 +25,8 @@ export function NextDraftAction({
   onSetup,
 }: NextDraftActionProps): JSX.Element {
   const inFlight = useRef(false);
+  const requestSequence = useRef(0);
+  const currentKind = useRef(action.kind);
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<{
     kind: DraftNextActionModel["kind"];
@@ -32,8 +34,15 @@ export function NextDraftAction({
   } | null>(null);
   const error = failure?.kind === action.kind ? failure.error : null;
 
+  if (currentKind.current !== action.kind) {
+    currentKind.current = action.kind;
+    requestSequence.current += 1;
+    inFlight.current = false;
+  }
+
   useEffect(() => {
     setFailure((current) => (current?.kind === action.kind ? current : null));
+    setPending(false);
   }, [action.kind]);
 
   const callbacks = {
@@ -49,16 +58,22 @@ export function NextDraftAction({
     if (action.disabled || inFlight.current) return;
     const callback = callbacks[action.kind];
     if (!callback) return;
+    const request = ++requestSequence.current;
+    const kind = action.kind;
     inFlight.current = true;
     setPending(true);
     setFailure(null);
     try {
       await callback();
     } catch (nextError) {
-      setFailure({ kind: action.kind, error: nextError });
+      if (request === requestSequence.current && kind === currentKind.current) {
+        setFailure({ kind, error: nextError });
+      }
     } finally {
-      inFlight.current = false;
-      setPending(false);
+      if (request === requestSequence.current && kind === currentKind.current) {
+        inFlight.current = false;
+        setPending(false);
+      }
     }
   };
 

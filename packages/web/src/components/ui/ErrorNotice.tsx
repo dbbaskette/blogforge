@@ -9,6 +9,7 @@ export interface ErrorNoticeProps {
   onSignIn?: () => void;
   onReload?: () => void;
   onDismiss?: () => void;
+  dismissLabel?: string;
 }
 
 const ACTION_LABELS: Record<ErrorRecoveryAction, string> = {
@@ -37,6 +38,7 @@ export function ErrorNotice({
   onSignIn,
   onReload,
   onDismiss,
+  dismissLabel = "Dismiss",
 }: ErrorNoticeProps): JSX.Element {
   const presentation = presentError(error, operation);
   const action = presentation.action;
@@ -88,7 +90,7 @@ export function ErrorNotice({
         )}
         {onDismiss && (
           <button type="button" onClick={onDismiss} className="nb-btn nb-btn-ghost nb-btn-sm">
-            Dismiss
+            {dismissLabel}
           </button>
         )}
       </div>

@@ -1,7 +1,8 @@
 """POST /api/drafts/{id}/sections/{section_id}/regenerate
-   POST /api/drafts/{id}/sections/{section_id}/save
-   POST /api/drafts/{id}/sections/reorder
+POST /api/drafts/{id}/sections/{section_id}/save
+POST /api/drafts/{id}/sections/reorder
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from blogforge.auth.dependencies import get_current_user
 from blogforge.config import get_settings
 from blogforge.db.models import User
 from blogforge.drafts.models import Draft, SectionVersion
+from blogforge.drafts.section_errors import encode_section_error
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.references import get_reference_context
 from blogforge.generate.section import stream_section
@@ -168,9 +170,7 @@ async def regenerate_section(
                 404, detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}}
             )
 
-    pack_root = await resolve_voice(
-        draft, current.id, pack_store=pack_store
-    )
+    pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
     job = await reg.create(JobType.REGEN_SECTION, draft_id=draft_id)
     background_tasks.add_task(
@@ -214,9 +214,7 @@ async def revert_section_version(
     current: User = Depends(get_current_user),
 ) -> Draft:
     store: SqlDraftStore = request.app.state.draft_store
-    reverted = await store.revert_section(
-        draft_id, section_id, version_id, user_id=current.id
-    )
+    reverted = await store.revert_section(draft_id, section_id, version_id, user_id=current.id)
     if reverted is None:
         raise HTTPException(
             404,
@@ -255,9 +253,7 @@ async def _run_regenerate(
             await reg.fail(job_id, "section_not_found", section_id)
             return
 
-        manifest = yaml.safe_load(
-            (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
-        ) or {}
+        manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
         provider = await build_provider_for(user_id, provider_name)
 
         # Snapshot the prior content before it's overwritten so the author
@@ -292,32 +288,35 @@ async def _run_regenerate(
             ):
                 if cancel_evt.is_set():
                     section.status = "failed"
-                    section.last_error = "Cancelled before completion."
+                    section.last_error = encode_section_error(
+                        "generation_cancelled", "Cancelled before completion."
+                    )
                     await store.update(draft.id, draft, user_id=user_id)
                     return
                 if chunk.delta:
                     buf += chunk.delta
         except ProviderMissingKey as e:
             section.status = "failed"
-            section.last_error = e.message
+            section.last_error = encode_section_error(e.code, e.message, e.hint)
             await store.update(draft.id, draft, user_id=user_id)
             await reg.fail(job_id, e.code, e.message, e.hint)
             return
         except ProviderError as e:
             section.status = "failed"
-            section.last_error = e.message
+            section.last_error = encode_section_error(e.code, e.message, e.hint)
             await store.update(draft.id, draft, user_id=user_id)
             await reg.fail(job_id, e.code, e.message, e.hint)
             return
         except ComposeError as e:
             section.status = "failed"
-            section.last_error = str(e)
+            hint = "Check the draft's format/samples against the pack manifest."
+            section.last_error = encode_section_error("compose_error", str(e), hint)
             await store.update(draft.id, draft, user_id=user_id)
             await reg.fail(
                 job_id,
                 "compose_error",
                 str(e),
-                "Check the draft's format/samples against the pack manifest.",
+                hint,
             )
             return
         cleaned = buf.strip()
@@ -342,9 +341,9 @@ async def _run_regenerate(
         # boot-time recover_stranded_sections() is the backstop.
         if section is not None and section.status == "generating":
             section.status = "failed"
-            section.last_error = (
-                section.last_error
-                or "Generation was interrupted before it finished — please retry."
+            section.last_error = section.last_error or encode_section_error(
+                "generation_interrupted",
+                "Generation was interrupted before it finished. Please retry.",
             )
             try:
                 await store.update(draft.id, draft, user_id=user_id)

@@ -14,6 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from blogforge.auth.dependencies import get_current_user
 from blogforge.config import get_settings
 from blogforge.db.models import User
+from blogforge.drafts.section_errors import encode_section_error
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.document import generate_document, split_document
 from blogforge.generate.references import get_reference_context
@@ -174,10 +175,11 @@ async def _run_expand(
         if bg:
             reference_context = f"{bg}\n\n{reference_context}" if reference_context else bg
 
-        async def _fail_targets(message: str) -> None:
+        async def _fail_targets(code: str, message: str, hint: str | None = None) -> None:
+            persisted_error = encode_section_error(code, message, hint)
             for s in targets:
                 s.status = "failed"
-                s.last_error = message
+                s.last_error = persisted_error
             await store.update(draft.id, draft, user_id=user_id)
 
         # Single-pass: compose the ENTIRE post in one LLM call from the outline.
@@ -218,16 +220,17 @@ async def _run_expand(
                 reference_context=reference_context,
             )
         except (ProviderMissingKey, ProviderError) as e:
-            await _fail_targets(e.message)
+            await _fail_targets(e.code, e.message, e.hint)
             await reg.fail(job_id, e.code, e.message, e.hint)
             return
         except ComposeError as e:
-            await _fail_targets(str(e))
+            hint = "Check the draft's format/samples against the pack manifest."
+            await _fail_targets("compose_error", str(e), hint)
             await reg.fail(
                 job_id,
                 "compose_error",
                 str(e),
-                "Check the draft's format/samples against the pack manifest.",
+                hint,
             )
             return
 
@@ -267,7 +270,11 @@ async def _run_expand(
                 section.last_generated_at = now
             else:
                 section.status = "failed"
-                section.last_error = "No content mapped to this section from the single-pass draft."
+                section.last_error = encode_section_error(
+                    "empty_generation",
+                    "No content mapped to this section from the single-pass draft.",
+                    "Try composing this section again.",
+                )
             await reg.set_stage(job_id, f"section:done:{section.id}")
 
         draft.stage = "sections"
@@ -305,7 +312,10 @@ async def _run_expand(
                 for s in stranded:
                     s.status = "failed"
                     s.last_error = s.last_error or (
-                        "Generation was interrupted before it finished — please retry."
+                        encode_section_error(
+                            "generation_interrupted",
+                            "Generation was interrupted before it finished. Please retry.",
+                        )
                     )
                 try:
                     await store.update(draft.id, draft, user_id=user_id)

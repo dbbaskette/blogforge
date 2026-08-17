@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -28,6 +28,7 @@ export function DraftPage(): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [failedSave, setFailedSave] = useState<Draft | null>(null);
+  const saveSequence = useRef(0);
 
   const loadDraft = useCallback(async (): Promise<void> => {
     if (!id) return;
@@ -54,16 +55,20 @@ export function DraftPage(): JSX.Element {
   const saveDraft = useCallback(
     async (next: Draft): Promise<void> => {
       if (!id) return;
+      const sequence = ++saveSequence.current;
+      const snapshot = structuredClone(next);
       setSaving(true);
       setSaveError(null);
       try {
-        await updateDraft(id, next);
+        await updateDraft(id, snapshot);
+        if (sequence !== saveSequence.current) return;
         setFailedSave(null);
       } catch (nextError) {
+        if (sequence !== saveSequence.current) return;
         setSaveError(nextError);
-        setFailedSave(next);
+        setFailedSave(snapshot);
       } finally {
-        setSaving(false);
+        if (sequence === saveSequence.current) setSaving(false);
       }
     },
     [id],

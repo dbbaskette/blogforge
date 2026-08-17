@@ -8,6 +8,7 @@ pass stays coherent across sections. Each section's prior prose is
 snapshotted into version history first, so the whole pass is revertible
 section by section.
 """
+
 from __future__ import annotations
 
 import time
@@ -17,12 +18,12 @@ from uuid import UUID
 
 import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from blogforge.voice.compose import ComposeError
 from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.models import Draft
+from blogforge.drafts.section_errors import encode_section_error
 from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.references import get_reference_context
 from blogforge.generate.section import stream_section
@@ -30,6 +31,7 @@ from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import JobRegistry
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
+from blogforge.voice.compose import ComposeError
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["revise"])
@@ -40,9 +42,7 @@ class _ReviseBody(BaseModel):
 
 
 def _has_written_section(draft: Draft) -> bool:
-    return any(
-        s.content_md.strip() and s.status in ("ready", "edited") for s in draft.sections
-    )
+    return any(s.content_md.strip() and s.status in ("ready", "edited") for s in draft.sections)
 
 
 def _revise_context(draft: Draft, base: str) -> str:
@@ -93,9 +93,7 @@ async def revise_draft(
                 404, detail={"error": {"code": "pack_not_found", "message": draft.idea.pack_slug}}
             )
 
-    pack_root = await resolve_voice(
-        draft, current.id, pack_store=pack_store
-    )
+    pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
     job = await reg.create(JobType.REVISE_DRAFT, draft_id=draft_id)
     background_tasks.add_task(
@@ -132,9 +130,7 @@ async def _run_revise(
             await reg.fail(job_id, "draft_not_found", f"Draft {draft_id} gone")
             return
 
-        manifest = yaml.safe_load(
-            (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
-        ) or {}
+        manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
         provider = await build_provider_for(user_id, provider_name)
         base_ref = await get_reference_context(draft.id, draft.references)
 
@@ -181,26 +177,29 @@ async def _run_revise(
                 ):
                     if cancel_evt.is_set():
                         section.status = "failed"
-                        section.last_error = "Cancelled before completion."
+                        section.last_error = encode_section_error(
+                            "generation_cancelled", "Cancelled before completion."
+                        )
                         await store.update(draft.id, draft, user_id=user_id)
                         break
                     if chunk.delta:
                         buf += chunk.delta
             except (ProviderMissingKey, ProviderError) as e:
                 section.status = "failed"
-                section.last_error = e.message
+                section.last_error = encode_section_error(e.code, e.message, e.hint)
                 await store.update(draft.id, draft, user_id=user_id)
                 section_errors.append((e.code, e.message, e.hint))
                 continue
             except ComposeError as e:
                 section.status = "failed"
-                section.last_error = str(e)
+                hint = "Check the draft's format/samples against the pack manifest."
+                section.last_error = encode_section_error("compose_error", str(e), hint)
                 await store.update(draft.id, draft, user_id=user_id)
                 section_errors.append(
                     (
                         "compose_error",
                         str(e),
-                        "Check the draft's format/samples against the pack manifest.",
+                        hint,
                     )
                 )
                 continue

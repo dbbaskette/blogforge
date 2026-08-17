@@ -46,3 +46,49 @@ Complete and self-reviewed.
 
 - The passing full suite still emits pre-existing React Router future-flag, React `act(...)`, and jsdom navigation warnings.
 - The successful Vite build retains the existing HeadlineLab static/dynamic import chunking warning.
+
+## Fix round: async ownership and persisted recovery metadata
+
+### Changes
+
+- Added monotonic DraftPage save sequencing. Each request sends a cloned snapshot, and only the latest request may publish saved, failed, Retry, or saving state. A late stale failure cannot replace a newer success.
+- Added a versioned JSON envelope for section failures in the existing `last_error` text column. Expand, whole-draft revise, single-section regeneration, cancellation, interruption, and empty-generation persistence now retain code, message, and hint without a migration.
+- Added safe frontend parsing for versioned metadata, legacy plain strings, `HTTP 502: ...`, and `HTTP status: 502 ...` forms. Reopened failures recover Settings, Sign in, Reload, Retry, or Continue editing while raw/encoded details stay inside the closed Details disclosure.
+- Bound section regeneration, whole-draft revision, and reorder retries to immutable failed payloads instead of current input/order state.
+- Added request-token ownership to `NextDraftAction`, invalidating pending results when the action kind genuinely changes. The workspace no longer treats its pre-request compose theater flag as a server-backed stage transition, so an immediate request rejection remains recoverable.
+- Kept the normal Next action hidden after failure, leaving exactly one primary recovery action.
+
+### Test-first evidence
+
+1. The new frontend red run reproduced legacy/structured persisted failures, mutable regeneration/revision/reorder retry payloads, stale save races, and late Next rejection state. The focused run failed 10 behavior tests before implementation.
+2. The backend helper red run failed at collection because `blogforge.drafts.section_errors` did not exist.
+3. A full-suite integration failure exposed a temporary `retry-remaining` to `compose-draft` transition owned by local request state. Removing that false stage transition made both the workspace recovery test and the explicit late-rejection test pass.
+
+### Commands and results
+
+- `pnpm exec vitest run tests/routes/DraftPage.test.tsx tests/components/NextDraftAction.test.tsx tests/components/SectionCard.test.tsx tests/components/SectionsPanel.test.tsx`: 4 files passed, 37 tests passed.
+- `pnpm exec vitest run tests/components/DraftWorkspace.nextAction.test.tsx tests/components/NextDraftAction.test.tsx tests/components/SectionCard.test.tsx`: 3 files passed, 27 tests passed.
+- `UV_CACHE_DIR=/tmp/blogforge-uv-cache uv run pytest packages/api/tests/drafts/test_section_errors.py packages/api/tests/drafts/test_recovery.py packages/api/tests/api/test_expand_route.py packages/api/tests/api/test_revise_route.py packages/api/tests/api/test_section_save_route.py packages/api/tests/api/test_section_enforce.py -q`: 21 tests passed.
+- `pnpm test`: 92 files passed, 482 tests passed.
+- `pnpm build`: TypeScript and Vite production build passed; the existing HeadlineLab chunk warning remains.
+- Focused `pnpm exec biome check` across all 11 changed frontend source/test files: passed with no diagnostics.
+- Focused `uv run ruff check` across all changed backend source/test files: passed with no diagnostics.
+- Repository-wide `pnpm lint`: reports 74 pre-existing diagnostics in unrelated files.
+- Repository-wide `uv run ruff check .`: reports 93 pre-existing diagnostics in unrelated files.
+- `git diff --check`: passed.
+- Added-line em-dash scan across changed production files: no matches.
+
+### Self-review
+
+- Confirmed newer save success suppresses an older failure and its stale Retry payload.
+- Confirmed latest save failure retries its exact cloned draft snapshot.
+- Confirmed provider, session, conflict, service, generic, and interrupted persisted failures each expose a valid recovery path after reload.
+- Confirmed persisted JSON is never rendered as the primary message, and failed sections retain completed prose/editability.
+- Confirmed retries replay the original regeneration instruction, whole-draft note, and section ID order after the visible UI changes.
+- Confirmed a late rejection from action A is discarded after moving to B and stays discarded if A later returns.
+- Confirmed existing untracked plan/design documents remain untouched and excluded.
+
+### Fix-round concerns
+
+- The full frontend suite still emits its existing React Router future-flag, React `act(...)`, and jsdom navigation warnings.
+- Repository-wide Biome and Ruff remain red on unrelated baseline debt; every changed file passes the corresponding focused check.
