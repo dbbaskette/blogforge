@@ -272,7 +272,7 @@ export function ReviewCenter({
         setCached("review-center", draft.id, analysisHash, finished);
       }
     },
-    [draft.id, executeCheck, hash, updateSummary],
+    [draft.id, executeCheck, updateSummary],
   );
 
   useEffect(() => {

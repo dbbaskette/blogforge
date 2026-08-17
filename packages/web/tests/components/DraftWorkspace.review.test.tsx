@@ -77,7 +77,7 @@ afterAll(() => {
   if (originalScrollIntoView) {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", originalScrollIntoView);
   } else {
-    delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView = undefined;
   }
 });
 
@@ -191,8 +191,6 @@ describe("DraftWorkspace Review routing", () => {
     });
     fireEvent.click(within(proofreader).getByRole("button", { name: "Apply" }));
 
-    await waitFor(() =>
-      expect(onSectionSave).toHaveBeenCalledWith("s1", "Rewritten sentence."),
-    );
+    await waitFor(() => expect(onSectionSave).toHaveBeenCalledWith("s1", "Rewritten sentence."));
   });
 });

@@ -131,10 +131,7 @@ describe("OptimizePanel", () => {
   });
 
   it("recognizes a reference-aware GEO cache entry as current", async () => {
-    const currentHash = combineAnalysisHash(
-      hashDraftContent(draft),
-      hashReferenceFingerprint([]),
-    );
+    const currentHash = combineAnalysisHash(hashDraftContent(draft), hashReferenceFingerprint([]));
     setCached("geo", "d1", currentHash, report);
 
     render(

@@ -13,6 +13,17 @@ bundle and the API in lockstep). Pre-`1.0.0`, the API is still evolving.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-17
+
+### Added
+- One five-check Review Center with automatic factual support and
+  reference-aware refresh, plus a stage-aware Next action.
+
+### Fixed
+- Human-readable, actionable errors preserve in-progress work; Compose recovery
+  regenerates only remaining sections and retains completed sections. Resolves
+  #135, #136, and #141.
+
 ## [0.8.3] — 2026-07-28
 
 ### Changed

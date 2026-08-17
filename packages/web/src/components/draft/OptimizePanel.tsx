@@ -138,23 +138,26 @@ export function OptimizePanel({
       .finally(() => setLintBusy(false));
   }, [view]);
 
-  const run = useCallback(async (knownHash?: string | null): Promise<void> => {
-    setBusy(true);
-    setError(null);
-    try {
-      const [h, fresh] = await Promise.all([
-        knownHash === undefined ? currentGeoHash() : Promise.resolve(knownHash),
-        analyzeGeo(draft.id),
-      ]);
-      setReport(fresh);
-      if (h) setCached("geo", draft.id, h, fresh);
-      setStale(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, [currentGeoHash, draft.id]);
+  const run = useCallback(
+    async (knownHash?: string | null): Promise<void> => {
+      setBusy(true);
+      setError(null);
+      try {
+        const [h, fresh] = await Promise.all([
+          knownHash === undefined ? currentGeoHash() : Promise.resolve(knownHash),
+          analyzeGeo(draft.id),
+        ]);
+        setReport(fresh);
+        if (h) setCached("geo", draft.id, h, fresh);
+        setStale(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [currentGeoHash, draft.id],
+  );
 
   // On open: restore the last saved scan and its resolutions — ALWAYS, even if
   // the draft was edited since. A fresh scan is a deliberate act (Re-analyze),
