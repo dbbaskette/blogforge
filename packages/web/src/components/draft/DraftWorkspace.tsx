@@ -5,9 +5,13 @@ import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/dr
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
+import { deriveNextDraftAction } from "../../lib/draftNextAction";
+import type { FactualSupportResult } from "../../lib/reviewCenter";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
+import { ErrorNotice } from "../ui/ErrorNotice";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { HeroImage } from "./HeroImage";
+import { NextDraftAction } from "./NextDraftAction";
 import { OutlinePanel } from "./OutlinePanel";
 import { OutlineSidebar } from "./OutlineSidebar";
 import { ReferencesList } from "./ReferencesList";
@@ -28,7 +32,6 @@ const SectionsPanel = lazy(() =>
 // The review/improve overlays are on-demand — lazy-load them so their code
 // (and heavyweight deps) stays out of the initial chunk. Each opens from an
 // explicit click, so the fetch hides inside the open animation.
-const CheckupPanel = lazy(() => import("./CheckupPanel").then((m) => ({ default: m.CheckupPanel })));
 const HeadlineLab = lazy(() => import("./HeadlineLab").then((m) => ({ default: m.HeadlineLab })));
 const HumanizePanel = lazy(() =>
   import("./HumanizePanel").then((m) => ({ default: m.HumanizePanel })),
@@ -41,6 +44,9 @@ const RepurposePanel = lazy(() =>
   import("./RepurposePanel").then((m) => ({ default: m.RepurposePanel })),
 );
 const ShapePanel = lazy(() => import("./ShapePanel").then((m) => ({ default: m.ShapePanel })));
+const ReviewCenter = lazy(() =>
+  import("./ReviewCenter").then((m) => ({ default: m.ReviewCenter })),
+);
 
 const INLINE_AI_HINT_KEY = "bf.inlineai.hint.dismissed";
 
@@ -48,7 +54,9 @@ export interface DraftWorkspaceProps {
   draft: Draft;
   jobId: string | null;
   saving: boolean;
-  saveError: string | null;
+  saveError: unknown;
+  onRetrySave?: () => Promise<void>;
+  onDismissSaveError?: () => void;
   onChange: (next: Draft) => Promise<void>;
   onGenerateOutline: () => Promise<void>;
   onExpandAll: () => Promise<void>;
@@ -67,6 +75,8 @@ export function DraftWorkspace({
   jobId,
   saving,
   saveError,
+  onRetrySave,
+  onDismissSaveError,
   onChange,
   onGenerateOutline,
   onExpandAll,
@@ -80,12 +90,15 @@ export function DraftWorkspace({
   onJobComplete,
 }: DraftWorkspaceProps): JSX.Element {
   const [lintOpen, setLintOpen] = useState(false);
+  const [initialFactualSupport, setInitialFactualSupport] = useState<FactualSupportResult | null>(
+    null,
+  );
   const [repurposeOpen, setRepurposeOpen] = useState(false);
   const [headlinesOpen, setHeadlinesOpen] = useState(false);
   const [shapeOpen, setShapeOpen] = useState(false);
   const [geoOpen, setGeoOpen] = useState(false);
   const [humanizeOpen, setHumanizeOpen] = useState(false);
-  const [checkupOpen, setCheckupOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   // Import lands here verbatim — no tool runs and nothing is edited until the
   // writer asks for it (Improve ▾ → Shape/GEO/Proofread). The shaping pass is
   // never auto-run on an imported draft.
@@ -99,7 +112,7 @@ export function DraftWorkspace({
   }, []);
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
-  const [jobError, setJobError] = useState<{ message: string; hint?: string } | null>(null);
+  const [jobError, setJobError] = useState<unknown>(null);
   // True from the instant Compose fires until the job completes/errors —
   // independent of generatingIds, which stays empty during the latency
   // window before the first SSE section:start event arrives.
@@ -144,9 +157,14 @@ export function DraftWorkspace({
         setComposingWholeDraft(false);
         onJobComplete();
       },
-      onError: (_code, message, hint) => {
+      onError: (code, message, hint) => {
         setGeneratingIds(new Set());
-        setJobError({ message, hint });
+        setJobError(
+          Object.assign(new Error(message), {
+            code,
+            detail: hint ? { hint } : undefined,
+          }),
+        );
         setJobActive(false);
         setLiveSectionId(null);
         setLiveText("");
@@ -289,6 +307,20 @@ export function DraftWorkspace({
     return o.some((os, i) => norm(os.title) !== norm(draft.sections[i]?.title ?? ""));
   }, [draft.stage, draft.outline, draft.sections]);
   const jobRunning = jobActive || generatingIds.size > 0;
+  const nextAction = useMemo(
+    () =>
+      deriveNextDraftAction({
+        stage: draft.stage,
+        hasModel: (draft.idea.model?.trim().length ?? 0) > 0,
+        outlineCount: draft.outline?.sections.length ?? 0,
+        unwrittenCount: unfilledCount,
+        totalSections: draft.sections.length,
+        generationRunning: jobRunning || draft.sections.some((s) => s.status === "generating"),
+        generationFailed: Boolean(jobError) || draft.sections.some((s) => s.status === "failed"),
+        outlineDrift,
+      }),
+    [draft, jobError, jobRunning, outlineDrift, unfilledCount],
+  );
 
   const handleGenerate = useCallback(async () => {
     setAdvancing(true);
@@ -307,17 +339,37 @@ export function DraftWorkspace({
     setComposingWholeDraft(true);
     try {
       await onExpandAll();
+    } catch (error) {
+      setComposingWholeDraft(false);
+      throw error;
     } finally {
       setAdvancing(false);
     }
   }, [onExpandAll]);
 
   const handleExpandUnfilled = useCallback(async () => {
+    setAdvancing(true);
     setLiveSectionId(null);
     setLiveText("");
+    setJobError(null);
     setComposingWholeDraft(true);
-    await onExpandUnfilled();
+    try {
+      await onExpandUnfilled();
+    } catch (error) {
+      setComposingWholeDraft(false);
+      throw error;
+    } finally {
+      setAdvancing(false);
+    }
   }, [onExpandUnfilled]);
+
+  const focusSetup = useCallback((): void => {
+    const toggle = document.getElementById("draft-setup-toggle") as HTMLButtonElement | null;
+    if (!toggle) return;
+    toggle.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    if (toggle.getAttribute("aria-expanded") !== "true") toggle.click();
+    toggle.focus();
+  }, []);
 
   // Holistic revise touches many sections — clear any single-section live
   // buffer so tokens aren't misattributed to one card.
@@ -354,10 +406,28 @@ export function DraftWorkspace({
     setTimeout(() => setTemplateMsg(null), 2800);
   }, [draft.id, draft.title]);
 
+  const scrollToReviewSection = useCallback((sectionId?: string): void => {
+    if (!sectionId) return;
+    const element = document.getElementById(
+      sectionId === "opening" ? "opening" : `section-${sectionId}`,
+    );
+    element?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const openReviewTool = useCallback(
+    (open: (value: boolean) => void, sectionId?: string): void => {
+      scrollToReviewSection(sectionId);
+      setReviewOpen(false);
+      open(true);
+    },
+    [scrollToReviewSection],
+  );
+
   // Show the review/improve/export bar whenever there's composed prose to work
   // on — not only on the Draft tab. (Resuming a draft on its outline stage, or
   // flipping back to Outline, used to make every tool disappear.)
   const showFooter = shouldShowDraftTools(draft.stage, draft.sections);
+  const currentSaveError = saveError ?? titleSave.error;
 
   return (
     <div className="max-w-6xl mx-auto px-4 lg:px-8 py-8 grid lg:grid-cols-[220px_minmax(0,1fr)] gap-8">
@@ -392,8 +462,8 @@ export function DraftWorkspace({
                 />
                 Saving…
               </>
-            ) : saveError || titleSave.error ? (
-              <span className="text-rose-ink">Save error: {saveError ?? titleSave.error}</span>
+            ) : currentSaveError !== null ? (
+              <span className="text-rose-ink">Changes not saved</span>
             ) : (
               <>
                 <span aria-hidden className="inline-block w-2 h-2 rounded-full bg-leaf" />
@@ -403,7 +473,29 @@ export function DraftWorkspace({
           </span>
         </div>
 
+        {currentSaveError !== null && (
+          <div className="mb-5">
+            <ErrorNotice
+              error={currentSaveError}
+              operation="saving your draft"
+              onRetry={onRetrySave ? () => void onRetrySave() : undefined}
+              onDismiss={onDismissSaveError}
+            />
+          </div>
+        )}
+
         <StageNav draft={draft} onJump={onJumpStage} />
+
+        <NextDraftAction
+          action={advancing ? { ...nextAction, disabled: true } : nextAction}
+          onCreateOutline={handleGenerate}
+          onComposeDraft={handleExpandAll}
+          onRetryRemaining={handleExpandUnfilled}
+          onFinishRemaining={handleExpandUnfilled}
+          onReviewOutline={() => onJumpStage("outline")}
+          onReviewDraft={() => setReviewOpen(true)}
+          onSetup={focusSetup}
+        />
 
         {outlineDrift && (
           <div className="mt-3 flex items-center gap-2 text-xs text-amber-ink bg-amber-soft border border-amber/30 rounded-nb-sm px-3 py-1.5 w-fit">
@@ -466,7 +558,6 @@ export function DraftWorkspace({
             draft={draft}
             onChange={handleOutlineChange}
             onApplyTitle={(title) => onChange({ ...draft, title })}
-            onAdvance={handleExpandAll}
             onRegenerate={handleGenerate}
             references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
           />
@@ -513,43 +604,41 @@ export function DraftWorkspace({
         )}
 
         {draft.stage === "sections" && (
-        <Suspense
-          fallback={
-            <p className="text-center text-muted text-sm py-16 animate-fade-in">
-              Opening the editor…
-            </p>
-          }
-        >
-        {hasOpening && (
-          <OpeningCard
-            value={draft.outline?.opening_hook ?? ""}
-            draftId={draft.id}
-            pendingTexts={pendingTextsForSection("opening")}
-            onSave={handleOpeningChange}
-          />
-        )}
-          <SectionsPanel
-            draft={draft}
-            generatingIds={generatingIds}
-            jobError={jobError}
-            onDismissJobError={() => setJobError(null)}
-            unfilledCount={unfilledCount}
-            jobRunning={jobRunning}
-            composingWholeDraft={composingWholeDraft}
-            liveWords={totalWords}
-            liveSectionId={liveSectionId}
-            liveText={liveText}
-            onSectionSave={onSectionSave}
-            pendingTextsForSection={pendingTextsForSection}
-            onRegenerateSection={handleRegenerateSection}
-            onRevertSection={onRevertSection}
-            onReviseDraft={handleReviseDraft}
-            onReorder={onReorder}
-            onExpandUnfilled={handleExpandUnfilled}
-            onComposeRemaining={handleExpandUnfilled}
-            references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
-          />
-        </Suspense>
+          <Suspense
+            fallback={
+              <p className="text-center text-muted text-sm py-16 animate-fade-in">
+                Opening the editor…
+              </p>
+            }
+          >
+            {hasOpening && (
+              <OpeningCard
+                value={draft.outline?.opening_hook ?? ""}
+                draftId={draft.id}
+                pendingTexts={pendingTextsForSection("opening")}
+                onSave={handleOpeningChange}
+              />
+            )}
+            <SectionsPanel
+              draft={draft}
+              generatingIds={generatingIds}
+              jobError={jobError}
+              onDismissJobError={() => setJobError(null)}
+              unfilledCount={unfilledCount}
+              jobRunning={jobRunning}
+              composingWholeDraft={composingWholeDraft}
+              liveWords={totalWords}
+              liveSectionId={liveSectionId}
+              liveText={liveText}
+              onSectionSave={onSectionSave}
+              pendingTextsForSection={pendingTextsForSection}
+              onRegenerateSection={handleRegenerateSection}
+              onRevertSection={onRevertSection}
+              onReviseDraft={handleReviseDraft}
+              onReorder={onReorder}
+              references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -559,87 +648,82 @@ export function DraftWorkspace({
           totalWords={totalWords}
           draftedCount={draftedCount}
           sectionCount={draft.sections.length}
-          onLint={() => setLintOpen(true)}
+          onReview={() => setReviewOpen(true)}
           onRepurpose={() => setRepurposeOpen(true)}
-          onHeadlines={() => setHeadlinesOpen(true)}
-          onShape={() => setShapeOpen(true)}
-          onGeo={() => setGeoOpen(true)}
-          onHumanize={() => setHumanizeOpen(true)}
-          onCheckup={() => setCheckupOpen(true)}
         />
       )}
 
       {/* Lazy overlay panels: null fallback — each pops in when its chunk lands. */}
       <Suspense fallback={null}>
-      {lintOpen && (
-        <LintPanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onTrackChange={handleTrackChange}
-          onClose={() => setLintOpen(false)}
-        />
-      )}
-      {shapeOpen && (
-        <ShapePanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onClose={() => setShapeOpen(false)}
-        />
-      )}
-      {geoOpen && (
-        <OptimizePanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onChange={onChange}
-          onClose={() => setGeoOpen(false)}
-        />
-      )}
-      {humanizeOpen && (
-        <HumanizePanel
-          draft={draft}
-          onSectionSave={onSectionSave}
-          onClose={() => setHumanizeOpen(false)}
-        />
-      )}
-      {checkupOpen && (
-        <CheckupPanel
-          draft={draft}
-          onOpenReview={() => {
-            setCheckupOpen(false);
-            setLintOpen(true);
-          }}
-          onOpenGeo={() => {
-            setCheckupOpen(false);
-            setGeoOpen(true);
-          }}
-          onOpenShape={() => {
-            setCheckupOpen(false);
-            setShapeOpen(true);
-          }}
-          onOpenHumanize={() => {
-            setCheckupOpen(false);
-            setHumanizeOpen(true);
-          }}
-          onClose={() => setCheckupOpen(false)}
-        />
-      )}
-      {repurposeOpen && (
-        <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
-      )}
-      {headlinesOpen && (
-        <HeadlineLab
-          draftId={draft.id}
-          onApplyTitle={(title) => onChange({ ...draft, title })}
-          onApplyHook={(hook) =>
-            onChange(
-              draft.outline
-                ? { ...draft, outline: { ...draft.outline, opening_hook: hook } }
-                : draft,
-            )
-          }
-          onClose={() => setHeadlinesOpen(false)}
-        />
-      )}
+        {lintOpen && (
+          <LintPanel
+            draft={draft}
+            initialFactualSupport={initialFactualSupport ?? undefined}
+            onSectionSave={onSectionSave}
+            onTrackChange={handleTrackChange}
+            onClose={() => {
+              setLintOpen(false);
+              setInitialFactualSupport(null);
+            }}
+          />
+        )}
+        {shapeOpen && (
+          <ShapePanel
+            draft={draft}
+            onSectionSave={onSectionSave}
+            onClose={() => setShapeOpen(false)}
+          />
+        )}
+        {geoOpen && (
+          <OptimizePanel
+            draft={draft}
+            onSectionSave={onSectionSave}
+            onChange={onChange}
+            onClose={() => setGeoOpen(false)}
+          />
+        )}
+        {humanizeOpen && (
+          <HumanizePanel
+            draft={draft}
+            onSectionSave={onSectionSave}
+            onClose={() => setHumanizeOpen(false)}
+          />
+        )}
+        {reviewOpen && (
+          <ReviewCenter
+            draft={draft}
+            onOpenProofread={(sectionId) => {
+              setInitialFactualSupport(null);
+              openReviewTool(setLintOpen, sectionId);
+            }}
+            onOpenFactualSupport={(sectionId, result) => {
+              setInitialFactualSupport(result ?? null);
+              openReviewTool(setLintOpen, sectionId);
+            }}
+            onOpenShape={(sectionId) => openReviewTool(setShapeOpen, sectionId)}
+            onOpenHumanization={(sectionId) => openReviewTool(setHumanizeOpen, sectionId)}
+            onOpenGeo={(sectionId) => openReviewTool(setGeoOpen, sectionId)}
+            onOpenHeadlines={() => openReviewTool(setHeadlinesOpen)}
+            onClose={() => setReviewOpen(false)}
+          />
+        )}
+        {repurposeOpen && (
+          <RepurposePanel draftId={draft.id} onClose={() => setRepurposeOpen(false)} />
+        )}
+        {headlinesOpen && (
+          <HeadlineLab
+            draftId={draft.id}
+            onApplyTitle={(title) => onChange({ ...draft, title })}
+            onApplyHook={(hook) =>
+              onChange(
+                draft.outline
+                  ? { ...draft, outline: { ...draft.outline, opening_hook: hook } }
+                  : draft,
+              )
+            }
+            onClose={() => setHeadlinesOpen(false)}
+          />
+        )}
       </Suspense>
     </div>
   );

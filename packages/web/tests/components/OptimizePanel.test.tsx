@@ -22,8 +22,14 @@ vi.mock("../../src/api/drafts", () => ({
 vi.mock("../../src/api/references", () => ({ listReferences: vi.fn().mockResolvedValue([]) }));
 
 import { type GeoReport, analyzeGeo } from "../../src/api/geo";
+import { listReferences } from "../../src/api/references";
 import { OptimizePanel } from "../../src/components/draft/OptimizePanel";
-import { setCached } from "../../src/lib/panelCache";
+import {
+  combineAnalysisHash,
+  hashDraftContent,
+  hashReferenceFingerprint,
+  setCached,
+} from "../../src/lib/panelCache";
 
 const report: GeoReport = {
   score: 62,
@@ -67,6 +73,7 @@ describe("OptimizePanel", () => {
     vi.clearAllMocks();
     localStorage.clear();
     vi.mocked(analyzeGeo).mockResolvedValue(report);
+    vi.mocked(listReferences).mockResolvedValue([]);
   });
 
   it("analyzes on mount and renders the score header, a section preview, and the rail", async () => {
@@ -121,6 +128,26 @@ describe("OptimizePanel", () => {
     expect(analyzeGeo).not.toHaveBeenCalled();
     // ...and the "edited since scan" nudge appears (hash mismatch).
     expect(screen.getByText(/edited since scan/i)).toBeInTheDocument();
+  });
+
+  it("recognizes a reference-aware GEO cache entry as current", async () => {
+    const currentHash = combineAnalysisHash(hashDraftContent(draft), hashReferenceFingerprint([]));
+    setCached("geo", "d1", currentHash, report);
+
+    render(
+      <MemoryRouter>
+        <OptimizePanel
+          draft={draft}
+          onSectionSave={vi.fn().mockResolvedValue(undefined)}
+          onChange={vi.fn().mockResolvedValue(undefined)}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByText("62")).toBeInTheDocument());
+    expect(screen.queryByText(/edited since scan/i)).not.toBeInTheDocument();
+    expect(analyzeGeo).not.toHaveBeenCalled();
   });
 
   it("shows a scoring state while analyze is in flight", () => {

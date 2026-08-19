@@ -15,9 +15,16 @@ import { Link } from "react-router-dom";
 
 import { type Draft, lintDraft } from "../../api/drafts";
 import { type GeoReport, analyzeGeo, rescoreGeo } from "../../api/geo";
+import { listReferences } from "../../api/references";
 import { geoFindingsToIssues } from "../../lib/issues/geoAdapter";
 import { type LintResult, proofreadFindingsToIssues } from "../../lib/issues/proofreadAdapter";
-import { hashDraftContent, peekCached, setCached } from "../../lib/panelCache";
+import {
+  combineAnalysisHash,
+  hashDraftContent,
+  hashReferenceFingerprint,
+  peekCached,
+  setCached,
+} from "../../lib/panelCache";
 import { HighlightedText } from "../review/HighlightedText";
 import { type ReviewGroup, ReviewRail } from "../review/ReviewRail";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
@@ -64,7 +71,7 @@ export function OptimizePanel({
 }: OptimizePanelProps): JSX.Element {
   const panelRef = useDialogA11y(true, onClose);
   const [report, setReport] = useState<GeoReport | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   // The saved scan predates the current draft content — findings may be out of
   // date, but we keep showing them until the writer chooses to Re-analyze.
   const [stale, setStale] = useState(false);
@@ -111,6 +118,14 @@ export function OptimizePanel({
   }, [highlight]);
 
   const contentHash = useMemo(() => hashDraftContent(draft), [draft]);
+  const currentGeoHash = useCallback(async (): Promise<string | null> => {
+    try {
+      const references = await listReferences(draft.id);
+      return combineAnalysisHash(contentHash, hashReferenceFingerprint(references));
+    } catch {
+      return null;
+    }
+  }, [contentHash, draft.id]);
 
   // Load the Proofreader findings on demand the first time the view needs them.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once when proofreading first shown
@@ -123,21 +138,26 @@ export function OptimizePanel({
       .finally(() => setLintBusy(false));
   }, [view]);
 
-  const run = useCallback(async (): Promise<void> => {
-    setBusy(true);
-    setError(null);
-    try {
-      const h = hashDraftContent(draft);
-      const fresh = await analyzeGeo(draft.id);
-      setReport(fresh);
-      setCached("geo", draft.id, h, fresh);
-      setStale(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }, [draft]);
+  const run = useCallback(
+    async (knownHash?: string | null): Promise<void> => {
+      setBusy(true);
+      setError(null);
+      try {
+        const [h, fresh] = await Promise.all([
+          knownHash === undefined ? currentGeoHash() : Promise.resolve(knownHash),
+          analyzeGeo(draft.id),
+        ]);
+        setReport(fresh);
+        if (h) setCached("geo", draft.id, h, fresh);
+        setStale(false);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [currentGeoHash, draft.id],
+  );
 
   // On open: restore the last saved scan and its resolutions — ALWAYS, even if
   // the draft was edited since. A fresh scan is a deliberate act (Re-analyze),
@@ -146,13 +166,16 @@ export function OptimizePanel({
   // header can nudge a re-run.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
   useEffect(() => {
-    const saved = peekCached<GeoReport>("geo", draft.id);
-    if (saved) {
-      setReport(saved.data);
-      setStale(saved.hash !== contentHash);
-    } else {
-      run();
-    }
+    void currentGeoHash().then((hash) => {
+      const saved = peekCached<GeoReport>("geo", draft.id);
+      if (saved) {
+        setReport(saved.data);
+        setStale(!hash || saved.hash !== hash);
+        setBusy(false);
+      } else {
+        void run(hash);
+      }
+    });
   }, []);
 
   // ── Targeted re-score: after a fix, re-score ONLY the affected lever(s) and
@@ -339,7 +362,7 @@ export function OptimizePanel({
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={run}
+              onClick={() => void run()}
               className={`nb-btn nb-btn-sm ${stale ? "bg-cobalt-50 text-cobalt-800 border-cobalt-200" : "nb-btn-ghost"}`}
               disabled={busy}
             >

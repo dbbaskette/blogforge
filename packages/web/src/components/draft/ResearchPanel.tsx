@@ -9,6 +9,7 @@ import {
   postIdeationMessage,
 } from "../../api/ideation";
 import { type StreamJobHandlers, useStreamJob } from "../../hooks/useStreamJob";
+import { ErrorNotice } from "../ui/ErrorNotice";
 import { ReferencesList } from "./ReferencesList";
 
 interface ResearchPanelProps {
@@ -25,6 +26,16 @@ interface LiveMessage {
   proposed_outline: OutlineProposal | null;
 }
 
+type ResearchFailure =
+  | { error: unknown; operation: string; retry: "reload" | "accept" }
+  | {
+      error: unknown;
+      operation: string;
+      retry: "send";
+      text: string;
+      mode: IdeationMode;
+    };
+
 function fromServer(m: IdeationMessage): LiveMessage {
   return {
     id: m.id,
@@ -40,18 +51,23 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
   const [jobId, setJobId] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [accepting, setAccepting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<ResearchFailure | null>(null);
   // "ideate": you lead the chat. "interview": the AI asks you questions.
   const [mode, setMode] = useState<IdeationMode>("ideate");
 
-  const reload = useCallback(async (): Promise<void> => {
-    try {
-      const hist = await listIdeation(draft.id);
-      setMessages(hist.map(fromServer));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }, [draft.id]);
+  const reload = useCallback(
+    async (publishFailure = true): Promise<void> => {
+      try {
+        const hist = await listIdeation(draft.id);
+        setMessages(hist.map(fromServer));
+      } catch (e) {
+        if (publishFailure) {
+          setFailure({ error: e, operation: "loading your research", retry: "reload" });
+        }
+      }
+    },
+    [draft.id],
+  );
 
   useEffect(() => {
     void reload();
@@ -61,6 +77,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
   // on done we reload history so the server-side parsed proposed_outline
   // shows up correctly and the message gets its persisted id.
   const liveAssistantText = useRef("");
+  const lastRequest = useRef<{ text: string; mode: IdeationMode } | null>(null);
   const handlersRef = useRef<StreamJobHandlers>({});
   handlersRef.current = useMemo<StreamJobHandlers>(
     () => ({
@@ -81,7 +98,18 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
         });
       },
       onError: (err) => {
-        setError(err.message);
+        const request = lastRequest.current;
+        setFailure(
+          request
+            ? {
+                error: err,
+                operation: "continuing your research",
+                retry: "send",
+                text: request.text,
+                mode: request.mode,
+              }
+            : { error: err, operation: "continuing your research", retry: "reload" },
+        );
         setStreaming(false);
         setJobId(null);
         liveAssistantText.current = "";
@@ -109,7 +137,8 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
   const send = useCallback(
     async (text: string, sendMode: IdeationMode): Promise<void> => {
       if (!text.trim() || streaming) return;
-      setError(null);
+      setFailure(null);
+      lastRequest.current = { text, mode: sendMode };
       // Optimistically append the user bubble immediately.
       setMessages((cur) => [
         ...cur,
@@ -120,10 +149,16 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
         const { job_id } = await postIdeationMessage(draft.id, text, sendMode);
         setJobId(job_id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setFailure({
+          error: e,
+          operation: "sending your research message",
+          retry: "send",
+          text,
+          mode: sendMode,
+        });
         setStreaming(false);
         // Roll back: refetch from server so optimistic state is replaced with truth.
-        void reload();
+        void reload(false);
       }
     },
     [draft.id, reload, streaming],
@@ -138,22 +173,35 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
 
   const startInterview = useCallback((): void => {
     setMode("interview");
-    void send("Interview me about this piece — ask me your first question.", "interview");
+    void send("Interview me about this piece. Ask me your first question.", "interview");
   }, [send]);
 
   const handleAccept = useCallback(async (): Promise<void> => {
     if (accepting) return;
     setAccepting(true);
-    setError(null);
+    setFailure(null);
     try {
       await acceptIdeation(draft.id);
       onJobComplete();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setFailure({ error: e, operation: "accepting this outline", retry: "accept" });
     } finally {
       setAccepting(false);
     }
   }, [accepting, draft.id, onJobComplete]);
+
+  const retryFailure = (): void => {
+    if (!failure) return;
+    const failed = failure;
+    setFailure(null);
+    if (failed.retry === "send") {
+      void send(failed.text, failed.mode);
+    } else if (failed.retry === "reload") {
+      void reload();
+    } else {
+      void handleAccept();
+    }
+  };
 
   // Find the most recent assistant message with a proposed_outline.
   const latestOutline = useMemo<OutlineProposal | null>(() => {
@@ -213,7 +261,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
                     type="button"
                     onClick={startInterview}
                     disabled={streaming}
-                    className="nb-btn nb-btn-primary nb-btn-sm"
+                    className="nb-btn nb-btn-sm"
                   >
                     Start the interview →
                   </button>
@@ -242,13 +290,15 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
             ))}
           </ol>
 
-          {error && (
-            <p
-              className="text-xs px-3 py-2 rounded-nb-sm mb-2"
-              style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-            >
-              {error}
-            </p>
+          {failure && (
+            <div className="mb-2">
+              <ErrorNotice
+                error={failure.error}
+                operation={failure.operation}
+                onRetry={retryFailure}
+                onDismiss={() => setFailure(null)}
+              />
+            </div>
           )}
 
           <div className="border-t border-rule pt-3">
@@ -280,7 +330,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
                 type="button"
                 onClick={() => void handleSend()}
                 disabled={streaming || !composer.trim()}
-                className="nb-btn nb-btn-sm nb-btn-primary"
+                className="nb-btn nb-btn-sm"
               >
                 {streaming ? "Streaming…" : "Send"}
               </button>
@@ -326,7 +376,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
                 type="button"
                 onClick={() => void handleAccept()}
                 disabled={!latestOutline || accepting || streaming}
-                className="nb-btn nb-btn-sm nb-btn-primary"
+                className="nb-btn nb-btn-sm"
               >
                 {accepting ? "Accepting…" : "Accept this outline →"}
               </button>

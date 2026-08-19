@@ -141,9 +141,22 @@ export async function hardDeleteDraft(id: string): Promise<void> {
 export async function generateOutline(id: string): Promise<Draft> {
   return api<Draft>(`/api/drafts/${encodeURIComponent(id)}/outline`, { method: "POST" });
 }
-export async function expandSections(id: string, limit?: number): Promise<{ job_id: string }> {
-  const qs = limit != null ? `?limit=${limit}` : "";
-  return api(`/api/drafts/${encodeURIComponent(id)}/expand${qs}`, { method: "POST" });
+export interface ExpandSectionsOptions {
+  limit?: number;
+  remainingOnly?: boolean;
+}
+
+export async function expandSections(
+  id: string,
+  options: ExpandSectionsOptions = {},
+): Promise<{ job_id: string }> {
+  const params = new URLSearchParams();
+  if (options.limit != null) params.set("limit", String(options.limit));
+  if (options.remainingOnly) params.set("remaining_only", "true");
+  const qs = params.toString();
+  return api(`/api/drafts/${encodeURIComponent(id)}/expand${qs ? `?${qs}` : ""}`, {
+    method: "POST",
+  });
 }
 export async function getActiveJob(
   id: string,

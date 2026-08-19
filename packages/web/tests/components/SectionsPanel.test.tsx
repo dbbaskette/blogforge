@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ApiError } from "../../src/api/client";
 import type { Draft } from "../../src/api/drafts";
 import { SectionsPanel } from "../../src/components/draft/SectionsPanel";
 
@@ -42,8 +43,6 @@ const baseProps = {
   onRegenerateSection: noop,
   onRevertSection: noop,
   onReorder: noop,
-  onExpandUnfilled: noop,
-  onComposeRemaining: noop,
   onReviseDraft: noop,
 };
 
@@ -56,21 +55,39 @@ describe("SectionsPanel", () => {
     expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
   });
 
-  it("composes the whole draft in one pass", () => {
-    const onExpandUnfilled = vi.fn(async (): Promise<void> => {});
+  it("leaves draft progression to the workspace next action", () => {
+    render(
+      <SectionsPanel {...baseProps} draft={makeDraft()} unfilledCount={5} onReviseDraft={noop} />,
+    );
+    expect(screen.getByText(/5 sections unwritten/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /compose draft/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps completed sections and links Settings after a provider generation failure", () => {
+    const providerError = Object.assign(new Error("Provider stopped responding"), {
+      status: 502,
+      code: "provider_rejected_request",
+      detail: { upstream: "rejected" },
+    }) as ApiError;
     render(
       <SectionsPanel
         {...baseProps}
         draft={makeDraft()}
-        unfilledCount={5}
-        onExpandUnfilled={onExpandUnfilled}
-        onReviseDraft={noop}
+        unfilledCount={1}
+        jobError={providerError}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /compose draft/i }));
-    expect(onExpandUnfilled).toHaveBeenCalled();
-    // The incremental "draft next N" button is gone — single-pass is whole-doc.
-    expect(screen.queryByRole("button", { name: /draft next/i })).not.toBeInTheDocument();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Check your AI provider");
+    expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
+    const details = screen.getByText("Details").closest("details");
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toHaveTextContent("Provider stopped responding");
+    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+    expect(screen.queryByRole("button", { name: /compose remaining/i })).not.toBeInTheDocument();
   });
 
   it("shows one unified composing state (not per-section) during a single-pass compose", () => {
@@ -100,5 +117,116 @@ describe("SectionsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /revise 1 section/i }));
 
     await waitFor(() => expect(onReviseDraft).toHaveBeenCalledWith("smooth the transitions"));
+  });
+
+  it("keeps completed sections and retries a failed whole-draft revision", async () => {
+    const onReviseDraft = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("gateway payload"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    render(<SectionsPanel {...baseProps} draft={makeDraft()} onReviseDraft={onReviseDraft} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /revise whole draft/i }));
+    fireEvent.change(screen.getByLabelText(/revise the whole draft/i), {
+      target: { value: "smooth the transitions" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /revise 1 section/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The service is unavailable");
+    expect(screen.getByText(/the first section prose/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReviseDraft).toHaveBeenCalledTimes(2));
+    expect(onReviseDraft).toHaveBeenLastCalledWith("smooth the transitions");
+  });
+
+  it("retries the exact failed whole-draft note after the textarea changes", async () => {
+    const onReviseDraft = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("gateway payload"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    render(<SectionsPanel {...baseProps} draft={makeDraft()} onReviseDraft={onReviseDraft} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /revise whole draft/i }));
+    const note = screen.getByLabelText(/revise the whole draft/i);
+    fireEvent.change(note, { target: { value: "smooth the transitions" } });
+    fireEvent.click(screen.getByRole("button", { name: /revise 1 section/i }));
+    await screen.findByRole("alert");
+    fireEvent.change(note, { target: { value: "replace every example" } });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReviseDraft).toHaveBeenCalledTimes(2));
+    expect(onReviseDraft).toHaveBeenLastCalledWith("smooth the transitions");
+  });
+
+  it("rolls back and retries a failed section reorder", async () => {
+    const draft = makeDraft();
+    draft.sections.push({
+      id: "s2",
+      title: "Second Section",
+      brief: "",
+      content_md: "The second section prose.",
+      status: "ready",
+      last_generated_at: null,
+      last_error: null,
+      word_count: 4,
+    });
+    const onReorder = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("database response"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    render(<SectionsPanel {...baseProps} draft={draft} onReorder={onReorder} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move section down" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The service is unavailable");
+    expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent("First Section");
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReorder).toHaveBeenCalledTimes(2));
+    expect(onReorder).toHaveBeenLastCalledWith(["s2", "s1"]);
+  });
+
+  it("replays the exact failed section order after the server order changes", async () => {
+    const draft = makeDraft();
+    draft.sections.push({
+      id: "s2",
+      title: "Second Section",
+      brief: "",
+      content_md: "Second prose.",
+      status: "ready",
+      last_generated_at: null,
+      last_error: null,
+      word_count: 2,
+    });
+    draft.sections.push({
+      id: "s3",
+      title: "Third Section",
+      brief: "",
+      content_md: "Third prose.",
+      status: "ready",
+      last_generated_at: null,
+      last_error: null,
+      word_count: 2,
+    });
+    const onReorder = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error("database response"), { status: 503 }))
+      .mockResolvedValueOnce(undefined);
+    const { rerender } = render(
+      <SectionsPanel {...baseProps} draft={draft} onReorder={onReorder} />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Move section down" })[0]);
+    await screen.findByRole("alert");
+    const serverChanged = {
+      ...draft,
+      sections: [draft.sections[2], draft.sections[0], draft.sections[1]],
+    };
+    rerender(<SectionsPanel {...baseProps} draft={serverChanged} onReorder={onReorder} />);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(onReorder).toHaveBeenCalledTimes(2));
+    expect(onReorder).toHaveBeenLastCalledWith(["s2", "s1", "s3"]);
   });
 });

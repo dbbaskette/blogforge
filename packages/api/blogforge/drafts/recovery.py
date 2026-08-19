@@ -10,15 +10,18 @@ section is stale. Recover each: if it still holds prose, keep it
 (``status="ready"``); otherwise mark it ``"failed"`` so the UI offers a retry.
 This runs once in the FastAPI lifespan, after migrations.
 """
+
 from __future__ import annotations
 
 from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blogforge.db.models import Section
+from blogforge.drafts.section_errors import encode_section_error
 
-INTERRUPTED_MESSAGE = (
-    "Generation was interrupted before it finished — please retry."
+INTERRUPTED_MESSAGE = encode_section_error(
+    "generation_interrupted",
+    "Generation was interrupted before it finished. Please retry.",
 )
 
 

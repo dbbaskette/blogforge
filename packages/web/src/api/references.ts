@@ -4,7 +4,7 @@
  * to ground its outlines and sections.
  */
 
-import { api } from "./client";
+import { api, parseResponseError } from "./client";
 
 export type ReferenceKind = "url" | "file" | "text";
 
@@ -58,18 +58,7 @@ export async function addFileReference(
     credentials: "include",
   });
   if (!res.ok) {
-    let detail: string | undefined;
-    try {
-      const j = await res.json();
-      detail =
-        typeof j?.detail === "string" ? j.detail : (j?.detail?.error?.message ?? JSON.stringify(j));
-    } catch {
-      /* ignore */
-    }
-    throw Object.assign(new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`), {
-      status: res.status,
-      code: detail,
-    });
+    throw await parseResponseError(res);
   }
   return (await res.json()) as Reference;
 }

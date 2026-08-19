@@ -9,8 +9,63 @@ const BASE = import.meta.env.VITE_API_URL ?? "";
 export interface ApiError extends Error {
   status: number;
   code?: string;
+  detail?: unknown;
   repositoryUrl?: string;
   path?: string;
+}
+
+type JsonObject = Record<string, unknown>;
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringProperty(value: unknown, key: string): string | undefined {
+  return isJsonObject(value) && typeof value[key] === "string" ? value[key] : undefined;
+}
+
+/** Parse one failed response into a safe, metadata-rich API error.
+ * The body is read exactly once so JSON and multipart callers behave alike. */
+export async function parseResponseError(res: Response): Promise<ApiError> {
+  const raw = await res.text();
+  let payload: unknown;
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = undefined;
+    }
+  }
+
+  const payloadObject = isJsonObject(payload) ? payload : undefined;
+  const detail = payloadObject
+    ? "detail" in payloadObject
+      ? payloadObject.detail
+      : payload
+    : raw || undefined;
+  const detailObject = isJsonObject(detail) ? detail : undefined;
+  const structured =
+    detailObject?.error ?? detailObject ?? (payloadObject ? payloadObject.error : undefined);
+  const message = stringProperty(structured, "message");
+  const code = stringProperty(structured, "code");
+  const repositoryUrl = stringProperty(structured, "repository_url");
+  const errorPath = stringProperty(structured, "path");
+
+  return Object.assign(
+    new Error(
+      message ??
+        (res.status === 401
+          ? "Your session has expired. Please sign in again."
+          : "The request could not be completed."),
+    ),
+    {
+      status: res.status,
+      code,
+      detail,
+      repositoryUrl,
+      path: errorPath,
+    },
+  );
 }
 
 export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
@@ -24,49 +79,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     credentials: "include",
   });
   if (!res.ok) {
-    if (
-      res.status === 401 &&
-      typeof window !== "undefined" &&
-      window.location?.pathname !== "/login"
-    ) {
-      // Session expired or never signed in — bounce to the login screen
-      // instead of letting callers render a raw "HTTP 401" banner mid-page.
-      try {
-        window.location.assign("/login");
-      } catch {
-        /* jsdom (tests) has no navigation — ignore */
-      }
-    }
-    let detail: string | undefined;
-    let code: string | undefined;
-    let repositoryUrl: string | undefined;
-    let errorPath: string | undefined;
-    try {
-      const j = await res.json();
-      const structured = j?.detail?.error ?? j?.error;
-      detail =
-        typeof j?.detail === "string"
-          ? j.detail
-          : typeof structured?.message === "string"
-            ? structured.message
-            : JSON.stringify(j);
-      code = typeof structured?.code === "string" ? structured.code : undefined;
-      repositoryUrl =
-        typeof structured?.repository_url === "string" ? structured.repository_url : undefined;
-      errorPath = typeof structured?.path === "string" ? structured.path : undefined;
-    } catch {
-      /* fall through */
-    }
-    const err: ApiError = Object.assign(
-      new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`),
-      {
-        status: res.status,
-        code,
-        repositoryUrl,
-        path: errorPath,
-      },
-    );
-    throw err;
+    throw await parseResponseError(res);
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get("Content-Type") ?? "";

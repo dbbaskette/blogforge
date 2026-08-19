@@ -1,6 +1,9 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
+import type { ApiError } from "../../api/client";
 import type { Section } from "../../api/drafts";
+import { parsePersistedSectionError } from "../../lib/errors";
+import { ErrorNotice } from "../ui/ErrorNotice";
 import { Icon } from "../ui/Icon";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { MarkdownEditor } from "./MarkdownEditor";
@@ -100,24 +103,43 @@ export const SectionCard = memo(function SectionCard({
 
   const [open, setOpen] = useState(initialOpen);
   const [regenerating, setRegenerating] = useState(false);
-  const [regenError, setRegenError] = useState<string | null>(null);
+  const [regenFailure, setRegenFailure] = useState<{
+    error: unknown;
+    instruction: string | undefined;
+  } | null>(null);
   const [note, setNote] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [dismissedPersistedError, setDismissedPersistedError] = useState<string | null>(null);
 
-  const handleRegenerate = async (): Promise<void> => {
+  const runRegenerate = async (instruction: string | undefined): Promise<void> => {
     setRegenerating(true);
-    setRegenError(null);
+    setRegenFailure(null);
+    if (section.last_error) setDismissedPersistedError(section.last_error);
     try {
-      await onRegenerate(note.trim() || undefined);
+      await onRegenerate(instruction);
       setNote("");
     } catch (e) {
-      setRegenError(e instanceof Error ? e.message : String(e));
+      setRegenFailure({ error: e, instruction });
     } finally {
       setRegenerating(false);
     }
   };
 
+  const handleRegenerate = (): void => {
+    void runRegenerate(note.trim() || undefined);
+  };
+
   const isFailed = displayStatus === "failed";
+  const persistedError = section.last_error ? parsePersistedSectionError(section.last_error) : null;
+  const showPersistedError =
+    isFailed && persistedError !== null && section.last_error !== dismissedPersistedError;
+  const persistedMetadata = persistedError as Partial<ApiError> | null;
+  const persistedCanRetry =
+    typeof persistedMetadata?.status === "number" || typeof persistedMetadata?.code === "string";
+
+  useEffect(() => {
+    if (effectiveGenerating || !section.last_error) setDismissedPersistedError(null);
+  }, [effectiveGenerating, section.last_error]);
 
   return (
     <article
@@ -192,25 +214,22 @@ export const SectionCard = memo(function SectionCard({
       </div>
 
       {open && (
-        <div
-          id={`section-body-${section.id}`}
-          className="px-5 pb-5 pt-1 border-t border-rule"
-        >
+        <div id={`section-body-${section.id}`} className="px-5 pb-5 pt-1 border-t border-rule">
           {section.brief && (
             <p className="font-serif italic text-[14px] text-muted px-3 py-2 mt-3 mb-4 rounded-nb-sm bg-cobalt-50/60 border-l-[3px] border-cobalt-200">
               {section.brief}
             </p>
           )}
 
-          {isFailed && section.last_error && (
-            <div
-              className="mb-4 px-3 py-2.5 rounded-nb-sm text-sm leading-snug"
-              style={{ background: "#fde7e2", border: "1px solid #f7c3b6", color: "#b5321b" }}
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-wider mb-0.5">
-                Last attempt failed
-              </p>
-              {section.last_error}
+          {showPersistedError && (
+            <div className="mb-4">
+              <ErrorNotice
+                error={persistedError}
+                operation="composing this section"
+                onRetry={persistedCanRetry ? () => void runRegenerate(undefined) : undefined}
+                onDismiss={() => setDismissedPersistedError(section.last_error ?? null)}
+                dismissLabel="Continue editing"
+              />
             </div>
           )}
 
@@ -243,7 +262,7 @@ export const SectionCard = memo(function SectionCard({
               draftId={draftId}
               pendingTexts={pendingTexts}
             />
-          ) : (
+          ) : showPersistedError ? null : (
             <div
               className="nb-card p-6 text-center border-dashed"
               style={{ background: "#fafbfc" }}
@@ -260,13 +279,15 @@ export const SectionCard = memo(function SectionCard({
             </div>
           )}
 
-          {regenError && (
-            <p
-              className="mt-3 text-xs px-3 py-2 rounded-nb-sm"
-              style={{ background: "#fde7e2", color: "#b5321b", border: "1px solid #f7c3b6" }}
-            >
-              {regenError}
-            </p>
+          {regenFailure !== null && (
+            <div className="mt-3">
+              <ErrorNotice
+                error={regenFailure.error}
+                operation="regenerating this section"
+                onRetry={() => void runRegenerate(regenFailure.instruction)}
+                onDismiss={() => setRegenFailure(null)}
+              />
+            </div>
           )}
 
           {section.content_md.trim() && !effectiveGenerating && (
@@ -277,7 +298,7 @@ export const SectionCard = memo(function SectionCard({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !regenerating) void handleRegenerate();
+                    if (e.key === "Enter" && !regenerating) handleRegenerate();
                   }}
                   placeholder="Optional: how should I revise this? e.g. “tighten”, “add an example”"
                   aria-label="Revision note"

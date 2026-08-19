@@ -1,10 +1,13 @@
 """JobRegistry unit tests — create/cancel/LRU/replay."""
+
 from __future__ import annotations
+
+import asyncio
 
 import pytest
 
 from blogforge.jobs.models import JobType
-from blogforge.jobs.registry import JobRegistry
+from blogforge.jobs.registry import ActiveDraftJobError, JobRegistry
 
 
 @pytest.mark.asyncio
@@ -37,6 +40,23 @@ async def test_active_for_draft_returns_newest() -> None:
     newest = await reg.create(JobType.REGEN_SECTION, draft_id="d1")
     found = reg.active_for_draft("d1")
     assert found is not None and found.id == newest.id
+
+
+@pytest.mark.asyncio
+async def test_create_for_draft_allows_only_one_concurrent_generation() -> None:
+    reg = JobRegistry()
+
+    results = await asyncio.gather(
+        reg.create_for_draft(JobType.EXPAND, "d1"),
+        reg.create_for_draft(JobType.REVISE_DRAFT, "d1"),
+        return_exceptions=True,
+    )
+
+    jobs = [result for result in results if not isinstance(result, Exception)]
+    conflicts = [result for result in results if isinstance(result, ActiveDraftJobError)]
+    assert len(jobs) == 1
+    assert len(conflicts) == 1
+    assert conflicts[0].active_job.id == jobs[0].id
 
 
 @pytest.mark.asyncio

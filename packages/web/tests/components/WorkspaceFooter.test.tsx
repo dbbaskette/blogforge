@@ -22,13 +22,8 @@ const baseProps = {
   totalWords: 120,
   draftedCount: 2,
   sectionCount: 2,
-  onLint: vi.fn(),
+  onReview: vi.fn(),
   onRepurpose: vi.fn(),
-  onHeadlines: vi.fn(),
-  onShape: vi.fn(),
-  onGeo: vi.fn(),
-  onHumanize: vi.fn(),
-  onCheckup: vi.fn(),
 };
 
 beforeEach(() => {
@@ -38,36 +33,14 @@ beforeEach(() => {
 });
 
 describe("WorkspaceFooter", () => {
-  it("shows the grouped menus + Preview + Checkup, and fires onCheckup", () => {
+  it("shows one Review entry point instead of Improve or Checkup controls", () => {
     render(<WorkspaceFooter {...baseProps} />);
-    expect(screen.getByRole("button", { name: /improve/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^review$/i }));
+    expect(baseProps.onReview).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: /export/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^preview$/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /checkup/i }));
-    expect(baseProps.onCheckup).toHaveBeenCalled();
-  });
-
-  it("Improve menu opens Proofread / Shape / GEO / Headlines", () => {
-    render(<WorkspaceFooter {...baseProps} />);
-    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
-    fireEvent.click(screen.getByRole("button", { name: /proofread/i }));
-    expect(baseProps.onLint).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
-    fireEvent.click(screen.getByRole("button", { name: /shape assistant/i }));
-    expect(baseProps.onShape).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
-    fireEvent.click(screen.getByRole("button", { name: /geo optimizer/i }));
-    expect(baseProps.onGeo).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
-    fireEvent.click(screen.getByRole("button", { name: /headlines & hooks/i }));
-    expect(baseProps.onHeadlines).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /improve/i }));
-    fireEvent.click(screen.getByRole("button", { name: /humanize/i }));
-    expect(baseProps.onHumanize).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /improve/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /checkup/i })).not.toBeInTheDocument();
   });
 
   it("Export menu lists copy, every format, and repurpose", () => {
