@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -116,15 +115,13 @@ async def create_draft(
         from blogforge.api.references import ingest_url_reference
 
         draft_uuid = UUID(draft.id)
-        results = await asyncio.gather(
-            *[ingest_url_reference(draft.id, draft_uuid, u) for u in idea.source_urls],
-            return_exceptions=True,
-        )
-        warnings = [
-            ReferenceWarning(url=u, error=str(r) or r.__class__.__name__)
-            for u, r in zip(idea.source_urls, results, strict=True)
-            if isinstance(r, Exception)
-        ]
+        for url in idea.source_urls:
+            try:
+                await ingest_url_reference(draft.id, draft_uuid, url)
+            except Exception as error:
+                warnings.append(
+                    ReferenceWarning(url=url, error=str(error) or error.__class__.__name__)
+                )
         refreshed = await store.get(draft.id, user_id=current.id)
         if refreshed is not None:
             draft = refreshed

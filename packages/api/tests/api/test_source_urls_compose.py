@@ -3,8 +3,11 @@ references (reusing the fs blob backend + a mocked extractor — no network)."""
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
+from blogforge.api import references as references_api
 from blogforge.references.extractors import ExtractionResult
 
 
@@ -49,6 +52,44 @@ async def test_create_draft_ingests_source_urls(authed_client, fs_storage, monke
     body = r.json()
     urls = sorted(ref["url"] for ref in body["references"] if ref["kind"] == "url")
     assert urls == ["https://a.example", "https://b.example"]
+    assert body["reference_warnings"] == []
+
+
+async def test_create_draft_serializes_reference_persistence(
+    authed_client, fs_storage, monkeypatch
+) -> None:
+    async def fake_extract(url: str) -> ExtractionResult:
+        return ExtractionResult(name=f"T:{url}", extracted=f"# body {url}", extracted_chars=10)
+
+    real_persist = references_api._persist
+    active_writes = 0
+
+    async def guarded_persist(**kwargs):  # type: ignore[no-untyped-def]
+        nonlocal active_writes
+        active_writes += 1
+        try:
+            await asyncio.sleep(0)
+            if active_writes > 1:
+                raise RuntimeError("concurrent reference writes are unsafe")
+            return await real_persist(**kwargs)
+        finally:
+            active_writes -= 1
+
+    monkeypatch.setattr("blogforge.api.references.extract_url", fake_extract)
+    monkeypatch.setattr("blogforge.api.references._persist", guarded_persist)
+    client, _ = authed_client
+
+    response = client.post(
+        "/api/drafts",
+        json=_idea(source_urls=["https://a.example", "https://b.example"]),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert sorted(ref["url"] for ref in body["references"] if ref["kind"] == "url") == [
+        "https://a.example",
+        "https://b.example",
+    ]
     assert body["reference_warnings"] == []
 
 
