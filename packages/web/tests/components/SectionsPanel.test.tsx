@@ -5,6 +5,22 @@ import type { ApiError } from "../../src/api/client";
 import type { Draft } from "../../src/api/drafts";
 import { SectionsPanel } from "../../src/components/draft/SectionsPanel";
 
+vi.mock("../../src/api/providers", () => ({
+  listProviderAvailability: vi
+    .fn()
+    .mockResolvedValue({ anthropic: true, openai: true, google: false }),
+  listModels: vi.fn().mockResolvedValue([
+    {
+      id: "m1",
+      label: "Model One",
+      context_window: 200_000,
+      supports_streaming: true,
+      input_per_million_usd: null,
+      output_per_million_usd: null,
+    },
+  ]),
+}));
+
 function makeDraft(): Draft {
   return {
     id: "d1",
@@ -228,5 +244,78 @@ describe("SectionsPanel", () => {
 
     await waitFor(() => expect(onReorder).toHaveBeenCalledTimes(2));
     expect(onReorder).toHaveBeenLastCalledWith(["s2", "s1", "s3"]);
+  });
+
+  it("reorders via drag-and-drop from the grip handle", async () => {
+    const draft2 = makeDraft();
+    draft2.sections = [
+      { ...draft2.sections[0], id: "s1", title: "First Section" },
+      { ...draft2.sections[0], id: "s2", title: "Second Section" },
+      { ...draft2.sections[0], id: "s3", title: "Third Section" },
+    ];
+    const onReorder = vi.fn(async (): Promise<void> => {});
+    render(
+      <SectionsPanel {...baseProps} draft={draft2} onReorder={onReorder} onReviseDraft={noop} />,
+    );
+
+    const dataTransfer = {
+      effectAllowed: "",
+      dropEffect: "",
+      setData: vi.fn(),
+    };
+    // Drag the first section's grip onto the third card.
+    fireEvent.dragStart(screen.getByRole("button", { name: /drag to reorder first section/i }), {
+      dataTransfer,
+    });
+    const thirdCard = screen.getByText("Third Section").closest("div[class*='rounded']")!;
+    fireEvent.dragOver(thirdCard, { dataTransfer });
+    fireEvent.drop(thirdCard, { dataTransfer });
+
+    await waitFor(() => expect(onReorder).toHaveBeenCalledWith(["s2", "s3", "s1"]));
+  });
+
+  it("retries a failed compose with a different provider/model", async () => {
+    const onUpdateIdea = vi.fn(async (): Promise<void> => {});
+    const onComposeRemaining = vi.fn(async (): Promise<void> => {});
+    render(
+      <SectionsPanel
+        {...baseProps}
+        draft={makeDraft()}
+        jobError={new Error("rate limited")}
+        unfilledCount={3}
+        onReviseDraft={noop}
+        onUpdateIdea={onUpdateIdea}
+        onComposeRemaining={onComposeRemaining}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /try another model/i }));
+    const providerSelect = await screen.findByLabelText(/provider for retry/i);
+    fireEvent.change(providerSelect, { target: { value: "openai" } });
+    const modelSelect = await screen.findByLabelText(/model for retry/i);
+    await waitFor(() => expect(modelSelect).not.toBeDisabled());
+    fireEvent.change(modelSelect, { target: { value: "m1" } });
+    fireEvent.click(screen.getByRole("button", { name: /compose with this model/i }));
+
+    await waitFor(() =>
+      expect(onUpdateIdea).toHaveBeenCalledWith({ provider: "openai", model: "m1" }),
+    );
+    expect(onComposeRemaining).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a Stop control while composing", () => {
+    const onCancelJob = vi.fn();
+    render(
+      <SectionsPanel
+        {...baseProps}
+        draft={makeDraft()}
+        jobRunning
+        composingWholeDraft
+        onReviseDraft={noop}
+        onCancelJob={onCancelJob}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Stop generating" }));
+    expect(onCancelJob).toHaveBeenCalledTimes(1);
   });
 });

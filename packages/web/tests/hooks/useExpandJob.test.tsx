@@ -77,4 +77,89 @@ describe("useExpandJob", () => {
     renderHook(() => useExpandJob("j", handlers()));
     expect(() => send(created[0], { type: "token", delta: "x" })).not.toThrow();
   });
+
+  it("closes the stream after an error frame", () => {
+    const onError = vi.fn();
+    renderHook(() => useExpandJob("j", handlers({ onError })));
+    const closeSpy = vi.spyOn(created[0], "close");
+    send(created[0], { type: "error", code: "provider_error", message: "boom" });
+    expect(onError).toHaveBeenCalledWith("provider_error", "boom", undefined);
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
+  it("reconnects after a dropped connection and fires onResync", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "running" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const onResync = vi.fn();
+      renderHook(() => useExpandJob("j", handlers({ onResync })));
+      created[0].onerror?.(new Event("error"));
+      await vi.advanceTimersByTimeAsync(1000);
+      // A fresh EventSource replaced the dropped one.
+      expect(created.length).toBe(2);
+      expect(fetchMock).toHaveBeenCalled();
+      expect(onResync).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("resolves a job that finished while disconnected without reopening", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: "succeeded",
+          result: { draft_id: "d", sections_done: 2, sections_failed: 0 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const onComplete = vi.fn();
+      renderHook(() => useExpandJob("j", handlers({ onComplete })));
+      created[0].onerror?.(new Event("error"));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(created.length).toBe(1); // no reconnect — job already done
+      expect(onComplete).toHaveBeenCalledWith({
+        draft_id: "d",
+        sections_done: 2,
+        sections_failed: 0,
+      });
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("surfaces job_not_found when the job vanished (evicted) mid-stream", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error("HTTP 404"), { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const onError = vi.fn();
+      renderHook(() => useExpandJob("j", handlers({ onError })));
+      created[0].onerror?.(new Event("error"));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(created.length).toBe(1); // no reconnect
+      expect(onError).toHaveBeenCalledWith(
+        "job_not_found",
+        "This job is no longer running.",
+        undefined,
+      );
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
 });

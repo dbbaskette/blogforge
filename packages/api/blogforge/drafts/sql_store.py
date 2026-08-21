@@ -142,6 +142,7 @@ def _summary_from_row(row: DraftRow) -> DraftSummary:
         title=row.title,
         stage=row.stage,  # type: ignore[arg-type]
         pack_slug=row.idea.get("pack_slug", "") if row.idea else "",
+        created_at=row.created_at,
         updated_at=row.updated_at,
         word_count=word_count,
         tags=list(row.tags or []),

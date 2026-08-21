@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { Draft, Section } from "../../api/drafts";
+import type { Draft, IdeaInput, Section } from "../../api/drafts";
+import {
+  listModels,
+  listProviderAvailability,
+  type ModelInfo,
+  type Provider,
+} from "../../api/providers";
 import { ErrorNotice } from "../ui/ErrorNotice";
 import { DraftReadView } from "./DraftReadView";
 import { SectionCard } from "./SectionCard";
@@ -32,6 +38,14 @@ interface SectionsPanelProps {
   onReviseDraft: (instruction: string) => Promise<void>;
   /** Optional right-rail block, typically a collapsible ReferencesList. */
   references?: React.ReactNode;
+  /** Compose the still-unwritten sections — powers the failure-banner retry. */
+  onComposeRemaining?: () => Promise<void>;
+  /** Stop the in-flight generation job. */
+  onCancelJob?: () => void;
+  /** True between clicking Stop and the server confirming cancellation. */
+  cancelling?: boolean;
+  /** Patch the draft's idea (provider/model) for the retry-with-model flow. */
+  onUpdateIdea?: (patch: Partial<IdeaInput>) => Promise<void>;
 }
 
 export function SectionsPanel({
@@ -52,6 +66,10 @@ export function SectionsPanel({
   onReorder,
   onReviseDraft,
   references,
+  onComposeRemaining,
+  onCancelJob,
+  cancelling = false,
+  onUpdateIdea,
 }: SectionsPanelProps): JSX.Element {
   const [view, setView] = useState<"edit" | "read">("edit");
   const [reviseOpen, setReviseOpen] = useState(false);
@@ -101,19 +119,61 @@ export function SectionsPanel({
     [onReorder],
   );
 
-  const moveSection = useCallback(
-    (idx: number, dir: -1 | 1): void => {
+  // Optimistic reorder shared by the arrow buttons and drag-and-drop.
+  const reorderTo = useCallback(
+    async (from: number, to: number): Promise<void> => {
       const cur = sectionsRef.current;
-      const swap = idx + dir;
-      if (swap < 0 || swap >= cur.length) return;
+      if (from === to) return;
+      if (from < 0 || to < 0 || from >= cur.length || to >= cur.length) return;
       const next = [...cur];
-      [next[idx], next[swap]] = [next[swap], next[idx]];
-      void persistOrder(
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      await persistOrder(
         next.map((s) => s.id),
         next,
       );
     },
     [persistOrder],
+  );
+
+  const moveSection = useCallback(
+    (idx: number, dir: -1 | 1): void => {
+      void reorderTo(idx, idx + dir);
+    },
+    [reorderTo],
+  );
+
+  // ── Drag-and-drop reorder state ──
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const dragIndexRef = useRef<number | null>(null);
+  const handleDragStart = useCallback((index: number, e: React.DragEvent): void => {
+    dragIndexRef.current = index;
+    setDraggingIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    // Required for Firefox to initiate the drag at all.
+    e.dataTransfer.setData("text/plain", String(index));
+  }, []);
+  const clearDrag = useCallback((): void => {
+    dragIndexRef.current = null;
+    setDraggingIndex(null);
+    setDropIndex(null);
+  }, []);
+  const handleDragOverSection = useCallback((index: number, e: React.DragEvent): void => {
+    if (dragIndexRef.current === null || dragIndexRef.current === index) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropIndex(index);
+  }, []);
+  const handleDropOnSection = useCallback(
+    (index: number, e: React.DragEvent): void => {
+      e.preventDefault();
+      const from = dragIndexRef.current;
+      clearDrag();
+      if (from === null || from === index) return;
+      void reorderTo(from, index);
+    },
+    [clearDrag, reorderTo],
   );
 
   // Per-section handler bundle, recreated only when the section list itself
@@ -129,6 +189,9 @@ export function SectionsPanel({
         onRevert: (versionId: string) => onRevertSection(section.id, versionId),
         onMoveUp: () => moveSection(i, -1),
         onMoveDown: () => moveSection(i, 1),
+        onDragStart: (e: React.DragEvent) => handleDragStart(i, e),
+        onDragEnd: clearDrag,
+        dragging: draggingIndex === i,
       })),
     [
       sections,
@@ -137,6 +200,9 @@ export function SectionsPanel({
       onRegenerateSection,
       onRevertSection,
       moveSection,
+      handleDragStart,
+      clearDrag,
+      draggingIndex,
     ],
   );
 
@@ -148,6 +214,51 @@ export function SectionsPanel({
   // it fills, so the ticker climbs section-by-section as the draft lands. Prefer
   // the workspace-owned total (matches the footer) when supplied.
   const liveWords = liveWordsProp ?? sections.reduce((acc, s) => acc + s.word_count, 0);
+
+  // Retry-after-failure with a different provider/model. The picker lazy-loads
+  // availability + models only when the writer opens it.
+  const [retryOpen, setRetryOpen] = useState(false);
+  const [providers, setProviders] = useState<Record<string, boolean> | null>(null);
+  const [provider, setProvider] = useState<Provider>(draft.idea.provider);
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [model, setModel] = useState(draft.idea.model);
+  const [retrying, setRetrying] = useState(false);
+
+  const toggleRetry = async (): Promise<void> => {
+    setRetryOpen((v) => !v);
+    if (!providers) {
+      try {
+        setProviders(await listProviderAvailability());
+      } catch {
+        /* fall back to showing just the current provider */
+      }
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setModels([]);
+    listModels(provider)
+      .then((ms) => {
+        if (!cancelled) setModels(ms);
+      })
+      .catch(() => {
+        /* picker shows the raw current model id as the only option */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [provider]);
+
+  const retryWithModel = async (): Promise<void> => {
+    setRetrying(true);
+    try {
+      await onUpdateIdea?.({ provider, model });
+      await onComposeRemaining?.();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const runRevise = async (instruction: string): Promise<void> => {
     setRevising(true);
@@ -297,6 +408,7 @@ export function SectionsPanel({
               <span className="tabular-nums text-amber-ink font-semibold">
                 {liveWords.toLocaleString()} {liveWords === 1 ? "word" : "words"}
               </span>
+              {onCancelJob && <StopButton onClick={onCancelJob} cancelling={cancelling} />}
             </span>
           </div>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#c2d4ff" }}>
@@ -322,8 +434,9 @@ export function SectionsPanel({
               />
               Composing your draft…
             </span>
-            <span className="font-mono text-xs text-cobalt-700">
+            <span className="flex items-center gap-3 font-mono text-xs text-cobalt-700">
               {doneCount} / {total} sections
+              {onCancelJob && <StopButton onClick={onCancelJob} cancelling={cancelling} />}
             </span>
           </div>
           <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#c2d4ff" }}>
@@ -362,6 +475,67 @@ export function SectionsPanel({
             operation="generating your draft"
             onDismiss={onDismissJobError}
           />
+          {!jobRunning &&
+            unfilledCount > 0 &&
+            onComposeRemaining &&
+            onUpdateIdea && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void toggleRetry()}
+                  aria-expanded={retryOpen}
+                  className="nb-btn nb-btn-sm"
+                >
+                  Try another model…
+                </button>
+                {retryOpen && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={provider}
+                      onChange={(e) => {
+                        setProvider(e.target.value as Provider);
+                        setModel("");
+                      }}
+                      aria-label="Provider for retry"
+                      className="nb-select"
+                      style={{ width: "auto" }}
+                    >
+                      {(providers
+                        ? Object.entries(providers)
+                            .filter(([, ok]) => ok)
+                            .map(([p]) => p)
+                        : [provider]
+                      ).map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      aria-label="Model for retry"
+                      className="nb-select"
+                      style={{ width: "auto" }}
+                    >
+                      {(models.length ? models : [{ id: model, label: model }]).map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => void retryWithModel()}
+                      disabled={retrying || !model}
+                      className="nb-btn nb-btn-primary nb-btn-sm shrink-0"
+                    >
+                      {retrying ? "Starting…" : "Compose with this model →"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
         </div>
       )}
 
@@ -383,7 +557,13 @@ export function SectionsPanel({
       ) : view === "read" ? (
         <DraftReadView draft={draft} />
       ) : (
-        <div className="space-y-3">
+        <div
+          className="space-y-3"
+          onDragLeave={(e) => {
+            // Leaving the list entirely (not just moving between cards) clears the indicator.
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropIndex(null);
+          }}
+        >
           {sections.map((section, i) => {
             const isComposing = generatingIds.has(section.id);
             const hasLanded = section.status === "ready" || section.status === "edited";
@@ -392,12 +572,18 @@ export function SectionsPanel({
             return (
               <div
                 key={section.id}
+                onDragOver={(e) => handleDragOverSection(i, e)}
+                onDrop={(e) => handleDropOnSection(i, e)}
                 className={`rounded-[14px] transition-shadow duration-500 ${
                   isComposing
                     ? "section-card-composing"
                     : jobRunning && hasLanded
                       ? "section-card-landed"
                       : ""
+                } ${
+                  draggingIndex !== null && dropIndex === i && draggingIndex !== i
+                    ? "ring-2 ring-cobalt-400 ring-offset-2 ring-offset-canvas"
+                    : ""
                 }`}
               >
                 <SectionCard
@@ -412,6 +598,9 @@ export function SectionsPanel({
                   onRevert={cardProps[i].onRevert}
                   onMoveUp={cardProps[i].onMoveUp}
                   onMoveDown={cardProps[i].onMoveDown}
+                  onDragStart={cardProps[i].onDragStart}
+                  onDragEnd={cardProps[i].onDragEnd}
+                  dragging={cardProps[i].dragging}
                   canMoveUp={i > 0}
                   canMoveDown={i < sections.length - 1}
                 />
@@ -421,6 +610,26 @@ export function SectionsPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function StopButton({
+  onClick,
+  cancelling,
+}: {
+  onClick: () => void;
+  cancelling: boolean;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={cancelling}
+      aria-label="Stop generating"
+      className="nb-btn nb-btn-sm shrink-0"
+    >
+      {cancelling ? "Stopping…" : "Stop"}
+    </button>
   );
 }
 

@@ -97,6 +97,12 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
           return next;
         });
       },
+      // After a dropped connection the server replays the full accumulated
+      // text — reset the live buffer so it isn't duplicated.
+      onResync: () => {
+        liveAssistantText.current = "";
+        setMessages((cur) => cur.map((m) => (m.id === "__live__" ? { ...m, content: "" } : m)));
+      },
       onError: (err) => {
         const request = lastRequest.current;
         setFailure(
@@ -127,6 +133,7 @@ export function ResearchPanel({ draft, onJobComplete }: ResearchPanelProps): JSX
     () => ({
       onDelta: (d) => handlersRef.current.onDelta?.(d),
       onResult: (r) => handlersRef.current.onResult?.(r),
+      onResync: () => handlersRef.current.onResync?.(),
       onError: (e) => handlersRef.current.onError?.(e),
       onDone: () => handlersRef.current.onDone?.(),
     }),

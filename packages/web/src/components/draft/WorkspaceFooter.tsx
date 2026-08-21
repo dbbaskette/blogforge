@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { type Draft, downloadDraftUrl } from "../../api/drafts";
+import { PALETTE_ACTION_EVENT } from "../CommandPalette";
 import { PublishDialog } from "./PublishDialog";
 import { ReadingPreview } from "./ReadingPreview";
 
@@ -100,6 +101,17 @@ export function WorkspaceFooter({
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+
+  // ⌘K "Publish to GitHub…" opens this dialog from the command palette.
+  useEffect(() => {
+    const onPaletteAction = (e: Event): void => {
+      if ((e as CustomEvent<{ action?: string }>).detail?.action === "publish") {
+        setPublishOpen(true);
+      }
+    };
+    window.addEventListener(PALETTE_ACTION_EVENT, onPaletteAction);
+    return () => window.removeEventListener(PALETTE_ACTION_EVENT, onPaletteAction);
+  }, []);
 
   const openPreview = (): void => {
     setPreviewOpen(true);

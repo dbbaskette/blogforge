@@ -2,12 +2,14 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Link } from "react-router-dom";
 
 import type { Draft, DraftStage, IdeaInput, OutlineProposal } from "../../api/drafts";
+import { cancelJob } from "../../api/drafts";
 import { createTemplateFromDraft } from "../../api/templates";
 import { useDebouncedSave } from "../../hooks/useDebouncedSave";
 import { type ExpandJobHandlers, useExpandJob } from "../../hooks/useExpandJob";
 import { deriveNextDraftAction } from "../../lib/draftNextAction";
 import type { FactualSupportResult } from "../../lib/reviewCenter";
 import { approveAll, loadPending, prunePending, trackChange } from "../../lib/trackedChanges";
+import { PALETTE_ACTION_EVENT } from "../CommandPalette";
 import { ErrorNotice } from "../ui/ErrorNotice";
 import { InlineMarkdown } from "../ui/InlineMarkdown";
 import { HeroImage } from "./HeroImage";
@@ -113,6 +115,8 @@ export function DraftWorkspace({
   const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [jobError, setJobError] = useState<unknown>(null);
+  // Set between clicking "Stop" and the server confirming cancellation.
+  const [cancelling, setCancelling] = useState(false);
   // True from the instant Compose fires until the job completes/errors —
   // independent of generatingIds, which stays empty during the latency
   // window before the first SSE section:start event arrives.
@@ -148,6 +152,9 @@ export function DraftWorkspace({
       onToken: (delta) => {
         if (liveSectionId) setLiveText((prev) => prev + delta);
       },
+      // After a dropped connection the server replays the full accumulated
+      // text — reset the live buffer so it isn't duplicated.
+      onResync: () => setLiveText(""),
       onComplete: () => {
         setGeneratingIds(new Set());
         setJobError(null);
@@ -155,20 +162,25 @@ export function DraftWorkspace({
         setLiveSectionId(null);
         setLiveText("");
         setComposingWholeDraft(false);
+        setCancelling(false);
         onJobComplete();
       },
       onError: (code, message, hint) => {
         setGeneratingIds(new Set());
-        setJobError(
-          Object.assign(new Error(message), {
-            code,
-            detail: hint ? { hint } : undefined,
-          }),
-        );
+        // A user-initiated cancel is not a failure — settle quietly.
+        if (code !== "cancelled") {
+          setJobError(
+            Object.assign(new Error(message), {
+              code,
+              detail: hint ? { hint } : undefined,
+            }),
+          );
+        }
         setJobActive(false);
         setLiveSectionId(null);
         setLiveText("");
         setComposingWholeDraft(false);
+        setCancelling(false);
         onJobComplete();
       },
     }),
@@ -180,6 +192,7 @@ export function DraftWorkspace({
       onSectionStart: (id) => handlersRef.current.onSectionStart(id),
       onSectionDone: (id) => handlersRef.current.onSectionDone(id),
       onToken: (d) => handlersRef.current.onToken?.(d),
+      onResync: () => handlersRef.current.onResync?.(),
       onComplete: (r) => handlersRef.current.onComplete(r),
       onError: (c, m, h) => handlersRef.current.onError(c, m, h),
     }),
@@ -193,6 +206,20 @@ export function DraftWorkspace({
   useEffect(() => {
     if (jobId !== null) setJobActive(true);
   }, [jobId]);
+
+  // Command palette actions that open workspace panels (⌘K → "Proofread this
+  // draft" etc.). The palette dispatches a window event so it stays decoupled
+  // from the workspace tree.
+  useEffect(() => {
+    const onPaletteAction = (e: Event): void => {
+      const action = (e as CustomEvent<{ action?: string }>).detail?.action;
+      if (action === "proofread") setLintOpen(true);
+      else if (action === "headlines") setHeadlinesOpen(true);
+      else if (action === "repurpose") setRepurposeOpen(true);
+    };
+    window.addEventListener(PALETTE_ACTION_EVENT, onPaletteAction);
+    return () => window.removeEventListener(PALETTE_ACTION_EVENT, onPaletteAction);
+  }, []);
 
   useEffect(() => {
     const alreadyGenerating = draft.sections
@@ -393,6 +420,20 @@ export function DraftWorkspace({
     },
     [onRegenerateSection],
   );
+
+  const handleCancelJob = useCallback(async (): Promise<void> => {
+    if (!jobId) return;
+    setCancelling(true);
+    try {
+      await cancelJob(jobId);
+      // The SSE stream delivers the "cancelled" frame that settles all state.
+    } catch {
+      // The job may have just finished (or already been cancelled) — the
+      // stream's terminal frame settles the UI either way.
+    } finally {
+      setCancelling(false);
+    }
+  }, [jobId]);
 
   const handleSaveTemplate = useCallback(async () => {
     const name = window.prompt("Template name", draft.title || "Untitled template");
@@ -636,6 +677,12 @@ export function DraftWorkspace({
               onRevertSection={onRevertSection}
               onReviseDraft={handleReviseDraft}
               onReorder={onReorder}
+              onComposeRemaining={handleExpandUnfilled}
+              onCancelJob={handleCancelJob}
+              cancelling={cancelling}
+              onUpdateIdea={async (patch) => {
+                await onChange({ ...draft, idea: { ...draft.idea, ...patch } });
+              }}
               references={<ReferencesList draftId={draft.id} collapsible defaultOpen={false} />}
             />
           </Suspense>

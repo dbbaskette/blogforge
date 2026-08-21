@@ -28,6 +28,11 @@ interface SectionCardProps {
   onMoveDown: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  /** Drag-and-drop reorder: the grip handle starts the drag; the list
+   * wrapper in SectionsPanel handles hover/drop targeting. */
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
+  dragging?: boolean;
 }
 
 function StatusPill({ status }: { status: Section["status"] }): JSX.Element {
@@ -88,6 +93,9 @@ export const SectionCard = memo(function SectionCard({
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  onDragStart,
+  onDragEnd,
+  dragging = false,
 }: SectionCardProps): JSX.Element {
   const hasLiveText = liveText !== undefined && liveText.length > 0;
   const effectiveGenerating = isGenerating || section.status === "generating";
@@ -144,7 +152,9 @@ export const SectionCard = memo(function SectionCard({
   return (
     <article
       id={`section-${section.id}`}
-      className={`nb-card scroll-mt-20 ${isFailed ? "" : "nb-card-hover"}`}
+      className={`nb-card scroll-mt-20 ${isFailed ? "" : "nb-card-hover"} ${
+        dragging ? "opacity-50" : ""
+      }`}
       style={isFailed ? { borderColor: "#f7c3b6" } : undefined}
     >
       {/* Toggle row — heading is a button, side controls live outside it. */}
@@ -177,6 +187,19 @@ export const SectionCard = memo(function SectionCard({
         </button>
 
         <div className="flex items-center gap-1 pr-5">
+          {onDragStart && (
+            <button
+              type="button"
+              draggable
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              className="nb-icon-btn cursor-grab active:cursor-grabbing touch-none"
+              aria-label={`Drag to reorder ${section.title || "section"}`}
+              title="Drag to reorder"
+            >
+              <Icon name="grip" size={14} title="" />
+            </button>
+          )}
           {canMoveUp && (
             <button
               type="button"

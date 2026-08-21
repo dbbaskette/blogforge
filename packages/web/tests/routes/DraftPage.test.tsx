@@ -502,6 +502,44 @@ describe("DraftPage", () => {
     expect(screen.getByText(/All changes saved/i)).toBeInTheDocument();
   });
 
+  it("recovers from a load failure via Retry", async () => {
+    vi.mocked(getDraft)
+      .mockRejectedValueOnce(new Error("Server hiccup"))
+      .mockResolvedValueOnce({
+        id: "abc123",
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        title: "My Test Draft",
+        stage: "research",
+        idea: {
+          topic: "My Test Draft",
+          pack_slug: "dan",
+          provider: "anthropic",
+          model: "claude-3-5-sonnet",
+          target_words: 1500,
+        },
+        outline: null,
+        sections: [],
+      } as never);
+
+    render(
+      <MemoryRouter initialEntries={["/drafts/abc123"]}>
+        <Routes>
+          <Route path="/drafts/:id" element={<DraftPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // The failure is recoverable, not a dead end.
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to drafts/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^Send$/i })).toBeInTheDocument(),
+    );
+  });
+
   it("requests remaining-only expansion when retrying a failed draft", async () => {
     vi.mocked(getDraft).mockResolvedValueOnce({
       id: "abc123",
