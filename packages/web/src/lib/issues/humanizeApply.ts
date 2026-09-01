@@ -15,7 +15,11 @@ import type { Draft } from "../../api/drafts";
 import type { Applied, AppliedField } from "../../components/review/useIssueLifecycle";
 import type { Issue, IssueAction } from "./types";
 
-type SectionSave = (sectionId: string, content_md: string, createVersion?: boolean) => Promise<void>;
+type SectionSave = (
+  sectionId: string,
+  content_md: string,
+  createVersion?: boolean,
+) => Promise<void>;
 
 /**
  * Locate `target` in `text` for a *safe* replacement — exact first, then a

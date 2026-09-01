@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { humanizeFindingsToIssues } from "../../../src/lib/issues/humanizeAdapter";
 import type { HumanizeReport } from "../../../src/api/humanize";
+import { humanizeFindingsToIssues } from "../../../src/lib/issues/humanizeAdapter";
 
 const report: HumanizeReport = {
   intensity: "medium",
@@ -10,10 +10,22 @@ const report: HumanizeReport = {
       key: "soul",
       label: "De-robot / Soul",
       findings: [
-        { lens: "soul", section_id: "s1", target: "The API serves as a gateway.",
-          suggestion: "The API is the gateway.", note: "puffery", needs_review: false },
-        { lens: "soul", section_id: "s2", target: "Freed 11 GB.",
-          suggestion: "Freed 12 GB.", note: "loosen", needs_review: true },
+        {
+          lens: "soul",
+          section_id: "s1",
+          target: "The API serves as a gateway.",
+          suggestion: "The API is the gateway.",
+          note: "puffery",
+          needs_review: false,
+        },
+        {
+          lens: "soul",
+          section_id: "s2",
+          target: "Freed 11 GB.",
+          suggestion: "Freed 12 GB.",
+          note: "loosen",
+          needs_review: true,
+        },
       ],
     },
   ],

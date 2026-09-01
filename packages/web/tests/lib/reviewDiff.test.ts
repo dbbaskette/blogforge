@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { type DiffSeg, trimContext, reviewDiff } from "../../src/lib/reviewDiff";
+import { type DiffSeg, reviewDiff, trimContext } from "../../src/lib/reviewDiff";
 
 const join = (segs: DiffSeg[], kinds: string[]): string =>
-  segs.filter((s) => kinds.includes(s.kind)).map((s) => s.text).join(" ");
+  segs
+    .filter((s) => kinds.includes(s.kind))
+    .map((s) => s.text)
+    .join(" ");
 
 describe("reviewDiff", () => {
   it("marks identical text as one same segment", () => {
@@ -48,7 +51,7 @@ describe("trimContext", () => {
     const after = `${"pad ".repeat(30)}REWRITTEN ${"pad ".repeat(30)}`.trim();
     const segs = trimContext(reviewDiff(before, after), 5);
     const firstSame = segs.find((s) => s.kind === "same");
-    expect(firstSame && firstSame.text.split(" ").length).toBeLessThanOrEqual(6);
+    expect(firstSame?.text.split(" ").length).toBeLessThanOrEqual(6);
     expect(segs[0].text.startsWith("…")).toBe(true);
   });
 

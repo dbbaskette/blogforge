@@ -18,17 +18,23 @@ export function rhythmVariance(lengths: number[]): number {
 
 export function RhythmStrip({ text }: { text: string }) {
   const lens = sentenceLengths(text).slice(0, 24);
+  const occurrences = new Map<number, number>();
+  const bars = lens.map((length) => {
+    const occurrence = occurrences.get(length) ?? 0;
+    occurrences.set(length, occurrence + 1);
+    return { id: `${length}-${occurrence}`, length };
+  });
   const max = Math.max(1, ...lens);
   const metronomic = lens.length > 3 && rhythmVariance(lens) < 3;
   return (
     <div>
       <div className="flex items-end gap-1" style={{ height: 64 }}>
-        {lens.map((n, i) => (
+        {bars.map(({ id, length }) => (
           <span
-            key={i}
+            key={id}
             style={{
               flex: 1,
-              height: `${Math.max(8, (n / max) * 100)}%`,
+              height: `${Math.max(8, (length / max) * 100)}%`,
               background: "#2f6bff",
               opacity: 0.55,
               borderRadius: "3px 3px 0 0",

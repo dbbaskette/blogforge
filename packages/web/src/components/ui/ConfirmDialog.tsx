@@ -16,13 +16,12 @@ type Resolver = (ok: boolean) => void;
 // Default falls back to the native confirm so any consumer stays usable (and
 // unit-testable) without the provider; the <ConfirmProvider> mounted at the app
 // root overrides it with the on-brand modal in the running app.
-const ConfirmContext = createContext<(opts: ConfirmOptions) => Promise<boolean>>(
-  (opts) =>
-    Promise.resolve(
-      typeof window !== "undefined" && typeof window.confirm === "function"
-        ? window.confirm(typeof opts.title === "string" ? opts.title : "Are you sure?")
-        : true,
-    ),
+const ConfirmContext = createContext<(opts: ConfirmOptions) => Promise<boolean>>((opts) =>
+  Promise.resolve(
+    typeof window !== "undefined" && typeof window.confirm === "function"
+      ? window.confirm(typeof opts.title === "string" ? opts.title : "Are you sure?")
+      : true,
+  ),
 );
 
 /**
@@ -50,11 +49,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }): JS
     <ConfirmContext.Provider value={confirm}>
       {children}
       {opts && (
-        <ConfirmModal
-          opts={opts}
-          onCancel={() => settle(false)}
-          onConfirm={() => settle(true)}
-        />
+        <ConfirmModal opts={opts} onCancel={() => settle(false)} onConfirm={() => settle(true)} />
       )}
     </ConfirmContext.Provider>
   );
@@ -73,26 +68,25 @@ function ConfirmModal({
   onCancel: () => void;
   onConfirm: () => void;
 }): JSX.Element {
-  const ref = useDialogA11y(true, onCancel);
+  const ref = useDialogA11y<HTMLDialogElement>(true, onCancel);
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4"
-      onClick={onCancel}
-      role="presentation"
-    >
-      <div
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4">
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Cancel confirmation"
+        className="absolute inset-0 h-full w-full cursor-default"
+        onClick={onCancel}
+      />
+      <dialog
+        open
         ref={ref}
-        className="nb-card w-[440px] max-w-full p-0 text-ink animate-fade-up"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
+        className="relative nb-card w-[440px] max-w-full m-0 p-0 text-ink animate-fade-up"
         aria-label={opts.title}
       >
         <div className="px-7 pt-6 pb-5 space-y-2">
           <h2 className="font-serif text-xl font-medium text-ink tracking-tight">{opts.title}</h2>
-          {opts.message && (
-            <div className="text-sm text-ink-2 leading-relaxed">{opts.message}</div>
-          )}
+          {opts.message && <div className="text-sm text-ink-2 leading-relaxed">{opts.message}</div>}
         </div>
         <div className="px-7 pb-6 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="nb-btn nb-btn-sm">
@@ -106,7 +100,7 @@ function ConfirmModal({
             {opts.confirmLabel ?? "Confirm"}
           </button>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

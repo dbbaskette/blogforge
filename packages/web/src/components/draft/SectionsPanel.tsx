@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Draft, IdeaInput, Section } from "../../api/drafts";
 import {
-  listModels,
-  listProviderAvailability,
   type ModelInfo,
   type Provider,
+  listModels,
+  listProviderAvailability,
 } from "../../api/providers";
 import { ErrorNotice } from "../ui/ErrorNotice";
 import { DraftReadView } from "./DraftReadView";
@@ -475,67 +475,64 @@ export function SectionsPanel({
             operation="generating your draft"
             onDismiss={onDismissJobError}
           />
-          {!jobRunning &&
-            unfilledCount > 0 &&
-            onComposeRemaining &&
-            onUpdateIdea && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void toggleRetry()}
-                  aria-expanded={retryOpen}
-                  className="nb-btn nb-btn-sm"
-                >
-                  Try another model…
-                </button>
-                {retryOpen && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <select
-                      value={provider}
-                      onChange={(e) => {
-                        setProvider(e.target.value as Provider);
-                        setModel("");
-                      }}
-                      aria-label="Provider for retry"
-                      className="nb-select"
-                      style={{ width: "auto" }}
-                    >
-                      {(providers
-                        ? Object.entries(providers)
-                            .filter(([, ok]) => ok)
-                            .map(([p]) => p)
-                        : [provider]
-                      ).map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      aria-label="Model for retry"
-                      className="nb-select"
-                      style={{ width: "auto" }}
-                    >
-                      {(models.length ? models : [{ id: model, label: model }]).map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void retryWithModel()}
-                      disabled={retrying || !model}
-                      className="nb-btn nb-btn-primary nb-btn-sm shrink-0"
-                    >
-                      {retrying ? "Starting…" : "Compose with this model →"}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
+          {!jobRunning && unfilledCount > 0 && onComposeRemaining && onUpdateIdea && (
+            <>
+              <button
+                type="button"
+                onClick={() => void toggleRetry()}
+                aria-expanded={retryOpen}
+                className="nb-btn nb-btn-sm"
+              >
+                Try another model…
+              </button>
+              {retryOpen && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={provider}
+                    onChange={(e) => {
+                      setProvider(e.target.value as Provider);
+                      setModel("");
+                    }}
+                    aria-label="Provider for retry"
+                    className="nb-select"
+                    style={{ width: "auto" }}
+                  >
+                    {(providers
+                      ? Object.entries(providers)
+                          .filter(([, ok]) => ok)
+                          .map(([p]) => p)
+                      : [provider]
+                    ).map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    aria-label="Model for retry"
+                    className="nb-select"
+                    style={{ width: "auto" }}
+                  >
+                    {(models.length ? models : [{ id: model, label: model }]).map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void retryWithModel()}
+                    disabled={retrying || !model}
+                    className="nb-btn nb-btn-primary nb-btn-sm shrink-0"
+                  >
+                    {retrying ? "Starting…" : "Compose with this model →"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

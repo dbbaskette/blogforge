@@ -54,15 +54,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }): JSX.
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div
+      <output
         className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2 pointer-events-none"
-        role="status"
         aria-live="polite"
       >
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onDismiss={() => remove(t.id)} />
         ))}
-      </div>
+      </output>
     </ToastContext.Provider>
   );
 }
@@ -74,16 +73,13 @@ export function useToast(): { toast: ToastFn } {
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }): JSX.Element {
   const success = toast.kind === "success";
   return (
-    <button
-      type="button"
-      onClick={onDismiss}
+    <div
       className="nb-card pointer-events-auto flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left animate-slide-in-right max-w-sm"
       style={
         success
           ? { background: "#e3f5ec", borderColor: "#15a06b", color: "#0e7a50" }
           : { background: "#fde7e2", borderColor: "#e6492d", color: "#b5321b" }
       }
-      aria-label={`Dismiss notification: ${toast.message}`}
     >
       <span aria-hidden="true" className="text-base leading-none">
         {success ? "✓" : "✕"}
@@ -102,6 +98,14 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           {toast.action.label}
         </button>
       )}
-    </button>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="ml-1 font-bold hover:opacity-70"
+        aria-label={`Dismiss notification: ${toast.message}`}
+      >
+        ×
+      </button>
+    </div>
   );
 }

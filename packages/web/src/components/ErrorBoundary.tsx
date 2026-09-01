@@ -28,18 +28,12 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center px-4">
           <div className="nb-card w-full max-w-md p-8 text-center">
-            <h1 className="font-serif text-xl font-medium text-ink mb-2">
-              Something went wrong
-            </h1>
+            <h1 className="font-serif text-xl font-medium text-ink mb-2">Something went wrong</h1>
             <p className="text-sm text-muted mb-5">
               An unexpected error broke this view. Reloading usually fixes it.
             </p>
             <div className="flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={this.reset}
-                className="nb-btn nb-btn-sm"
-              >
+              <button type="button" onClick={this.reset} className="nb-btn nb-btn-sm">
                 Try again
               </button>
               <button

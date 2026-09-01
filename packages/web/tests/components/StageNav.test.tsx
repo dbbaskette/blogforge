@@ -15,8 +15,14 @@ function makeDraft(over: Partial<Draft> = {}): Draft {
     outline: { opening_hook: "h", sections: [], estimated_words: 0 },
     sections: [
       {
-        id: "s1", title: "First", brief: "", content_md: "x",
-        status: "ready", last_generated_at: null, last_error: null, word_count: 1,
+        id: "s1",
+        title: "First",
+        brief: "",
+        content_md: "x",
+        status: "ready",
+        last_generated_at: null,
+        last_error: null,
+        word_count: 1,
       },
     ],
     tags: [],

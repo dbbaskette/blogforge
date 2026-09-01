@@ -267,7 +267,8 @@ describe("SectionsPanel", () => {
     fireEvent.dragStart(screen.getByRole("button", { name: /drag to reorder first section/i }), {
       dataTransfer,
     });
-    const thirdCard = screen.getByText("Third Section").closest("div[class*='rounded']")!;
+    const thirdCard = screen.getByText("Third Section").closest("div[class*='rounded']");
+    if (!thirdCard) throw new Error("Expected the third section card");
     fireEvent.dragOver(thirdCard, { dataTransfer });
     fireEvent.drop(thirdCard, { dataTransfer });
 

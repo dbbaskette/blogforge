@@ -65,7 +65,14 @@ vi.mock("../../src/api/voice", () => {
     }),
     auditionVoice: vi.fn().mockResolvedValue({ original: "", rewritten: "" }),
     listSources: vi.fn().mockResolvedValue([]),
-    addUrlSource: vi.fn().mockResolvedValue({ id: "src1", url: "https://example.com", name: "Example", status: "ready", extracted_chars: 0, added_at: "2026-01-01T00:00:00Z" }),
+    addUrlSource: vi.fn().mockResolvedValue({
+      id: "src1",
+      url: "https://example.com",
+      name: "Example",
+      status: "ready",
+      extracted_chars: 0,
+      added_at: "2026-01-01T00:00:00Z",
+    }),
     deleteSource: vi.fn().mockResolvedValue(undefined),
     importLinkedIn: vi.fn().mockResolvedValue(profile),
   };
@@ -113,9 +120,7 @@ describe("VoicePage", () => {
     const starBtn = screen.getByRole("button", { name: /exemplar/i });
     fireEvent.click(starBtn);
 
-    await waitFor(() =>
-      expect(setExemplar).toHaveBeenCalledWith("s1", false),
-    );
+    await waitFor(() => expect(setExemplar).toHaveBeenCalledWith("s1", false));
   });
 
   it("shows download pack link", async () => {
@@ -137,9 +142,7 @@ describe("VoicePage", () => {
   it("shows distilled style text in the textarea", async () => {
     renderPage();
     await waitFor(() =>
-      expect(
-        screen.getByDisplayValue("Write with clarity and precision."),
-      ).toBeInTheDocument(),
+      expect(screen.getByDisplayValue("Write with clarity and precision.")).toBeInTheDocument(),
     );
   });
 });

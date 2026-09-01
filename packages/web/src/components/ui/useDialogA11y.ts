@@ -19,8 +19,11 @@ const dialogStack: symbol[] = [];
  * closes on Escape, and restores focus to the previously-focused element on
  * close. Returns a ref to spread onto the dialog/panel root element.
  */
-export function useDialogA11y(active: boolean, onClose: () => void): RefObject<HTMLDivElement> {
-  const ref = useRef<HTMLDivElement>(null);
+export function useDialogA11y<T extends HTMLElement = HTMLDivElement>(
+  active: boolean,
+  onClose: () => void,
+): RefObject<T> {
+  const ref = useRef<T>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   // Stable identity for this dialog instance across renders.

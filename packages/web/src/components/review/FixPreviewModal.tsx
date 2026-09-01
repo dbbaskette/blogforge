@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
-import { trimContext, reviewDiff } from "../../lib/reviewDiff";
+import { reviewDiff, trimContext } from "../../lib/reviewDiff";
 import { useDialogA11y } from "../ui/useDialogA11y";
 
 interface FixPreviewModalProps {
@@ -39,7 +39,7 @@ export function FixPreviewModal({
   onApply,
   onCancel,
 }: FixPreviewModalProps): JSX.Element {
-  const ref = useDialogA11y(true, () => {
+  const ref = useDialogA11y<HTMLDialogElement>(true, () => {
     if (!busy) onCancel();
   });
   const [editing, setEditing] = useState(false);
@@ -47,7 +47,7 @@ export function FixPreviewModal({
 
   const segs = useMemo(() => trimContext(reviewDiff(before, after)), [before, after]);
 
-  const pane = (side: "original" | "rewrite"): JSX.Element[] => {
+  const pane = (side: "original" | "rewrite"): ReactNode[] => {
     const drop = side === "original" ? "added" : "removed";
     const mark = side === "original" ? "removed" : "added";
     return segs
@@ -73,27 +73,25 @@ export function FixPreviewModal({
           <span key={`${i}-${s.text.slice(0, 8)}`}>{s.text}</span>
         ),
       )
-      .reduce<JSX.Element[]>(
-        (acc, el, i) => (i ? [...acc, <span key={`sp${i}`}> </span>, el] : [el]),
-        [],
-      );
+      .flatMap((element, index) => (index === 0 ? [element] : [" ", element]));
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4 max-sm:p-0"
-      onClick={() => {
-        if (!busy) onCancel();
-      }}
-      role="presentation"
-    >
-      <div
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm animate-fade-in p-4 max-sm:p-0">
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close fix preview"
+        className="absolute inset-0 h-full w-full cursor-default"
+        onClick={() => {
+          if (!busy) onCancel();
+        }}
+      />
+      <dialog
+        open
         ref={ref}
-        role="dialog"
-        aria-modal="true"
         aria-labelledby="fix-preview-title"
-        className="nb-card flex flex-col w-[720px] max-w-full p-0 overflow-hidden animate-fade-up max-sm:w-full max-sm:h-full max-sm:max-h-full max-sm:rounded-none"
-        onClick={(e) => e.stopPropagation()}
+        className="relative nb-card flex flex-col w-[720px] max-w-full m-0 p-0 overflow-hidden animate-fade-up max-sm:w-full max-sm:h-full max-sm:max-h-full max-sm:rounded-none"
       >
         <header className="px-5 py-3 border-b border-rule flex items-center gap-2.5">
           {leverLabel && <span className="nb-pill nb-pill-empty shrink-0">{leverLabel}</span>}
@@ -141,7 +139,12 @@ export function FixPreviewModal({
         )}
 
         <footer className="px-5 py-3 border-t border-rule flex items-center justify-end gap-2">
-          <button type="button" className="nb-btn nb-btn-ghost nb-btn-sm" onClick={onCancel} disabled={busy}>
+          <button
+            type="button"
+            className="nb-btn nb-btn-ghost nb-btn-sm"
+            onClick={onCancel}
+            disabled={busy}
+          >
             Cancel
           </button>
           {editing ? (
@@ -175,7 +178,7 @@ export function FixPreviewModal({
             {busy ? "Applying…" : "Apply"}
           </button>
         </footer>
-      </div>
+      </dialog>
     </div>
   );
 }
