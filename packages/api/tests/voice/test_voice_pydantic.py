@@ -1,4 +1,4 @@
-from blogforge.voice.models import VoiceProfile, VoiceSample, VoiceRules
+from blogforge.voice.models import VoiceProfile, VoiceSample
 
 
 def test_defaults_and_round_trip():

@@ -5,6 +5,7 @@ Revises: 0013_voice_profiles_samples
 Create Date: 2026-06-18
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -35,9 +36,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["profile_id"], ["voice_profiles.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "ix_voice_sources_profile_id", "voice_sources", ["profile_id"], unique=False
-    )
+    op.create_index("ix_voice_sources_profile_id", "voice_sources", ["profile_id"], unique=False)
 
 
 def downgrade() -> None:

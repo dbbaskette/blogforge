@@ -1,4 +1,5 @@
 """POST /api/drafts/{id}/references/file — multipart upload for md/txt/pdf."""
+
 from __future__ import annotations
 
 import io
@@ -117,13 +118,9 @@ async def test_post_file_md_round_trips(authed) -> None:
     assert body["extracted_chars"] > 0
     ref_id = body["id"]
     s3 = get_s3_client()
-    raw = await s3.get_object(
-        f"drafts/{draft_id}/references/originals/{ref_id}.md"
-    )
+    raw = await s3.get_object(f"drafts/{draft_id}/references/originals/{ref_id}.md")
     assert raw == payload
-    extracted = await s3.get_object(
-        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
-    )
+    extracted = await s3.get_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")
     assert b"Markdown body." in extracted
 
 
@@ -161,12 +158,8 @@ async def test_post_file_pdf_round_trips(authed) -> None:
     # Blank page extracts to empty, but the row+objects still land.
     ref_id = body["id"]
     s3 = get_s3_client()
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/originals/{ref_id}.pdf"
-    )
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
-    )
+    assert await s3.head_object(f"drafts/{draft_id}/references/originals/{ref_id}.pdf")
+    assert await s3.head_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")
 
 
 # ---------- size + type validation ----------

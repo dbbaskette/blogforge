@@ -7,6 +7,7 @@ is a no-op (same pattern as SqlDraftStore).
 Name collision: the ORM rows and Pydantic models share names.  We
 alias ORM rows to avoid shadowing the exported Pydantic types.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -23,6 +24,7 @@ from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample, VoiceS
 # ---------------------------------------------------------------------------
 # Row → Pydantic mappers
 # ---------------------------------------------------------------------------
+
 
 def _source_from_row(row: VoiceSourceRow) -> VoiceSource:
     return VoiceSource(
@@ -74,6 +76,7 @@ def _now() -> datetime:
 # ---------------------------------------------------------------------------
 # Store
 # ---------------------------------------------------------------------------
+
 
 class SqlVoiceStore:
     """Per-user, async voice-profile store."""
@@ -300,12 +303,16 @@ class SqlVoiceStore:
             if profile_row is None:
                 return []
             rows = (
-                await session.execute(
-                    select(VoiceSourceRow)
-                    .where(VoiceSourceRow.profile_id == profile_row.id)
-                    .order_by(VoiceSourceRow.added_at)
+                (
+                    await session.execute(
+                        select(VoiceSourceRow)
+                        .where(VoiceSourceRow.profile_id == profile_row.id)
+                        .order_by(VoiceSourceRow.added_at)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return [_source_from_row(r) for r in rows]
 
     async def delete_source(self, user_id: UUID, source_id: str) -> None:
@@ -338,9 +345,7 @@ class SqlVoiceStore:
             row.updated_at = _now()
             await session.commit()
 
-    async def set_exemplar(
-        self, user_id: UUID, sample_id: str, exemplar: bool
-    ) -> VoiceProfile:
+    async def set_exemplar(self, user_id: UUID, sample_id: str, exemplar: bool) -> VoiceProfile:
         """Toggle a sample's exemplar flag; bump version only on a real change.
 
         Lenient like delete_sample: an unparseable or foreign sample id is a

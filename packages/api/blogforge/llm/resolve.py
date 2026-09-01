@@ -1,4 +1,5 @@
 """Resolve (user, provider) -> a ready LLMProvider using the user's stored key."""
+
 from __future__ import annotations
 
 import os

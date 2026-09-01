@@ -1,4 +1,5 @@
 """KeyVault — per-user provider keys, encrypted at rest."""
+
 from __future__ import annotations
 
 import logging
@@ -65,7 +66,8 @@ class KeyVault:
                     # re-enter it to re-encrypt under the current secret.
                     logger.warning(
                         "provider key for %r can't be decrypted (session_secret "
-                        "changed); treating as unset", provider
+                        "changed); treating as unset",
+                        provider,
                     )
                     return ""
         return ""

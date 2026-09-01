@@ -1,4 +1,5 @@
 """Pydantic shape for a library reference (the API view)."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

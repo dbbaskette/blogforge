@@ -11,9 +11,7 @@ ROOT = Path(__file__).parents[3]
 
 
 def _git(cwd: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
-    )
+    result = subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
     return result.stdout.strip()
 
 
@@ -46,9 +44,7 @@ def test_compare_accepts_strict_increase(baseline: str, candidate: str) -> None:
         ("0.7.0", "0.07.1"),
     ],
 )
-def test_compare_rejects_nonincrease_or_malformed(
-    baseline: str, candidate: str
-) -> None:
+def test_compare_rejects_nonincrease_or_malformed(baseline: str, candidate: str) -> None:
     result = _version("compare", baseline, candidate)
     assert result.returncode != 0
 
@@ -65,9 +61,7 @@ def _set_versions(repo: Path, version: str, *, api_version: str | None = None) -
 @pytest.fixture
 def version_repo(tmp_path: Path) -> tuple[Path, str]:
     repo = tmp_path / "repo"
-    subprocess.run(
-        ["git", "init", "-b", "main", str(repo)], check=True, capture_output=True
-    )
+    subprocess.run(["git", "init", "-b", "main", str(repo)], check=True, capture_output=True)
     _git(repo, "config", "user.email", "version-test@example.com")
     _git(repo, "config", "user.name", "Version Test")
     scripts = repo / "scripts"
@@ -87,9 +81,7 @@ def version_repo(tmp_path: Path) -> tuple[Path, str]:
     return repo, _git(repo, "rev-parse", "HEAD")
 
 
-def _commit_file(
-    repo: Path, path: str, content: str, *, add_all: bool = False
-) -> None:
+def _commit_file(repo: Path, path: str, content: str, *, add_all: bool = False) -> None:
     target = repo / path
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content)
@@ -132,9 +124,7 @@ def test_runtime_change_requires_newer_version(version_repo) -> None:
         "playwright.config.ts",
     ],
 )
-def test_exempt_only_change_does_not_require_bump(
-    version_repo, path: str
-) -> None:
+def test_exempt_only_change_does_not_require_bump(version_repo, path: str) -> None:
     repo, base = version_repo
     _commit_file(repo, path, "changed\n")
     result = _check(repo, base)
@@ -162,9 +152,7 @@ def test_deleted_runtime_file_requires_newer_version(version_repo) -> None:
 def test_runtime_change_with_patch_bump_passes(version_repo) -> None:
     repo, base = version_repo
     _set_versions(repo, "0.7.1")
-    _commit_file(
-        repo, "packages/api/blogforge/server.py", "changed\n", add_all=True
-    )
+    _commit_file(repo, "packages/api/blogforge/server.py", "changed\n", add_all=True)
     result = _check(repo, base)
     assert result.returncode == 0, result.stderr
 
@@ -173,9 +161,7 @@ def test_mixed_exempt_and_runtime_change_requires_bump(version_repo) -> None:
     repo, base = version_repo
     (repo / "docs/note.md").parent.mkdir(parents=True)
     (repo / "docs/note.md").write_text("docs\n")
-    _commit_file(
-        repo, "packages/api/blogforge/server.py", "runtime\n", add_all=True
-    )
+    _commit_file(repo, "packages/api/blogforge/server.py", "runtime\n", add_all=True)
     result = _check(repo, base)
     assert result.returncode != 0
     assert "must be greater" in result.stderr
@@ -184,9 +170,7 @@ def test_mixed_exempt_and_runtime_change_requires_bump(version_repo) -> None:
 def test_mismatched_candidate_versions_fail(version_repo) -> None:
     repo, base = version_repo
     _set_versions(repo, "0.7.1", api_version="0.7.0")
-    _commit_file(
-        repo, "packages/api/blogforge/server.py", "changed\n", add_all=True
-    )
+    _commit_file(repo, "packages/api/blogforge/server.py", "changed\n", add_all=True)
     result = _check(repo, base)
     assert result.returncode != 0
     assert "version mismatch" in result.stderr

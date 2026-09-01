@@ -133,13 +133,16 @@ def _render_writing_craft(pack_root: Path) -> str:
         body,
         default_rationale=STYLE_GUIDE_RATIONALE,
     )
-    precedence = render_prompt_rules([
-        PromptRule(
-            "When general craft guidance conflicts with the author's style guide, "
-            "follow the style guide.",
-            "The author's style guide records their established preferences and takes precedence.",
-        )
-    ])
+    precedence = render_prompt_rules(
+        [
+            PromptRule(
+                "When general craft guidance conflicts with the author's style guide, "
+                "follow the style guide.",
+                "The author's style guide records their established preferences and "
+                "takes precedence.",
+            )
+        ]
+    )
     return (
         "## Section 2: General Writing Craft\n\n"
         "These are general craft defaults.\n\n"
@@ -181,12 +184,16 @@ def _load_ai_patterns(pack_root: Path) -> str:
 
 def _render_humanizer(m: Manifest, pack_root: Path) -> str:
     lines: list[str] = ["## Section 1: The Humanizer (Strict Anti-Robot Constraints)\n"]
-    lines.append(render_prompt_rules([
-        PromptRule(
-            "Scrub the text of LLM-isms before applying the author's style.",
-            "Removing formulaic language first keeps it from obscuring the author's voice.",
+    lines.append(
+        render_prompt_rules(
+            [
+                PromptRule(
+                    "Scrub the text of LLM-isms before applying the author's style.",
+                    "Removing formulaic language first keeps it from obscuring the author's voice.",
+                )
+            ]
         )
-    ]))
+    )
     lines.append("")
 
     words = effective_words(m)
@@ -195,23 +202,32 @@ def _render_humanizer(m: Manifest, pack_root: Path) -> str:
         local_words = m.banished.words
         if local_words:
             joined_local_words = ", ".join(f'"{word}"' for word in local_words)
-            lines.append(render_prompt_rules([
-                PromptRule(
-                    f"Do not use any item in this banished vocabulary list: {joined_local_words}.",
-                    "These terms conflict with the author's established voice and "
-                    "explicit preferences.",
+            lines.append(
+                render_prompt_rules(
+                    [
+                        PromptRule(
+                            "Do not use any item in this banished vocabulary list: "
+                            f"{joined_local_words}.",
+                            "These terms conflict with the author's established voice and "
+                            "explicit preferences.",
+                        )
+                    ]
                 )
-            ]))
+            )
         local_word_keys = {word.lower() for word in local_words}
         shared_words = [word for word in words if word.lower() not in local_word_keys]
         if shared_words:
-            lines.append(render_prompt_rules([
-                PromptRule(
-                    "Do not use any item in the universal AI-tell vocabulary list.",
-                    "These terms are recurrent style defects that make prose sound "
-                    "machine-generated.",
+            lines.append(
+                render_prompt_rules(
+                    [
+                        PromptRule(
+                            "Do not use any item in the universal AI-tell vocabulary list.",
+                            "These terms are recurrent style defects that make prose sound "
+                            "machine-generated.",
+                        )
+                    ]
                 )
-            ]))
+            )
             lines.append(", ".join(shared_words))
         if local_words:
             lines.append(", ".join(local_words))
@@ -223,24 +239,33 @@ def _render_humanizer(m: Manifest, pack_root: Path) -> str:
         local_phrases = m.banished.phrases
         if local_phrases:
             joined_local_phrases = ", ".join(f'"{phrase}"' for phrase in local_phrases)
-            lines.append(render_prompt_rules([
-                PromptRule(
-                    f"Do not use any item in this banished phrase list: {joined_local_phrases}.",
-                    "These phrases conflict with the author's established voice and "
-                    "explicit preferences.",
+            lines.append(
+                render_prompt_rules(
+                    [
+                        PromptRule(
+                            "Do not use any item in this banished phrase list: "
+                            f"{joined_local_phrases}.",
+                            "These phrases conflict with the author's established voice and "
+                            "explicit preferences.",
+                        )
+                    ]
                 )
-            ]))
+            )
         shared_phrases = [
             phrase for phrase in phrases if phrase.lower() not in {p.lower() for p in local_phrases}
         ]
         if shared_phrases:
-            lines.append(render_prompt_rules([
-                PromptRule(
-                    "Do not use any item in the universal AI-tell phrase list.",
-                    "These phrases are recurrent style defects that make prose sound "
-                    "machine-generated.",
+            lines.append(
+                render_prompt_rules(
+                    [
+                        PromptRule(
+                            "Do not use any item in the universal AI-tell phrase list.",
+                            "These phrases are recurrent style defects that make prose sound "
+                            "machine-generated.",
+                        )
+                    ]
                 )
-            ]))
+            )
             lines.extend(f'- "{phrase}"' for phrase in shared_phrases)
         if local_phrases:
             lines.extend(f'- "{phrase}"' for phrase in local_phrases)
@@ -248,13 +273,17 @@ def _render_humanizer(m: Manifest, pack_root: Path) -> str:
 
     if m.banished.permitted_exceptions:
         lines.append("**Permitted exceptions**")
-        lines.append(render_prompt_rules([
-            PromptRule(
-                "Allow the following listed exceptions to the banished vocabulary "
-                "and phrase rules.",
-                "Each listed overlap is intentional and on-brand for the author's voice.",
+        lines.append(
+            render_prompt_rules(
+                [
+                    PromptRule(
+                        "Allow the following listed exceptions to the banished vocabulary "
+                        "and phrase rules.",
+                        "Each listed overlap is intentional and on-brand for the author's voice.",
+                    )
+                ]
             )
-        ]))
+        )
         for ex in m.banished.permitted_exceptions:
             lines.append(f"- *{ex.term}*: {ex.reason}")
         lines.append("")
@@ -263,17 +292,21 @@ def _render_humanizer(m: Manifest, pack_root: Path) -> str:
     if m.rules.no_em_dashes:
         rules.append(PromptRule("Do not use em dashes.", TTS_RATIONALE))
     if m.rules.no_ascii_double_hyphen_between_letters:
-        rules.append(PromptRule(
-            "Do not use ASCII double-hyphens (`--`) between letters.",
-            TTS_RATIONALE,
-        ))
+        rules.append(
+            PromptRule(
+                "Do not use ASCII double-hyphens (`--`) between letters.",
+                TTS_RATIONALE,
+            )
+        )
     starters = effective_sentence_starters(m)
     if starters:
         joined = ", ".join(f'"{s}"' for s in starters)
-        rules.append(PromptRule(
-            f"Do not start a sentence with any of these phrases: {joined}.",
-            "Repeated stock openers are a recognizable AI-writing tell.",
-        ))
+        rules.append(
+            PromptRule(
+                f"Do not start a sentence with any of these phrases: {joined}.",
+                "Repeated stock openers are a recognizable AI-writing tell.",
+            )
+        )
     if rules:
         lines.append("**Rules:**")
         lines.append(render_prompt_rules(rules))
@@ -282,30 +315,45 @@ def _render_humanizer(m: Manifest, pack_root: Path) -> str:
     if m.pop_culture.allowed or m.pop_culture.banned:
         lines.append("**Pop culture:**")
         if m.pop_culture.allowed:
-            lines.append(render_prompt_rules([
-                PromptRule(
-                    "Use pop-culture references only from this allowed franchise list.",
-                    "These references are part of the author's established voice.",
+            lines.append(
+                render_prompt_rules(
+                    [
+                        PromptRule(
+                            "Use pop-culture references only from this allowed franchise list.",
+                            "These references are part of the author's established voice.",
+                        )
+                    ],
+                    bullet=True,
                 )
-            ], bullet=True))
+            )
             lines.append(f"  Allowed franchises: {', '.join(m.pop_culture.allowed)}")
         if m.pop_culture.banned:
-            lines.append(render_prompt_rules([
-                PromptRule(
-                    "Do not use pop-culture references from this banned franchise list.",
-                    "These references conflict with the author's established voice "
-                    "and preferences.",
+            lines.append(
+                render_prompt_rules(
+                    [
+                        PromptRule(
+                            "Do not use pop-culture references from this banned franchise list.",
+                            "These references conflict with the author's established voice "
+                            "and preferences.",
+                        )
+                    ],
+                    bullet=True,
                 )
-            ], bullet=True))
+            )
             lines.append(f"  Banned franchises: {', '.join(m.pop_culture.banned)}")
         lines.append("")
 
-    lines.append(render_prompt_rules([
-        PromptRule(
-            "Avoid every AI sentence pattern listed below.",
-            "These patterns are recurrent style defects that make prose sound machine-generated.",
+    lines.append(
+        render_prompt_rules(
+            [
+                PromptRule(
+                    "Avoid every AI sentence pattern listed below.",
+                    "These patterns are recurrent style defects that make prose sound "
+                    "machine-generated.",
+                )
+            ]
         )
-    ]))
+    )
     lines.append("")
     lines.append(_load_ai_patterns(pack_root))
 
@@ -321,22 +369,27 @@ def _render_format(pack_root: Path, m: Manifest, name: str) -> str:
         body,
         default_rationale=FORMAT_INSTRUCTION_RATIONALE,
     )
-    rule = render_prompt_rules([
-        PromptRule(
-            "Follow the format-specific instructions below.",
-            "The selected publishing format has surface-specific reader and layout requirements.",
-        )
-    ])
+    rule = render_prompt_rules(
+        [
+            PromptRule(
+                "Follow the format-specific instructions below.",
+                "The selected publishing format has surface-specific reader and layout "
+                "requirements.",
+            )
+        ]
+    )
     return f"---\n\n## Additional format-specific instructions\n\n{rule}\n\n{body}"
 
 
 def _render_samples(pack_root: Path, m: Manifest, ids: list[str]) -> str:
-    exemplar_rule = render_prompt_rules([
-        PromptRule(
-            "Match the tone and rhythm of these voice exemplars.",
-            "These examples capture the author's voice in use.",
-        )
-    ])
+    exemplar_rule = render_prompt_rules(
+        [
+            PromptRule(
+                "Match the tone and rhythm of these voice exemplars.",
+                "These examples capture the author's voice in use.",
+            )
+        ]
+    )
     out: list[str] = [f"---\n\n## Voice exemplars\n\n{exemplar_rule}\n"]
     for sid in ids:
         sample = next((s for s in m.samples if s.id == sid), None)
@@ -364,7 +417,8 @@ def _render_bio(pack_root: Path, m: Manifest, name: str) -> str:
     body = (pack_root / bio.file).read_text(encoding="utf-8")
     # Strip author notes: italic-only lines like "*155 characters.*"
     kept = [
-        line for line in body.splitlines()
+        line
+        for line in body.splitlines()
         if not (line.strip().startswith("*") and line.strip().endswith("*"))
     ]
     # Extract blockquote body; strip "> " prefix

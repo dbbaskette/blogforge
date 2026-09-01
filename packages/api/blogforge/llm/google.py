@@ -1,4 +1,5 @@
 """Google Gemini adapter (Generative Language API). Uses ?key=<api_key>."""
+
 from __future__ import annotations
 
 import json
@@ -56,14 +57,16 @@ class GoogleProvider:
         # and does not work cleanly for all user key types.
         result: list[ModelInfo] = []
         for mid, rate in models_for("google").items():
-            result.append(ModelInfo(
-                id=mid,
-                label=rate["label"],
-                context_window=int(rate["context_window"]),
-                supports_streaming=bool(rate["supports_streaming"]),
-                input_per_million_usd=float(rate["input_per_million_usd"]),
-                output_per_million_usd=float(rate["output_per_million_usd"]),
-            ))
+            result.append(
+                ModelInfo(
+                    id=mid,
+                    label=rate["label"],
+                    context_window=int(rate["context_window"]),
+                    supports_streaming=bool(rate["supports_streaming"]),
+                    input_per_million_usd=float(rate["input_per_million_usd"]),
+                    output_per_million_usd=float(rate["output_per_million_usd"]),
+                )
+            )
         return result
 
     async def complete(
@@ -108,15 +111,20 @@ class GoogleProvider:
                         "Re-emit ONLY a JSON object matching the schema."
                     )
                     return await self._complete_with_retry(
-                        model=model, prompt=prompt + hint,
-                        json_schema=json_schema, attempt=1,
+                        model=model,
+                        prompt=prompt + hint,
+                        json_schema=json_schema,
+                        attempt=1,
                     )
                 raise ProviderError("Google returned invalid JSON after retry.")._with_code(
                     "analyze_invalid_json"
                 ) from None
         return LLMResponse(
-            text=text, input_tokens=in_tok, output_tokens=out_tok,
-            model=model, finish_reason=finish,
+            text=text,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            model=model,
+            finish_reason=finish,
         )
 
     async def stream(self, *, model: str, prompt: str) -> AsyncIterator[StreamChunk]:

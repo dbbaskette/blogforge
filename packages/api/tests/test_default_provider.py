@@ -62,9 +62,7 @@ async def test_put_persists_each_supported_default_provider(provider: str):
 
         assert response.status_code == 200
         assert response.json() == {"default_provider": provider}
-        assert client.get("/api/providers/default").json() == {
-            "default_provider": provider
-        }
+        assert client.get("/api/providers/default").json() == {"default_provider": provider}
         assert await _default_for(user) == provider
 
 
@@ -92,9 +90,7 @@ async def test_put_rejects_unknown_provider(authed_client):
         assert user.default_provider is None
 
 
-async def test_put_accepts_provider_even_when_runtime_is_unavailable(
-    authed_client, monkeypatch
-):
+async def test_put_accepts_provider_even_when_runtime_is_unavailable(authed_client, monkeypatch):
     client, _ = authed_client
     monkeypatch.setattr("blogforge.llm.codex_cli.codex_available", lambda: False)
 
@@ -114,18 +110,22 @@ async def test_default_provider_is_isolated_between_users():
     bob = await _create_user("bob-default@example.com")
 
     with _client_for(alice) as alice_client, _client_for(bob) as bob_client:
-        assert alice_client.put(
-            "/api/providers/default",
-            json={"default_provider": "anthropic"},
-        ).status_code == 200
-        assert bob_client.put(
-            "/api/providers/default",
-            json={"default_provider": "google"},
-        ).status_code == 200
+        assert (
+            alice_client.put(
+                "/api/providers/default",
+                json={"default_provider": "anthropic"},
+            ).status_code
+            == 200
+        )
+        assert (
+            bob_client.put(
+                "/api/providers/default",
+                json={"default_provider": "google"},
+            ).status_code
+            == 200
+        )
 
         assert alice_client.get("/api/providers/default").json() == {
             "default_provider": "anthropic"
         }
-        assert bob_client.get("/api/providers/default").json() == {
-            "default_provider": "google"
-        }
+        assert bob_client.get("/api/providers/default").json() == {"default_provider": "google"}

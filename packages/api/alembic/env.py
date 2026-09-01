@@ -1,4 +1,5 @@
 """Alembic env — uses BlogForge's Settings + Base.metadata."""
+
 from logging.config import fileConfig
 
 from alembic import context

@@ -4,6 +4,7 @@ Two code paths:
   • use_voice_profile=True  → materialize the user's voice profile from S3
   • use_voice_profile=False → return the named pack's root_path (legacy)
 """
+
 from __future__ import annotations
 
 import os
@@ -24,10 +25,10 @@ from blogforge.s3.lifespan import ensure_bucket
 from blogforge.voice.resolve import resolve_voice
 from blogforge.voice.store import SqlVoiceStore
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_draft(*, use_voice_profile: bool, pack_slug: str = "dan") -> object:
     """Return a minimal draft-like object with idea.use_voice_profile + idea.pack_slug."""
@@ -128,9 +129,7 @@ async def test_resolve_voice_profile_path_returns_dir_with_stylepack_yaml(
     pack_root = await resolve_voice(draft, user_id, pack_store=pack_store)
 
     assert isinstance(pack_root, Path)
-    assert (pack_root / "stylepack.yaml").is_file(), (
-        f"Expected stylepack.yaml in {pack_root}"
-    )
+    assert (pack_root / "stylepack.yaml").is_file(), f"Expected stylepack.yaml in {pack_root}"
 
 
 # ---------------------------------------------------------------------------

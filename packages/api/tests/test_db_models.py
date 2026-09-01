@@ -1,4 +1,5 @@
 """ORM models can be created, persisted, and queried."""
+
 from datetime import datetime
 
 import pytest

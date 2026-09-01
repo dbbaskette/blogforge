@@ -4,6 +4,7 @@ The streaming flow rides the existing JobRegistry + /api/jobs/{id}/events
 SSE plumbing: POST /message creates a job, the BG task feeds deltas via
 reg.append_token, then persists the assistant message on completion.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -177,14 +178,13 @@ async def _run_ideation(
             await reg.fail(job_id, "draft_not_found", draft_id)
             return
 
-        manifest = yaml.safe_load(
-            (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
-        ) or {}
+        manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
 
         reference_context = await get_reference_context(draft.id, draft.references)
 
         # Prepend profile-level background sources (facts/terminology, not style).
         from blogforge.voice.sources_context import build_background_context
+
         bg = await build_background_context(user_id)
         if bg:
             reference_context = f"{bg}\n\n{reference_context}" if reference_context else bg
@@ -285,9 +285,7 @@ async def accept_ideation(
     # the user clicks Compose. Matches POST /api/drafts/{id}/outline.
     from blogforge.drafts.models import Section
 
-    draft.sections = [
-        Section(id=s.id, title=s.title, brief=s.brief) for s in proposal.sections
-    ]
+    draft.sections = [Section(id=s.id, title=s.title, brief=s.brief) for s in proposal.sections]
     draft.stage = "outline"
     draft.updated_at = datetime.now(UTC)
     updated = await store.update(draft.id, draft, user_id=current.id)

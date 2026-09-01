@@ -1,4 +1,5 @@
 """Resolve a provider name + api key to an LLMProvider instance."""
+
 from __future__ import annotations
 
 import os
@@ -28,6 +29,7 @@ _FACTORIES: dict[str, Callable[[str], LLMProvider]] = {
 def get_provider(name: str, api_key: str) -> LLMProvider:
     if os.environ.get("BLOGFORGE_TEST_PROVIDER") == "mock":
         from blogforge.test_helpers.mock_provider import MockProvider
+
         return MockProvider(api_key=api_key or "mock")
     if name not in _FACTORIES:
         raise ProviderError(f"Unknown provider: {name}")

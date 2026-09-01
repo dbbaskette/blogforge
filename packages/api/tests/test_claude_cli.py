@@ -1,4 +1,5 @@
 """ClaudeCliProvider: JSON coercion, model list, availability gating."""
+
 from __future__ import annotations
 
 import pytest
@@ -48,6 +49,7 @@ async def test_list_models_returns_cli_aliases() -> None:
 @pytest.mark.asyncio
 async def test_keyvault_claude_cli_sentinel_tracks_binary(monkeypatch: pytest.MonkeyPatch) -> None:
     import uuid
+
     from blogforge.keys import KeyVault
 
     dummy_user_id = uuid.uuid4()

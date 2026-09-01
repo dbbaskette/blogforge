@@ -1,4 +1,5 @@
 """argon2 hash + verify."""
+
 from blogforge.auth.passwords import hash_password, verify_password
 
 

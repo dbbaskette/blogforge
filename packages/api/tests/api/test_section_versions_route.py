@@ -1,5 +1,6 @@
 """Section version history: save/regenerate snapshots prior content;
 list + revert restore it (and revert is itself undoable)."""
+
 from __future__ import annotations
 
 
@@ -23,13 +24,20 @@ def _seed(client, *, s1_content: str = "") -> str:
     }
     created["sections"] = [
         {
-            "id": "s1", "title": "A", "brief": "",
-            "content_md": s1_content, "status": "ready" if s1_content else "empty",
+            "id": "s1",
+            "title": "A",
+            "brief": "",
+            "content_md": s1_content,
+            "status": "ready" if s1_content else "empty",
             "word_count": len(s1_content.split()),
         },
         {
-            "id": "s2", "title": "B", "brief": "",
-            "content_md": "", "status": "empty", "word_count": 0,
+            "id": "s2",
+            "title": "B",
+            "brief": "",
+            "content_md": "",
+            "status": "empty",
+            "word_count": 0,
         },
     ]
     created["stage"] = "sections"

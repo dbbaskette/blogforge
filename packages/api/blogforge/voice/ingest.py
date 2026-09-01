@@ -23,6 +23,7 @@ S3 key layout:
     voice/{profile_id}/samples/{sample_id}.md
     voice/{profile_id}/sources/{source_id}.md
 """
+
 from __future__ import annotations
 
 from uuid import UUID, uuid4

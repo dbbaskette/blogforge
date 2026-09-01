@@ -11,9 +11,8 @@ from blogforge.prompt_rules import PromptRule, render_prompt_rules
 
 def _format_directive(name: str, rules: list[PromptRule]) -> str:
     """Render a structural format task with rationale-backed constraints."""
-    return (
-        f"Format task: Structure this as a {name} post.\n\n"
-        + render_prompt_rules(rules, bullet=True)
+    return f"Format task: Structure this as a {name} post.\n\n" + render_prompt_rules(
+        rules, bullet=True
     )
 
 
@@ -239,16 +238,18 @@ def builtin_format_section_note(requested: str | None) -> str | None:
     directive = builtin_format_directive(requested)
     if directive is None:
         return None
-    section_rule = render_prompt_rules([
-        PromptRule(
-            "Write only the current section; do not reproduce the whole structure.",
-            "BlogForge stores and regenerates sections independently, so a section response "
-            "must not recreate the whole article.",
-        ),
-        PromptRule(
-            "Apply the overall format's conventions only where they fit this section.",
-            "The format should guide local prose without forcing every section into the full "
-            "article skeleton.",
-        ),
-    ])
+    section_rule = render_prompt_rules(
+        [
+            PromptRule(
+                "Write only the current section; do not reproduce the whole structure.",
+                "BlogForge stores and regenerates sections independently, so a section response "
+                "must not recreate the whole article.",
+            ),
+            PromptRule(
+                "Apply the overall format's conventions only where they fit this section.",
+                "The format should guide local prose without forcing every section into the full "
+                "article skeleton.",
+            ),
+        ]
+    )
     return f"Overall post format (context):\n{directive}\n\n{section_rule}"

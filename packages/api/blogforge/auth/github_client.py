@@ -1,10 +1,12 @@
 """GitHub OAuth HTTP calls (token exchange + identity)."""
+
 from __future__ import annotations
 
 import httpx
 
 from blogforge.auth.github import GithubIdentity
 from blogforge.config import get_settings
+
 _GH = "https://github.com"
 _API = "https://api.github.com"
 

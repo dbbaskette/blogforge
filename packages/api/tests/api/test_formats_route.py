@@ -1,4 +1,5 @@
 """GET /api/formats — built-in output formats for the compose picker."""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

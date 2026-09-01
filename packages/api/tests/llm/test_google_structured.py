@@ -1,4 +1,5 @@
 """Google adapter — response_schema path + dialect adapter."""
+
 from __future__ import annotations
 
 import json as _json
@@ -56,16 +57,20 @@ async def test_complete_with_schema_sends_response_schema() -> None:
     provider = GoogleProvider(api_key="g-test")
     route = respx.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
-    ).mock(return_value=httpx.Response(
-        200,
-        json={
-            "candidates": [{
-                "content": {"parts": [{"text": '{"value": "ok"}'}]},
-                "finishReason": "STOP",
-            }],
-            "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 3},
-        },
-    ))
+    ).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {"parts": [{"text": '{"value": "ok"}'}]},
+                        "finishReason": "STOP",
+                    }
+                ],
+                "usageMetadata": {"promptTokenCount": 4, "candidatesTokenCount": 3},
+            },
+        )
+    )
     resp = await provider.complete(
         model="gemini-2.5-pro", prompt="give me", json_schema=_SIMPLE_SCHEMA
     )
@@ -83,10 +88,12 @@ async def test_complete_with_schema_fails_after_two_invalid() -> None:
     bad = httpx.Response(
         200,
         json={
-            "candidates": [{
-                "content": {"parts": [{"text": "not json"}]},
-                "finishReason": "STOP",
-            }],
+            "candidates": [
+                {
+                    "content": {"parts": [{"text": "not json"}]},
+                    "finishReason": "STOP",
+                }
+            ],
             "usageMetadata": {"promptTokenCount": 3, "candidatesTokenCount": 2},
         },
     )
@@ -94,7 +101,5 @@ async def test_complete_with_schema_fails_after_two_invalid() -> None:
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
     ).mock(side_effect=[bad, bad])
     with pytest.raises(ProviderError) as exc:
-        await provider.complete(
-            model="gemini-2.5-pro", prompt="x", json_schema=_SIMPLE_SCHEMA
-        )
+        await provider.complete(model="gemini-2.5-pro", prompt="x", json_schema=_SIMPLE_SCHEMA)
     assert exc.value.code == "analyze_invalid_json"

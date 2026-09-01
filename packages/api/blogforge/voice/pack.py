@@ -9,6 +9,7 @@ satisfies myvoice's slug-must-match-directory check when validate_pack is run,
 but compose_prompt itself does not check this invariant — only compose reads
 the manifest without cross-checking the directory name.
 """
+
 from __future__ import annotations
 
 import io
@@ -24,6 +25,7 @@ from blogforge.voice.models import VoiceProfile
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _slug(profile: VoiceProfile) -> str:
     """A filesystem-safe slug for this profile's pack directory."""
@@ -103,6 +105,7 @@ def _sample_name(profile: VoiceProfile, sample_id: str) -> str:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 async def materialize(profile: VoiceProfile, sample_texts: dict[str, str]) -> Path:
     """Write a complete myvoice pack to the cache and return the pack directory.
 
@@ -128,11 +131,7 @@ async def materialize(profile: VoiceProfile, sample_texts: dict[str, str]) -> Pa
     samples_dir.mkdir(exist_ok=True)
 
     # Determine which exemplar sample ids to include in the manifest.
-    exemplar_ids = [
-        s.id
-        for s in profile.samples
-        if s.exemplar and s.id in sample_texts
-    ]
+    exemplar_ids = [s.id for s in profile.samples if s.exemplar and s.id in sample_texts]
 
     # --- stylepack.yaml ---
     manifest = _build_manifest(profile, exemplar_ids)
@@ -150,19 +149,18 @@ async def materialize(profile: VoiceProfile, sample_texts: dict[str, str]) -> Pa
 
     texts = list(sample_texts.values())
     if texts:
-        (pack_dir / "fingerprint.md").write_text(
-            render_fingerprint_md(texts), encoding="utf-8"
-        )
+        (pack_dir / "fingerprint.md").write_text(render_fingerprint_md(texts), encoding="utf-8")
 
     # --- samples/{id}.md ---
     for sid in exemplar_ids:
         text = sample_texts[sid]
         # myvoice _render_samples expects blockquote lines (">" prefix).
         # Wrap the entire text so the composer can extract it correctly.
-        blockquoted = "\n".join(
-            f"> {line}" if line.strip() else ">"
-            for line in text.splitlines()
-        ) if text.splitlines() else f"> {text}"
+        blockquoted = (
+            "\n".join(f"> {line}" if line.strip() else ">" for line in text.splitlines())
+            if text.splitlines()
+            else f"> {text}"
+        )
         (samples_dir / f"{sid}.md").write_text(blockquoted, encoding="utf-8")
 
     return pack_dir

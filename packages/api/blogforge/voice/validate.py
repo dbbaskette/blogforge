@@ -38,10 +38,12 @@ def validate_pack(pack_root: Path) -> ValidationResult:
 
     manifest_path = pack_root / "stylepack.yaml"
     if not manifest_path.is_file():
-        errors.append(ValidationError(
-            f"missing required file: stylepack.yaml in {pack_root}",
-            "stylepack.yaml",
-        ))
+        errors.append(
+            ValidationError(
+                f"missing required file: stylepack.yaml in {pack_root}",
+                "stylepack.yaml",
+            )
+        )
         return ValidationResult(valid=False, errors=errors)
 
     try:
@@ -60,10 +62,12 @@ def validate_pack(pack_root: Path) -> ValidationResult:
 
     # slug must match directory name
     if manifest.pack.slug != pack_root.name:
-        errors.append(ValidationError(
-            f"pack.slug '{manifest.pack.slug}' does not match dir name '{pack_root.name}'",
-            "pack.slug",
-        ))
+        errors.append(
+            ValidationError(
+                f"pack.slug '{manifest.pack.slug}' does not match dir name '{pack_root.name}'",
+                "pack.slug",
+            )
+        )
 
     # style-guide.md must exist and be non-empty
     sg = pack_root / "style-guide.md"
@@ -76,31 +80,38 @@ def validate_pack(pack_root: Path) -> ValidationResult:
     for i, fmt in enumerate(manifest.formats):
         p = pack_root / fmt.file
         if not p.is_file() or p.stat().st_size == 0:
-            errors.append(ValidationError(
-                f"formats[{i}].file not found or empty: {fmt.file}", f"formats[{i}].file"
-            ))
+            errors.append(
+                ValidationError(
+                    f"formats[{i}].file not found or empty: {fmt.file}", f"formats[{i}].file"
+                )
+            )
 
     for i, sample in enumerate(manifest.samples):
         p = pack_root / sample.file
         if not p.is_file() or p.stat().st_size == 0:
-            errors.append(ValidationError(
-                f"samples[{i}].file not found or empty: {sample.file}", f"samples[{i}].file"
-            ))
+            errors.append(
+                ValidationError(
+                    f"samples[{i}].file not found or empty: {sample.file}", f"samples[{i}].file"
+                )
+            )
             continue
         # sample must contain at least one blockquote line
         body = p.read_text(encoding="utf-8")
         if not any(line.startswith("> ") for line in body.splitlines()):
-            errors.append(ValidationError(
-                f"samples[{i}] ({sample.file}) contains no blockquote (lines starting with '> ')",
-                f"samples[{i}].file",
-            ))
+            errors.append(
+                ValidationError(
+                    f"samples[{i}] ({sample.file}) contains no blockquote "
+                    "(lines starting with '> ')",
+                    f"samples[{i}].file",
+                )
+            )
 
     for i, bio in enumerate(manifest.bios):
         p = pack_root / bio.file
         if not p.is_file() or p.stat().st_size == 0:
-            errors.append(ValidationError(
-                f"bios[{i}].file not found or empty: {bio.file}", f"bios[{i}].file"
-            ))
+            errors.append(
+                ValidationError(f"bios[{i}].file not found or empty: {bio.file}", f"bios[{i}].file")
+            )
             continue
         if bio.max_chars is not None:
             body = _extract_bio_body(p.read_text(encoding="utf-8"))

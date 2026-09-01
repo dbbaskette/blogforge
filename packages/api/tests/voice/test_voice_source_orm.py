@@ -6,6 +6,7 @@ across session boundaries.
 
 Mirrors test_voice_models_migration.py exactly.
 """
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
@@ -56,9 +57,7 @@ async def test_voice_source_round_trip() -> None:
         # Fresh session: proves the data persisted, not just the identity map.
         async with sm() as read:
             fetched_profile = (
-                await read.execute(
-                    select(VoiceProfile).where(VoiceProfile.id == profile_id)
-                )
+                await read.execute(select(VoiceProfile).where(VoiceProfile.id == profile_id))
             ).scalar_one()
             await read.refresh(fetched_profile, ["sources"])
             assert len(fetched_profile.sources) == 1

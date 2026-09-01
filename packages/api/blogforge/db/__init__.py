@@ -1,4 +1,5 @@
 """Database layer."""
+
 from blogforge.db.base import Base
 from blogforge.db.engine import (
     get_engine,

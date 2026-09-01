@@ -55,13 +55,15 @@ def lint_to_hits(manifest: Manifest, text: str) -> list[LintHit]:
         line_start = line_starts[v.line - 1]
         start_char = line_start + v.column
         end_char = start_char + len(v.match)
-        hits.append(LintHit(
-            start=_utf16_offset(text, start_char),
-            end=_utf16_offset(text, end_char),
-            kind=_kind_map[v.kind],  # type: ignore[arg-type]
-            rule_id=f"{v.kind}:{v.match.lower()}",
-            message=v.message,
-        ))
+        hits.append(
+            LintHit(
+                start=_utf16_offset(text, start_char),
+                end=_utf16_offset(text, end_char),
+                kind=_kind_map[v.kind],  # type: ignore[arg-type]
+                rule_id=f"{v.kind}:{v.match.lower()}",
+                message=v.message,
+            )
+        )
     return hits
 
 
@@ -111,34 +113,40 @@ def detect_positive_hits(text: str) -> list[LintHit]:
     first_sentence_end = re.search(r"[.!?]", text)
     first_segment = text[: first_sentence_end.end()] if first_sentence_end else text
     for m in _CONFLICT_OPENERS.finditer(first_segment):
-        hits.append(LintHit(
-            start=_utf16_offset(text, m.start()),
-            end=_utf16_offset(text, m.end()),
-            kind="positive_hit",
-            rule_id="hit:conflict_opener",
-            message="Conflict & Resolution opener detected.",
-        ))
+        hits.append(
+            LintHit(
+                start=_utf16_offset(text, m.start()),
+                end=_utf16_offset(text, m.end()),
+                kind="positive_hit",
+                rule_id="hit:conflict_opener",
+                message="Conflict & Resolution opener detected.",
+            )
+        )
 
     for m in _S2V_TRIGGERS.finditer(text):
         window_start = max(0, m.start() - 80)
         window_end = min(len(text), m.end() + 80)
         if _S2V_TIME.search(text[window_start:window_end]):
-            hits.append(LintHit(
-                start=_utf16_offset(text, m.start()),
-                end=_utf16_offset(text, m.end()),
-                kind="positive_hit",
-                rule_id="hit:speed_to_value",
-                message="Speed-to-Value vocabulary near a time/effort claim.",
-            ))
+            hits.append(
+                LintHit(
+                    start=_utf16_offset(text, m.start()),
+                    end=_utf16_offset(text, m.end()),
+                    kind="positive_hit",
+                    rule_id="hit:speed_to_value",
+                    message="Speed-to-Value vocabulary near a time/effort claim.",
+                )
+            )
 
     for m in _GOLDEN.finditer(text):
-        hits.append(LintHit(
-            start=_utf16_offset(text, m.start(1)),
-            end=_utf16_offset(text, m.end(1)),
-            kind="positive_hit",
-            rule_id="hit:golden_command",
-            message="Golden Command pattern.",
-        ))
+        hits.append(
+            LintHit(
+                start=_utf16_offset(text, m.start(1)),
+                end=_utf16_offset(text, m.end(1)),
+                kind="positive_hit",
+                rule_id="hit:golden_command",
+                message="Golden Command pattern.",
+            )
+        )
 
     return hits
 
@@ -150,18 +158,23 @@ def detect_ai_patterns(text: str) -> list[LintHit]:
         (_AI_NEGATION, "ai_pattern:negation", "AI negation/antithesis pattern."),
         (_AI_NOT_ONLY, "ai_pattern:negation", "AI 'not only... but' pattern."),
         (_AI_INFLATION, "ai_pattern:inflation", "AI significance-inflation phrasing."),
-        (_AI_VAGUE_ATTRIBUTION, "ai_pattern:vague_attribution",
-         "Vague attribution — name the source or cut it."),
+        (
+            _AI_VAGUE_ATTRIBUTION,
+            "ai_pattern:vague_attribution",
+            "Vague attribution — name the source or cut it.",
+        ),
     )
     for pattern, rule_id, message in specs:
         for m in pattern.finditer(text):
-            hits.append(LintHit(
-                start=_utf16_offset(text, m.start()),
-                end=_utf16_offset(text, m.end()),
-                kind="rule",
-                rule_id=rule_id,
-                message=message,
-            ))
+            hits.append(
+                LintHit(
+                    start=_utf16_offset(text, m.start()),
+                    end=_utf16_offset(text, m.end()),
+                    kind="rule",
+                    rule_id=rule_id,
+                    message=message,
+                )
+            )
 
     # Staccato pair runs: walk sentences, flag a run of >=2 consecutive short
     # "X and Y." noun-pair sentences (each <=12 words; multiple "and"s are OK,
@@ -192,13 +205,15 @@ def detect_ai_patterns(text: str) -> list[LintHit]:
             run_end = idx + len(sent)
         else:
             if run_start is not None and run_len >= 2:
-                run_hits.append(LintHit(
-                    start=_utf16_offset(text, run_start),
-                    end=_utf16_offset(text, run_end),
-                    kind="rule",
-                    rule_id="ai_pattern:staccato_pairs",
-                    message="Staccato paired-list run — connect the ideas or use a real list.",
-                ))
+                run_hits.append(
+                    LintHit(
+                        start=_utf16_offset(text, run_start),
+                        end=_utf16_offset(text, run_end),
+                        kind="rule",
+                        rule_id="ai_pattern:staccato_pairs",
+                        message="Staccato paired-list run — connect the ideas or use a real list.",
+                    )
+                )
             run_start = None
             run_len = 0
     hits.extend(run_hits)
@@ -211,13 +226,17 @@ def detect_ai_patterns(text: str) -> list[LintHit]:
         end = _utf16_offset(text, m.end())
         if any(rs <= start and end <= re_end for rs, re_end in run_spans):
             continue
-        hits.append(LintHit(
-            start=start,
-            end=end,
-            kind="rule",
-            rule_id="ai_pattern:staccato_pairs",
-            message='Sentence fragment starting "As well as" — fold it into the previous sentence.',
-        ))
+        hits.append(
+            LintHit(
+                start=start,
+                end=end,
+                kind="rule",
+                rule_id="ai_pattern:staccato_pairs",
+                message=(
+                    'Sentence fragment starting "As well as": fold it into the previous sentence.'
+                ),
+            )
+        )
     return hits
 
 
@@ -237,51 +256,59 @@ def lint(manifest: Manifest, text: str) -> list[Violation]:
             for m in pattern.finditer(line):
                 if m.group(1) in exemptions:
                     continue
-                violations.append(Violation(
-                    kind="word",
-                    message=f'banished word: "{m.group(1)}"',
-                    match=m.group(1),
-                    line=ln_no,
-                    column=m.start(1),
-                ))
+                violations.append(
+                    Violation(
+                        kind="word",
+                        message=f'banished word: "{m.group(1)}"',
+                        match=m.group(1),
+                        line=ln_no,
+                        column=m.start(1),
+                    )
+                )
 
     # Banished phrases: case-insensitive substring match.
     for phrase in effective_phrases(manifest):
         pattern = re.compile(re.escape(phrase), re.IGNORECASE)
         for ln_no, line in enumerate(lines, start=1):
             for m in pattern.finditer(line):
-                violations.append(Violation(
-                    kind="phrase",
-                    message=f'banished phrase: "{m.group(0)}"',
-                    match=m.group(0),
-                    line=ln_no,
-                    column=m.start(0),
-                ))
+                violations.append(
+                    Violation(
+                        kind="phrase",
+                        message=f'banished phrase: "{m.group(0)}"',
+                        match=m.group(0),
+                        line=ln_no,
+                        column=m.start(0),
+                    )
+                )
 
     # Em dash rule.
     if manifest.rules.no_em_dashes:
         for ln_no, line in enumerate(lines, start=1):
             for m in re.finditer("—", line):
-                violations.append(Violation(
-                    kind="rule",
-                    message="em dash not allowed",
-                    match="—",
-                    line=ln_no,
-                    column=m.start(),
-                ))
+                violations.append(
+                    Violation(
+                        kind="rule",
+                        message="em dash not allowed",
+                        match="—",
+                        line=ln_no,
+                        column=m.start(),
+                    )
+                )
 
     # ASCII double-hyphen between letters.
     if manifest.rules.no_ascii_double_hyphen_between_letters:
         pattern = re.compile(r"[A-Za-z]--[A-Za-z]")
         for ln_no, line in enumerate(lines, start=1):
             for m in pattern.finditer(line):
-                violations.append(Violation(
-                    kind="rule",
-                    message="ASCII double-hyphen between letters not allowed",
-                    match=m.group(),
-                    line=ln_no,
-                    column=m.start(),
-                ))
+                violations.append(
+                    Violation(
+                        kind="rule",
+                        message="ASCII double-hyphen between letters not allowed",
+                        match=m.group(),
+                        line=ln_no,
+                        column=m.start(),
+                    )
+                )
 
     # Forbidden sentence starters: at start-of-line OR after ". ", "! ", "? ".
     starters = effective_sentence_starters(manifest)
@@ -290,12 +317,14 @@ def lint(manifest: Manifest, text: str) -> list[Violation]:
         pattern = re.compile(rf"(?:^|(?<=[.!?]\s))({starter_alt})\b")
         for ln_no, line in enumerate(lines, start=1):
             for m in pattern.finditer(line):
-                violations.append(Violation(
-                    kind="rule",
-                    message=f'sentence starts with "{m.group(1)}"',
-                    match=m.group(1),
-                    line=ln_no,
-                    column=m.start(1),
-                ))
+                violations.append(
+                    Violation(
+                        kind="rule",
+                        message=f'sentence starts with "{m.group(1)}"',
+                        match=m.group(1),
+                        line=ln_no,
+                        column=m.start(1),
+                    )
+                )
 
     return violations

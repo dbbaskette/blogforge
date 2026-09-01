@@ -188,8 +188,7 @@ def _build_prompt(kind: SuggestKind, system: str, draft_text: str, n: int) -> st
             *_KIND_RULES[kind],
             PromptRule("Return JSON matching the suggestions schema.", OUTPUT_RATIONALE),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "suggestions.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into suggestions.",
                 "Those labels are prompt metadata rather than article prose.",
             ),
         ]

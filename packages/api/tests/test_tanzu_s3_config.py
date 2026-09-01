@@ -17,20 +17,24 @@ def _seaweedfs_vcap() -> str:
     # Real ndc shape: the `seaweedfs` offering (instance `blogforge-s3`). The
     # broker provisions a bucket named after the instance GUID and serves an
     # https endpoint behind a self-signed cert.
-    return json.dumps({
-        "seaweedfs": [{
-            "name": "blogforge-s3",
-            "credentials": {
-                "endpoint": "seaweedfs-s3.example.com",
-                "endpoint_url": "https://seaweedfs-s3.example.com",
-                "access_key": "AK",
-                "secret_key": "SK",
-                "bucket": "cf-deadbeef",
-                "region": "us-east-1",
-                "use_ssl": True,
-            },
-        }]
-    })
+    return json.dumps(
+        {
+            "seaweedfs": [
+                {
+                    "name": "blogforge-s3",
+                    "credentials": {
+                        "endpoint": "seaweedfs-s3.example.com",
+                        "endpoint_url": "https://seaweedfs-s3.example.com",
+                        "access_key": "AK",
+                        "secret_key": "SK",
+                        "bucket": "cf-deadbeef",
+                        "region": "us-east-1",
+                        "use_ssl": True,
+                    },
+                }
+            ]
+        }
+    )
 
 
 def test_s3_binding_adopts_endpoint_bucket_and_disables_tls_verify(monkeypatch) -> None:

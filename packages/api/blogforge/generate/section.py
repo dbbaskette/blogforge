@@ -1,4 +1,5 @@
 """Stream a section's prose via provider.stream()."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -111,16 +112,18 @@ def _render_revise_prompt(draft: Draft, section: Section, instruction: str) -> s
 
 def _render_fresh_section_revision_directive(instruction: str) -> str:
     """Render author guidance for regenerating an empty section."""
-    rules = render_prompt_rules([
-        PromptRule(
-            "Follow the author's revision instruction when writing this section.",
-            "The author expects this fresh draft to address the requested change.",
-        ),
-        PromptRule(
-            "Stay in the author's voice.",
-            "A regenerated empty section must still match the rest of the post.",
-        ),
-    ])
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Follow the author's revision instruction when writing this section.",
+                "The author expects this fresh draft to address the requested change.",
+            ),
+            PromptRule(
+                "Stay in the author's voice.",
+                "A regenerated empty section must still match the rest of the post.",
+            ),
+        ]
+    )
     return f"REVISION DIRECTIVE (context):\n{instruction}\n\n{rules}"
 
 

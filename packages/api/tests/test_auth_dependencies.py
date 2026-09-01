@@ -1,4 +1,5 @@
 """get_current_user reads the session cookie, returns 401 / 403 as appropriate."""
+
 import pytest_asyncio
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -33,16 +34,22 @@ async def setup_db_and_user():
     sm = get_sessionmaker()
     async with sm() as s:
         approved = User(
-            email="a@b.com", password_hash=hash_password("x"),
-            status="approved", role="user",
+            email="a@b.com",
+            password_hash=hash_password("x"),
+            status="approved",
+            role="user",
         )
         pending = User(
-            email="p@b.com", password_hash=hash_password("x"),
-            status="pending", role="user",
+            email="p@b.com",
+            password_hash=hash_password("x"),
+            status="pending",
+            role="user",
         )
         admin = User(
-            email="r@b.com", password_hash=hash_password("x"),
-            status="approved", role="admin",
+            email="r@b.com",
+            password_hash=hash_password("x"),
+            status="approved",
+            role="admin",
         )
         s.add_all([approved, pending, admin])
         await s.commit()

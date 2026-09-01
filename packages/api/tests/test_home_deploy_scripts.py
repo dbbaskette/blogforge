@@ -10,9 +10,7 @@ ROOT = Path(__file__).parents[3]
 
 
 def _git(cwd: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
-    )
+    result = subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
     return result.stdout.strip()
 
 
@@ -130,12 +128,8 @@ def _remote_clone(repo: Path, env: dict[str, str]) -> Path:
 
 
 def _set_versions(repo: Path, version: str) -> None:
-    (repo / "packages/web/package.json").write_text(
-        f'{{\n  "version": "{version}"\n}}\n'
-    )
-    (repo / "packages/api/blogforge/__init__.py").write_text(
-        f'__version__ = "{version}"\n'
-    )
+    (repo / "packages/web/package.json").write_text(f'{{\n  "version": "{version}"\n}}\n')
+    (repo / "packages/api/blogforge/__init__.py").write_text(f'__version__ = "{version}"\n')
 
 
 def test_deploy_refuses_non_main_branch(deploy_repo) -> None:
@@ -223,8 +217,7 @@ def test_rollback_requires_exact_confirmation(deploy_repo) -> None:
 def test_rollback_yes_sends_reachable_detached_redeploy_program(deploy_repo) -> None:
     repo, env, _ = deploy_repo
     env["SSH_RESULT"] = (
-        "BLOGFORGE_ROLLBACK_RESULT\\tnewsha\\toldsha\\t0.6.3\\t"
-        '{"status":"ok","version":"0.6.3"}'
+        'BLOGFORGE_ROLLBACK_RESULT\\tnewsha\\toldsha\\t0.6.3\\t{"status":"ok","version":"0.6.3"}'
     )
     env["PUBLIC_HEALTH"] = '{"status":"ok","version":"0.6.3"}'
     result = _run(repo, env, "rollback-home.sh", "--yes", "HEAD")
@@ -389,13 +382,13 @@ def test_remote_redeploy_failure_reports_both_shas(deploy_repo) -> None:
     [
         (
             "deploy-home.sh",
-            'BLOGFORGE_DEPLOY_RESULT\\tprevious\\tattempted\\t0.6.4\\t'
+            "BLOGFORGE_DEPLOY_RESULT\\tprevious\\tattempted\\t0.6.4\\t"
             '{"status":"ok","version":"0.6.4"}',
             (),
         ),
         (
             "rollback-home.sh",
-            'BLOGFORGE_ROLLBACK_RESULT\\tprevious\\tattempted\\t0.6.4\\t'
+            "BLOGFORGE_ROLLBACK_RESULT\\tprevious\\tattempted\\t0.6.4\\t"
             '{"status":"ok","version":"0.6.4"}',
             ("--yes", "HEAD"),
         ),

@@ -1,4 +1,5 @@
 """Seed the configured admin user. Called from the FastAPI lifespan event."""
+
 from datetime import UTC, datetime
 
 from sqlalchemy import select

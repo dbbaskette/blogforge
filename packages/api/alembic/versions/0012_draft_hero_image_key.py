@@ -5,6 +5,7 @@ Revises: 0011_draft_tags
 Create Date: 2026-06-01
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

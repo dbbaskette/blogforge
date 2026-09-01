@@ -1,11 +1,11 @@
 """POST /api/drafts/{id}/headlines — alternative titles or opening hooks."""
+
 from __future__ import annotations
 
 from typing import Literal
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Request
-from blogforge.voice.compose import ComposeError
 from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
@@ -14,6 +14,7 @@ from blogforge.drafts.sql_store import SqlDraftStore
 from blogforge.generate.headlines import generate_headlines
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
+from blogforge.voice.compose import ComposeError
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["headlines"])
@@ -47,9 +48,7 @@ async def headlines(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    manifest = yaml.safe_load(
-        (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
-    ) or {}
+    manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
     provider = await build_provider_for(current.id, draft.idea.provider)
     try:
         options = await generate_headlines(

@@ -4,6 +4,7 @@
 directory they should build prompts from.  It centralises the choice
 between the user's materialised voice profile and a traditional style pack.
 """
+
 from __future__ import annotations
 
 import logging

@@ -1,4 +1,5 @@
 """POST /api/drafts/{id}/sections/{id}/save + reorder."""
+
 from __future__ import annotations
 
 
@@ -22,12 +23,20 @@ def _seed(client) -> str:
     }
     created["sections"] = [
         {
-            "id": "s1", "title": "A", "brief": "",
-            "content_md": "", "status": "empty", "word_count": 0,
+            "id": "s1",
+            "title": "A",
+            "brief": "",
+            "content_md": "",
+            "status": "empty",
+            "word_count": 0,
         },
         {
-            "id": "s2", "title": "B", "brief": "",
-            "content_md": "", "status": "empty", "word_count": 0,
+            "id": "s2",
+            "title": "B",
+            "brief": "",
+            "content_md": "",
+            "status": "empty",
+            "word_count": 0,
         },
     ]
     created["stage"] = "sections"

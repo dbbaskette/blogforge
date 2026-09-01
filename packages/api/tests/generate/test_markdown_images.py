@@ -216,10 +216,7 @@ def test_continues_after_same_line_garbage_in_malformed_data_destination() -> No
     markdown = f"![broken](data:image/png;base64,AAAA garbage\n{image}"
 
     assert strip_embedded_images(markdown) == EmbeddedImageCleanup(
-        text=(
-            "![broken](data:image/png;base64,AAAA garbage\n"
-            "[Image omitted during import: later]"
-        ),
+        text=("![broken](data:image/png;base64,AAAA garbage\n[Image omitted during import: later]"),
         removed_images=1,
         removed_characters=len(image),
     )

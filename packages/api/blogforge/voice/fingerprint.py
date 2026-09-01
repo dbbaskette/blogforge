@@ -5,6 +5,7 @@ samples: sentence-length rhythm, recurring signature phrases, and a top-words
 vocabulary signature. The subjective tonal dimensions (casual/vivid/…) are
 scored by an LLM in the API layer; this module stays dependency-free + testable.
 """
+
 from __future__ import annotations
 
 import re
@@ -71,24 +72,28 @@ def render_fingerprint_md(sample_texts: list[str]) -> str:
     mix = (
         f"in recent sampled sentences, about {round(100 * short / len(lengths))}% run "
         f"under 10 words and {round(100 * longn / len(lengths))}% over 25"
-        if lengths else "not enough sample text to measure rhythm"
+        if lengths
+        else "not enough sample text to measure rhythm"
     )
     phrases = "".join(f'\n- "{p}"' for p in s["signature_phrases"]) or "\n- (none found)"
     words = ", ".join(s["top_words"]) or "(none)"
-    rules = render_prompt_rules([
-        PromptRule(
-            "Match this sentence-length distribution.",
-            "Flattening the rhythm changes the author's recognizable cadence.",
-        ),
-        PromptRule(
-            "Use the author's signature phrases only when natural; never force them.",
-            VOICE_RATIONALE,
-        ),
-        PromptRule(
-            "Prefer the author's characteristic vocabulary when it fits the meaning.",
-            VOICE_RATIONALE,
-        ),
-    ], bullet=True)
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Match this sentence-length distribution.",
+                "Flattening the rhythm changes the author's recognizable cadence.",
+            ),
+            PromptRule(
+                "Use the author's signature phrases only when natural; never force them.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule(
+                "Prefer the author's characteristic vocabulary when it fits the meaning.",
+                VOICE_RATIONALE,
+            ),
+        ],
+        bullet=True,
+    )
     return (
         "## Voice fingerprint (measured from the author's samples)\n\n"
         f"{rules}\n"

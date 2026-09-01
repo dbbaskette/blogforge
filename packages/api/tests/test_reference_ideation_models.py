@@ -1,4 +1,5 @@
 """Reference + IdeationMessage ORM models persist and CASCADE on draft delete."""
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -72,15 +73,9 @@ async def test_ideation_message_round_trips_with_proposed_outline(session):
 
 async def test_unique_position_per_draft(session):
     draft = await _make_draft(session)
+    session.add(IdeationMessage(id="m-a", draft_id=draft.id, position=0, role="user", content="hi"))
     session.add(
-        IdeationMessage(
-            id="m-a", draft_id=draft.id, position=0, role="user", content="hi"
-        )
-    )
-    session.add(
-        IdeationMessage(
-            id="m-b", draft_id=draft.id, position=0, role="assistant", content="hello"
-        )
+        IdeationMessage(id="m-b", draft_id=draft.id, position=0, role="assistant", content="hello")
     )
     from sqlalchemy.exc import IntegrityError
 
@@ -91,15 +86,9 @@ async def test_unique_position_per_draft(session):
 async def test_draft_delete_cascades_to_references(session):
     draft = await _make_draft(session)
     session.add(
-        Reference(
-            id="ref-x", draft_id=draft.id, kind="text", name="note", extracted_chars=10
-        )
+        Reference(id="ref-x", draft_id=draft.id, kind="text", name="note", extracted_chars=10)
     )
-    session.add(
-        IdeationMessage(
-            id="m-x", draft_id=draft.id, position=0, role="user", content="hi"
-        )
-    )
+    session.add(IdeationMessage(id="m-x", draft_id=draft.id, position=0, role="user", content="hi"))
     await session.commit()
 
     await session.delete(draft)

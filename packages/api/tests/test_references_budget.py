@@ -1,4 +1,5 @@
 """get_reference_context concatenates extracted markdown under a budget."""
+
 import pytest_asyncio
 from moto.server import ThreadedMotoServer
 
@@ -19,12 +20,16 @@ async def stack():
     import os
     from unittest import mock
 
-    with mock.patch.dict(os.environ, {
-        "BLOGFORGE_S3_ENDPOINT_URL": endpoint,
-        "BLOGFORGE_S3_ACCESS_KEY": "test",
-        "BLOGFORGE_S3_SECRET_KEY": "test",
-        "BLOGFORGE_S3_BUCKET": "ctx-test",
-    }, clear=False):
+    with mock.patch.dict(
+        os.environ,
+        {
+            "BLOGFORGE_S3_ENDPOINT_URL": endpoint,
+            "BLOGFORGE_S3_ACCESS_KEY": "test",
+            "BLOGFORGE_S3_SECRET_KEY": "test",
+            "BLOGFORGE_S3_BUCKET": "ctx-test",
+        },
+        clear=False,
+    ):
         get_settings.cache_clear()
         reset_s3_client_for_tests()
         await ensure_bucket()

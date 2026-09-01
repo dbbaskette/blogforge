@@ -1,4 +1,5 @@
 """Anthropic adapter — json_schema (tool-use) path."""
+
 from __future__ import annotations
 
 import httpx
@@ -48,6 +49,7 @@ async def test_complete_with_schema_uses_tool_use() -> None:
     # Request body should include tools + tool_choice
     sent = route.calls.last.request.content
     import json as _json
+
     body = _json.loads(sent.decode())
     assert "tools" in body
     assert body["tools"][0]["name"] == "record_analysis"
@@ -64,7 +66,9 @@ async def test_complete_with_schema_retries_on_invalid_json() -> None:
         httpx.Response(
             200,
             json={
-                "id": "msg_1", "type": "message", "role": "assistant",
+                "id": "msg_1",
+                "type": "message",
+                "role": "assistant",
                 "model": "claude-sonnet-4-6",
                 "content": [{"type": "text", "text": "I cannot use the tool"}],
                 "stop_reason": "end_turn",
@@ -74,12 +78,18 @@ async def test_complete_with_schema_retries_on_invalid_json() -> None:
         httpx.Response(
             200,
             json={
-                "id": "msg_2", "type": "message", "role": "assistant",
+                "id": "msg_2",
+                "type": "message",
+                "role": "assistant",
                 "model": "claude-sonnet-4-6",
-                "content": [{
-                    "type": "tool_use", "id": "tu_1", "name": "record_analysis",
-                    "input": {"value": "fixed"},
-                }],
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "tu_1",
+                        "name": "record_analysis",
+                        "input": {"value": "fixed"},
+                    }
+                ],
                 "stop_reason": "tool_use",
                 "usage": {"input_tokens": 10, "output_tokens": 4},
             },
@@ -100,7 +110,9 @@ async def test_complete_with_schema_fails_after_two_invalid_attempts() -> None:
     text_resp = httpx.Response(
         200,
         json={
-            "id": "msg", "type": "message", "role": "assistant",
+            "id": "msg",
+            "type": "message",
+            "role": "assistant",
             "model": "claude-sonnet-4-6",
             "content": [{"type": "text", "text": "no tool"}],
             "stop_reason": "end_turn",

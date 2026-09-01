@@ -1,4 +1,5 @@
 """GET /api/events — global SSE event bus."""
+
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,8 +1,9 @@
 """S3 key layout for library references.
 
-    library/{user_id}/{lib_id}/extracted.md   ← cleaned markdown the LLM sees
-    library/{user_id}/{lib_id}/original{ext}   ← raw upload / URL stub
+library/{user_id}/{lib_id}/extracted.md   ← cleaned markdown the LLM sees
+library/{user_id}/{lib_id}/original{ext}   ← raw upload / URL stub
 """
+
 from __future__ import annotations
 
 from uuid import UUID

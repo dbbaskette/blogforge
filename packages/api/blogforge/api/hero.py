@@ -7,6 +7,7 @@ DELETE /api/drafts/{id}/hero-image   clear the hero image
 Image generation is Google-only, so it pulls the Google key from the vault
 regardless of the draft's text provider.
 """
+
 from __future__ import annotations
 
 import logging

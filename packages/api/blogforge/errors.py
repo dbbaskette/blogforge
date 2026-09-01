@@ -6,6 +6,7 @@ may not surface a traceback at all, making a user-reported "HTTP 500"
 a scavenger hunt. We attach a short error id to both the logged traceback
 and the JSON response so the two can be matched instantly.
 """
+
 from __future__ import annotations
 
 import logging

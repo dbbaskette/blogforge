@@ -4,8 +4,9 @@ from pathlib import Path
 def assert_paired(prompt: str, instruction: str, rationale_fragment: str) -> None:
     pair = f"Rule: {instruction}\nBecause: "
     assert pair in prompt
-    reason = prompt[prompt.index(pair) + len(pair):].splitlines()[0]
+    reason = prompt[prompt.index(pair) + len(pair) :].splitlines()[0]
     assert rationale_fragment in reason
+
 
 def test_public_api_imports() -> None:
     from blogforge.voice import (  # noqa: F401
@@ -22,13 +23,17 @@ def test_public_api_imports() -> None:
         validate_pack,
     )
 
+
 def test_ai_tells_resource_loads() -> None:
     from blogforge.voice.ai_tells import load_ai_tells
+
     t = load_ai_tells()
     assert t.words and t.phrases and t.patterns  # bundled resources resolved
 
+
 def test_compose_prompt_smoke(tmp_path: Path) -> None:
     from blogforge.voice import compose_prompt
+
     pack = tmp_path / "pack"
     pack.mkdir()
     (pack / "stylepack.yaml").write_text(
@@ -176,14 +181,11 @@ def test_compose_normalizes_custom_format_rules_with_surface_reasons(
         encoding="utf-8",
     )
     (pack / "style-guide.md").write_text(
-        "Rule: Write plainly.\n"
-        "Because: Plain language matches the author's approved voice.\n",
+        "Rule: Write plainly.\nBecause: Plain language matches the author's approved voice.\n",
         encoding="utf-8",
     )
     (pack / "formats" / "launch-note.md").write_text(
-        "## Launch note layout\n\n"
-        "Use exactly three bullets.\n"
-        "End with a short call to action.\n",
+        "## Launch note layout\n\nUse exactly three bullets.\nEnd with a short call to action.\n",
         encoding="utf-8",
     )
 
@@ -206,8 +208,10 @@ def test_compose_normalizes_custom_format_rules_with_surface_reasons(
         "selected publishing surface requires this instruction",
     )
 
+
 def test_compose_prompt_includes_fingerprint_single_voice_block(tmp_path: Path) -> None:
     from blogforge.voice import compose_prompt
+
     pack = tmp_path / "pack"
     pack.mkdir()
     (pack / "stylepack.yaml").write_text(
@@ -257,6 +261,7 @@ def test_validate_template_pack() -> None:
     from importlib import resources
 
     from blogforge.voice import validate_pack
+
     tmpl = resources.files("blogforge.voice").joinpath("bundled_packs/_template")
     res = validate_pack(Path(str(tmpl)))
     assert res is not None

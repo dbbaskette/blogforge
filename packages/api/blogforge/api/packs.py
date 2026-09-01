@@ -1,4 +1,5 @@
 """GET /api/packs — wraps myvoice.PackStore."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -15,8 +16,7 @@ def _voice_preview(info: Any) -> dict[str, str]:
     so a malformed pack never breaks the list."""
     try:
         manifest = (
-            yaml.safe_load((info.root_path / "stylepack.yaml").read_text(encoding="utf-8"))
-            or {}
+            yaml.safe_load((info.root_path / "stylepack.yaml").read_text(encoding="utf-8")) or {}
         )
     except (OSError, yaml.YAMLError):
         return {"description": "", "one_line": ""}

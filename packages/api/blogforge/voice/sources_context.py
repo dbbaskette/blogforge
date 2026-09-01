@@ -6,6 +6,7 @@ has factual grounding from the user's context URLs (e.g. product docs).
 Sources are NEVER used for style distillation — they live in voice_sources,
 not voice_samples.
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,8 +17,8 @@ from blogforge.voice.store import SqlVoiceStore
 
 logger = logging.getLogger(__name__)
 
-_PER_SOURCE_LIMIT = 4_000   # chars per individual source
-_TOTAL_LIMIT = 16_000       # chars for the whole background block (excl. headers)
+_PER_SOURCE_LIMIT = 4_000  # chars per individual source
+_TOTAL_LIMIT = 16_000  # chars for the whole background block (excl. headers)
 
 _HEADER = (
     "## Background sources\n"

@@ -143,8 +143,7 @@ _IMPACTS: dict[str, str] = {
     "extracted sentence shapes for 'what is X' queries.",
     "question_headings": "Question headings match how users phrase queries — engines map "
     "query to heading directly.",
-    "skimmability": "Engines parse structure; walls of prose fragment poorly into answer "
-    "passages.",
+    "skimmability": "Engines parse structure; walls of prose fragment poorly into answer passages.",
     "brand_explicit": "AI can cite content without naming you ('ghost citation') — an "
     "explicit brand travels with the quote.",
     "faq": "FAQ blocks are eligible for People-Also-Ask and schema.org/FAQPage rich "
@@ -155,8 +154,7 @@ _IMPACTS: dict[str, str] = {
     "synthesizing their own.",
     "freshness": "Dated claims signal current content; engines demote pieces they can't "
     "place in time.",
-    "comparison_table": "Tables answer 'X vs Y' queries directly — engines lift rows "
-    "verbatim.",
+    "comparison_table": "Tables answer 'X vs Y' queries directly — engines lift rows verbatim.",
     "stat_attribution": "A number tied to a named source is a citable fact; a bare number is "
     "just a claim.",
     "query_coverage": "Answering the follow-up questions keeps the engine on your page "
@@ -687,16 +685,24 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     cap_findings = []
     if not capsule_ok:
         why = (
-            f"Opening paragraph is {wc} words (target 40–75)" if not 40 <= wc <= 75
-            else "Opening paragraph contains links" if _MD_LINK_RE.search(para)
+            f"Opening paragraph is {wc} words (target 40–75)"
+            if not 40 <= wc <= 75
+            else "Opening paragraph contains links"
+            if _MD_LINK_RE.search(para)
             else "Opening sentence never names the subject"
         )
-        cap_findings = [{"target": para[:200], "note": f"{why} — answer engines lift "
-                         "self-contained 40–75-word openers verbatim.", "fix": "capsule"}]
+        cap_findings = [
+            {
+                "target": para[:200],
+                "note": f"{why} — answer engines lift self-contained 40–75-word openers verbatim.",
+                "fix": "capsule",
+            }
+        ]
     caps = _lever(
         "answer_capsule",
         90 if capsule_ok else (50 if 20 <= wc <= 110 else 30),
-        "Opening paragraph works as a liftable answer capsule." if capsule_ok
+        "Opening paragraph works as a liftable answer capsule."
+        if capsule_ok
         else "No 40–75-word self-contained, link-free opening capsule.",
         findings=cap_findings,
         fix="capsule" if cap_findings else None,
@@ -707,8 +713,9 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     sentences = [s for s in _SENT_SPLIT_GEO.split(full) if s.strip()]
     facts = [i for i, s in enumerate(sentences) if _DIGIT_RE.search(s)]
     if not facts or len(sentences) < 8:
-        front_load = _lever("page_front_load", 50,
-                            "Too little factual content to judge front-loading.")
+        front_load = _lever(
+            "page_front_load", 50, "Too little factual content to judge front-loading."
+        )
     else:
         cutoff = max(1, int(len(sentences) * 0.30))
         share = sum(1 for i in facts if i < cutoff) / len(facts)
@@ -726,9 +733,15 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         "definitive_language",
         max(0, int(100 - ratio * 400)),
         f"{len(hedged)} of {len(sentences)} sentences hedge (may/might/could/perhaps).",
-        findings=[{"target": h[:200], "note": "Hedged claim — engines quote statements "
-                   "they can lift without qualification.", "fix": "definitive"}
-                  for h in hedged[:3]],
+        findings=[
+            {
+                "target": h[:200],
+                "note": "Hedged claim — engines quote statements "
+                "they can lift without qualification.",
+                "fix": "definitive",
+            }
+            for h in hedged[:3]
+        ],
         fix="definitive" if hedged else None,
     )
 
@@ -1600,9 +1613,8 @@ async def generate_faq(
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
     if questions:
-        task = (
-            "Create FAQ entries for these supplied reader questions:\n"
-            + "\n".join(f"- {q.strip()}" for q in questions if q.strip())
+        task = "Create FAQ entries for these supplied reader questions:\n" + "\n".join(
+            f"- {q.strip()}" for q in questions if q.strip()
         )
         requested_rules = [
             PromptRule(
@@ -1645,8 +1657,7 @@ async def generate_faq(
             ),
             PromptRule("Return JSON matching the FAQ schema.", OUTPUT_RATIONALE),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "FAQ fields.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into FAQ fields.",
                 "Prompt metadata would corrupt fields parsed by the FAQ editor.",
             ),
         ]
@@ -1706,8 +1717,7 @@ async def generate_opener(
                 "The client prepends this response verbatim.",
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "the sentence.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into the sentence.",
                 "The client prepends this response verbatim as clean article prose.",
             ),
         ]
@@ -1953,8 +1963,7 @@ async def generate_alt_text(
                 "The client inserts this response directly into the image's alt-text slot.",
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "the alt text.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into the alt text.",
                 "The client inserts this response directly into the image's alt-text slot.",
             ),
         ]
@@ -2016,8 +2025,7 @@ async def generate_queries(
             ),
             PromptRule("Return JSON matching the queries schema.", OUTPUT_RATIONALE),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "query fields.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into query fields.",
                 "Prompt metadata would corrupt queries parsed by the citation-check workflow.",
             ),
         ]

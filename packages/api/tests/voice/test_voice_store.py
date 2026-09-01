@@ -1,11 +1,11 @@
 """SqlVoiceStore CRUD — scoped by user_id, version bumped on every mutation."""
-import pytest
+
 from uuid import uuid4
 
-from blogforge.db.models import User
 from blogforge.db.engine import get_sessionmaker
-from blogforge.voice.store import SqlVoiceStore
+from blogforge.db.models import User
 from blogforge.voice.models import VoiceRules
+from blogforge.voice.store import SqlVoiceStore
 
 
 async def test_get_or_create_and_mutations():
@@ -117,7 +117,7 @@ async def test_cross_user_sample_isolation():
 
     # B tries to delete A's sample → no-op
     await store.delete_sample(uid_b, sample.id)
-    assert len(((await store.get(uid_a)).samples)) == 1
+    assert len((await store.get(uid_a)).samples) == 1
 
     # B tries to toggle A's sample → A's sample unchanged
     await store.set_exemplar(uid_b, sample.id, True)

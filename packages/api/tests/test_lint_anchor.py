@@ -1,4 +1,5 @@
 """Section-anchoring helpers for the interactive lint endpoint."""
+
 from types import SimpleNamespace
 
 from blogforge.api.lint import (

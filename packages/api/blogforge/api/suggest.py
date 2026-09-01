@@ -4,6 +4,7 @@ Runs fact-check / reword / expand passes over a whole draft and returns a
 grouped punch-list. Mirrors the headlines endpoint: resolve the voice, load the
 manifest, build the provider, delegate to the generator.
 """
+
 from __future__ import annotations
 
 from typing import get_args

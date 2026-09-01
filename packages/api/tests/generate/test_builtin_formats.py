@@ -1,4 +1,5 @@
 """Built-in output formats registry + directive resolution."""
+
 from __future__ import annotations
 
 from blogforge.generate.builtin_formats import (

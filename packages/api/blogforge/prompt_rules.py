@@ -8,12 +8,8 @@ TTS_RATIONALE = (
     "This text will be read by a text-to-speech engine, and disruptive "
     "punctuation can produce confusing pauses or phrasing."
 )
-FACTUAL_RATIONALE = (
-    "Unsupported material damages factual trust and makes attribution unreliable."
-)
-PRESERVATION_RATIONALE = (
-    "This is a bounded edit and must not damage the approved article."
-)
+FACTUAL_RATIONALE = "Unsupported material damages factual trust and makes attribution unreliable."
+PRESERVATION_RATIONALE = "This is a bounded edit and must not damage the approved article."
 OUTPUT_RATIONALE = (
     "Downstream code parses this response, so extra or malformed content breaks the workflow."
 )
@@ -23,12 +19,8 @@ CONTINUITY_RATIONALE = (
 VOICE_RATIONALE = (
     "The result must retain the author's recognizable voice instead of sounding templated."
 )
-STYLE_GUIDE_RATIONALE = (
-    "This rule captures the author's approved and recognizable voice."
-)
-FORMAT_INSTRUCTION_RATIONALE = (
-    "The selected publishing surface requires this instruction."
-)
+STYLE_GUIDE_RATIONALE = "This rule captures the author's approved and recognizable voice."
+FORMAT_INSTRUCTION_RATIONALE = "The selected publishing surface requires this instruction."
 
 _IMPERATIVE_PREFIXES = (
     "always",
@@ -121,14 +113,11 @@ def render_prompt_rules(
 ) -> str:
     if bullet:
         return "\n".join(
-            f"- Rule: {rule.instruction.strip()}\n"
-            f"  Because: {rule.rationale.strip()}"
+            f"- Rule: {rule.instruction.strip()}\n  Because: {rule.rationale.strip()}"
             for rule in rules
         )
     return "\n\n".join(
-        f"Rule: {rule.instruction.strip()}\n"
-        f"Because: {rule.rationale.strip()}"
-        for rule in rules
+        f"Rule: {rule.instruction.strip()}\nBecause: {rule.rationale.strip()}" for rule in rules
     )
 
 

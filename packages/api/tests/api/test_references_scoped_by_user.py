@@ -4,6 +4,7 @@ User A creates a draft + reference. User B's GET / POST / DELETE on
 those resources must all 404 (never 403) so the existence of A's
 draft can't be probed via this surface.
 """
+
 from __future__ import annotations
 
 import os
@@ -83,12 +84,8 @@ def _idea_json() -> dict:  # type: ignore[type-arg]
 def _add_url_ref(client: TestClient, draft_id: str) -> str:
     html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
     with (
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
-        ),
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.extract", return_value="body"
-        ),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.extract", return_value="body"),
     ):
         r = client.post(
             f"/api/drafts/{draft_id}/references/url",

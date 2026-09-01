@@ -1,4 +1,5 @@
 """Postgres-backed template store. User-scoped, like SqlDraftStore."""
+
 from __future__ import annotations
 
 from uuid import UUID
@@ -34,12 +35,16 @@ class TemplateStore:
     async def list_for_user(self, user_id: UUID) -> list[Template]:
         async with get_sessionmaker()() as session:
             rows = (
-                await session.execute(
-                    select(TemplateRow)
-                    .where(TemplateRow.user_id == user_id)
-                    .order_by(TemplateRow.updated_at.desc())
+                (
+                    await session.execute(
+                        select(TemplateRow)
+                        .where(TemplateRow.user_id == user_id)
+                        .order_by(TemplateRow.updated_at.desc())
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return [_template_from_row(r) for r in rows]
 
     async def create(self, *, user_id: UUID, data: TemplateInput) -> Template:
@@ -73,9 +78,7 @@ class TemplateStore:
         async with get_sessionmaker()() as session:
             draft = (
                 await session.execute(
-                    select(DraftRow).where(
-                        DraftRow.id == duuid, DraftRow.user_id == user_id
-                    )
+                    select(DraftRow).where(DraftRow.id == duuid, DraftRow.user_id == user_id)
                 )
             ).scalar_one_or_none()
             if draft is None:

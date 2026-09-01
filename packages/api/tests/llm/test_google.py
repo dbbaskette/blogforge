@@ -1,4 +1,5 @@
 """Google Gemini adapter — mocked HTTP via respx."""
+
 from __future__ import annotations
 
 import httpx
@@ -30,15 +31,17 @@ async def test_complete_happy_path() -> None:
     p = GoogleProvider(api_key="g-test")
     respx.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
-    ).mock(return_value=httpx.Response(
-        200,
-        json={
-            "candidates": [
-                {"content": {"parts": [{"text": "Hello!"}]}, "finishReason": "STOP"}
-            ],
-            "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 2},
-        },
-    ))
+    ).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "candidates": [
+                    {"content": {"parts": [{"text": "Hello!"}]}, "finishReason": "STOP"}
+                ],
+                "usageMetadata": {"promptTokenCount": 5, "candidatesTokenCount": 2},
+            },
+        )
+    )
     r = await p.complete(model="gemini-2.5-pro", prompt="hi")
     assert r.text == "Hello!"
     assert r.input_tokens == 5
@@ -60,9 +63,11 @@ async def test_stream_yields_deltas() -> None:
     )
     respx.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:streamGenerateContent"
-    ).mock(return_value=httpx.Response(
-        200, content=sse_body, headers={"content-type": "text/event-stream"}
-    ))
+    ).mock(
+        return_value=httpx.Response(
+            200, content=sse_body, headers={"content-type": "text/event-stream"}
+        )
+    )
     deltas = []
     usage = None
     async for c in p.stream(model="gemini-2.5-pro", prompt="hi"):
@@ -103,9 +108,11 @@ async def test_rate_limit_maps() -> None:
     p = GoogleProvider(api_key="g-test")
     respx.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
-    ).mock(return_value=httpx.Response(
-        429, headers={"retry-after": "60"}, json={"error": {"message": "rate limit"}}
-    ))
+    ).mock(
+        return_value=httpx.Response(
+            429, headers={"retry-after": "60"}, json={"error": {"message": "rate limit"}}
+        )
+    )
     with pytest.raises(ProviderRateLimit) as exc:
         await p.complete(model="gemini-2.5-pro", prompt="hi")
     assert exc.value.retry_after_seconds == 60

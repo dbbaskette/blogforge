@@ -1,4 +1,5 @@
 """Approve / reject / disable / promote endpoints."""
+
 from uuid import uuid4
 
 import pytest_asyncio
@@ -19,12 +20,16 @@ async def setup():
         await conn.run_sync(Base.metadata.create_all)
     async with get_sessionmaker()() as session:
         admin = User(
-            email="root@x.com", password_hash=hash_password("x"),
-            status="approved", role="admin",
+            email="root@x.com",
+            password_hash=hash_password("x"),
+            status="approved",
+            role="admin",
         )
         pending = User(
-            email="p@x.com", password_hash=hash_password("x"),
-            status="pending", role="user",
+            email="p@x.com",
+            password_hash=hash_password("x"),
+            status="pending",
+            role="user",
         )
         session.add_all([admin, pending])
         await session.commit()
@@ -97,8 +102,11 @@ async def test_list_includes_github_user_with_null_email(setup):
     async with get_sessionmaker()() as session:
         session.add(
             User(
-                email=None, github_id=4242, github_login="ghuser",
-                status="approved", role="user",
+                email=None,
+                github_id=4242,
+                github_login="ghuser",
+                status="approved",
+                role="user",
             )
         )
         await session.commit()

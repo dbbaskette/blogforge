@@ -1,4 +1,5 @@
 """OpenAI adapter — mocked HTTP via respx."""
+
 from __future__ import annotations
 
 import httpx
@@ -47,8 +48,8 @@ async def test_stream_yields_deltas() -> None:
     sse_body = (
         'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n'
         'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n'
-        f'data: {final_chunk}\n\n'
-        'data: [DONE]\n\n'
+        f"data: {final_chunk}\n\n"
+        "data: [DONE]\n\n"
     )
     respx.post("https://api.openai.com/v1/chat/completions").mock(
         return_value=httpx.Response(

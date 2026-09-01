@@ -129,8 +129,7 @@ def test_humanize_prompt_preserves_facts_with_a_reason():
     assert "Rule: Preserve every number, URL, and quoted span." in prompt
     assert "Because: Humanization must not alter the article's factual record" in prompt
     assert (
-        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
-        "suggestions."
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into suggestions."
     ) in prompt
 
 

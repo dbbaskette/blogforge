@@ -1,4 +1,5 @@
 """Anthropic adapter — mocked HTTP via respx."""
+
 from __future__ import annotations
 
 import httpx
@@ -69,8 +70,7 @@ async def test_stream_yields_deltas_and_final_usage() -> None:
         '"usage":{"input_tokens":10,"output_tokens":0}}}'
     )
     msg_delta = (
-        '{"type":"message_delta","delta":{"stop_reason":"end_turn"},'
-        '"usage":{"output_tokens":2}}'
+        '{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}'
     )
     sse_body = (
         "event: message_start\n"
@@ -112,10 +112,12 @@ async def test_list_models_returns_known_set() -> None:
     respx.get("https://api.anthropic.com/v1/models").mock(
         return_value=httpx.Response(
             200,
-            json={"data": [
-                {"id": "claude-opus-4-7", "display_name": "Claude Opus 4.7"},
-                {"id": "claude-sonnet-4-6", "display_name": "Claude Sonnet 4.6"},
-            ]},
+            json={
+                "data": [
+                    {"id": "claude-opus-4-7", "display_name": "Claude Opus 4.7"},
+                    {"id": "claude-sonnet-4-6", "display_name": "Claude Sonnet 4.6"},
+                ]
+            },
         )
     )
     models = await provider.list_models()

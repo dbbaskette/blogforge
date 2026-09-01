@@ -1,4 +1,5 @@
 """apply_vcap_services translates a bound services payload into env vars."""
+
 import json
 import os
 from unittest import mock
@@ -28,9 +29,7 @@ VCAP = {
 def test_translates_postgres_uri_to_asyncpg():
     with mock.patch.dict(os.environ, {"VCAP_SERVICES": json.dumps(VCAP)}, clear=True):
         apply_vcap_services()
-        assert os.environ["BLOGFORGE_DATABASE_URL"] == (
-            "postgresql+asyncpg://u:p@h:5432/db"
-        )
+        assert os.environ["BLOGFORGE_DATABASE_URL"] == ("postgresql+asyncpg://u:p@h:5432/db")
 
 
 def test_translates_s3_credentials():

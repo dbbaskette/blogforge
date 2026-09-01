@@ -1,4 +1,5 @@
 """_clean_inline_output — strip self-correction narration from inline AI fixes."""
+
 from blogforge.generate.inline import _clean_inline_output
 
 

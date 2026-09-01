@@ -12,6 +12,7 @@ prefix; "reuse" copies a library reference's objects back under a draft
 prefix and inserts a normal `references` row, so prompt assembly, listing,
 and deletion all work unchanged.
 """
+
 from __future__ import annotations
 
 import secrets
@@ -83,12 +84,16 @@ async def list_library(
 ) -> list[LibraryReference]:
     async with get_sessionmaker()() as session:
         rows = (
-            await session.execute(
-                select(LibraryRow)
-                .where(LibraryRow.user_id == current.id)
-                .order_by(LibraryRow.added_at.desc())
+            (
+                await session.execute(
+                    select(LibraryRow)
+                    .where(LibraryRow.user_id == current.id)
+                    .order_by(LibraryRow.added_at.desc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return [_lib_from_row(r) for r in rows]
 
 
@@ -173,9 +178,7 @@ async def delete_library_reference(
     async with get_sessionmaker()() as session:
         row = (
             await session.execute(
-                select(LibraryRow).where(
-                    LibraryRow.id == lib_id, LibraryRow.user_id == current.id
-                )
+                select(LibraryRow).where(LibraryRow.id == lib_id, LibraryRow.user_id == current.id)
             )
         ).scalar_one_or_none()
         if row is None:
@@ -205,9 +208,7 @@ async def add_from_library(
     async with get_sessionmaker()() as session:
         lib = (
             await session.execute(
-                select(LibraryRow).where(
-                    LibraryRow.id == lib_id, LibraryRow.user_id == current.id
-                )
+                select(LibraryRow).where(LibraryRow.id == lib_id, LibraryRow.user_id == current.id)
             )
         ).scalar_one_or_none()
         if lib is None:

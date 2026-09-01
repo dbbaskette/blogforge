@@ -1,4 +1,5 @@
 """Non-admin users cannot reach /api/admin/*."""
+
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
@@ -17,12 +18,16 @@ async def app_with_users():
         await conn.run_sync(Base.metadata.create_all)
     async with get_sessionmaker()() as session:
         user = User(
-            email="u@x.com", password_hash=hash_password("x"),
-            status="approved", role="user",
+            email="u@x.com",
+            password_hash=hash_password("x"),
+            status="approved",
+            role="user",
         )
         admin = User(
-            email="a@x.com", password_hash=hash_password("x"),
-            status="approved", role="admin",
+            email="a@x.com",
+            password_hash=hash_password("x"),
+            status="approved",
+            role="admin",
         )
         session.add_all([user, admin])
         await session.commit()

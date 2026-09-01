@@ -41,7 +41,7 @@ async def test_download_title_with_typographic_punctuation(authed_client) -> Non
     created = client.post(
         "/api/drafts",
         json={
-            "topic": "“Faster is Still Safer” — the Three R’s",
+            "topic": "“Faster is Still Safer” — the Three R’s",  # noqa: RUF001
             "pack_slug": "dan",
             "provider": "anthropic",
             "model": "m",

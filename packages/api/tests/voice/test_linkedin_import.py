@@ -20,7 +20,7 @@ def _zip(files: dict[str, str]) -> bytes:
 
 
 def test_parses_profile_and_article() -> None:
-    csv_text = "Headline,Summary\r\n\"Sr. Director @ X\",\"A leader in technical marketing.\"\r\n"
+    csv_text = 'Headline,Summary\r\n"Sr. Director @ X","A leader in technical marketing."\r\n'
     html = (
         "<html><head><title>My Article</title></head><body><p>"
         + ("Real writing about platforms. " * 20)

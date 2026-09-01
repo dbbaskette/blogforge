@@ -1,7 +1,6 @@
 """Tests for /api/keys per-user provider key management."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 
 def test_set_get_delete_key(authed_client, monkeypatch) -> None:

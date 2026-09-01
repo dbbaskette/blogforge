@@ -1,4 +1,5 @@
 """GET/DELETE /api/jobs/{id} + /api/jobs/{id}/events."""
+
 from __future__ import annotations
 
 import asyncio

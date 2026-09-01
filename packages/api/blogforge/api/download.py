@@ -1,4 +1,5 @@
 """GET /api/drafts/{id}/download — export as Markdown, HTML, or .docx."""
+
 from __future__ import annotations
 
 import re

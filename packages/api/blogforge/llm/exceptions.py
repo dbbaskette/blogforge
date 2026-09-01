@@ -1,9 +1,11 @@
 """Typed exceptions for LLM provider failures."""
+
 from __future__ import annotations
 
 
 class ProviderError(Exception):
     """Generic provider failure. Subclasses carry semantic codes."""
+
     code: str = "provider_error"
 
     def __init__(self, message: str, *, hint: str | None = None) -> None:

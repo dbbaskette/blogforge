@@ -1,4 +1,5 @@
 """Locate the bundled `_template` pack on disk."""
+
 from __future__ import annotations
 
 import os

@@ -1,4 +1,5 @@
 """ensure_bucket() is idempotent and creates the configured bucket on first call."""
+
 import pytest_asyncio
 from moto.server import ThreadedMotoServer
 

@@ -4,6 +4,7 @@ Reads the signed session cookie, loads the user, enforces approval status
 and (optionally) role=admin. Raises HTTP 401 for missing/invalid cookies
 and 403 for status/role mismatches.
 """
+
 from collections.abc import AsyncIterator
 
 from fastapi import Cookie, Depends, HTTPException, status

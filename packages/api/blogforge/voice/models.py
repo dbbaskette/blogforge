@@ -1,4 +1,5 @@
 """Pydantic shapes for voice profiles and samples."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

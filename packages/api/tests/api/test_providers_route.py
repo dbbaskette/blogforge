@@ -5,9 +5,8 @@ the per-user keys migration (Task 4/5). The route is being updated in Task 5 to
 use per-user key lookup; the unknown-provider 404 test is preserved as it remains
 correct.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 
 def test_list_models_unknown_provider_404(authed_client) -> None:

@@ -1,4 +1,5 @@
 """Per-user provider API keys (Settings)."""
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
@@ -17,8 +18,12 @@ class KeyBody(BaseModel):
 
 def _check(provider: str) -> None:
     if provider not in SUPPORTED_PROVIDERS:
-        raise HTTPException(404, detail={"error": {"code": "unknown_provider",
-            "message": f"Unknown provider '{provider}'"}})
+        raise HTTPException(
+            404,
+            detail={
+                "error": {"code": "unknown_provider", "message": f"Unknown provider '{provider}'"}
+            },
+        )
 
 
 @router.get("")
@@ -27,14 +32,20 @@ async def status_map(current: User = Depends(get_current_user)) -> dict[str, boo
 
 
 @router.put("/{provider}")
-async def set_key(provider: str, body: KeyBody, current: User = Depends(get_current_user)) -> dict[str, str]:
+async def set_key(
+    provider: str, body: KeyBody, current: User = Depends(get_current_user)
+) -> dict[str, str]:
     _check(provider)
     if not body.api_key.strip():
-        raise HTTPException(400, detail={"error": {"code": "empty_key", "message": "Key must not be empty."}})
+        raise HTTPException(
+            400, detail={"error": {"code": "empty_key", "message": "Key must not be empty."}}
+        )
     try:
         await get_provider(provider, body.api_key).list_models()
     except (ProviderError, ProviderMissingKey) as exc:
-        raise HTTPException(400, detail={"error": {"code": "invalid_key", "message": str(exc)}}) from exc
+        raise HTTPException(
+            400, detail={"error": {"code": "invalid_key", "message": str(exc)}}
+        ) from exc
     await KeyVault(current.id).set(provider, body.api_key)
     return {"status": "ok"}
 

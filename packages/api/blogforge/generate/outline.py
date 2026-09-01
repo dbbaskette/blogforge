@@ -1,4 +1,5 @@
 """ANALYZE stage for outline: render prompt, call LLM with json_schema, validate."""
+
 from __future__ import annotations
 
 from pathlib import Path

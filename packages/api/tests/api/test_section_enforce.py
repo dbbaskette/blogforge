@@ -7,6 +7,7 @@ requires a ``Manifest``. That blew up with
 ``'dict' object has no attribute 'banished'`` *after* the model had already
 produced the section text, failing the whole regen (matching the other callers
 in inline.py / expand.py / voice.py, which all validate first)."""
+
 from __future__ import annotations
 
 import pytest
