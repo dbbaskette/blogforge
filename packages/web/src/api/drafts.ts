@@ -278,14 +278,26 @@ export async function lintDraft(
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
 }
 
-/** Generate an AI hero image for the draft (Google Imagen). */
+export type HeroTheme = "editorial" | "fun" | "space" | "minimal";
+
+export interface HeroImageOptions {
+  /** Full prompt override for backwards-compatible API callers. */
+  prompt?: string;
+  /** Visual treatment applied after BlogForge derives article-specific subject matter. */
+  theme?: HeroTheme;
+  /** Optional writer guidance combined with the selected theme and article facts. */
+  direction?: string;
+}
+
+/** Generate an AI hero image for the draft. */
 export async function generateHeroImage(
   draftId: string,
-  prompt = "",
+  options: HeroImageOptions | string = {},
 ): Promise<{ hero_image_key: string }> {
+  const body = typeof options === "string" ? { prompt: options } : options;
   return api(`/api/drafts/${encodeURIComponent(draftId)}/hero-image`, {
     method: "POST",
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify(body),
   });
 }
 

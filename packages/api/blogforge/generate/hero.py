@@ -1,19 +1,10 @@
-"""AI hero-image generation via Google Imagen (Gemini Developer API, REST).
-
-The text Google provider already talks to generativelanguage.googleapis.com
-directly over httpx (the deprecated google-generativeai SDK has no Imagen
-support), so hero images use the same REST style — the Imagen `:predict`
-endpoint. Image generation is Google-only here regardless of the draft's text
-provider, per the product decision to reuse the existing Google key.
-
-NOTE: Imagen on the Gemini API requires a paid-tier key; a free key returns
-403, surfaced as a clean ProviderError to the caller.
-"""
+"""AI hero-image generation via the native Gemini image API."""
 # ruff: noqa: E501
 
 from __future__ import annotations
 
 import base64
+from typing import Literal
 
 import httpx
 
@@ -23,10 +14,27 @@ from blogforge.llm.exceptions import ProviderError, ProviderMissingKey, Provider
 from blogforge.prompt_rules import PromptRule, render_prompt_rules
 
 _BASE = "https://generativelanguage.googleapis.com/v1beta"
-# Imagen 4 via the :predict endpoint — verified available on the Gemini API
-# (imagen-3.0-* 404s on v1beta). Use -fast-generate-001 for a cheaper/quicker
-# variant. Override at the call site if a key exposes different models.
-DEFAULT_IMAGE_MODEL = "imagen-4.0-generate-001"
+DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image"
+
+HeroTheme = Literal["editorial", "fun", "space", "minimal"]
+
+_THEME_DIRECTIONS: dict[HeroTheme, str] = {
+    "editorial": (
+        "Use a polished editorial visual style with restrained color and cinematic depth."
+    ),
+    "fun": (
+        "Use a playful, energetic illustration style with bold color, expressive shapes, "
+        "and a sense of delight."
+    ),
+    "space": (
+        "Use an imaginative cosmic visual language with deep space, stars, and planetary "
+        "forms while keeping the article-specific subject as the focal point."
+    ),
+    "minimal": (
+        "Use a clean minimal composition with ample negative space, a limited palette, "
+        "and one strong focal subject."
+    ),
+}
 
 
 # Shared editorial rules appended to every hero prompt.
@@ -53,19 +61,48 @@ _HERO_STYLE = render_prompt_rules(
 )
 
 
-def build_hero_prompt(draft: Draft) -> str:
+def build_hero_prompt(
+    draft: Draft,
+    *,
+    theme: HeroTheme = "editorial",
+    direction: str = "",
+) -> str:
     """Deterministic default from the draft's title. Also the fallback when the
     AI concept distill (:func:`build_hero_prompt_ai`) is unavailable."""
     topic = draft.title or draft.idea.topic
-    return f'A striking, editorial hero image for a blog post titled "{topic}". {_HERO_STYLE}'
+    context = _hero_context(draft, max_sections=2, max_section_chars=350)
+    subject = (
+        f'Create a scene for a blog post titled "{topic}" using only these article details:\n'
+        f"{context}"
+    )
+    return _frame_hero_prompt(
+        subject,
+        theme=theme,
+        direction=direction,
+    )
 
 
-def _frame_hero_prompt(subject: str) -> str:
+def _frame_hero_prompt(
+    subject: str,
+    *,
+    theme: HeroTheme = "editorial",
+    direction: str = "",
+) -> str:
     """Wrap a concrete subject description in the shared editorial styling."""
-    return f"A striking, editorial hero image. {subject.strip()} {_HERO_STYLE}"
+    custom = direction.strip()
+    custom_rule = f" Creative direction from the writer: {custom}" if custom else ""
+    return (
+        f"A striking hero image. {subject.strip()} {_THEME_DIRECTIONS[theme]}"
+        f"{custom_rule} {_HERO_STYLE}"
+    )
 
 
-def _hero_context(draft: Draft, *, max_sections: int = 6) -> str:
+def _hero_context(
+    draft: Draft,
+    *,
+    max_sections: int = 6,
+    max_section_chars: int = 700,
+) -> str:
     """Compact, concrete material for the image concept — what the post is
     actually about: title, opening hook, section titles + briefs, and tags."""
     parts: list[str] = []
@@ -78,7 +115,11 @@ def _hero_context(draft: Draft, *, max_sections: int = 6) -> str:
     lines: list[str] = []
     for s in seq[:max_sections]:
         brief = (getattr(s, "brief", "") or "").strip()
-        lines.append(f"- {s.title}" + (f": {brief}" if brief else ""))
+        content = (getattr(s, "content_md", "") or "").strip()
+        line = f"- {s.title}" + (f": {brief}" if brief else "")
+        if content:
+            line += f"\n  Article excerpt: {content[:max_section_chars]}"
+        lines.append(line)
     if lines:
         parts.append("Sections:\n" + "\n".join(lines))
     if draft.tags:
@@ -98,6 +139,16 @@ _HERO_DISTILL_RULES = render_prompt_rules(
         PromptRule(
             "Use real objects or a scene rather than vague abstractions.",
             "Concrete imagery renders more reliably than an abstract theme alone.",
+        ),
+        PromptRule(
+            "Use 2 to 4 specific visual anchors from the article when they are available, "
+            "such as a number, named object, place, tool, or concrete comparison.",
+            "Distinctive facts make the image specific to this post instead of generic stock art.",
+        ),
+        PromptRule(
+            "Do not invent facts, objects, people, places, or numbers that are not supported "
+            "by the supplied post.",
+            "The hero concept must stay faithful to the article.",
         ),
         PromptRule(
             "Write one sentence under 40 words.",
@@ -134,7 +185,14 @@ def _clean_concept(text: str) -> str:
     return t[:400]
 
 
-async def build_hero_prompt_ai(draft: Draft, provider: LLMProvider, model: str) -> str:
+async def build_hero_prompt_ai(
+    draft: Draft,
+    provider: LLMProvider,
+    model: str,
+    *,
+    theme: HeroTheme = "editorial",
+    direction: str = "",
+) -> str:
     """Distill the draft's content into a concrete image concept via the text
     model, then frame it in the editorial styling. Raises on provider failure —
     callers fall back to :func:`build_hero_prompt`."""
@@ -143,7 +201,11 @@ async def build_hero_prompt_ai(draft: Draft, provider: LLMProvider, model: str) 
         prompt=f"{_HERO_DISTILL_INSTRUCTION}{_HERO_DISTILL_RULES}\n\nPOST:\n{_hero_context(draft)}",
     )
     concept = _clean_concept(resp.text)
-    return _frame_hero_prompt(concept) if concept else build_hero_prompt(draft)
+    return (
+        _frame_hero_prompt(concept, theme=theme, direction=direction)
+        if concept
+        else build_hero_prompt(draft, theme=theme, direction=direction)
+    )
 
 
 async def generate_hero_image(
@@ -156,26 +218,50 @@ async def generate_hero_image(
     """Generate one image. Returns (image_bytes, mime_type)."""
     if not api_key:
         raise ProviderMissingKey("google")
-    url = f"{_BASE}/models/{model}:predict?key={api_key}"
+    url = f"{_BASE}/models/{model}:generateContent?key={api_key}"
     payload = {
-        "instances": [{"prompt": prompt}],
-        "parameters": {"sampleCount": 1, "aspectRatio": aspect_ratio},
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "responseModalities": ["TEXT", "IMAGE"],
+            "imageConfig": {"aspectRatio": aspect_ratio},
+        },
     }
-    async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.post(url, json=payload)
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            r = await client.post(url, json=payload)
+    except httpx.TimeoutException as exc:
+        raise ProviderError(
+            "Google image generation timed out.",
+            hint="Try again. The previous request may still have completed upstream.",
+        )._with_code("provider_timeout") from exc
+    except httpx.HTTPError as exc:
+        raise ProviderError(
+            "Could not reach Google image generation.",
+            hint="Check the connection and try again.",
+        )._with_code("provider_unavailable") from exc
     if r.status_code in (401, 403):
         raise ProviderMissingKey("google")
     if r.status_code == 429:
-        raise ProviderRateLimit("Imagen rate limit hit — try again shortly.")
+        raise ProviderRateLimit("Google image generation rate limit hit. Try again shortly.")
     if r.status_code >= 400:
-        raise ProviderError(f"imagen {r.status_code}: {r.text[:300]}")
-    data = r.json()
-    predictions = data.get("predictions") or []
-    if not predictions:
-        raise ProviderError("Imagen returned no image (the prompt may have been filtered).")
-    pred = predictions[0]
-    b64 = pred.get("bytesBase64Encoded")
-    mime = str(pred.get("mimeType") or "image/png")
-    if not b64:
-        raise ProviderError("Imagen response missing image bytes.")
-    return base64.b64decode(b64), mime
+        raise ProviderError(
+            f"Google image generation returned HTTP {r.status_code}: {r.text[:300]}"
+        )._with_code("image_generation_failed")
+    try:
+        data = r.json()
+        candidates = data.get("candidates") or []
+        parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+        inline = next((part.get("inlineData") for part in parts if part.get("inlineData")), None)
+        if not inline or not inline.get("data"):
+            raise ProviderError(
+                "Google returned no image. The prompt may have been filtered.",
+                hint="Adjust the image direction and try again.",
+            )._with_code("image_generation_filtered")
+        mime = str(inline.get("mimeType") or "image/png")
+        return base64.b64decode(inline["data"], validate=True), mime
+    except ProviderError:
+        raise
+    except (ValueError, TypeError, KeyError) as exc:
+        raise ProviderError("Google returned an invalid image response.")._with_code(
+            "image_generation_invalid_response"
+        ) from exc
