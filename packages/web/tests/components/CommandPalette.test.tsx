@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CommandPalette, PALETTE_ACTION_EVENT } from "../../src/components/CommandPalette";
 import { ToastProvider } from "../../src/components/ui/Toast";
@@ -29,6 +29,10 @@ function renderAt(path: string): { unmount: () => void } {
     </MemoryRouter>,
   );
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("CommandPalette", () => {
   it("lists navigation commands and open-draft entries", async () => {
@@ -72,5 +76,19 @@ describe("CommandPalette", () => {
     fireEvent.change(input, { target: { value: "voice" } });
     expect(screen.getByText("Your Voice")).toBeInTheDocument();
     expect(screen.queryByText("New piece")).not.toBeInTheDocument();
+  });
+
+  it("keeps the editor open and reports an authenticated download failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 });
+    vi.stubGlobal("fetch", fetchMock);
+    renderAt("/drafts/d1");
+
+    fireEvent.click(await screen.findByText("Download .md"));
+
+    expect(await screen.findByText(/session expired/i)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/drafts/d1/download", {
+      credentials: "include",
+    });
+    expect(screen.getByRole("dialog", { name: "Command palette" })).toBeInTheDocument();
   });
 });

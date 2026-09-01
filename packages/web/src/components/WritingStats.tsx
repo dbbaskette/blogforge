@@ -18,8 +18,9 @@ interface WritingStats {
 
 /**
  * Writing activity derived from the drafts list — no extra API call.
- * "Touched" means updated_at; word counts are each draft's CURRENT size,
- * so the sparkline reads as writing volume, not a precise daily ledger.
+ * Piece counts use created_at, falling back to updated_at for legacy payloads.
+ * Word activity uses updated_at and each draft's CURRENT size, so the sparkline
+ * reads as writing volume, not a precise daily ledger.
  */
 function computeStats(drafts: DraftSummary[], now = new Date()): WritingStats {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
@@ -30,10 +31,13 @@ function computeStats(drafts: DraftSummary[], now = new Date()): WritingStats {
   let wordsThisMonth = 0;
 
   for (const d of drafts) {
+    const created = Date.parse(d.created_at ?? d.updated_at);
+    if (!Number.isNaN(created) && created >= monthStart) {
+      piecesThisMonth += 1;
+    }
     const updated = Date.parse(d.updated_at);
     if (Number.isNaN(updated)) continue;
     if (updated >= monthStart) {
-      piecesThisMonth += 1;
       wordsThisMonth += d.word_count;
     }
     const weeksAgo = Math.floor((now.getTime() - updated) / (7 * DAY_MS));

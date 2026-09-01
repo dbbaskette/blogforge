@@ -53,6 +53,31 @@ describe("WritingStats", () => {
     expect(screen.getByText("2.0k")).toBeInTheDocument(); // 1200 + 800
   });
 
+  it("counts pieces by creation date while words follow recent editing activity", () => {
+    render(
+      <WritingStats
+        drafts={[
+          draft({
+            id: "new",
+            created_at: inThisMonth(),
+            updated_at: inThisMonth(),
+            word_count: 100,
+          }),
+          draft({
+            id: "old-but-edited",
+            created_at: inLastMonth(),
+            updated_at: inThisMonth(),
+            word_count: 900,
+          }),
+        ]}
+      />,
+    );
+
+    const values = document.querySelectorAll("span.tabular-nums");
+    expect(values[0]).toHaveTextContent("1");
+    expect(values[1]).toHaveTextContent("1.0k");
+  });
+
   it("computes a consecutive-week streak ending at the current week", () => {
     render(
       <WritingStats

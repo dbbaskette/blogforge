@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { type DraftSummary, downloadDraftUrl, listDrafts } from "../api/drafts";
+import { downloadFile } from "../lib/download";
+import { useToast } from "./ui/Toast";
 import { useDialogA11y } from "./ui/useDialogA11y";
 
 /** Window-level event the draft workspace listens on to open its panels. */
@@ -17,7 +19,7 @@ interface Command {
   /** Navigation target; running the command navigates here + closes. */
   to?: string;
   /** Inline action; running it fires + closes (used alongside or instead of `to`). */
-  run?: () => void;
+  run?: () => void | Promise<void>;
 }
 
 const STATIC_COMMANDS: Command[] = [
@@ -45,6 +47,7 @@ const MAX_DRAFTS = 10;
 
 export function CommandPalette({ onClose }: { onClose: () => void }): JSX.Element {
   const ref = useDialogA11y(true, onClose);
+  const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
@@ -87,12 +90,18 @@ export function CommandPalette({ onClose }: { onClose: () => void }): JSX.Elemen
             glyph: "⬇️",
             label: "Download .md",
             hint: "This draft",
-            run: () => window.location.assign(downloadDraftUrl(draftId)),
+            run: async () => {
+              try {
+                await downloadFile(downloadDraftUrl(draftId), "post.md");
+              } catch (error) {
+                toast(error instanceof Error ? error.message : "Download failed.", "error");
+              }
+            },
           },
         ]
       : [];
     return [...STATIC_COMMANDS, ...contextual, ...draftCommands];
-  }, [drafts, draftId]);
+  }, [drafts, draftId, toast]);
 
   const results = useMemo<Command[]>(() => {
     const q = query.trim().toLowerCase();
@@ -115,7 +124,7 @@ export function CommandPalette({ onClose }: { onClose: () => void }): JSX.Elemen
   }, [active]);
 
   const run = (cmd: Command): void => {
-    cmd.run?.();
+    void cmd.run?.();
     if (cmd.to) navigate(cmd.to);
     onClose();
   };
