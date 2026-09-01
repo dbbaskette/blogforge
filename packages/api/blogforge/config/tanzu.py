@@ -119,11 +119,13 @@ def _apply_genai(instances: list[tuple[str, dict[str, Any]]]) -> None:
             and inst.get("name") != "blogforge-ai"
         ):
             continue
-        creds = inst.get("credentials", {}) or {}
+        raw_creds = inst.get("credentials")
+        creds: dict[str, Any] = raw_creds if isinstance(raw_creds, dict) else {}
         # The Tanzu GenAI tile nests the real values under "endpoint"
         # ({"endpoint": {"openai_api_base", "api_base", "api_key", ...}}); tolerate
         # a flat shape too. Prefer the OpenAI-compatible base for our provider.
-        ep = creds.get("endpoint") if isinstance(creds.get("endpoint"), dict) else creds
+        raw_endpoint = creds.get("endpoint")
+        ep: dict[str, Any] = raw_endpoint if isinstance(raw_endpoint, dict) else creds
         base = ep.get("openai_api_base") or ep.get("api_base") or ep.get("url") or ep.get("uri")
         key = ep.get("api_key") or ep.get("apiKey") or ep.get("key")
         if base:

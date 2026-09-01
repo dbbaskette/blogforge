@@ -76,4 +76,6 @@ async def resolve_voice(
         # Callers keep their existing 404 guard; we just return the path.
         # If pack_info is None the caller's guard already raised before here
         # (or will raise when they try to read stylepack.yaml).
-        return pack_info.root_path
+        if pack_info is None:
+            raise FileNotFoundError(f"Voice pack not found: {draft.idea.pack_slug}")
+        return Path(pack_info.root_path)

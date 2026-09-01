@@ -32,7 +32,7 @@ async def exchange_code(code: str, redirect_uri: str) -> str:
     token = resp.json().get("access_token")
     if not token:
         raise GithubAuthError("GitHub did not return an access token")
-    return token
+    return str(token)
 
 
 async def fetch_identity(token: str) -> GithubIdentity:

@@ -33,6 +33,7 @@ from blogforge.library.keys import lib_extracted_key, lib_original_key, lib_pref
 from blogforge.library.models import LibraryReference
 from blogforge.references.extractors import file_extension_for_kind
 from blogforge.s3 import S3Client, S3Error, get_s3_client
+from blogforge.s3.fs import FsStorage
 
 router = APIRouter(tags=["library"])
 
@@ -63,7 +64,7 @@ def _lib_from_row(row: LibraryRow) -> LibraryReference:
     )
 
 
-async def _copy(s3: S3Client, src: str, dst: str, content_type: str) -> None:
+async def _copy(s3: S3Client | FsStorage, src: str, dst: str, content_type: str) -> None:
     """Copy one S3 object (get + put). Raises S3Error on failure."""
     data = await s3.get_object(src)
     await s3.put_object(dst, data, content_type)

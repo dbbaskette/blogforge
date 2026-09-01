@@ -48,7 +48,7 @@ def _pack_dir(profile: VoiceProfile) -> Path:
     return _cache_root() / profile.id / str(profile.version) / _slug(profile)
 
 
-def _build_manifest(profile: VoiceProfile, exemplar_ids: list[str]) -> dict:
+def _build_manifest(profile: VoiceProfile, exemplar_ids: list[str]) -> dict[str, object]:
     """Build a myvoice SPEC v1.0 manifest dict from a VoiceProfile."""
     rules = profile.rules
 

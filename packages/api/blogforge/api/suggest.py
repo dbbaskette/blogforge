@@ -29,7 +29,7 @@ _VALID_KINDS = set(get_args(SuggestKind))
 
 class _SuggestBody(BaseModel):
     # Which passes to run; defaults to all three.
-    kinds: list[str] = Field(default_factory=lambda: list(ALL_KINDS))
+    kinds: list[str] = Field(default_factory=lambda: [str(kind) for kind in ALL_KINDS])
     per_kind: int = Field(default=4, ge=2, le=6)
 
 

@@ -72,9 +72,19 @@ def _render_whats_next(draft: Draft, current_idx: int) -> str:
 def _render_section_prompt(draft: Draft, section: Section) -> str:
     # Position from the section list (where the written prose lives), falling
     # back to outline order; the two are kept in sync.
-    sections = draft.sections or (draft.outline.sections if draft.outline else [])
-    total = max(len(sections), 1)
-    position_idx = next((i for i, s in enumerate(sections) if s.id == section.id), 0)
+    total = max(
+        len(draft.sections) or len(draft.outline.sections if draft.outline else []),
+        1,
+    )
+    if draft.sections:
+        position_idx = next(
+            (i for i, item in enumerate(draft.sections) if item.id == section.id), 0
+        )
+    else:
+        outline_sections = draft.outline.sections if draft.outline else []
+        position_idx = next(
+            (i for i, item in enumerate(outline_sections) if item.id == section.id), 0
+        )
     is_first = position_idx == 0
     is_last = position_idx == total - 1
     template = Template(_PROMPT_PATH.read_text(encoding="utf-8"))
@@ -97,9 +107,19 @@ def _render_revise_prompt(draft: Draft, section: Section, instruction: str) -> s
     """Prompt for a targeted, minimal edit of an already-written section: hand
     the model the CURRENT prose and the author's note, and tell it to change
     only what the note requires while reproducing the rest verbatim."""
-    sections = draft.sections or (draft.outline.sections if draft.outline else [])
-    total = max(len(sections), 1)
-    position_idx = next((i for i, s in enumerate(sections) if s.id == section.id), 0)
+    total = max(
+        len(draft.sections) or len(draft.outline.sections if draft.outline else []),
+        1,
+    )
+    if draft.sections:
+        position_idx = next(
+            (i for i, item in enumerate(draft.sections) if item.id == section.id), 0
+        )
+    else:
+        outline_sections = draft.outline.sections if draft.outline else []
+        position_idx = next(
+            (i for i, item in enumerate(outline_sections) if item.id == section.id), 0
+        )
     template = Template(_REVISE_PROMPT_PATH.read_text(encoding="utf-8"))
     return template.render(
         title=draft.title or draft.idea.topic,

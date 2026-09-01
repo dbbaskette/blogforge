@@ -14,6 +14,7 @@ import logging
 
 from blogforge.drafts.models import Reference
 from blogforge.s3 import S3Client, S3Error, get_s3_client
+from blogforge.s3.fs import FsStorage
 
 _log = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ async def get_reference_context(draft_id: str, refs: list[Reference]) -> str:
     return _format(truncated)
 
 
-async def _fetch_one(s3: S3Client, draft_id: str, ref: Reference) -> str:
+async def _fetch_one(s3: S3Client | FsStorage, draft_id: str, ref: Reference) -> str:
     key = f"drafts/{draft_id}/references/extracted/{ref.id}.md"
     try:
         raw = await s3.get_object(key)

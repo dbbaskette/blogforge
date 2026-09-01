@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from typing import TypedDict
 
 from blogforge.prompt_rules import VOICE_RATIONALE, PromptRule, render_prompt_rules
 
@@ -29,7 +30,15 @@ def _sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENT.split(text) if s.strip()]
 
 
-def compute_stats(sample_texts: list[str]) -> dict:
+class VoiceStats(TypedDict):
+    rhythm: list[int]
+    top_words: list[str]
+    signature_phrases: list[str]
+    word_count: int
+    avg_sentence_len: float
+
+
+def compute_stats(sample_texts: list[str]) -> VoiceStats:
     """Deterministic stylometry from the user's sample texts."""
     text = "\n".join(t for t in sample_texts if t and t.strip())
     sents = _sentences(text)

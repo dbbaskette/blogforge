@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import re
+from uuid import UUID
 
 from fastapi import (
     APIRouter,
@@ -300,7 +301,7 @@ def _default_model(provider_name: str) -> str:
     return _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
 
 
-async def _auto_select_provider(user_id) -> str | None:
+async def _auto_select_provider(user_id: UUID) -> str | None:
     from blogforge.config import get_settings
     from blogforge.keys import KeyVault
     from blogforge.llm.claude_cli import claude_available
@@ -514,7 +515,7 @@ async def audition_voice(
     body: _AuditionBody,
     request: Request,
     current: User = Depends(get_current_user),
-) -> dict:
+) -> dict[str, str]:
     """Rewrite a snippet of text in the user's voice — an instant 'try my voice' demo."""
     import yaml
 
@@ -582,7 +583,7 @@ _DIM_SCHEMA = {
 async def voice_fingerprint(
     request: Request,
     current: User = Depends(get_current_user),
-) -> dict:
+) -> dict[str, object]:
     """A shareable 'voiceprint': tonal dimensions (LLM-scored) + deterministic
     rhythm / signature phrases / vocabulary from the user's samples."""
     from blogforge.s3 import get_s3_client
@@ -607,7 +608,7 @@ async def voice_fingerprint(
         n_samples * 12 + n_exemplar * 6 + (40 if profile.distilled_style_md.strip() else 0),
     )
 
-    dimensions: dict | None = None
+    dimensions: dict[str, int] | None = None
     provider_name = await _auto_select_provider(current.id)
     if provider_name and stats["word_count"] >= 60:
         try:

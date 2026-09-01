@@ -173,8 +173,7 @@ def _detect_repeated_phrases(blocks: list[_Block], covered: list[str]) -> list[F
             Finding(
                 rule="repeated-phrase",
                 message=(
-                    f'"{shown}" appears {total} times across '
-                    f"{len(per_block)} sections ({where})."
+                    f'"{shown}" appears {total} times across {len(per_block)} sections ({where}).'
                 ),
                 text=shown,
             )

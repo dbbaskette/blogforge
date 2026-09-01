@@ -239,8 +239,8 @@ async def _run_revise(
             return
         # Every target failed → surface the first real error.
         if targets and revised == 0 and section_errors:
-            code, message, hint = section_errors[0]
-            await reg.fail(job_id, code, message, hint)
+            code, message, failure_hint = section_errors[0]
+            await reg.fail(job_id, code, message, failure_hint)
             return
         elapsed = time.monotonic() - started
         await reg.complete(

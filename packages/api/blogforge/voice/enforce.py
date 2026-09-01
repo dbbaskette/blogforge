@@ -23,6 +23,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 
+from blogforge.llm.base import LLMProvider
 from blogforge.prompt_rules import (
     PRESERVATION_RATIONALE,
     TTS_RATIONALE,
@@ -132,7 +133,9 @@ def build_repair_prompt(text: str, v: RuleViolations) -> str:
     )
 
 
-async def enforce_voice_rules(text: str, manifest: Manifest, provider, model: str) -> str:
+async def enforce_voice_rules(
+    text: str, manifest: Manifest, provider: LLMProvider, model: str
+) -> str:
     """Detect rule violations, repair via the model, then deterministically
     backstop the mechanical tells. Returns the (possibly unchanged) text.
 
