@@ -1,4 +1,5 @@
 """generate/ideation: assemble prompt, stream reply, parse JSON block."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -39,6 +40,7 @@ def _draft(messages: list[IdeationMessage] | None = None) -> Draft:
 
 
 # ── prompt assembly ──────────────────────────────────────────────────
+
 
 def test_build_prompt_seeds_first_user_message_from_idea():
     """When there's no history, the seed message carries the topic +
@@ -103,8 +105,9 @@ def test_ideation_system_block_mentions_json():
 
 # ── JSON block parser ───────────────────────────────────────────────
 
+
 def test_parse_extracts_fenced_json_block():
-    text = '''Some prose first.
+    text = """Some prose first.
 
 ```json
 {
@@ -117,7 +120,7 @@ def test_parse_extracts_fenced_json_block():
 ```
 
 And maybe more chat after.
-'''
+"""
     proposal = parse_proposed_outline(text)
     assert proposal is not None
     assert proposal.opening_hook == "h"
@@ -138,10 +141,10 @@ def test_parse_accepts_unfenced_json_object():
     """Some models (or older snapshots) emit a bare JSON object without fencing.
 
     We accept the first valid {...} as a fallback."""
-    text = '''ok here:
+    text = """ok here:
 
 {"opening_hook": "h", "sections": [], "estimated_words": 100}
-'''
+"""
     proposal = parse_proposed_outline(text)
     assert proposal is not None
     assert proposal.estimated_words == 100

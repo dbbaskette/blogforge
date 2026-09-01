@@ -154,7 +154,11 @@ persona:
     manifest: dict[str, object] = {"samples": []}
 
     proposal = await propose_outline(
-        idea, pack_root, manifest, provider, model="mock-1",
+        idea,
+        pack_root,
+        manifest,
+        provider,
+        model="mock-1",
     )
     assert isinstance(proposal, OutlineProposal)
     assert proposal.opening_hook == "Most agents are demos."

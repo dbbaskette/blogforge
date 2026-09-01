@@ -5,6 +5,7 @@ Revises: 0012_draft_hero_image_key
 Create Date: 2026-06-16
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -45,9 +46,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("user_id", name="uq_voice_profiles_user_id"),
     )
-    op.create_index(
-        "ix_voice_profiles_user_id", "voice_profiles", ["user_id"], unique=False
-    )
+    op.create_index("ix_voice_profiles_user_id", "voice_profiles", ["user_id"], unique=False)
 
     op.create_table(
         "voice_samples",
@@ -59,9 +58,7 @@ def upgrade() -> None:
         sa.Column("original_filename", sa.String(length=300), nullable=True),
         sa.Column("s3_key", sa.String(length=400), nullable=False),
         sa.Column("extracted_chars", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column(
-            "exemplar", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
+        sa.Column("exemplar", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("status", sa.String(length=8), nullable=False, server_default="ready"),
         sa.Column(
             "added_at",
@@ -72,9 +69,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["profile_id"], ["voice_profiles.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "ix_voice_samples_profile_id", "voice_samples", ["profile_id"], unique=False
-    )
+    op.create_index("ix_voice_samples_profile_id", "voice_samples", ["profile_id"], unique=False)
 
 
 def downgrade() -> None:

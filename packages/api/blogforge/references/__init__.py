@@ -3,6 +3,7 @@
 The extractors produce a clean markdown body the LLM consumes; the
 original bytes are kept alongside in S3 for audit/re-extraction.
 """
+
 from blogforge.references.extractors import (
     EXTRACTED_CHAR_CAP,
     ExtractionResult,

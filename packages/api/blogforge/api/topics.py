@@ -4,6 +4,7 @@ Powers the compose page's "Spark ideas" button. Voice-aware (materializes the
 user's profile or the chosen pack) but draft-free, so a writer with a blank
 Topic box can get unstuck without first creating a draft.
 """
+
 from __future__ import annotations
 
 from types import SimpleNamespace

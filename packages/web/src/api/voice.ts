@@ -241,9 +241,14 @@ export async function importLinkedIn(file: File): Promise<VoiceProfile> {
     let detail: string | undefined;
     try {
       const j = await res.json();
-      detail = typeof j?.detail === "string" ? j.detail : (j?.detail?.error?.message ?? JSON.stringify(j));
-    } catch { /* ignore */ }
-    throw Object.assign(new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`), { status: res.status });
+      detail =
+        typeof j?.detail === "string" ? j.detail : (j?.detail?.error?.message ?? JSON.stringify(j));
+    } catch {
+      /* ignore */
+    }
+    throw Object.assign(new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`), {
+      status: res.status,
+    });
   }
   return (await res.json()) as VoiceProfile;
 }
@@ -258,10 +263,10 @@ export async function importLinkedIn(file: File): Promise<VoiceProfile> {
  * where the Vite proxy forwards /api to a different port.
  */
 export function voiceExportUrl(): string {
-  return `/api/voice/export`;
+  return "/api/voice/export";
 }
 
 /** URL for downloading the portable Markdown voice guide. */
 export function voiceGuideUrl(): string {
-  return `/api/voice/guide.md`;
+  return "/api/voice/guide.md";
 }

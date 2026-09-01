@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { type Draft, downloadDraftUrl } from "../../api/drafts";
+import { downloadFile } from "../../lib/download";
+import { PALETTE_ACTION_EVENT } from "../CommandPalette";
 import { PublishDialog } from "./PublishDialog";
 import { ReadingPreview } from "./ReadingPreview";
 
@@ -101,6 +103,17 @@ export function WorkspaceFooter({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
 
+  // ⌘K "Publish to GitHub…" opens this dialog from the command palette.
+  useEffect(() => {
+    const onPaletteAction = (e: Event): void => {
+      if ((e as CustomEvent<{ action?: string }>).detail?.action === "publish") {
+        setPublishOpen(true);
+      }
+    };
+    window.addEventListener(PALETTE_ACTION_EVENT, onPaletteAction);
+    return () => window.removeEventListener(PALETTE_ACTION_EVENT, onPaletteAction);
+  }, []);
+
   const openPreview = (): void => {
     setPreviewOpen(true);
     onPreview?.();
@@ -128,23 +141,7 @@ export function WorkspaceFooter({
   // "download.json". Now failures surface as a message and save nothing.
   const download = async (opts: Parameters<typeof downloadDraftUrl>[1]): Promise<void> => {
     try {
-      const res = await fetch(downloadDraftUrl(draftId, opts), { credentials: "include" });
-      if (!res.ok) {
-        throw new Error(
-          res.status === 401
-            ? "Session expired — sign in again, then retry."
-            : `Export failed (HTTP ${res.status}).`,
-        );
-      }
-      const blob = await res.blob();
-      const cd = res.headers.get("Content-Disposition") ?? "";
-      const name = /filename="([^"]+)"/.exec(cd)?.[1] ?? `post.${opts?.format ?? "md"}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFile(downloadDraftUrl(draftId, opts), `post.${opts?.format ?? "md"}`);
     } catch (e) {
       flashStatus(e instanceof Error ? e.message : String(e));
     }

@@ -1,4 +1,5 @@
 """Scripted LLM provider for tests. Activated by env var BLOGFORGE_TEST_PROVIDER=mock."""
+
 from __future__ import annotations
 
 import asyncio
@@ -39,8 +40,10 @@ class MockProvider:
         for chunk in text.split(" "):
             await asyncio.sleep(0.005)
             yield StreamChunk(delta=chunk + " ")
-        yield StreamChunk(usage=Usage(
-            input_tokens=len(prompt.split()),
-            output_tokens=len(text.split()),
-            finish_reason="stop",
-        ))
+        yield StreamChunk(
+            usage=Usage(
+                input_tokens=len(prompt.split()),
+                output_tokens=len(text.split()),
+                finish_reason="stop",
+            )
+        )

@@ -5,12 +5,12 @@ test_s3_client.py and the references API tests.  Only the text path (no
 network) is tested here; the url path would require real network or a more
 involved mock.
 """
+
 from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator
 from unittest import mock
-from uuid import uuid4
 
 import pytest_asyncio
 
@@ -21,7 +21,6 @@ from blogforge.s3 import get_s3_client, reset_s3_client_for_tests
 from blogforge.s3.lifespan import ensure_bucket
 from blogforge.voice.ingest import add_file_sample, add_text_sample
 from blogforge.voice.models import VoiceSample
-
 
 # ---------------------------------------------------------------------------
 # S3 fixture — same pattern as test_s3_client.py / test_references_text.py

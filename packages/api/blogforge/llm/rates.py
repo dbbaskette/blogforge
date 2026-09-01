@@ -1,4 +1,5 @@
 """Load the static rate card bundled with the package."""
+
 from __future__ import annotations
 
 from functools import lru_cache

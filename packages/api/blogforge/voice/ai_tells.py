@@ -98,6 +98,6 @@ def parsed_patterns() -> list[dict[str, str]]:
                 title_match = re.search(r"\*\*(.+?)\*\*", body)
                 if title_match is not None:
                     title = title_match.group(1)
-                    body = (body[:title_match.start()] + body[title_match.end():]).strip()
+                    body = (body[: title_match.start()] + body[title_match.end() :]).strip()
             out.append({"title": (title or "Rule").rstrip("."), "body": body})
     return out

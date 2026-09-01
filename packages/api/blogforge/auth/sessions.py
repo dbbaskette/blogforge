@@ -6,6 +6,7 @@ the secret), and the version lets us invalidate every existing cookie at
 once — "sign out all sessions" and password changes bump the user's
 session_version, so older cookies no longer match.
 """
+
 from uuid import UUID
 
 from itsdangerous import BadSignature, URLSafeSerializer

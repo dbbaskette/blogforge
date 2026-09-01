@@ -1,13 +1,12 @@
 """Draft pydantic model coerces legacy stage='idea' → 'research'."""
+
 import pytest
 
 from blogforge.drafts.models import Draft, IdeaInput
 
 
 def _idea() -> IdeaInput:
-    return IdeaInput(
-        topic="t", pack_slug="dan", provider="anthropic", model="m", target_words=1500
-    )
+    return IdeaInput(topic="t", pack_slug="dan", provider="anthropic", model="m", target_words=1500)
 
 
 def test_legacy_idea_stage_in_body_coerces_to_research():

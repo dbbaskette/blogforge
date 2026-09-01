@@ -1,4 +1,5 @@
 """Unhandled exceptions return a 500 with a greppable error id + are logged."""
+
 import logging
 
 import pytest

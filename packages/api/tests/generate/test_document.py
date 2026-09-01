@@ -1,5 +1,6 @@
 """Single-pass document generation: the whole post is one LLM call, then split
 back onto the section model by H2 heading."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -137,8 +138,7 @@ def test_render_document_prompt_lists_sections_and_forbids_repetition() -> None:
         "splits the response into editable sections"
     ) in rendered
     assert (
-        "Rule: Use the author's voice.\nBecause: The article must remain "
-        "recognizably authored"
+        "Rule: Use the author's voice.\nBecause: The article must remain recognizably authored"
     ) in rendered
     assert (
         "Rule: Never use banished words or phrases.\nBecause: Those terms conflict "
@@ -169,9 +169,7 @@ class _CompleteRecorder:
 @pytest.mark.asyncio
 async def test_generate_document_returns_one_pass_output(tmp_path: Path) -> None:
     rec = _CompleteRecorder("## The Betrayal\nbody\n\n## The Concept\nbody\n\n## The Payoff\nbody")
-    out = await generate_document(
-        _draft(), _fake_pack(tmp_path), {"samples": []}, rec, model="m"
-    )
+    out = await generate_document(_draft(), _fake_pack(tmp_path), {"samples": []}, rec, model="m")
     assert out.startswith("## The Betrayal")
     # Voice system prompt + all section titles reached the provider in one call.
     assert "Be brief." in rec.prompt

@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type DraftSummary, listDrafts } from "../../src/api/drafts";
+import { type DraftSummary, deleteDraft, listDrafts, restoreDraft } from "../../src/api/drafts";
+import { ToastProvider } from "../../src/components/ui/Toast";
 import { DraftsPage } from "../../src/routes/DraftsPage";
 
 vi.mock("../../src/hooks/useMe", () => ({
@@ -25,6 +26,7 @@ vi.mock("../../src/api/auth", () => ({
 vi.mock("../../src/api/drafts", () => ({
   listDrafts: vi.fn(),
   deleteDraft: vi.fn(),
+  restoreDraft: vi.fn().mockResolvedValue({}),
   setDraftTags: vi.fn(),
 }));
 vi.mock("../../src/api/providers", () => ({
@@ -94,5 +96,56 @@ describe("DraftsPage", () => {
 
     expect(screen.getByText(/tagged essay/i)).toBeInTheDocument();
     expect(screen.queryByText(/tagged recipe/i)).not.toBeInTheDocument();
+  });
+
+  it("shows an error toast when delete fails", async () => {
+    vi.mocked(listDrafts).mockResolvedValue([summary({ id: "a", title: "Doomed draft" })]);
+    vi.mocked(deleteDraft).mockRejectedValue(new Error("Network down"));
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      render(
+        <MemoryRouter>
+          <ToastProvider>
+            <DraftsPage />
+          </ToastProvider>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText(/doomed draft/i)).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: /delete doomed draft/i }));
+
+      await waitFor(() => expect(screen.getByText(/network down/i)).toBeInTheDocument());
+      // The failed draft is still in the list.
+      expect(screen.getByText(/doomed draft/i)).toBeInTheDocument();
+    } finally {
+      confirmSpy.mockRestore();
+    }
+  });
+
+  it("offers Undo after a successful delete", async () => {
+    vi.mocked(listDrafts)
+      .mockResolvedValueOnce([summary({ id: "a", title: "Deleted essay" })])
+      .mockResolvedValue([]); // post-delete reload
+    vi.mocked(deleteDraft).mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      render(
+        <MemoryRouter>
+          <ToastProvider>
+            <DraftsPage />
+          </ToastProvider>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getByText(/deleted essay/i)).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole("button", { name: /delete deleted essay/i }));
+
+      const undo = await screen.findByRole("button", { name: "Undo" });
+      expect(undo).toBeInTheDocument();
+      fireEvent.click(undo);
+      await waitFor(() => expect(restoreDraft).toHaveBeenCalledWith("a"));
+    } finally {
+      confirmSpy.mockRestore();
+    }
   });
 });

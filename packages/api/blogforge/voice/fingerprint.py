@@ -5,10 +5,12 @@ samples: sentence-length rhythm, recurring signature phrases, and a top-words
 vocabulary signature. The subjective tonal dimensions (casual/vivid/…) are
 scored by an LLM in the API layer; this module stays dependency-free + testable.
 """
+
 from __future__ import annotations
 
 import re
 from collections import Counter
+from typing import TypedDict
 
 from blogforge.prompt_rules import VOICE_RATIONALE, PromptRule, render_prompt_rules
 
@@ -28,7 +30,15 @@ def _sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENT.split(text) if s.strip()]
 
 
-def compute_stats(sample_texts: list[str]) -> dict:
+class VoiceStats(TypedDict):
+    rhythm: list[int]
+    top_words: list[str]
+    signature_phrases: list[str]
+    word_count: int
+    avg_sentence_len: float
+
+
+def compute_stats(sample_texts: list[str]) -> VoiceStats:
     """Deterministic stylometry from the user's sample texts."""
     text = "\n".join(t for t in sample_texts if t and t.strip())
     sents = _sentences(text)
@@ -71,24 +81,28 @@ def render_fingerprint_md(sample_texts: list[str]) -> str:
     mix = (
         f"in recent sampled sentences, about {round(100 * short / len(lengths))}% run "
         f"under 10 words and {round(100 * longn / len(lengths))}% over 25"
-        if lengths else "not enough sample text to measure rhythm"
+        if lengths
+        else "not enough sample text to measure rhythm"
     )
     phrases = "".join(f'\n- "{p}"' for p in s["signature_phrases"]) or "\n- (none found)"
     words = ", ".join(s["top_words"]) or "(none)"
-    rules = render_prompt_rules([
-        PromptRule(
-            "Match this sentence-length distribution.",
-            "Flattening the rhythm changes the author's recognizable cadence.",
-        ),
-        PromptRule(
-            "Use the author's signature phrases only when natural; never force them.",
-            VOICE_RATIONALE,
-        ),
-        PromptRule(
-            "Prefer the author's characteristic vocabulary when it fits the meaning.",
-            VOICE_RATIONALE,
-        ),
-    ], bullet=True)
+    rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Match this sentence-length distribution.",
+                "Flattening the rhythm changes the author's recognizable cadence.",
+            ),
+            PromptRule(
+                "Use the author's signature phrases only when natural; never force them.",
+                VOICE_RATIONALE,
+            ),
+            PromptRule(
+                "Prefer the author's characteristic vocabulary when it fits the meaning.",
+                VOICE_RATIONALE,
+            ),
+        ],
+        bullet=True,
+    )
     return (
         "## Voice fingerprint (measured from the author's samples)\n\n"
         f"{rules}\n"

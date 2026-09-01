@@ -143,8 +143,7 @@ _IMPACTS: dict[str, str] = {
     "extracted sentence shapes for 'what is X' queries.",
     "question_headings": "Question headings match how users phrase queries — engines map "
     "query to heading directly.",
-    "skimmability": "Engines parse structure; walls of prose fragment poorly into answer "
-    "passages.",
+    "skimmability": "Engines parse structure; walls of prose fragment poorly into answer passages.",
     "brand_explicit": "AI can cite content without naming you ('ghost citation') — an "
     "explicit brand travels with the quote.",
     "faq": "FAQ blocks are eligible for People-Also-Ask and schema.org/FAQPage rich "
@@ -155,8 +154,7 @@ _IMPACTS: dict[str, str] = {
     "synthesizing their own.",
     "freshness": "Dated claims signal current content; engines demote pieces they can't "
     "place in time.",
-    "comparison_table": "Tables answer 'X vs Y' queries directly — engines lift rows "
-    "verbatim.",
+    "comparison_table": "Tables answer 'X vs Y' queries directly — engines lift rows verbatim.",
     "stat_attribution": "A number tied to a named source is a citable fact; a bare number is "
     "just a claim.",
     "query_coverage": "Answering the follow-up questions keeps the engine on your page "
@@ -687,16 +685,24 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     cap_findings = []
     if not capsule_ok:
         why = (
-            f"Opening paragraph is {wc} words (target 40–75)" if not 40 <= wc <= 75
-            else "Opening paragraph contains links" if _MD_LINK_RE.search(para)
+            f"Opening paragraph is {wc} words (target 40–75)"
+            if not 40 <= wc <= 75
+            else "Opening paragraph contains links"
+            if _MD_LINK_RE.search(para)
             else "Opening sentence never names the subject"
         )
-        cap_findings = [{"target": para[:200], "note": f"{why} — answer engines lift "
-                         "self-contained 40–75-word openers verbatim.", "fix": "capsule"}]
+        cap_findings = [
+            {
+                "target": para[:200],
+                "note": f"{why} — answer engines lift self-contained 40–75-word openers verbatim.",
+                "fix": "capsule",
+            }
+        ]
     caps = _lever(
         "answer_capsule",
         90 if capsule_ok else (50 if 20 <= wc <= 110 else 30),
-        "Opening paragraph works as a liftable answer capsule." if capsule_ok
+        "Opening paragraph works as a liftable answer capsule."
+        if capsule_ok
         else "No 40–75-word self-contained, link-free opening capsule.",
         findings=cap_findings,
         fix="capsule" if cap_findings else None,
@@ -707,8 +713,9 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
     sentences = [s for s in _SENT_SPLIT_GEO.split(full) if s.strip()]
     facts = [i for i, s in enumerate(sentences) if _DIGIT_RE.search(s)]
     if not facts or len(sentences) < 8:
-        front_load = _lever("page_front_load", 50,
-                            "Too little factual content to judge front-loading.")
+        front_load = _lever(
+            "page_front_load", 50, "Too little factual content to judge front-loading."
+        )
     else:
         cutoff = max(1, int(len(sentences) * 0.30))
         share = sum(1 for i in facts if i < cutoff) / len(facts)
@@ -726,9 +733,15 @@ def score_structural(draft: Draft) -> dict[str, dict[str, Any]]:
         "definitive_language",
         max(0, int(100 - ratio * 400)),
         f"{len(hedged)} of {len(sentences)} sentences hedge (may/might/could/perhaps).",
-        findings=[{"target": h[:200], "note": "Hedged claim — engines quote statements "
-                   "they can lift without qualification.", "fix": "definitive"}
-                  for h in hedged[:3]],
+        findings=[
+            {
+                "target": h[:200],
+                "note": "Hedged claim — engines quote statements "
+                "they can lift without qualification.",
+                "fix": "definitive",
+            }
+            for h in hedged[:3]
+        ],
         fix="definitive" if hedged else None,
     )
 
@@ -1207,7 +1220,15 @@ def _clampi(v: Any) -> int:
         return 0
 
 
-def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
+def _object(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _items(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def parse_semantic(raw: str, draft: Draft) -> dict[str, Any]:
     """Parse the semantic LLM reply into answer_first / definitional_opener /
     factual_density lever dicts. Tolerant of junk; maps weak-section titles to
     ids so the panel can offer a fix."""
@@ -1245,8 +1266,8 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
                 best, best_id = overlap, s.id
         return best_id if best >= 2 else None
 
-    af = data.get("answer_first") if isinstance(data.get("answer_first"), dict) else {}
-    weak = af.get("weak_sections") if isinstance(af.get("weak_sections"), list) else []
+    af = _object(data.get("answer_first"))
+    weak = _items(af.get("weak_sections"))
     af_findings = []
     for title in weak:
         sid = _match_section(str(title))
@@ -1266,9 +1287,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         fix="answer_first" if af_findings else None,
     )
 
-    do = (
-        data.get("definitional_opener") if isinstance(data.get("definitional_opener"), dict) else {}
-    )
+    do = _object(data.get("definitional_opener"))
     do_score = _clampi(do.get("score"))
     # Existence vs execution: only offer to ADD an opener when the model says
     # none exists. A low score with has_definition=True means the definition is
@@ -1292,8 +1311,8 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         fix=def_fix,
     )
 
-    fd = data.get("factual_density") if isinstance(data.get("factual_density"), dict) else {}
-    thin = fd.get("thin_spots") if isinstance(fd.get("thin_spots"), list) else []
+    fd = _object(data.get("factual_density"))
+    thin = _items(fd.get("thin_spots"))
     fd_findings = [
         {
             "target": str(t.get("target", "")).strip(),
@@ -1325,7 +1344,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         findings=fd_findings,
     )
 
-    be = data.get("brand_explicit") if isinstance(data.get("brand_explicit"), dict) else {}
+    be = _object(data.get("brand_explicit"))
     # Flag-only: naming the brand is the writer's call (and we can't invent one).
     brand = _lever(
         "brand_explicit",
@@ -1334,8 +1353,8 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         or "Whether the product/brand is named explicitly so citations travel with it.",
     )
 
-    cit = data.get("citations") if isinstance(data.get("citations"), dict) else {}
-    claims = cit.get("uncited_claims") if isinstance(cit.get("uncited_claims"), list) else []
+    cit = _object(data.get("citations"))
+    claims = _items(cit.get("uncited_claims"))
     cit_findings = [
         {
             "target": str(c.get("target", "")).strip(),
@@ -1360,19 +1379,17 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         fix="cite_reference" if cit_findings else None,
     )
 
-    cov = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
-    missing = (
-        cov.get("missing_subquestions") if isinstance(cov.get("missing_subquestions"), list) else []
-    )
+    cov = _object(data.get("coverage"))
+    missing = _items(cov.get("missing_subquestions"))
     coverage = [str(q).strip() for q in missing if str(q).strip()][:4]
 
     # The eight new levers share one generic shape (score/note/findings) — map
     # them uniformly instead of five more bespoke blocks above.
     new_levers: dict[str, dict[str, Any]] = {}
     for key in _NEW_SEMANTIC_KEYS:
-        obj = data.get(key) if isinstance(data.get(key), dict) else {}
+        obj = _object(data.get(key))
         finds: list[dict[str, str]] = []
-        for f in (obj.get("findings") or [])[:4]:
+        for f in _items(obj.get("findings"))[:4]:
             if not isinstance(f, dict) or not str(f.get("note", "")).strip():
                 continue
             fd_item = {
@@ -1395,7 +1412,7 @@ def parse_semantic(raw: str, draft: Draft) -> dict[str, dict[str, Any]]:
         **new_levers,
         # Not a lever (build_report/_ORDER ignore unknown keys) — analyze_geo
         # merges these into the structural faq lever as "not covered" advisories.
-        "_coverage": coverage,  # type: ignore[dict-item]
+        "_coverage": coverage,
     }
 
 
@@ -1448,7 +1465,7 @@ _SEMANTIC_KEYS = frozenset(
 
 async def _run_semantic(
     draft: Draft, pack_root: Path, provider: LLMProvider, *, model: str, extra_sources: str = ""
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, Any]:
     """The single voice-aware LLM pass → the four judgment levers (answer-first,
     definitional opener, factual density, brand), with the deterministic augments
     applied. Shared by the full report and the targeted re-score.
@@ -1502,7 +1519,7 @@ async def analyze_geo(
     )
     # Sub-question coverage gaps (from the semantic pass) surface as advisory
     # "not covered" findings on the structural FAQ lever — the FAQ fix answers them.
-    missing = semantic.pop("_coverage", [])
+    missing: list[str] = semantic.pop("_coverage", [])
     if missing and "faq" in structural:
         structural["faq"]["findings"] = [
             *structural["faq"]["findings"],
@@ -1600,9 +1617,8 @@ async def generate_faq(
 
     system = compose_prompt(pack_root, format=None, samples=None, draft=None)
     if questions:
-        task = (
-            "Create FAQ entries for these supplied reader questions:\n"
-            + "\n".join(f"- {q.strip()}" for q in questions if q.strip())
+        task = "Create FAQ entries for these supplied reader questions:\n" + "\n".join(
+            f"- {q.strip()}" for q in questions if q.strip()
         )
         requested_rules = [
             PromptRule(
@@ -1645,8 +1661,7 @@ async def generate_faq(
             ),
             PromptRule("Return JSON matching the FAQ schema.", OUTPUT_RATIONALE),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "FAQ fields.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into FAQ fields.",
                 "Prompt metadata would corrupt fields parsed by the FAQ editor.",
             ),
         ]
@@ -1706,8 +1721,7 @@ async def generate_opener(
                 "The client prepends this response verbatim.",
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "the sentence.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into the sentence.",
                 "The client prepends this response verbatim as clean article prose.",
             ),
         ]
@@ -1953,8 +1967,7 @@ async def generate_alt_text(
                 "The client inserts this response directly into the image's alt-text slot.",
             ),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "the alt text.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into the alt text.",
                 "The client inserts this response directly into the image's alt-text slot.",
             ),
         ]
@@ -2016,8 +2029,7 @@ async def generate_queries(
             ),
             PromptRule("Return JSON matching the queries schema.", OUTPUT_RATIONALE),
             PromptRule(
-                "Do not copy the `Rule` or `Because` labels or their rationales into "
-                "query fields.",
+                "Do not copy the `Rule` or `Because` labels or their rationales into query fields.",
                 "Prompt metadata would corrupt queries parsed by the citation-check workflow.",
             ),
         ]

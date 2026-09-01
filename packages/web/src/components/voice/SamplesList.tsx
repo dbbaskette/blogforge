@@ -34,9 +34,7 @@ function needsRedistill(sample: VoiceSample, distilledAt: string | null): boolea
 }
 
 export function SamplesList({ profile, onChange, onRefresh }: SamplesListProps): JSX.Element {
-  const anyNeedsRedistill = profile.samples.some((s) =>
-    needsRedistill(s, profile.distilled_at),
-  );
+  const anyNeedsRedistill = profile.samples.some((s) => needsRedistill(s, profile.distilled_at));
 
   return (
     <section className="mt-8">
@@ -114,7 +112,14 @@ function SampleRow({
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!(await confirm({ title: `Delete sample "${sample.name}"?`, confirmLabel: "Delete", danger: true }))) return;
+    if (
+      !(await confirm({
+        title: `Delete sample "${sample.name}"?`,
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setDeleting(true);
     try {
       await onDelete();

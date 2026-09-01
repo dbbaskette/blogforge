@@ -37,9 +37,7 @@ describe("LoginPage", () => {
         <LoginPage />
       </MemoryRouter>,
     );
-    expect(
-      screen.getByText(/isn't on the allowlist/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/isn't on the allowlist/i)).toBeInTheDocument();
     // Restore
     Object.defineProperty(window, "location", {
       writable: true,

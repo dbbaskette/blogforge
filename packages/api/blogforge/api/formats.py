@@ -4,6 +4,7 @@ These are pack- and voice-independent: the format shapes the article's
 structure while the selected voice profile/pack controls the tone. The picker
 shows them regardless of which voice source is active.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter

@@ -1,4 +1,5 @@
 """resolve_format — ignore a draft format the active voice doesn't define."""
+
 from blogforge.generate.formats import resolve_format
 
 

@@ -1,4 +1,5 @@
 """POST /api/drafts/{id}/outline."""
+
 from __future__ import annotations
 
 import json

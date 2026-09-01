@@ -1,4 +1,5 @@
 """Tests for the /api/voice REST endpoints (Task 8)."""
+
 from __future__ import annotations
 
 import os
@@ -12,7 +13,6 @@ from blogforge.config import get_settings
 from blogforge.s3 import reset_s3_client_for_tests
 from blogforge.s3.lifespan import ensure_bucket
 from tests.conftest import _seed_approved_user, _signed_client
-
 
 # ---------------------------------------------------------------------------
 # S3 fixture — moto-backed, same pattern as test_voice_ingest.py
@@ -84,12 +84,8 @@ def test_add_text_sample_and_distill(voice_client, monkeypatch) -> None:
     monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
     monkeypatch.setenv("BLOGFORGE_MOCK_OUTPUT", "## Style")
 
-    voice_client.post(
-        "/api/voice/samples/text", json={"name": "s", "text": "hello world"}
-    )
-    r = voice_client.post(
-        "/api/voice/distill", json={"provider": "anthropic", "model": "m"}
-    )
+    voice_client.post("/api/voice/samples/text", json={"name": "s", "text": "hello world"})
+    r = voice_client.post("/api/voice/distill", json={"provider": "anthropic", "model": "m"})
     assert r.status_code == 200
     assert "## Style" in r.json()["distilled_style_md"]
 
@@ -151,9 +147,7 @@ def test_update_distilled(voice_client) -> None:
 
 
 def test_add_and_delete_sample(voice_client) -> None:
-    r = voice_client.post(
-        "/api/voice/samples/text", json={"name": "to_delete", "text": "bye"}
-    )
+    r = voice_client.post("/api/voice/samples/text", json={"name": "to_delete", "text": "bye"})
     assert r.status_code == 201
     sample_id = r.json()["id"]
 

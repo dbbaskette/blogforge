@@ -22,7 +22,8 @@ export type IconName =
   | "trash"
   | "rotate"
   | "file-plus"
-  | "more";
+  | "more"
+  | "grip";
 
 export function Icon({
   name,
@@ -88,6 +89,16 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="12" cy="12" r="1" />
       <circle cx="5" cy="12" r="1" />
       <circle cx="19" cy="12" r="1" />
+    </>
+  ),
+  grip: (
+    <>
+      <circle cx="9" cy="5" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="5" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="19" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="19" r="1.4" fill="currentColor" stroke="none" />
     </>
   ),
 };

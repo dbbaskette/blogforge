@@ -5,6 +5,7 @@ Revises: 0007_user_session_version
 Create Date: 2026-05-28
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -31,9 +32,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["draft_id"], ["drafts.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "ix_section_versions_draft_id", "section_versions", ["draft_id"], unique=False
-    )
+    op.create_index("ix_section_versions_draft_id", "section_versions", ["draft_id"], unique=False)
     op.create_index(
         "ix_section_versions_section_id", "section_versions", ["section_id"], unique=False
     )

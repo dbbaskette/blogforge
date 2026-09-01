@@ -1,6 +1,7 @@
 """github_identity — add github_id/login/avatar; relax email + password_hash."""
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0015_github_identity"
 down_revision = "0014_voice_sources"

@@ -1,4 +1,5 @@
 """GitHub identity -> BlogForge user: allowlist gate + upsert + admin adoption."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,24 +1,30 @@
-"""Hero image — generate (Google Imagen), serve, and clear.
+"""Hero image generation, serving, and removal.
 
 POST   /api/drafts/{id}/hero-image   generate + store + persist key
 GET    /api/drafts/{id}/hero-image   stream the stored image bytes
 DELETE /api/drafts/{id}/hero-image   clear the hero image
 
-Image generation is Google-only (Imagen), so it pulls the Google key from the
-vault regardless of the draft's text provider.
+Image generation is Google-only, so it pulls the Google key from the vault
+regardless of the draft's text provider.
 """
+
 from __future__ import annotations
 
 import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.sql_store import SqlDraftStore
-from blogforge.generate.hero import build_hero_prompt, build_hero_prompt_ai, generate_hero_image
+from blogforge.generate.hero import (
+    HeroTheme,
+    build_hero_prompt,
+    build_hero_prompt_ai,
+    generate_hero_image,
+)
 from blogforge.keys import KeyVault
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
@@ -31,7 +37,9 @@ router = APIRouter(tags=["hero"])
 
 class _HeroBody(BaseModel):
     # Optional override; when blank we derive a prompt from the draft subject.
-    prompt: str = ""
+    prompt: str = Field(default="", max_length=2000)
+    theme: HeroTheme = "editorial"
+    direction: str = Field(default="", max_length=600)
 
 
 def _key_for(draft_id: str) -> str:
@@ -61,10 +69,20 @@ async def generate_hero(
         # (no key, provider error) so hero generation never blocks on it.
         try:
             text_provider = await build_provider_for(current.id, draft.idea.provider)
-            prompt = await build_hero_prompt_ai(draft, text_provider, draft.idea.model)
+            prompt = await build_hero_prompt_ai(
+                draft,
+                text_provider,
+                draft.idea.model,
+                theme=body.theme,
+                direction=body.direction,
+            )
         except Exception:
             logger.warning("hero prompt distill failed; using title-only prompt", exc_info=True)
-            prompt = build_hero_prompt(draft)
+            prompt = build_hero_prompt(
+                draft,
+                theme=body.theme,
+                direction=body.direction,
+            )
     try:
         image_bytes, mime = await generate_hero_image(prompt, api_key)
     except ProviderMissingKey as e:

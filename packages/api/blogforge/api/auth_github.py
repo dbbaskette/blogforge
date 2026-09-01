@@ -1,4 +1,5 @@
 """GET /api/auth/github/login + /callback — GitHub OAuth Authorization Code."""
+
 from __future__ import annotations
 
 import secrets
@@ -33,18 +34,29 @@ async def github_login(request: Request) -> RedirectResponse:
         return RedirectResponse(url="/login?error=github_not_configured", status_code=302)
     state = secrets.token_urlsafe(24)
     redirect_uri = f"{_base_url(request)}/api/auth/github/callback"
-    params = urlencode({
-        "client_id": s.github_client_id,
-        "redirect_uri": redirect_uri,
-        "scope": "read:user user:email",
-        "state": state,
-    })
-    resp = RedirectResponse(url=f"https://github.com/login/oauth/authorize?{params}", status_code=302)
+    params = urlencode(
+        {
+            "client_id": s.github_client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "read:user user:email",
+            "state": state,
+        }
+    )
+    resp = RedirectResponse(
+        url=f"https://github.com/login/oauth/authorize?{params}", status_code=302
+    )
     # samesite=lax (not the configurable session value): the GitHub callback is a
     # top-level GET navigation, so the state cookie must be sent on that cross-site
     # redirect. Do not change to strict/none — it would break the OAuth handshake.
-    resp.set_cookie(_STATE_COOKIE, state, max_age=600, httponly=True,
-                    secure=s.cookie_secure, samesite="lax", path="/")
+    resp.set_cookie(
+        _STATE_COOKIE,
+        state,
+        max_age=600,
+        httponly=True,
+        secure=s.cookie_secure,
+        samesite="lax",
+        path="/",
+    )
     return resp
 
 

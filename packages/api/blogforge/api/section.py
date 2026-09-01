@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import yaml
@@ -23,6 +24,7 @@ from blogforge.generate.references import get_reference_context
 from blogforge.generate.section import stream_section
 from blogforge.jobs.models import JobType
 from blogforge.jobs.registry import ActiveDraftJobError, JobRegistry
+from blogforge.llm.base import LLMProvider
 from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
 from blogforge.llm.resolve import build_provider_for
 from blogforge.voice.compose import ComposeError
@@ -33,7 +35,12 @@ from blogforge.voice.resolve import resolve_voice
 router = APIRouter(tags=["section"])
 
 
-async def _enforce_section_voice(text: str, manifest: dict, provider, model: str) -> str:
+async def _enforce_section_voice(
+    text: str,
+    manifest: dict[str, Any],
+    provider: LLMProvider,
+    model: str,
+) -> str:
     """Backstop the mechanical voice rules on generated section text.
 
     ``manifest`` is the raw parsed ``stylepack.yaml`` dict; enforcement needs the
@@ -360,7 +367,7 @@ async def _run_regenerate(
         # cancellation, or a dropped task) — the UI would show "Composing…"
         # forever. Mark it failed so the author gets a retry. Best-effort; the
         # boot-time recover_stranded_sections() is the backstop.
-        if section is not None and section.status == "generating":
+        if draft is not None and section is not None and section.status == "generating":
             section.status = "failed"
             section.last_error = section.last_error or encode_section_error(
                 "generation_interrupted",

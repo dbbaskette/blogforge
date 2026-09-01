@@ -84,6 +84,8 @@ export interface DraftSummary {
   title: string;
   stage: DraftStage;
   pack_slug: string;
+  /** Present on API responses from 0.10.3+; optional for older payloads. */
+  created_at?: string;
   updated_at: string;
   word_count: number;
   tags: string[];
@@ -163,6 +165,11 @@ export async function getActiveJob(
   init?: RequestInit,
 ): Promise<{ job_id: string | null }> {
   return api(`/api/drafts/${encodeURIComponent(id)}/active-job`, init);
+}
+
+/** Cancel an in-flight background job (compose / regenerate / revise). */
+export async function cancelJob(jobId: string): Promise<void> {
+  await api(`/api/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" });
 }
 export async function setDraftStage(id: string, stage: DraftStage): Promise<Draft> {
   return api<Draft>(`/api/drafts/${encodeURIComponent(id)}/stage`, {
@@ -271,14 +278,26 @@ export async function lintDraft(
   return api(`/api/drafts/${encodeURIComponent(id)}/lint`, { method: "POST" });
 }
 
-/** Generate an AI hero image for the draft (Google Imagen). */
+export type HeroTheme = "editorial" | "fun" | "space" | "minimal";
+
+export interface HeroImageOptions {
+  /** Full prompt override for backwards-compatible API callers. */
+  prompt?: string;
+  /** Visual treatment applied after BlogForge derives article-specific subject matter. */
+  theme?: HeroTheme;
+  /** Optional writer guidance combined with the selected theme and article facts. */
+  direction?: string;
+}
+
+/** Generate an AI hero image for the draft. */
 export async function generateHeroImage(
   draftId: string,
-  prompt = "",
+  options: HeroImageOptions | string = {},
 ): Promise<{ hero_image_key: string }> {
+  const body = typeof options === "string" ? { prompt: options } : options;
   return api(`/api/drafts/${encodeURIComponent(draftId)}/hero-image`, {
     method: "POST",
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify(body),
   });
 }
 

@@ -1,4 +1,5 @@
 """OpenAI adapter — json_schema (response_format) path."""
+
 from __future__ import annotations
 
 import json as _json
@@ -28,10 +29,12 @@ async def test_complete_with_schema_sends_response_format() -> None:
             json={
                 "id": "c1",
                 "model": "gpt-5",
-                "choices": [{
-                    "message": {"content": '{"value": "ok"}'},
-                    "finish_reason": "stop",
-                }],
+                "choices": [
+                    {
+                        "message": {"content": '{"value": "ok"}'},
+                        "finish_reason": "stop",
+                    }
+                ],
                 "usage": {"prompt_tokens": 5, "completion_tokens": 3},
             },
         )
@@ -53,7 +56,8 @@ async def test_complete_with_schema_retries_on_invalid_json() -> None:
     bad = httpx.Response(
         200,
         json={
-            "id": "c1", "model": "gpt-5",
+            "id": "c1",
+            "model": "gpt-5",
             "choices": [{"message": {"content": "not json"}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 5, "completion_tokens": 2},
         },
@@ -61,18 +65,19 @@ async def test_complete_with_schema_retries_on_invalid_json() -> None:
     good = httpx.Response(
         200,
         json={
-            "id": "c2", "model": "gpt-5",
-            "choices": [{
-                "message": {"content": '{"value": "fixed"}'},
-                "finish_reason": "stop",
-            }],
+            "id": "c2",
+            "model": "gpt-5",
+            "choices": [
+                {
+                    "message": {"content": '{"value": "fixed"}'},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {"prompt_tokens": 8, "completion_tokens": 4},
         },
     )
     respx.post("https://api.openai.com/v1/chat/completions").mock(side_effect=[bad, good])
-    resp = await provider.complete(
-        model="gpt-5", prompt="x", json_schema=_SIMPLE_SCHEMA
-    )
+    resp = await provider.complete(model="gpt-5", prompt="x", json_schema=_SIMPLE_SCHEMA)
     assert _json.loads(resp.text) == {"value": "fixed"}
 
 
@@ -83,7 +88,8 @@ async def test_complete_with_schema_fails_after_two_invalid() -> None:
     bad = httpx.Response(
         200,
         json={
-            "id": "c1", "model": "gpt-5",
+            "id": "c1",
+            "model": "gpt-5",
             "choices": [{"message": {"content": "still not json"}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 5, "completion_tokens": 2},
         },

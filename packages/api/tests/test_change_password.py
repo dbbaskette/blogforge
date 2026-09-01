@@ -1,4 +1,5 @@
 """session-revoke-all invalidates old session cookies; /me returns identity."""
+
 import pytest_asyncio
 from fastapi.testclient import TestClient
 

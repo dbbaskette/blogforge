@@ -1,4 +1,5 @@
 """Tests for voice style distillation."""
+
 from __future__ import annotations
 
 from blogforge.voice.distill import _build_prompt, distill_style
@@ -7,7 +8,7 @@ from blogforge.voice.distill import _build_prompt, distill_style
 def assert_paired(prompt: str, instruction: str, rationale_fragment: str) -> None:
     pair = f"Rule: {instruction}\nBecause: "
     assert pair in prompt
-    reason = prompt[prompt.index(pair) + len(pair):].splitlines()[0]
+    reason = prompt[prompt.index(pair) + len(pair) :].splitlines()[0]
     assert rationale_fragment in reason
 
 
@@ -19,6 +20,7 @@ def test_prompt_includes_samples_and_asks_for_style_guide():
 
 def test_distill_prompt_extracts_structured_traits():
     from blogforge.voice.distill import _build_prompt
+
     p = _build_prompt(["sample text here"])
     for trait in ("open", "transition", "opinion", "anecdote", "humor"):
         assert trait in p.lower()
@@ -29,8 +31,7 @@ def test_distill_prompt_extracts_structured_traits():
     )
     assert_paired(
         p,
-        "Format every model-facing style instruction as an adjacent `Rule:` and "
-        "`Because:` pair.",
+        "Format every model-facing style instruction as an adjacent `Rule:` and `Because:` pair.",
         "portable guide must explain why each instruction matters",
     )
     assert_paired(
@@ -52,6 +53,7 @@ async def test_distill_returns_provider_markdown(monkeypatch):
     monkeypatch.setenv("BLOGFORGE_TEST_PROVIDER", "mock")
     monkeypatch.setenv("BLOGFORGE_MOCK_OUTPUT", "## Style\nShort sentences.")
     from blogforge.llm.registry import get_provider
+
     out = await distill_style(["x"], get_provider("anthropic", "k"), model="m")
     assert out == "## Style\nShort sentences."
 

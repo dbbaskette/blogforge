@@ -850,8 +850,7 @@ async def test_semantic_prompt_renders_rule_rationale_pairs(tmp_path) -> None:  
         captured["prompt"],
         "Return exactly one concrete sentence in `impact` for every thin spot and "
         "uncited claim without restating the fix.",
-        "The panel needs a concise explanation of each recommendation's "
-        "answer-engine payoff.",
+        "The panel needs a concise explanation of each recommendation's answer-engine payoff.",
     )
 
 

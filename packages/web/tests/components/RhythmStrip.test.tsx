@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sentenceLengths, rhythmVariance } from "../../src/components/draft/RhythmStrip";
+import { rhythmVariance, sentenceLengths } from "../../src/components/draft/RhythmStrip";
 
 describe("RhythmStrip math", () => {
   it("splits into per-sentence word counts", () => {

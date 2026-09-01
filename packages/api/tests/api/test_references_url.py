@@ -5,6 +5,7 @@ mock trafilatura to keep these tests deterministic and exercise the
 route's S3 persistence + DB write end-to-end against an in-process moto
 S3 server.
 """
+
 from __future__ import annotations
 
 import os
@@ -103,9 +104,7 @@ async def test_post_url_persists_reference_and_objects(authed) -> None:
 
     html = "<html><head><title>Atlas Docs</title></head><body><p>x</p></body></html>"
     with (
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
-        ),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
         mock.patch(
             "blogforge.references.extractors.trafilatura.extract",
             return_value="# Atlas Docs\n\nBody text.",
@@ -126,15 +125,11 @@ async def test_post_url_persists_reference_and_objects(authed) -> None:
 
     # Both S3 objects landed.
     s3 = get_s3_client()
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt"
+    assert await s3.head_object(f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt")
+    assert await s3.head_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")
+    extracted = (await s3.get_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")).decode(
+        "utf-8"
     )
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
-    )
-    extracted = (
-        await s3.get_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")
-    ).decode("utf-8")
     assert "Body text" in extracted
 
 
@@ -143,12 +138,8 @@ async def test_post_url_custom_name_overrides_title(authed) -> None:
     draft_id = _create_draft(client)
     html = "<html><head><title>Auto Title</title></head><body><p>x</p></body></html>"
     with (
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
-        ),
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.extract", return_value="content"
-        ),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.extract", return_value="content"),
     ):
         r = client.post(
             f"/api/drafts/{draft_id}/references/url",
@@ -161,9 +152,7 @@ async def test_post_url_custom_name_overrides_title(authed) -> None:
 async def test_post_url_fetch_failure_returns_422(authed) -> None:
     client, _ = authed
     draft_id = _create_draft(client)
-    with mock.patch(
-        "blogforge.references.extractors.trafilatura.fetch_url", return_value=None
-    ):
+    with mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=None):
         r = client.post(
             f"/api/drafts/{draft_id}/references/url",
             json={"url": "https://example.com/dead"},
@@ -197,12 +186,8 @@ async def test_get_references_lists_in_added_order(authed) -> None:
     draft_id = _create_draft(client)
     html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
     with (
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
-        ),
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.extract", return_value="body"
-        ),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.extract", return_value="body"),
     ):
         client.post(
             f"/api/drafts/{draft_id}/references/url",
@@ -236,12 +221,8 @@ async def test_delete_reference_removes_row_and_s3_objects(authed) -> None:
     draft_id = _create_draft(client)
     html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
     with (
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
-        ),
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.extract", return_value="body"
-        ),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.extract", return_value="body"),
     ):
         created = client.post(
             f"/api/drafts/{draft_id}/references/url",
@@ -250,23 +231,15 @@ async def test_delete_reference_removes_row_and_s3_objects(authed) -> None:
     ref_id = created["id"]
     s3 = get_s3_client()
     # sanity
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
-    )
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt"
-    )
+    assert await s3.head_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")
+    assert await s3.head_object(f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt")
 
     r = client.delete(f"/api/drafts/{draft_id}/references/{ref_id}")
     assert r.status_code == 204
 
     # S3 objects gone
-    assert not await s3.head_object(
-        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
-    )
-    assert not await s3.head_object(
-        f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt"
-    )
+    assert not await s3.head_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")
+    assert not await s3.head_object(f"drafts/{draft_id}/references/originals/{ref_id}.url-stub.txt")
 
 
 async def test_delete_unknown_reference_404(authed) -> None:
@@ -278,9 +251,7 @@ async def test_delete_unknown_reference_404(authed) -> None:
 
 async def test_delete_unknown_draft_404(authed) -> None:
     client, _ = authed
-    r = client.delete(
-        "/api/drafts/00000000-0000-0000-0000-000000000000/references/ref-anything"
-    )
+    r = client.delete("/api/drafts/00000000-0000-0000-0000-000000000000/references/ref-anything")
     assert r.status_code == 404
 
 
@@ -290,12 +261,8 @@ async def test_delete_only_targets_specified_ref(authed) -> None:
     draft_id = _create_draft(client)
     html = "<html><head><title>T</title></head><body><p>x</p></body></html>"
     with (
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.fetch_url", return_value=html
-        ),
-        mock.patch(
-            "blogforge.references.extractors.trafilatura.extract", return_value="body"
-        ),
+        mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=html),
+        mock.patch("blogforge.references.extractors.trafilatura.extract", return_value="body"),
     ):
         a = client.post(
             f"/api/drafts/{draft_id}/references/url",
@@ -308,9 +275,5 @@ async def test_delete_only_targets_specified_ref(authed) -> None:
     assert client.delete(f"/api/drafts/{draft_id}/references/{a['id']}").status_code == 204
     s3 = get_s3_client()
     # `b` is untouched.
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/extracted/{b['id']}.md"
-    )
-    assert await s3.head_object(
-        f"drafts/{draft_id}/references/originals/{b['id']}.url-stub.txt"
-    )
+    assert await s3.head_object(f"drafts/{draft_id}/references/extracted/{b['id']}.md")
+    assert await s3.head_object(f"drafts/{draft_id}/references/originals/{b['id']}.url-stub.txt")

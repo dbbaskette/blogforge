@@ -8,6 +8,7 @@ Sizes are bounded by ``EXTRACTED_CHAR_CAP`` (200k). Anything longer is
 truncated with a trailing ``[truncated]`` marker so the LLM can tell it
 didn't see the full document.
 """
+
 from __future__ import annotations
 
 import asyncio

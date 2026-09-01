@@ -9,14 +9,12 @@ def test_prompt_renders_rules_for_reword_suggestions() -> None:
         "Because: These terms conflict with the author's established voice"
     ) in prompt
     assert (
-        "Rule: Do not use em dashes.\n"
-        "Because: This text will be read by a text-to-speech engine"
+        "Rule: Do not use em dashes.\nBecause: This text will be read by a text-to-speech engine"
     ) in prompt
     assert "Rule: Return JSON matching the suggestions schema." in prompt
     assert "Because: Downstream code parses this response" in prompt
     assert (
-        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into "
-        "suggestions."
+        "Rule: Do not copy the `Rule` or `Because` labels or their rationales into suggestions."
     ) in prompt
 
 

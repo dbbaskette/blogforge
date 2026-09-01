@@ -1,4 +1,5 @@
 """Deterministic checks for the 2026 lever additions."""
+
 from uuid import uuid4
 
 from blogforge.drafts.models import Draft, IdeaInput, Section
@@ -317,9 +318,7 @@ async def test_generate_citation_prompt_renders_bounded_preservation_and_output_
     tmp_path,  # type: ignore[no-untyped-def]
 ) -> None:
     quote = "Deployments complete in twelve minutes."
-    provider = _PromptRecorder(
-        'Acme reports, "Deployments complete in twelve minutes."'
-    )
+    provider = _PromptRecorder('Acme reports, "Deployments complete in twelve minutes."')
 
     await generate_citation(
         "Deployments are fast.",
@@ -375,10 +374,12 @@ async def test_generate_citation_prompt_renders_bounded_preservation_and_output_
 
 def test_answer_capsule_detects_capsule() -> None:
     # ~50-word link-free opening paragraph mentioning the title entity.
-    opener = ("BlogForge is a drafting tool that writes long-form posts in your own "
-              "voice. It researches a topic, plans one coherent outline, composes the "
-              "whole draft in a single pass, and then strips the telltale phrases that "
-              "make text read as machine-written, before you edit.")
+    opener = (
+        "BlogForge is a drafting tool that writes long-form posts in your own "
+        "voice. It researches a topic, plans one coherent outline, composes the "
+        "whole draft in a single pass, and then strips the telltale phrases that "
+        "make text read as machine-written, before you edit."
+    )
     d = make_draft(title="BlogForge review", first_para=opener)
     res = score_structural(d)
     assert res["answer_capsule"]["score"] >= 80
@@ -392,8 +393,10 @@ def test_answer_capsule_flags_missing_capsule() -> None:
 
 
 def test_definitive_language_penalizes_hedges() -> None:
-    hedgy = ("It might be possible that this could perhaps work. Some believe it "
-             "may help. It seems the results could arguably vary somewhat.")
+    hedgy = (
+        "It might be possible that this could perhaps work. Some believe it "
+        "may help. It seems the results could arguably vary somewhat."
+    )
     d = make_draft(body=hedgy)
     res = score_structural(d)
     assert res["definitive_language"]["score"] <= 40
@@ -414,8 +417,10 @@ def test_definitive_language_ignores_dated_attribution_month_may() -> None:
     assert res["score"] >= 80
     assert not res["findings"]
 
-    hedgy = ("It might be possible that this could perhaps work. Some believe it "
-             "may help. It seems the results could arguably vary somewhat.")
+    hedgy = (
+        "It might be possible that this could perhaps work. Some believe it "
+        "may help. It seems the results could arguably vary somewhat."
+    )
     d2 = make_draft(body=hedgy)
     res2 = score_structural(d2)["definitive_language"]
     assert res2["score"] <= 40

@@ -1,4 +1,5 @@
 """POST /api/drafts/{id}/claims — fact-check the draft against its references."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -36,9 +37,7 @@ async def claims(
     reference_context = await get_reference_context(draft.id, draft.references)
     provider = await build_provider_for(current.id, draft.idea.provider)
     try:
-        results = await check_claims(
-            md, reference_context, provider, model=draft.idea.model
-        )
+        results = await check_claims(md, reference_context, provider, model=draft.idea.model)
     except (ProviderMissingKey, ProviderError) as e:
         raise HTTPException(
             502, detail={"error": {"code": e.code, "message": e.message, "hint": e.hint}}

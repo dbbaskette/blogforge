@@ -2,6 +2,7 @@
 per-rule style linter can't see — modeled on a real draft where the intro
 was pasted into section one and "paved road" / "Avengers-level threat"
 recurred across sections."""
+
 from blogforge.drafts.models import Draft, IdeaInput, OutlineProposal, Section
 from blogforge.drafts.repetition import analyze_repetition
 
@@ -92,17 +93,23 @@ def test_clean_draft_has_no_findings():
             Section(
                 id="s1",
                 title="Problem",
-                content_md="Vendors quietly route private recordings through servers nobody vetted.",
+                content_md=(
+                    "Vendors quietly route private recordings through servers nobody vetted."
+                ),
             ),
             Section(
                 id="s2",
                 title="Mechanism",
-                content_md="A small daemon indexes files on disk so nothing ever leaves the laptop.",
+                content_md=(
+                    "A small daemon indexes files on disk so nothing ever leaves the laptop."
+                ),
             ),
             Section(
                 id="s3",
                 title="Payoff",
-                content_md="You keep ownership, latency drops, and the subscription bill disappears.",
+                content_md=(
+                    "You keep ownership, latency drops, and the subscription bill disappears."
+                ),
             ),
         ],
     )

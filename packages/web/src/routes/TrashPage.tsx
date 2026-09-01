@@ -33,7 +33,15 @@ export function TrashPage(): JSX.Element {
   };
 
   const onHardDelete = async (id: string): Promise<void> => {
-    if (!(await confirm({ title: "Delete this draft forever?", message: "This cannot be undone.", confirmLabel: "Delete forever", danger: true }))) return;
+    if (
+      !(await confirm({
+        title: "Delete this draft forever?",
+        message: "This cannot be undone.",
+        confirmLabel: "Delete forever",
+        danger: true,
+      }))
+    )
+      return;
     setBusyId(id);
     setError(null);
     try {

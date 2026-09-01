@@ -186,6 +186,7 @@ class DraftSummary(BaseModel):
     title: str
     stage: DraftStage
     pack_slug: str
+    created_at: UtcDatetime
     updated_at: UtcDatetime
     word_count: int
     tags: list[str] = Field(default_factory=list)

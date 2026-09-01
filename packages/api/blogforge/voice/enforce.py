@@ -16,12 +16,14 @@ Em/en dashes and ASCII ``--`` are treated as universal AI tells and enforced
 unconditionally (the whole point of the tool); banished words come from the
 active voice's manifest (universal AI-tell lists + the author's own list).
 """
+
 from __future__ import annotations
 
 import logging
 import re
 from dataclasses import dataclass, field
 
+from blogforge.llm.base import LLMProvider
 from blogforge.prompt_rules import (
     PRESERVATION_RATIONALE,
     TTS_RATIONALE,
@@ -53,9 +55,7 @@ class RuleViolations:
 
 def detect_violations(manifest: Manifest, text: str) -> RuleViolations:
     """Deterministically find mechanical-rule violations in ``text``."""
-    banished = sorted({
-        v.match for v in lint(manifest, text) if v.kind in ("word", "phrase")
-    })
+    banished = sorted({v.match for v in lint(manifest, text) if v.kind in ("word", "phrase")})
     return RuleViolations(
         em_dash=bool(re.search(r"[\u2014\u2013]", text)),
         ascii_hyphen=bool(_ASCII_HYPHEN_RE.search(text)),
@@ -75,47 +75,56 @@ def deterministic_backstop(text: str) -> str:
 def build_repair_prompt(text: str, v: RuleViolations) -> str:
     repair_rules: list[PromptRule] = []
     if v.em_dash:
-        repair_rules.append(PromptRule(
-            "Remove every em dash (\N{EM DASH}) and en dash (\N{EN DASH}). Recast "
-            "each sentence with a period, comma, colon, or parentheses. Do not "
-            "swap in another dash.",
-            TTS_RATIONALE,
-        ))
+        repair_rules.append(
+            PromptRule(
+                "Remove every em dash (\N{EM DASH}) and en dash (\N{EN DASH}). Recast "
+                "each sentence with a period, comma, colon, or parentheses. Do not "
+                "swap in another dash.",
+                TTS_RATIONALE,
+            )
+        )
     if v.ascii_hyphen:
-        repair_rules.append(PromptRule(
-            "Remove ASCII double-hyphens (`--`) used as dashes; rephrase.",
-            TTS_RATIONALE,
-        ))
+        repair_rules.append(
+            PromptRule(
+                "Remove ASCII double-hyphens (`--`) used as dashes; rephrase.",
+                TTS_RATIONALE,
+            )
+        )
     if v.banished:
-        repair_rules.append(PromptRule(
-            "Replace these banished words or phrases with plain alternatives: "
-            + ", ".join(f'"{b}"' for b in v.banished)
-            + ".",
-            "These terms conflict with the author's established voice and explicit preferences.",
-        ))
-    repair_rules.extend([
-        PromptRule(
-            "Fix only the listed violations.",
-            "This repair is intentionally bounded to avoid changing approved prose.",
-        ),
-        PromptRule(
-            "Preserve the meaning, structure, ideas, and author's voice.",
-            PRESERVATION_RATIONALE,
-        ),
-        PromptRule(
-            "Do not add commentary or a preamble.",
-            "Downstream code replaces the original passage with this response.",
-        ),
-        PromptRule(
-            "Return only the corrected text.",
-            "Downstream code replaces the original passage with this response.",
-        ),
-        PromptRule(
-            "Do not copy the `Rule` or `Because` labels or their rationales into "
-            "the corrected text.",
-            "Downstream code replaces the original passage with this response.",
-        ),
-    ])
+        repair_rules.append(
+            PromptRule(
+                "Replace these banished words or phrases with plain alternatives: "
+                + ", ".join(f'"{b}"' for b in v.banished)
+                + ".",
+                "These terms conflict with the author's established voice and explicit "
+                "preferences.",
+            )
+        )
+    repair_rules.extend(
+        [
+            PromptRule(
+                "Fix only the listed violations.",
+                "This repair is intentionally bounded to avoid changing approved prose.",
+            ),
+            PromptRule(
+                "Preserve the meaning, structure, ideas, and author's voice.",
+                PRESERVATION_RATIONALE,
+            ),
+            PromptRule(
+                "Do not add commentary or a preamble.",
+                "Downstream code replaces the original passage with this response.",
+            ),
+            PromptRule(
+                "Return only the corrected text.",
+                "Downstream code replaces the original passage with this response.",
+            ),
+            PromptRule(
+                "Do not copy the `Rule` or `Because` labels or their rationales into "
+                "the corrected text.",
+                "Downstream code replaces the original passage with this response.",
+            ),
+        ]
+    )
     return (
         "The text below must follow these constraints but currently breaks them:\n"
         + render_prompt_rules(repair_rules, bullet=True)
@@ -124,7 +133,9 @@ def build_repair_prompt(text: str, v: RuleViolations) -> str:
     )
 
 
-async def enforce_voice_rules(text: str, manifest: Manifest, provider, model: str) -> str:
+async def enforce_voice_rules(
+    text: str, manifest: Manifest, provider: LLMProvider, model: str
+) -> str:
     """Detect rule violations, repair via the model, then deterministically
     backstop the mechanical tells. Returns the (possibly unchanged) text.
 

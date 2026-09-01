@@ -1,4 +1,5 @@
 """Reference library — promote a draft ref, reuse it in another draft."""
+
 from __future__ import annotations
 
 import os

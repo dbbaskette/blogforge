@@ -5,6 +5,7 @@ UTF-16 offsets, which the editor uses to jump to and highlight the flagged
 span. Repetition is cross-section by nature, so each repetition finding is
 anchored to the first section whose prose contains the recycled phrase.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -42,7 +43,6 @@ async def lint_draft(
 
     from blogforge.voice import validate_pack
     from blogforge.voice.lint import detect_positive_hits, lint_to_hits
-
     from blogforge.voice.resolve import resolve_voice
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)

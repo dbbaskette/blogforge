@@ -10,6 +10,7 @@ Revises: 0004_linkedin
 Create Date: 2026-05-28
 
 """
+
 from collections.abc import Sequence
 
 from alembic import op

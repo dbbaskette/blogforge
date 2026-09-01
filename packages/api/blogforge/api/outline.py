@@ -1,16 +1,17 @@
 """POST /api/drafts/{id}/outline — sync outline generation."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from blogforge.voice.compose import ComposeError
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.models import User
 from blogforge.drafts.models import Draft, OutlineProposal
 from blogforge.generate.outline import propose_outline
 from blogforge.generate.references import get_reference_context
-from blogforge.llm.exceptions import ProviderError, ProviderMissingKey
+from blogforge.llm.exceptions import ProviderError
 from blogforge.llm.resolve import build_provider_for
+from blogforge.voice.compose import ComposeError
 from blogforge.voice.resolve import resolve_voice
 
 router = APIRouter(tags=["outline"])
@@ -45,9 +46,7 @@ async def generate_outline(
 
     import yaml
 
-    manifest = (
-        yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
-    )
+    manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
 
     reference_context = await get_reference_context(draft.id, draft.references)
 
@@ -62,9 +61,7 @@ async def generate_outline(
             reference_context=reference_context,
         )
     except ProviderError as e:
-        raise HTTPException(
-            502, detail={"error": {"code": e.code, "message": e.message}}
-        ) from e
+        raise HTTPException(502, detail={"error": {"code": e.code, "message": e.message}}) from e
     except ComposeError as e:
         raise HTTPException(
             422,
@@ -86,10 +83,7 @@ async def generate_outline(
     # Seed sections from outline so Stage 3 already has the section shells
     from blogforge.drafts.models import Section
 
-    draft.sections = [
-        Section(id=s.id, title=s.title, brief=s.brief)
-        for s in proposal.sections
-    ]
+    draft.sections = [Section(id=s.id, title=s.title, brief=s.brief) for s in proposal.sections]
     draft.stage = "outline"
     if not draft.title:
         draft.title = draft.idea.topic

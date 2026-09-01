@@ -1,4 +1,5 @@
 """GET /api/events — global SSE for draft:created/updated/deleted."""
+
 from __future__ import annotations
 
 import asyncio

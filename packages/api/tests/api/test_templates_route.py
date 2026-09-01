@@ -1,4 +1,5 @@
 """CRUD for reusable draft templates."""
+
 from __future__ import annotations
 
 

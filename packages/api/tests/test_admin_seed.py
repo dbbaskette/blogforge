@@ -1,4 +1,5 @@
 """Admin user is seeded once, idempotently."""
+
 from sqlalchemy import select
 
 from blogforge.auth.passwords import verify_password

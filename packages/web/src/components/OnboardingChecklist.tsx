@@ -52,9 +52,7 @@ export function OnboardingChecklist({
             <span
               aria-hidden
               className={`grid place-items-center w-6 h-6 rounded-full text-sm font-medium shrink-0 ${
-                step.done
-                  ? "bg-cobalt-50 text-cobalt-600"
-                  : "border border-rule text-muted bg-card"
+                step.done ? "bg-cobalt-50 text-cobalt-600" : "border border-rule text-muted bg-card"
               }`}
             >
               {step.done ? "✓" : i + 1}

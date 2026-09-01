@@ -3,6 +3,7 @@
 Synchronous (not job-based): inline edits are short fragments, so the request
 blocks on a single provider.complete() call and returns the rewritten text.
 """
+
 from __future__ import annotations
 
 from typing import Literal
@@ -58,9 +59,7 @@ async def inline_edit(
 
     pack_root = await resolve_voice(draft, current.id, pack_store=pack_store)
 
-    manifest = yaml.safe_load(
-        (pack_root / "stylepack.yaml").read_text(encoding="utf-8")
-    ) or {}
+    manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
     provider = await build_provider_for(current.id, draft.idea.provider)
     try:
         result = await transform_text(

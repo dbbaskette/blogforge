@@ -1,4 +1,5 @@
 """recover_stranded_sections — boot-time self-heal of stuck 'generating' rows."""
+
 from sqlalchemy import select
 
 from blogforge.auth.passwords import hash_password
@@ -57,9 +58,9 @@ async def test_recover_stranded_sections(session) -> None:
 
     # Read back at column level (no ORM identity-map staleness after a bulk UPDATE).
     result = await session.execute(
-        select(
-            Section.id, Section.status, Section.content_md, Section.last_error
-        ).where(Section.draft_id == draft.id)
+        select(Section.id, Section.status, Section.content_md, Section.last_error).where(
+            Section.draft_id == draft.id
+        )
     )
     rows = {r.id: r for r in result}
     # content preserved, restored to ready, stale error cleared

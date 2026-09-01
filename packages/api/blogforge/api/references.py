@@ -14,6 +14,7 @@ deletion. Storage layout (per spec §"Storage layout (S3)"):
 Cross-user access silently 404s — never 403 — so the existence of a
 draft owned by another user can't be probed via this surface.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -283,9 +284,7 @@ async def add_file_reference(
     if len(raw) > MAX_RAW_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail={
-                "error": {"code": "file_too_large", "message": "upload exceeds 5 MB"}
-            },
+            detail={"error": {"code": "file_too_large", "message": "upload exceeds 5 MB"}},
         )
     try:
         ext = file_extension_for_kind("file", filename)

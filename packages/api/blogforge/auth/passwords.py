@@ -1,4 +1,5 @@
 """Argon2id password hashing. Defaults are the argon2-cffi v23 defaults."""
+
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerifyMismatchError
 

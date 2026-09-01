@@ -6,6 +6,7 @@ small per-doc header (kind + name). Sources are fetched from S3 in parallel.
 A global character budget keeps the prompt size predictable; when the total
 content would exceed it, each ref is proportionally truncated.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,6 +14,7 @@ import logging
 
 from blogforge.drafts.models import Reference
 from blogforge.s3 import S3Client, S3Error, get_s3_client
+from blogforge.s3.fs import FsStorage
 
 _log = logging.getLogger(__name__)
 
@@ -45,9 +47,7 @@ async def get_reference_context(draft_id: str, refs: list[Reference]) -> str:
     pairs: list[tuple[Reference, str]] = []
     for ref, body in zip(refs, bodies, strict=True):
         if isinstance(body, BaseException):
-            _log.warning(
-                "reference %s body fetch failed; skipping body: %s", ref.id, body
-            )
+            _log.warning("reference %s body fetch failed; skipping body: %s", ref.id, body)
             pairs.append((ref, ""))
         else:
             pairs.append((ref, body))
@@ -60,13 +60,11 @@ async def get_reference_context(draft_id: str, refs: list[Reference]) -> str:
         500,
         (REFERENCE_BUDGET_CHARS - len(pairs) * _PER_REF_HEADER_OVERHEAD) // len(pairs),
     )
-    truncated = [
-        (ref, _truncate(body, per_ref_budget)) for ref, body in pairs
-    ]
+    truncated = [(ref, _truncate(body, per_ref_budget)) for ref, body in pairs]
     return _format(truncated)
 
 
-async def _fetch_one(s3: S3Client, draft_id: str, ref: Reference) -> str:
+async def _fetch_one(s3: S3Client | FsStorage, draft_id: str, ref: Reference) -> str:
     key = f"drafts/{draft_id}/references/extracted/{ref.id}.md"
     try:
         raw = await s3.get_object(key)

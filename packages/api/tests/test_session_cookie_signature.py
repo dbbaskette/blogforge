@@ -1,4 +1,5 @@
 """Cookie signer round-trips data and rejects tampered payloads."""
+
 from uuid import uuid4
 
 from blogforge.auth.sessions import SessionSigner
@@ -29,7 +30,7 @@ def test_tampered_cookie_rejected():
     dot = cookie.index(".")
     pos = dot // 2  # somewhere in the payload
     swap = "a" if cookie[pos] != "a" else "b"
-    tampered = cookie[:pos] + swap + cookie[pos + 1:]
+    tampered = cookie[:pos] + swap + cookie[pos + 1 :]
     assert s.unsign(tampered) is None
 
 

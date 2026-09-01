@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
   type Draft,
@@ -223,10 +223,27 @@ export function DraftPage(): JSX.Element {
     return (
       <div className="max-w-3xl mx-auto px-6 py-10">
         <ErrorNotice error={error} operation="loading your draft" onRetry={loadDraft} />
+        <Link
+          to="/"
+          className="mt-3 inline-block text-xs font-medium text-muted underline underline-offset-2 hover:text-ink"
+        >
+          Back to drafts
+        </Link>
       </div>
     );
   if (!draft || draft.id !== id)
-    return <p className="text-center text-muted text-sm py-16">Loading…</p>;
+    return (
+      <div className="max-w-3xl mx-auto px-6 py-10 animate-fade-in" aria-hidden>
+        <div className="h-4 w-28 rounded bg-rule/50 animate-pulse mb-8" />
+        <div className="h-10 w-2/3 rounded bg-rule/60 animate-pulse mb-3" />
+        <div className="h-10 w-1/2 rounded bg-rule/40 animate-pulse mb-10" />
+        <div className="nb-card p-6 space-y-3">
+          <div className="h-4 w-full rounded bg-rule/40 animate-pulse" />
+          <div className="h-4 w-5/6 rounded bg-rule/30 animate-pulse" />
+          <div className="h-4 w-3/4 rounded bg-rule/30 animate-pulse" />
+        </div>
+      </div>
+    );
 
   return (
     <DraftWorkspace

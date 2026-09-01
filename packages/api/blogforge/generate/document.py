@@ -8,6 +8,7 @@ restating itself. The result is then split back onto the existing Section model
 (by H2 heading) so per-section editing, regenerate, and version history keep
 working unchanged.
 """
+
 from __future__ import annotations
 
 import re

@@ -5,6 +5,7 @@ Revises: 0006_drop_linkedin
 Create Date: 2026-05-28
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

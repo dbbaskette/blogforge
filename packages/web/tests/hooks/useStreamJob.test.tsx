@@ -87,4 +87,53 @@ describe("useStreamJob", () => {
     send(created[0], { type: "weird" });
     expect(onDelta).not.toHaveBeenCalled();
   });
+
+  it("resolves a job that succeeded while disconnected, without reopening", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "succeeded", result: { foo: 42 } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const onResult = vi.fn();
+      const onDone = vi.fn();
+      renderHook(() => useStreamJob("j", { onResult, onDone }));
+      created[0].onerror?.(new Event("error"));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(created.length).toBe(1); // no reconnect — job already done
+      expect(onResult).toHaveBeenCalledWith({ foo: 42 });
+      expect(onDone).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("reconnects with onResync and resumes token delivery", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ status: "running" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const onDelta = vi.fn();
+      const onResync = vi.fn();
+      renderHook(() => useStreamJob("j", { onDelta, onResync }));
+      created[0].onerror?.(new Event("error"));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(created.length).toBe(2);
+      expect(onResync).toHaveBeenCalledTimes(1);
+      send(created[1], { type: "token", delta: "resumed" });
+      expect(onDelta).toHaveBeenCalledWith("resumed");
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
 });

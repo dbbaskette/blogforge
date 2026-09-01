@@ -1,4 +1,5 @@
 """Fernet-based secret cipher round-trips and rejects bad inputs."""
+
 import pytest
 from cryptography.fernet import InvalidToken
 

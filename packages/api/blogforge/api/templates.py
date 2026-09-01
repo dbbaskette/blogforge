@@ -1,4 +1,5 @@
 """CRUD for reusable draft templates. All routes are user-scoped."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -40,9 +41,7 @@ async def create_template_from_draft(
     store: TemplateStore = request.app.state.template_store
     tmpl = await store.create_from_draft(draft_id, user_id=current.id, name=body.name)
     if tmpl is None:
-        raise HTTPException(
-            404, detail={"error": {"code": "draft_not_found", "message": draft_id}}
-        )
+        raise HTTPException(404, detail={"error": {"code": "draft_not_found", "message": draft_id}})
     return tmpl
 
 

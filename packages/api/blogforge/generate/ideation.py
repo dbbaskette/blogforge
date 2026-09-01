@@ -10,6 +10,7 @@ When the author Accepts, the JSON block becomes their `draft.outline` and the
 stage advances. We stream the LLM reply to the FE chunk-by-chunk, then parse
 the JSON block once the stream completes and emit a final result event.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,8 +24,9 @@ from blogforge.generate.formats import resolve_format
 from blogforge.llm.base import LLMProvider
 from blogforge.prompt_rules import PromptRule, render_prompt_rules
 
-IDEATION_SYSTEM_BLOCK = "\n\n".join([
-    """You are helping the author plan a long-form piece in their voice (defined
+IDEATION_SYSTEM_BLOCK = "\n\n".join(
+    [
+        """You are helping the author plan a long-form piece in their voice (defined
 above by ROLE / Humanizer / style guide). You will go back and forth until they
 are happy with the outline.
 
@@ -34,65 +36,74 @@ OutlineProposal JSON schema (context):
 - estimated_words: integer
 
 Reference materials, when present above, are context for facts, examples, and angle.""",
-    render_prompt_rules([
-        PromptRule(
-            "Reply with a short conversational message followed by the proposed outline.",
-            "The author needs both an editor's explanation and a structured plan to react to.",
+        render_prompt_rules(
+            [
+                PromptRule(
+                    "Reply with a short conversational message followed by the proposed outline.",
+                    "The author needs both an editor's explanation and a structured plan "
+                    "to react to.",
+                ),
+                PromptRule(
+                    "Return the outline in a fenced ```json block matching the "
+                    "OutlineProposal schema.",
+                    "The client parses that schema to offer the outline for review and acceptance.",
+                ),
+                PromptRule(
+                    "Describe ONE continuous argument, not a list of standalone essays.",
+                    "The final article must carry one throughline from start to finish.",
+                ),
+                PromptRule(
+                    "Give every section a distinct job that depends on the sections before it.",
+                    "A continuous argument needs progression instead of standalone essays.",
+                ),
+                PromptRule(
+                    "Ensure NO two sections make the same core point or cover the same ground; "
+                    "merge overlap.",
+                    "Overlapping sections create repetitive prose and a weaker outline.",
+                ),
+                PromptRule(
+                    "Explain in every `brief` what the section uniquely contributes and how it "
+                    "builds on the previous one.",
+                    "Section briefs guide later generation and prevent sections from drifting into "
+                    "the same job.",
+                ),
+                PromptRule(
+                    "Use the FEWEST sections that carry the argument without overlap, roughly one "
+                    "per ~400 words.",
+                    "Fewer, meatier sections leave room for distinct ideas instead of "
+                    "thin repetition.",
+                ),
+                PromptRule(
+                    "Do not let section 1 restate the opening_hook.",
+                    "The first section must continue the opening rather than duplicate it.",
+                ),
+                PromptRule(
+                    "Use the author's voice.",
+                    "The accepted outline becomes the source for prose in the author's "
+                    "recognizable voice.",
+                ),
+                PromptRule(
+                    "Never use banished words or phrases.",
+                    "Those terms conflict with the author's established voice and explicit "
+                    "preferences.",
+                ),
+                PromptRule(
+                    "Revise the proposed outline freely in response to the author's feedback.",
+                    "The outline is a collaborative planning artifact until the author accepts it.",
+                ),
+                PromptRule(
+                    "Do not copy the `Rule` or `Because` labels or their rationales into "
+                    "the conversational reply or outline fields.",
+                    "Prompt metadata would pollute the author-facing chat and parsed outline.",
+                ),
+            ]
         ),
-        PromptRule(
-            "Return the outline in a fenced ```json block matching the OutlineProposal schema.",
-            "The client parses that schema to offer the outline for review and acceptance.",
-        ),
-        PromptRule(
-            "Describe ONE continuous argument, not a list of standalone essays.",
-            "The final article must carry one throughline from start to finish.",
-        ),
-        PromptRule(
-            "Give every section a distinct job that depends on the sections before it.",
-            "A continuous argument needs progression instead of standalone essays.",
-        ),
-        PromptRule(
-            "Ensure NO two sections make the same core point or cover the same ground; "
-            "merge overlap.",
-            "Overlapping sections create repetitive prose and a weaker outline.",
-        ),
-        PromptRule(
-            "Explain in every `brief` what the section uniquely contributes and how it "
-            "builds on the previous one.",
-            "Section briefs guide later generation and prevent sections from drifting into "
-            "the same job.",
-        ),
-        PromptRule(
-            "Use the FEWEST sections that carry the argument without overlap, roughly one "
-            "per ~400 words.",
-            "Fewer, meatier sections leave room for distinct ideas instead of thin repetition.",
-        ),
-        PromptRule(
-            "Do not let section 1 restate the opening_hook.",
-            "The first section must continue the opening rather than duplicate it.",
-        ),
-        PromptRule(
-            "Use the author's voice.",
-            "The accepted outline becomes the source for prose in the author's recognizable voice.",
-        ),
-        PromptRule(
-            "Never use banished words or phrases.",
-            "Those terms conflict with the author's established voice and explicit preferences.",
-        ),
-        PromptRule(
-            "Revise the proposed outline freely in response to the author's feedback.",
-            "The outline is a collaborative planning artifact until the author accepts it.",
-        ),
-        PromptRule(
-            "Do not copy the `Rule` or `Because` labels or their rationales into "
-            "the conversational reply or outline fields.",
-            "Prompt metadata would pollute the author-facing chat and parsed outline.",
-        ),
-    ]),
-])
+    ]
+)
 
-INTERVIEW_SYSTEM_BLOCK = "\n\n".join([
-    """You are interviewing the author to draw a long-form piece OUT of them, in
+INTERVIEW_SYSTEM_BLOCK = "\n\n".join(
+    [
+        """You are interviewing the author to draw a long-form piece OUT of them, in
 their voice (defined above by ROLE / Humanizer / style guide). They want you to
 lead: you ask, they answer.
 
@@ -102,67 +113,76 @@ When the interview is complete, the OutlineProposal schema is:
 - estimated_words: integer
 
 Reference materials, when present above, are context for questions, facts, and examples.""",
-    render_prompt_rules([
-        PromptRule(
-            "Ask exactly one focused question per reply.",
-            "One concrete question keeps the interview easy to answer and preserves "
-            "turn-by-turn state.",
+        render_prompt_rules(
+            [
+                PromptRule(
+                    "Ask exactly one focused question per reply.",
+                    "One concrete question keeps the interview easy to answer and preserves "
+                    "turn-by-turn state.",
+                ),
+                PromptRule(
+                    "Keep the question short and concrete.",
+                    "A concise prompt helps the author answer with useful specifics.",
+                ),
+                PromptRule(
+                    "Start broad, then deepen from topic, audience, and urgency into the claim, "
+                    "example, objection, and takeaway.",
+                    "A deliberate sequence uncovers the material needed for a specific, "
+                    "useful outline.",
+                ),
+                PromptRule(
+                    "Build on the author's latest answer like a sharp editor, not a form.",
+                    "Responsive questions uncover the author's actual angle instead of collecting "
+                    "generic answers.",
+                ),
+                PromptRule(
+                    "Do not write the piece or propose an outline while information is "
+                    "still missing.",
+                    "Premature drafting locks in assumptions before the author's intent is known.",
+                ),
+                PromptRule(
+                    "Emit no JSON until announcing that enough information has been gathered.",
+                    "The client treats JSON as the transition from interview mode to "
+                    "outline review.",
+                ),
+                PromptRule(
+                    "After roughly 4-7 exchanges, transition only once you understand the topic, "
+                    "angle, audience, central argument, and one concrete example.",
+                    "The outline needs enough source material to represent the author's intent "
+                    "without over-interviewing them.",
+                ),
+                PromptRule(
+                    "Announce the transition in one line.",
+                    "A short announcement makes the mode change clear before structured output.",
+                ),
+                PromptRule(
+                    "Return a fenced ```json block matching the OutlineProposal schema.",
+                    "The schema gives the client a parseable proposal.",
+                ),
+                PromptRule(
+                    "Make the outline one continuous argument with distinct, "
+                    "non-overlapping sections.",
+                    "The resulting post must progress from one unique contribution to the next.",
+                ),
+                PromptRule(
+                    "Use the author's voice.",
+                    "Both the interview and its proposed outline must remain recognizably "
+                    "authored.",
+                ),
+                PromptRule(
+                    "Never use banished words or phrases.",
+                    "Those terms conflict with the author's established voice and explicit "
+                    "preferences.",
+                ),
+                PromptRule(
+                    "Do not copy the `Rule` or `Because` labels or their rationales into "
+                    "interview replies or outline fields.",
+                    "Prompt metadata would pollute the author-facing interview and parsed outline.",
+                ),
+            ]
         ),
-        PromptRule(
-            "Keep the question short and concrete.",
-            "A concise prompt helps the author answer with useful specifics.",
-        ),
-        PromptRule(
-            "Start broad, then deepen from topic, audience, and urgency into the claim, "
-            "example, objection, and takeaway.",
-            "A deliberate sequence uncovers the material needed for a specific, useful outline.",
-        ),
-        PromptRule(
-            "Build on the author's latest answer like a sharp editor, not a form.",
-            "Responsive questions uncover the author's actual angle instead of collecting "
-            "generic answers.",
-        ),
-        PromptRule(
-            "Do not write the piece or propose an outline while information is still missing.",
-            "Premature drafting locks in assumptions before the author's intent is known.",
-        ),
-        PromptRule(
-            "Emit no JSON until announcing that enough information has been gathered.",
-            "The client treats JSON as the transition from interview mode to outline review.",
-        ),
-        PromptRule(
-            "After roughly 4-7 exchanges, transition only once you understand the topic, "
-            "angle, audience, central argument, and one concrete example.",
-            "The outline needs enough source material to represent the author's intent "
-            "without over-interviewing them.",
-        ),
-        PromptRule(
-            "Announce the transition in one line.",
-            "A short announcement makes the mode change clear before structured output.",
-        ),
-        PromptRule(
-            "Return a fenced ```json block matching the OutlineProposal schema.",
-            "The schema gives the client a parseable proposal.",
-        ),
-        PromptRule(
-            "Make the outline one continuous argument with distinct, non-overlapping sections.",
-            "The resulting post must progress from one unique contribution to the next.",
-        ),
-        PromptRule(
-            "Use the author's voice.",
-            "Both the interview and its proposed outline must remain recognizably authored.",
-        ),
-        PromptRule(
-            "Never use banished words or phrases.",
-            "Those terms conflict with the author's established voice and explicit preferences.",
-        ),
-        PromptRule(
-            "Do not copy the `Rule` or `Because` labels or their rationales into "
-            "interview replies or outline fields.",
-            "Prompt metadata would pollute the author-facing interview and parsed outline.",
-        ),
-    ]),
-])
+    ]
+)
 
 
 def _seed_user_message(draft: Draft) -> str:
@@ -184,9 +204,7 @@ def _seed_user_message(draft: Draft) -> str:
     return "\n".join(parts)
 
 
-def build_ideation_prompt(
-    draft: Draft, *, new_user_content: str, reference_context: str
-) -> str:
+def build_ideation_prompt(draft: Draft, *, new_user_content: str, reference_context: str) -> str:
     """Build the user-side prompt body for the LLM call.
 
     Layout (top to bottom):

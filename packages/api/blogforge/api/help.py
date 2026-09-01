@@ -1,4 +1,5 @@
 """GET /api/help/rules — live rule data for the Help page."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

@@ -7,6 +7,7 @@ from `Settings.session_secret` (default) or a dedicated
 `Settings.key_encryption_secret` later without forcing operators to
 hand-roll a 32-byte base64 string.
 """
+
 from __future__ import annotations
 
 import base64

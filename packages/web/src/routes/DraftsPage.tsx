@@ -7,17 +7,21 @@ import {
   deleteDraft,
   expandSections,
   listDrafts,
+  restoreDraft,
   setDraftTags,
 } from "../api/drafts";
 import { listProviderAvailability } from "../api/providers";
 import { getVoiceProfile } from "../api/voice";
 import { OnboardingChecklist, type OnboardingStep } from "../components/OnboardingChecklist";
+import { WritingStats } from "../components/WritingStats";
 import { DraftHealthBadges } from "../components/draft/DraftHealthBadges";
 import { useConfirm } from "../components/ui/ConfirmDialog";
 import { Icon } from "../components/ui/Icon";
+import { useToast } from "../components/ui/Toast";
 import { useGlobalEvents } from "../hooks/useGlobalEvents";
 
 const ONBOARDING_DISMISSED_KEY = "bf.onboarding.dismissed";
+const CMDK_HINT_KEY = "bf.cmdk.hint.dismissed";
 
 const STAGE_LABEL: Record<DraftSummary["stage"], { label: string; pillClass: string }> = {
   research: { label: "Researching", pillClass: "nb-pill nb-pill-empty" },
@@ -43,6 +47,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 export function DraftsPage(): JSX.Element {
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { toast } = useToast();
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noKeys, setNoKeys] = useState(false);
@@ -53,6 +58,14 @@ export function DraftsPage(): JSX.Element {
   const [onboardingDismissed, setOnboardingDismissed] = useState(
     () => localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1",
   );
+  // One-time tip teaching the command palette shortcut.
+  const [cmdkHintDismissed, setCmdkHintDismissed] = useState(
+    () => localStorage.getItem(CMDK_HINT_KEY) === "1",
+  );
+  const dismissCmdkHint = useCallback(() => {
+    localStorage.setItem(CMDK_HINT_KEY, "1");
+    setCmdkHintDismissed(true);
+  }, []);
 
   // Filters (client-side over the loaded list).
   const [query, setQuery] = useState("");
@@ -97,8 +110,26 @@ export function DraftsPage(): JSX.Element {
       }))
     )
       return;
-    await deleteDraft(id);
-    reload();
+    // Optimistic: drop the row immediately; roll back if the server refuses.
+    const snapshot = drafts;
+    setDrafts((cur) => cur?.filter((d) => d.id !== id) ?? cur);
+    try {
+      await deleteDraft(id);
+      toast("Moved to trash", "success", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            restoreDraft(id)
+              .then(() => reload())
+              .catch((e: unknown) => toast(e instanceof Error ? e.message : String(e), "error"));
+          },
+        },
+      });
+      reload();
+    } catch (e) {
+      setDrafts(snapshot ?? null);
+      toast(e instanceof Error ? e.message : String(e), "error");
+    }
   };
 
   const onTagsChange = useCallback(async (id: string, tags: string[]): Promise<void> => {
@@ -185,6 +216,25 @@ export function DraftsPage(): JSX.Element {
       )}
       {noKeys && <KeysBanner />}
       {error && <ErrorBanner message={error} />}
+
+      {drafts && drafts.length > 0 && <WritingStats drafts={drafts} />}
+
+      {!cmdkHintDismissed && (
+        <div className="mt-4 flex items-center gap-2 text-xs text-muted animate-fade-in">
+          <span>
+            Tip: press{" "}
+            <kbd className="font-mono px-1.5 py-0.5 rounded border border-rule bg-card">⌘K</kbd>{" "}
+            anywhere to search drafts and run actions.
+          </span>
+          <button
+            type="button"
+            onClick={dismissCmdkHint}
+            className="font-medium underline underline-offset-2 hover:no-underline"
+          >
+            Got it
+          </button>
+        </div>
+      )}
 
       <section className="mt-10">
         <div className="flex items-baseline justify-between mb-4">
@@ -282,9 +332,7 @@ export function DraftsPage(): JSX.Element {
           </div>
         )}
 
-        {drafts === null && !error && (
-          <p className="text-center text-muted text-sm py-16">Loading…</p>
-        )}
+        {drafts === null && !error && <ListSkeleton />}
 
         {drafts && drafts.length === 0 && <EmptyState onNew={() => navigate("/compose")} />}
 
@@ -323,6 +371,35 @@ export function DraftsPage(): JSX.Element {
 }
 
 // ────────────────────────────────────────────────────────────────
+// Loading skeleton — mirrors the draft-row shape so the list doesn't jump.
+
+function ListSkeleton(): JSX.Element {
+  return (
+    <div className="space-y-3" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="nb-card flex items-stretch">
+          <div className="pt-5 pl-4 pr-3 space-y-2">
+            <div className="h-4 w-10 rounded bg-rule/60 animate-pulse" />
+            <div className="h-3 w-8 rounded bg-rule/40 animate-pulse" />
+          </div>
+          <div className="flex-1 p-5 space-y-3">
+            <div
+              className="h-5 rounded bg-rule/60 animate-pulse"
+              style={{ width: `${58 - i * 9}%` }}
+            />
+            <div className="flex gap-2">
+              <div className="h-4 w-16 rounded-full bg-rule/40 animate-pulse" />
+              <div className="h-4 w-20 rounded-full bg-rule/40 animate-pulse" />
+              <div className="h-4 w-12 rounded-full bg-rule/30 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────
 // Hero
 
 function Hero({ onNew }: { onNew: () => void }): JSX.Element {
@@ -339,7 +416,12 @@ function Hero({ onNew }: { onNew: () => void }): JSX.Element {
             writing in{" "}
             <span className="relative inline-block italic">
               your voice.
-              <svg className="ink-underline" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+              <svg
+                className="ink-underline"
+                viewBox="0 0 100 8"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
                 <path d="M1,5.5 C 22,7.5 38,2.5 58,4 C 76,5.3 90,3.2 99,4.6" pathLength="120" />
               </svg>
             </span>
@@ -376,6 +458,7 @@ function DraftRow({
   const stage = STAGE_LABEL[draft.stage];
   const updated = formatRelative(draft.updated_at);
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [composing, setComposing] = useState(false);
 
   // Stage-aware quick action: pick the piece back up without a detour through
@@ -390,8 +473,10 @@ function DraftRow({
               setComposing(true);
               try {
                 await expandSections(draft.id);
-              } catch {
-                /* the draft page surfaces compose errors */
+              } catch (e) {
+                // The draft page surfaces job-stream errors; this catches the
+                // kick-off call itself (missing key, provider down…).
+                toast(e instanceof Error ? e.message : String(e), "error");
               } finally {
                 navigate(`/drafts/${draft.id}`);
               }

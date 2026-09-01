@@ -30,7 +30,7 @@ export function ShapePanel({
   onClose: () => void;
   autoRun?: boolean;
 }): JSX.Element {
-  const panelRef = useDialogA11y(true, onClose);
+  const panelRef = useDialogA11y<HTMLDialogElement>(true, onClose);
   const [result, setResult] = useState<SuggestResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,12 +87,11 @@ export function ShapePanel({
   const total = issues.length;
 
   return (
-    <div
+    <dialog
+      open
       ref={panelRef}
-      role="dialog"
-      aria-modal="true"
       aria-label="Shape Assistant"
-      className="fixed right-0 top-0 z-30 h-full w-[440px] max-w-full overflow-y-auto glass-card border-l border-rule shadow-glass-lg animate-slide-in-right"
+      className="fixed right-0 top-0 z-30 h-full w-[440px] max-w-full m-0 p-0 overflow-y-auto glass-card border-l border-rule shadow-glass-lg animate-slide-in-right"
     >
       <header className="px-6 pt-6 pb-4 border-b border-rule glass-bar sticky top-0 z-10">
         <div className="flex items-baseline justify-between">
@@ -175,6 +174,6 @@ export function ShapePanel({
           )}
         </div>
       )}
-    </div>
+    </dialog>
   );
 }

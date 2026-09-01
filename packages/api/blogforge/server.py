@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 
@@ -193,7 +193,7 @@ def create_app() -> FastAPI:
     from blogforge.llm.exceptions import ProviderMissingKey
 
     @app.exception_handler(ProviderMissingKey)
-    async def _missing_provider_key(_request, exc: ProviderMissingKey) -> JSONResponse:
+    async def _missing_provider_key(_request: Request, exc: ProviderMissingKey) -> JSONResponse:
         return JSONResponse(
             status_code=400,
             content={

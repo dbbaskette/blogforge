@@ -1,4 +1,5 @@
 """PATCH /api/drafts/{id}/tags — draft labels for the list view."""
+
 from __future__ import annotations
 
 

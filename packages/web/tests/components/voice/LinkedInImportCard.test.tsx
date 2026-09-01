@@ -9,7 +9,12 @@ vi.mock("../../../src/api/voice", () => ({
     persona_identity: "",
     persona_one_line: "",
     persona_tone: "",
-    rules: { banished_words: [], banished_phrases: [], no_em_dashes: false, no_ascii_double_hyphen: false },
+    rules: {
+      banished_words: [],
+      banished_phrases: [],
+      no_em_dashes: false,
+      no_ascii_double_hyphen: false,
+    },
     distilled_style_md: "",
     distilled_at: null,
     version: 1,
@@ -36,6 +41,9 @@ describe("LinkedInImportCard", () => {
     render(<LinkedInImportCard onImported={vi.fn()} />);
     const link = screen.getByRole("link", { name: /open linkedin data export/i });
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute("href", "https://www.linkedin.com/mypreferences/d/download-my-data");
+    expect(link).toHaveAttribute(
+      "href",
+      "https://www.linkedin.com/mypreferences/d/download-my-data",
+    );
   });
 });

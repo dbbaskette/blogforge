@@ -43,4 +43,4 @@ async def recover_stranded_sections(session: AsyncSession) -> int:
         .values(status="failed", last_error=INTERRUPTED_MESSAGE)
     )
     await session.commit()
-    return (kept.rowcount or 0) + (failed.rowcount or 0)
+    return int(getattr(kept, "rowcount", 0) or 0) + int(getattr(failed, "rowcount", 0) or 0)

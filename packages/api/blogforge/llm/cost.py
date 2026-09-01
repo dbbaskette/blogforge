@@ -1,4 +1,5 @@
 """Token → USD cost calculation. Pure function, table-driven."""
+
 from __future__ import annotations
 
 from blogforge.llm.rates import models_for

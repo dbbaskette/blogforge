@@ -1,4 +1,5 @@
 """GET /api/providers — availability via KeyVault (per-user keys)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,6 +15,7 @@ from blogforge.keys import SUPPORTED_PROVIDERS, KeyVault
 from blogforge.llm.types import TextProvider
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
+
 
 class DefaultProviderBody(BaseModel):
     default_provider: TextProvider
@@ -127,7 +129,5 @@ async def list_models(
             detail={"error": {"code": e.code, "message": e.message, "hint": e.hint}},
         ) from e
     except ProviderError as e:
-        raise HTTPException(
-            502, detail={"error": {"code": e.code, "message": e.message}}
-        ) from e
+        raise HTTPException(502, detail={"error": {"code": e.code, "message": e.message}}) from e
     return [m.model_dump() for m in models]

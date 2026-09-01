@@ -1,4 +1,5 @@
 """KeyVault stores per-user provider keys, encrypted at rest."""
+
 import pytest
 import pytest_asyncio
 

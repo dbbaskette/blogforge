@@ -20,6 +20,7 @@ This module looks at the whole draft at once and flags three things:
 Findings are dicts shaped like myvoice lint items ({rule, message, text})
 so they render in the existing Proofreader panel with no UI special-casing.
 """
+
 from __future__ import annotations
 
 import re
@@ -148,9 +149,7 @@ def _detect_repeated_phrases(blocks: list[_Block], covered: list[str]) -> list[F
     #    that genuinely span ≥2 sections.
     scored: list[tuple[tuple[str, ...], dict[str, int]]] = []
     for gram in candidates:
-        per_block = {
-            b.label: c for b in blocks if (c := _count_occurrences(b.tokens, gram))
-        }
+        per_block = {b.label: c for b in blocks if (c := _count_occurrences(b.tokens, gram))}
         if len(per_block) >= 2:
             scored.append((gram, per_block))
 
@@ -173,7 +172,9 @@ def _detect_repeated_phrases(blocks: list[_Block], covered: list[str]) -> list[F
         findings.append(
             Finding(
                 rule="repeated-phrase",
-                message=f'"{shown}" appears {total}× across {len(per_block)} sections ({where}).',
+                message=(
+                    f'"{shown}" appears {total} times across {len(per_block)} sections ({where}).'
+                ),
                 text=shown,
             )
         )
@@ -267,8 +268,6 @@ def analyze_repetition(draft: Draft) -> list[dict[str, object]]:
         return []
     dup_findings, covered = _detect_duplicate_paragraphs(blocks)
     findings = (
-        dup_findings
-        + _detect_echoed_openers(blocks)
-        + _detect_repeated_phrases(blocks, covered)
+        dup_findings + _detect_echoed_openers(blocks) + _detect_repeated_phrases(blocks, covered)
     )
     return [f.as_dict() for f in findings]

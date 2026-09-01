@@ -1,4 +1,5 @@
 """POST /ideation/message → streaming job → message persisted; /accept; GET history."""
+
 from __future__ import annotations
 
 import asyncio
@@ -77,11 +78,13 @@ def _stub_llm(monkeypatch):
         deltas = [
             "Here's an outline:\n\n",
             "```json\n",
-            json.dumps({
-                "opening_hook": "h",
-                "sections": [{"id": "01", "title": "T", "brief": "b"}],
-                "estimated_words": 800,
-            }),
+            json.dumps(
+                {
+                    "opening_hook": "h",
+                    "sections": [{"id": "01", "title": "T", "brief": "b"}],
+                    "estimated_words": 800,
+                }
+            ),
             "\n```\n",
         ]
         for d in deltas:
@@ -97,12 +100,8 @@ def _stub_llm(monkeypatch):
     async def _fake_get_key(self, provider: str) -> str:
         return "sk-stub"
 
-    monkeypatch.setattr(
-        "blogforge.api.ideation.stream_ideation", _fake_stream_ideation
-    )
-    monkeypatch.setattr(
-        "blogforge.keys.vault.KeyVault.get", _fake_get_key
-    )
+    monkeypatch.setattr("blogforge.api.ideation.stream_ideation", _fake_stream_ideation)
+    monkeypatch.setattr("blogforge.keys.vault.KeyVault.get", _fake_get_key)
 
 
 # ── tests ───────────────────────────────────────────────────────────
@@ -144,9 +143,7 @@ async def test_accept_copies_outline_and_advances_stage(signed_admin_client):
     client, draft_id = signed_admin_client
 
     # Send a message, wait for completion.
-    r = client.post(
-        f"/api/drafts/{draft_id}/ideation/message", json={"content": "go"}
-    )
+    r = client.post(f"/api/drafts/{draft_id}/ideation/message", json={"content": "go"})
     job_id = r.json()["job_id"]
     for _ in range(50):
         j = client.get(f"/api/jobs/{job_id}").json()
@@ -234,15 +231,11 @@ async def test_cross_user_404(signed_admin_client):
     )
 
     # Our `client` (signed in as ideation@x.com) shouldn't see other's draft.
-    assert (
-        client.get(f"/api/drafts/{other_draft.id}/ideation").status_code == 404
-    )
+    assert client.get(f"/api/drafts/{other_draft.id}/ideation").status_code == 404
     assert (
         client.post(
             f"/api/drafts/{other_draft.id}/ideation/message", json={"content": "x"}
         ).status_code
         == 404
     )
-    assert (
-        client.post(f"/api/drafts/{other_draft.id}/ideation/accept").status_code == 404
-    )
+    assert client.post(f"/api/drafts/{other_draft.id}/ideation/accept").status_code == 404

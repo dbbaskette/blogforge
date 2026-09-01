@@ -9,6 +9,7 @@ Revises: 0005_section_composite_pk
 Create Date: 2026-05-28
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa

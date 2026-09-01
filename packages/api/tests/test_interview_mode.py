@@ -1,4 +1,5 @@
 """Interview mode selects the interview system block in stream_ideation."""
+
 from blogforge.drafts.models import Draft, IdeaInput
 from blogforge.generate.ideation import stream_ideation
 

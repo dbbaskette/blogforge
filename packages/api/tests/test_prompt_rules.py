@@ -26,8 +26,7 @@ def test_bullet_renderer_keeps_each_reason_with_its_rule() -> None:
         bullet=True,
     )
     assert rendered == (
-        "- Rule: Preserve every quotation.\n"
-        "  Because: The edit must retain the factual record."
+        "- Rule: Preserve every quotation.\n  Because: The edit must retain the factual record."
     )
 
 

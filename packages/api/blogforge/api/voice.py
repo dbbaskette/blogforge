@@ -18,21 +18,33 @@ Routes:
   GET  /api/voice/sources                   → list[VoiceSource]
   DELETE /api/voice/sources/{source_id}     → 204
 """
+
 from __future__ import annotations
 
 import logging
 import re
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from blogforge.auth.dependencies import get_current_user
 from blogforge.db.engine import get_sessionmaker
 from blogforge.db.models import User
+from blogforge.voice.guide import build_voice_guide
 from blogforge.voice.ingest import add_file_sample, add_text_sample, add_url_sample, add_url_source
 from blogforge.voice.models import VoiceProfile, VoiceRules, VoiceSample, VoiceSource
-from blogforge.voice.guide import build_voice_guide
 from blogforge.voice.pack import export_zip, materialize
 from blogforge.voice.store import SqlVoiceStore
 
@@ -80,6 +92,7 @@ class _DistillBody(BaseModel):
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
+
 
 def _store(request: Request) -> SqlVoiceStore:
     store: SqlVoiceStore = request.app.state.voice_store
@@ -282,20 +295,19 @@ def _default_model(provider_name: str) -> str:
     default, which the GenAI gateway doesn't serve and would 404 on)."""
     if provider_name == "tanzu":
         from blogforge.config import get_settings
+
         models = get_settings().tanzu_models
         return models[0] if models else "openai/gpt-oss-120b"
     return _PROVIDER_DEFAULTS.get(provider_name, "claude-sonnet-4-6")
 
 
-async def _auto_select_provider(user_id) -> str | None:
+async def _auto_select_provider(user_id: UUID) -> str | None:
     from blogforge.config import get_settings
     from blogforge.keys import KeyVault
     from blogforge.llm.claude_cli import claude_available
 
     async with get_sessionmaker()() as session:
-        preferred = await session.scalar(
-            select(User.default_provider).where(User.id == user_id)
-        )
+        preferred = await session.scalar(select(User.default_provider).where(User.id == user_id))
     if preferred:
         return preferred
 
@@ -339,7 +351,9 @@ async def distill(
                 "error": {
                     "code": "provider_missing_key",
                     "message": "No API key or CLI subscription provider is configured.",
-                    "hint": "Configure a CLI subscription or add an API key in Settings → Providers.",
+                    "hint": (
+                        "Configure a CLI subscription or add an API key in Settings → Providers."
+                    ),
                 }
             },
         )
@@ -381,16 +395,24 @@ async def import_linkedin(
     from blogforge.llm.resolve import build_provider_for
     from blogforge.voice.ingest import add_text_sample
     from blogforge.voice.linkedin_import import (
-        LinkedInImportError, PERSONA_SCHEMA, build_persona_prompt, parse_linkedin_archive, parse_persona,
+        PERSONA_SCHEMA,
+        LinkedInImportError,
+        build_persona_prompt,
+        parse_linkedin_archive,
+        parse_persona,
     )
 
     data = await file.read()
     if len(data) > 10 * 1024 * 1024:
-        raise HTTPException(400, detail={"error": {"code": "file_too_large", "message": "Archive exceeds 10 MB."}})
+        raise HTTPException(
+            400, detail={"error": {"code": "file_too_large", "message": "Archive exceeds 10 MB."}}
+        )
     try:
         parsed = parse_linkedin_archive(data)
     except LinkedInImportError as exc:
-        raise HTTPException(400, detail={"error": {"code": "linkedin_parse_failed", "message": str(exc)}}) from exc
+        raise HTTPException(
+            400, detail={"error": {"code": "linkedin_parse_failed", "message": str(exc)}}
+        ) from exc
 
     store = _store(request)
     provider_name = provider or await _auto_select_provider(current.id)
@@ -400,7 +422,9 @@ async def import_linkedin(
         mdl = model or _default_model(provider_name)
         try:
             resp = await prov.complete(
-                model=mdl, prompt=build_persona_prompt(parsed.headline, parsed.summary), json_schema=PERSONA_SCHEMA
+                model=mdl,
+                prompt=build_persona_prompt(parsed.headline, parsed.summary),
+                json_schema=PERSONA_SCHEMA,
             )
             identity, one_line, tone = parse_persona(resp.text)
         except Exception:
@@ -408,7 +432,9 @@ async def import_linkedin(
     elif parsed.summary:
         identity = parsed.summary.split(". ")[0][:200]
 
-    await store.update_persona(current.id, identity=identity, one_line=one_line or parsed.headline, tone=tone)
+    await store.update_persona(
+        current.id, identity=identity, one_line=one_line or parsed.headline, tone=tone
+    )
     if parsed.summary:
         await add_text_sample(current.id, name="LinkedIn — About", text=parsed.summary)
     for art in parsed.articles[:25]:
@@ -489,7 +515,7 @@ async def audition_voice(
     body: _AuditionBody,
     request: Request,
     current: User = Depends(get_current_user),
-) -> dict:
+) -> dict[str, str]:
     """Rewrite a snippet of text in the user's voice — an instant 'try my voice' demo."""
     import yaml
 
@@ -505,9 +531,13 @@ async def audition_voice(
     if provider_name is None:
         raise HTTPException(
             400,
-            detail={"error": {"code": "provider_missing_key",
-                              "message": "No writing model is available.",
-                              "hint": "Add a provider key in Settings, or use the Tanzu model."}},
+            detail={
+                "error": {
+                    "code": "provider_missing_key",
+                    "message": "No writing model is available.",
+                    "hint": "Add a provider key in Settings, or use the Tanzu model.",
+                }
+            },
         )
     prov = await build_provider_for(current.id, provider_name)
     mdl = _default_model(provider_name)
@@ -518,7 +548,7 @@ async def audition_voice(
         if s.exemplar and s.s3_key:
             try:
                 sample_texts[s.id] = (await s3.get_object(s.s3_key)).decode("utf-8", "replace")
-            except Exception:  # noqa: BLE001 — skip unreadable samples
+            except Exception:
                 pass
     pack_root = await materialize(profile, sample_texts)
     system = compose_prompt(pack_root)
@@ -553,7 +583,7 @@ _DIM_SCHEMA = {
 async def voice_fingerprint(
     request: Request,
     current: User = Depends(get_current_user),
-) -> dict:
+) -> dict[str, object]:
     """A shareable 'voiceprint': tonal dimensions (LLM-scored) + deterministic
     rhythm / signature phrases / vocabulary from the user's samples."""
     from blogforge.s3 import get_s3_client
@@ -568,7 +598,7 @@ async def voice_fingerprint(
         if s.s3_key:
             try:
                 texts.append((await s3.get_object(s.s3_key)).decode("utf-8", "replace"))
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
     stats = compute_stats(texts)
     n_samples = sum(1 for t in texts if t.strip())
@@ -578,13 +608,14 @@ async def voice_fingerprint(
         n_samples * 12 + n_exemplar * 6 + (40 if profile.distilled_style_md.strip() else 0),
     )
 
-    dimensions: dict | None = None
+    dimensions: dict[str, int] | None = None
     provider_name = await _auto_select_provider(current.id)
     if provider_name and stats["word_count"] >= 60:
         try:
             import json
 
             from blogforge.llm.resolve import build_provider_for
+
             prov = await build_provider_for(current.id, provider_name)
             sample = "\n\n".join(texts)[:6000]
             prompt = (
@@ -603,7 +634,7 @@ async def voice_fingerprint(
             )
             raw = json.loads(resp.text)
             dimensions = {k: max(0, min(100, int(raw.get(k, 50)))) for k in _DIMENSIONS}
-        except Exception as exc:  # noqa: BLE001 — dimensions are best-effort
+        except Exception as exc:
             logger.warning("fingerprint dimensions failed: %r", exc)
             dimensions = None
 

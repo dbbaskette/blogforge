@@ -129,10 +129,7 @@ export function SectionVersionHistory({
           {versions.map((v) => {
             const diffOpen = openDiffId === v.id;
             return (
-              <li
-                key={v.id}
-                className="rounded-nb-sm bg-card px-3 py-2 border border-rule"
-              >
+              <li key={v.id} className="rounded-nb-sm bg-card px-3 py-2 border border-rule">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-xs">

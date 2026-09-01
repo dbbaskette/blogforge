@@ -1,4 +1,5 @@
 """Anthropic Messages API adapter — uses httpx directly (not the SDK) for simpler streaming."""
+
 from __future__ import annotations
 
 import json
@@ -39,14 +40,16 @@ class AnthropicProvider:
         result: list[ModelInfo] = []
         for m in r.json().get("data", []):
             rate = rates.get(m["id"])
-            result.append(ModelInfo(
-                id=m["id"],
-                label=(rate["label"] if rate else None) or m.get("display_name") or m["id"],
-                context_window=int(rate["context_window"] if rate else 200_000),
-                supports_streaming=bool(rate["supports_streaming"] if rate else True),
-                input_per_million_usd=float(rate["input_per_million_usd"]) if rate else None,
-                output_per_million_usd=float(rate["output_per_million_usd"]) if rate else None,
-            ))
+            result.append(
+                ModelInfo(
+                    id=m["id"],
+                    label=(rate["label"] if rate else None) or m.get("display_name") or m["id"],
+                    context_window=int(rate["context_window"] if rate else 200_000),
+                    supports_streaming=bool(rate["supports_streaming"] if rate else True),
+                    input_per_million_usd=float(rate["input_per_million_usd"]) if rate else None,
+                    output_per_million_usd=float(rate["output_per_million_usd"]) if rate else None,
+                )
+            )
         return result
 
     async def complete(
@@ -68,9 +71,7 @@ class AnthropicProvider:
             "messages": [{"role": "user", "content": prompt}],
         }
         if json_schema is not None:
-            body["tools"] = [
-                {"name": "record_analysis", "input_schema": json_schema}
-            ]
+            body["tools"] = [{"name": "record_analysis", "input_schema": json_schema}]
             body["tool_choice"] = {"type": "tool", "name": "record_analysis"}
         async with httpx.AsyncClient(timeout=120.0) as client:
             r = await client.post(f"{_BASE_URL}/messages", headers=self._headers, json=body)
@@ -86,8 +87,11 @@ class AnthropicProvider:
                 b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"
             )
             return LLMResponse(
-                text=text, input_tokens=in_tok, output_tokens=out_tok,
-                model=data.get("model", model), finish_reason=finish,
+                text=text,
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                model=data.get("model", model),
+                finish_reason=finish,
             )
 
         # Structured-output path: extract tool_use input
@@ -103,15 +107,20 @@ class AnthropicProvider:
                     "You MUST call the tool with valid arguments matching the schema."
                 )
                 return await self._complete_with_retry(
-                    model=model, prompt=prompt + hint, json_schema=json_schema, attempt=1,
+                    model=model,
+                    prompt=prompt + hint,
+                    json_schema=json_schema,
+                    attempt=1,
                 )
             raise ProviderError(
                 "Anthropic did not emit tool_use after retry.",
             )._with_code("analyze_invalid_json")
         return LLMResponse(
             text=json.dumps(tool_block.get("input", {})),
-            input_tokens=in_tok, output_tokens=out_tok,
-            model=data.get("model", model), finish_reason=finish,
+            input_tokens=in_tok,
+            output_tokens=out_tok,
+            model=data.get("model", model),
+            finish_reason=finish,
         )
 
     async def stream(self, *, model: str, prompt: str) -> AsyncIterator[StreamChunk]:

@@ -31,8 +31,6 @@ describe("ProviderKeysCard", () => {
 
   it("renders the Google hero-images note", async () => {
     render(<ProviderKeysCard />);
-    await waitFor(() =>
-      expect(screen.getByText(/Required for hero images/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Required for hero images/i)).toBeInTheDocument());
   });
 });

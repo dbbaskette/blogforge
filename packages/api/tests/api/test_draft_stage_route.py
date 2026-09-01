@@ -1,4 +1,5 @@
 """POST /api/drafts/{id}/stage — rework navigation (go back to research)."""
+
 from __future__ import annotations
 
 
@@ -15,8 +16,12 @@ def _advance_to_sections(client) -> str:
     }
     created["sections"] = [
         {
-            "id": "s1", "title": "First", "brief": "",
-            "content_md": "Written prose.", "status": "ready", "word_count": 2,
+            "id": "s1",
+            "title": "First",
+            "brief": "",
+            "content_md": "Written prose.",
+            "status": "ready",
+            "word_count": 2,
         },
     ]
     created["stage"] = "sections"

@@ -6,6 +6,7 @@ carries `formats: []`. Composing with an unknown format raises deep in myvoice
 (HTTP 422). Generation should instead fall back to no named format: write in the
 voice without the format-specific block, rather than fail.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,9 +23,5 @@ def resolve_format(pack_root: Path, requested: str | None) -> str | None:
         manifest = yaml.safe_load((pack_root / "stylepack.yaml").read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         return None
-    names = {
-        f.get("name")
-        for f in (manifest.get("formats") or [])
-        if isinstance(f, dict)
-    }
+    names = {f.get("name") for f in (manifest.get("formats") or []) if isinstance(f, dict)}
     return requested if requested in names else None

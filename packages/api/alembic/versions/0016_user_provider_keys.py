@@ -1,6 +1,7 @@
 """user_provider_keys — per-user keys; migrate global keys to the admin user."""
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0016_user_provider_keys"
 down_revision = "0015_github_identity"
@@ -11,7 +12,9 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "user_provider_keys",
-        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+        sa.Column(
+            "user_id", sa.Uuid(), sa.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        ),
         sa.Column("provider", sa.String(length=32), primary_key=True),
         sa.Column("encrypted_key", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
@@ -35,6 +38,8 @@ def downgrade() -> None:
         sa.Column("encrypted_key", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("updated_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "updated_by", sa.Uuid(), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        ),
     )
     op.drop_table("user_provider_keys")

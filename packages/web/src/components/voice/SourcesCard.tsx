@@ -73,7 +73,14 @@ function SourceRow({ source, onRefresh }: SourceRowProps): JSX.Element {
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async (): Promise<void> => {
-    if (!(await confirm({ title: `Delete source "${source.name || source.url}"?`, confirmLabel: "Delete", danger: true }))) return;
+    if (
+      !(await confirm({
+        title: `Delete source "${source.name || source.url}"?`,
+        confirmLabel: "Delete",
+        danger: true,
+      }))
+    )
+      return;
     setDeleting(true);
     try {
       await deleteSource(source.id);

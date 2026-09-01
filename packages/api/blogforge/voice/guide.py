@@ -1,4 +1,5 @@
 """Render a VoiceProfile as a portable Markdown 'voice guide' for external LLMs."""
+
 from __future__ import annotations
 
 from blogforge.prompt_rules import PromptRule, render_prompt_rules
@@ -16,25 +17,30 @@ _PREAMBLE = (
 def build_voice_guide(profile: VoiceProfile) -> str:
     ai = load_ai_tells()
     parts: list[str] = [f"# {profile.name or 'My Voice'} — Writing Voice Guide", _PREAMBLE]
-    parts.append(render_prompt_rules([
-        PromptRule(
-            "Follow this voice guide when writing for me.",
-            "It records the author's established voice and writing preferences.",
-        ),
-        PromptRule(
-            "Match the persona and style described below.",
-            "The persona and style define the author's recognizable voice.",
-        ),
-        PromptRule(
-            "Do not use the words, phrases, or patterns under `Avoid these AI-writing tells.`",
-            "These are recurrent style defects that make prose sound machine-generated.",
-        ),
-        PromptRule(
-            "Do not copy the `Rule:` and `Because:` labels or their rationales into "
-            "article output.",
-            "They are instructions for the writing process, not content for the article.",
+    parts.append(
+        render_prompt_rules(
+            [
+                PromptRule(
+                    "Follow this voice guide when writing for me.",
+                    "It records the author's established voice and writing preferences.",
+                ),
+                PromptRule(
+                    "Match the persona and style described below.",
+                    "The persona and style define the author's recognizable voice.",
+                ),
+                PromptRule(
+                    "Do not use the words, phrases, or patterns under "
+                    "`Avoid these AI-writing tells.`",
+                    "These are recurrent style defects that make prose sound machine-generated.",
+                ),
+                PromptRule(
+                    "Do not copy the `Rule:` and `Because:` labels or their rationales into "
+                    "article output.",
+                    "They are instructions for the writing process, not content for the article.",
+                ),
+            ]
         )
-    ]))
+    )
 
     persona: list[str] = []
     if profile.persona_identity.strip():
@@ -48,45 +54,55 @@ def build_voice_guide(profile: VoiceProfile) -> str:
 
     style = profile.distilled_style_md.strip()
     parts.append(
-        "## My style\n\n" + style if style
+        "## My style\n\n" + style
+        if style
         else "## My style\n\n*(Not yet distilled — run distillation on the Voice "
-             "screen to capture your style.)*"
+        "screen to capture your style.)*"
     )
 
     words = [w for w in profile.rules.banished_words if w.strip()]
     phrases = [p for p in profile.rules.banished_phrases if p.strip()]
     if words or phrases:
         b = ["## My banished words & phrases"]
-        b.append(render_prompt_rules([
-            PromptRule(
-                "Do not use the following words and phrases in my writing.",
-                "They conflict with the author's established voice and explicit preferences.",
+        b.append(
+            render_prompt_rules(
+                [
+                    PromptRule(
+                        "Do not use the following words and phrases in my writing.",
+                        "They conflict with the author's established voice and explicit "
+                        "preferences.",
+                    )
+                ]
             )
-        ]))
+        )
         if words:
             b.append(f"Words: {', '.join(words)}")
         if phrases:
             b.append(f"Phrases: {', '.join(phrases)}")
         parts.append("\n".join(b))
 
-    ai_rules = render_prompt_rules([
-        PromptRule(
-            "Do not use any item in the universal AI-tell word list.",
-            "These words are recurrent style defects that make prose sound machine-generated.",
-        ),
-        PromptRule(
-            "Do not use any item in the universal AI-tell phrase list.",
-            "These phrases are recurrent style defects that make prose sound machine-generated.",
-        ),
-        PromptRule(
-            "Do not begin sentences with any item in the universal AI-tell opener list.",
-            "Repeated stock openers are a recognizable AI-writing tell.",
-        ),
-        PromptRule(
-            "Avoid each structural pattern listed below.",
-            "These patterns are recurrent style defects that make prose sound machine-generated.",
-        ),
-    ])
+    ai_rules = render_prompt_rules(
+        [
+            PromptRule(
+                "Do not use any item in the universal AI-tell word list.",
+                "These words are recurrent style defects that make prose sound machine-generated.",
+            ),
+            PromptRule(
+                "Do not use any item in the universal AI-tell phrase list.",
+                "These phrases are recurrent style defects that make prose sound "
+                "machine-generated.",
+            ),
+            PromptRule(
+                "Do not begin sentences with any item in the universal AI-tell opener list.",
+                "Repeated stock openers are a recognizable AI-writing tell.",
+            ),
+            PromptRule(
+                "Avoid each structural pattern listed below.",
+                "These patterns are recurrent style defects that make prose sound "
+                "machine-generated.",
+            ),
+        ]
+    )
     parts.append(
         "## Avoid these AI-writing tells\n\n"
         f"{ai_rules}\n\n"

@@ -21,7 +21,7 @@ const WORDS_PER_MINUTE = 200;
  * article. Read-only; the editor lives elsewhere.
  */
 export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Element {
-  const overlayRef = useDialogA11y(true, onClose);
+  const overlayRef = useDialogA11y<HTMLDialogElement>(true, onClose);
 
   // Only sections with real prose make it into the published view.
   const sections = useMemo(
@@ -58,12 +58,11 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
   // `-translate-x-1/2` creates a containing block for fixed descendants),
   // collapsing the full-screen preview into the toolbar's box.
   return createPortal(
-    <div
+    <dialog
+      open
       ref={overlayRef}
-      role="dialog"
-      aria-modal="true"
       aria-label="Reading preview"
-      className="fixed inset-0 z-50 overflow-y-auto bg-canvas animate-fade-in"
+      className="fixed inset-0 z-50 h-full w-full max-h-none max-w-none m-0 p-0 overflow-y-auto bg-canvas animate-fade-in"
     >
       {/* Floating close affordance — stays put while the article scrolls. */}
       <div className="sticky top-0 z-10 flex justify-end px-4 py-3 pointer-events-none">
@@ -120,7 +119,7 @@ export function ReadingPreview({ draft, onClose }: ReadingPreviewProps): JSX.Ele
           </p>
         )}
       </article>
-    </div>,
+    </dialog>,
     document.body,
   );
 }

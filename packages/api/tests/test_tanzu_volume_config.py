@@ -16,14 +16,22 @@ _ENV = (
 
 def _volume_vcap() -> str:
     # CF volume services expose `volume_mounts` as a top-level key on the binding.
-    return json.dumps({
-        "block-storage": [{
-            "name": "blogforge-blobs",
-            "volume_mounts": [
-                {"container_dir": "/var/vcap/data/abc123", "mode": "rw", "device_type": "shared"}
-            ],
-        }]
-    })
+    return json.dumps(
+        {
+            "block-storage": [
+                {
+                    "name": "blogforge-blobs",
+                    "volume_mounts": [
+                        {
+                            "container_dir": "/var/vcap/data/abc123",
+                            "mode": "rw",
+                            "device_type": "shared",
+                        }
+                    ],
+                }
+            ]
+        }
+    )
 
 
 def test_bound_volume_selects_fs_backend_at_mount(monkeypatch) -> None:
@@ -43,14 +51,18 @@ def test_volume_wins_over_object_storage(monkeypatch) -> None:
     for k in _ENV:
         monkeypatch.delenv(k, raising=False)
     both = {
-        "block-storage": [{
-            "name": "blogforge-blobs",
-            "volume_mounts": [{"container_dir": "/vol", "mode": "rw"}],
-        }],
-        "seaweedfs": [{
-            "name": "blogforge-s3",
-            "credentials": {"endpoint_url": "https://s3.example.com"},
-        }],
+        "block-storage": [
+            {
+                "name": "blogforge-blobs",
+                "volume_mounts": [{"container_dir": "/vol", "mode": "rw"}],
+            }
+        ],
+        "seaweedfs": [
+            {
+                "name": "blogforge-s3",
+                "credentials": {"endpoint_url": "https://s3.example.com"},
+            }
+        ],
     }
     monkeypatch.setenv("VCAP_SERVICES", json.dumps(both))
 

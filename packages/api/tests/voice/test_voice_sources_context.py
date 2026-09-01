@@ -1,11 +1,13 @@
-"""Tests for build_background_context — formats ready sources, ignores failed, returns "" when none."""
+"""Tests for build_background_context.
+
+Formats ready sources, ignores failed sources, and returns an empty string when none exist.
+"""
+
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-import pytest
-
 from blogforge.voice.models import VoiceSource
-from blogforge.voice.sources_context import build_background_context, _HEADER
+from blogforge.voice.sources_context import build_background_context
 
 
 def _make_source(

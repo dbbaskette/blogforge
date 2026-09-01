@@ -47,12 +47,14 @@ def discover_packs(roots: list[Path]) -> list[PackInfo]:
                 slug = entry.name
                 name = entry.name
                 version = "?"
-            found.append(PackInfo(
-                slug=slug,
-                name=name,
-                version=version,
-                root_path=entry,
-                valid=result.valid,
-                errors=list(result.errors),
-            ))
+            found.append(
+                PackInfo(
+                    slug=slug,
+                    name=name,
+                    version=version,
+                    root_path=entry,
+                    valid=result.valid,
+                    errors=list(result.errors),
+                )
+            )
     return found

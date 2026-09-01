@@ -106,11 +106,7 @@ async def geo_rescore(
     # Building background context does DB + per-source S3 reads. rescore_geo only
     # consumes extra_sources for semantic levers; a structural-only rescore (which
     # fires after every applied fix) must not pay that cost.
-    bg = (
-        await build_background_context(current.id)
-        if set(body.levers) & _SEMANTIC_KEYS
-        else ""
-    )
+    bg = await build_background_context(current.id) if set(body.levers) & _SEMANTIC_KEYS else ""
     try:
         levers = await rescore_geo(
             draft, body.levers, pack_root, provider, model=draft.idea.model, extra_sources=bg or ""
@@ -137,7 +133,12 @@ async def geo_faq(
     draft, pack_root, manifest, provider = await _load(request, draft_id, current)
     try:
         faqs = await generate_faq(
-            draft, pack_root, manifest, provider, model=draft.idea.model, n=body.n,
+            draft,
+            pack_root,
+            manifest,
+            provider,
+            model=draft.idea.model,
+            n=body.n,
             questions=body.questions or None,
         )
     except (ProviderMissingKey, ProviderError, ComposeError) as e:
@@ -197,9 +198,7 @@ async def geo_quotes(
 
     try:
         extracted = (
-            await get_s3_client().get_object(
-                f"drafts/{draft_id}/references/extracted/{ref.id}.md"
-            )
+            await get_s3_client().get_object(f"drafts/{draft_id}/references/extracted/{ref.id}.md")
         ).decode("utf-8")
     except S3Error as e:
         raise HTTPException(
@@ -241,8 +240,13 @@ async def geo_cite(
         )
     try:
         passage = await generate_citation(
-            body.target, ref.name, ref.url, pack_root, provider,
-            model=draft.idea.model, quote=body.quote,
+            body.target,
+            ref.name,
+            ref.url,
+            pack_root,
+            provider,
+            model=draft.idea.model,
+            quote=body.quote,
         )
     except (ProviderMissingKey, ProviderError, ComposeError) as e:
         raise _provider_error(e) from e
@@ -291,9 +295,7 @@ async def geo_alt(
     """Descriptive alt text for one image, from its section's prose. The client
     splices it into the image markdown's empty alt slot."""
     draft, _pack_root, _manifest, provider = await _load(request, draft_id, current)
-    section_text = next(
-        (s.content_md for s in draft.sections if body.target in s.content_md), ""
-    )
+    section_text = next((s.content_md for s in draft.sections if body.target in s.content_md), "")
     try:
         alt = await generate_alt_text(body.target, section_text, provider, model=draft.idea.model)
     except (ProviderMissingKey, ProviderError, ComposeError) as e:

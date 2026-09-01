@@ -10,6 +10,7 @@ unchanged.
 Requires the API process to run where `claude` is on PATH and authenticated
 (i.e. on the host, not the slim container).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -41,6 +42,8 @@ def _map_model(model: str) -> str:
     if m.lower() in _FALLBACK_MODELS or m.lower().startswith("claude"):
         return m
     return _DEFAULT_MODEL
+
+
 # Tools Claude may use while writing (web search on, per product decision).
 _ALLOWED_TOOLS = ("WebSearch", "WebFetch")
 _TIMEOUT_SECONDS = 600
@@ -174,8 +177,12 @@ class ClaudeCliProvider:
                 for mid, rate in rates.items()
             ]
         return [
-            ModelInfo(id=m, label=f"Claude {m.capitalize()}", context_window=200_000,
-                      supports_streaming=False)
+            ModelInfo(
+                id=m,
+                label=f"Claude {m.capitalize()}",
+                context_window=200_000,
+                supports_streaming=False,
+            )
             for m in _FALLBACK_MODELS
         ]
 
@@ -186,12 +193,17 @@ class ClaudeCliProvider:
                 hint="Run BlogForge on a host where Claude Code is installed and logged in.",
             )
         args = [
-            self._bin, "-p",
-            "--output-format", "json",
+            self._bin,
+            "-p",
+            "--output-format",
+            "json",
             "--no-session-persistence",
-            "--append-system-prompt", _ENGINE_DIRECTIVE,
-            "--model", _map_model(model),
-            "--allowed-tools", *_ALLOWED_TOOLS,
+            "--append-system-prompt",
+            _ENGINE_DIRECTIVE,
+            "--model",
+            _map_model(model),
+            "--allowed-tools",
+            *_ALLOWED_TOOLS,
         ]
         # Run in a throwaway dir so generation never inherits BlogForge's own
         # CLAUDE.md / .claude config (auth still resolves from $HOME).

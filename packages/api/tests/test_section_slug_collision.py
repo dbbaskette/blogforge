@@ -24,9 +24,7 @@ async def user_id():
 
 
 def _idea() -> IdeaInput:
-    return IdeaInput(
-        topic="t", pack_slug="dan", provider="anthropic", model="m", target_words=1000
-    )
+    return IdeaInput(topic="t", pack_slug="dan", provider="anthropic", model="m", target_words=1000)
 
 
 def _outline() -> OutlineProposal:

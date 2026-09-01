@@ -1,4 +1,5 @@
 """POST /api/drafts/{id}/references/text — pasted-content reference."""
+
 from __future__ import annotations
 
 import os
@@ -105,13 +106,9 @@ async def test_post_text_round_trips(authed) -> None:
     ref_id = body["id"]
     s3 = get_s3_client()
     # Original is the raw paste as .txt
-    raw = await s3.get_object(
-        f"drafts/{draft_id}/references/originals/{ref_id}.txt"
-    )
+    raw = await s3.get_object(f"drafts/{draft_id}/references/originals/{ref_id}.txt")
     assert raw.decode("utf-8") == "BlogForge is fun."
-    extracted = await s3.get_object(
-        f"drafts/{draft_id}/references/extracted/{ref_id}.md"
-    )
+    extracted = await s3.get_object(f"drafts/{draft_id}/references/extracted/{ref_id}.md")
     assert extracted.decode("utf-8") == "BlogForge is fun."
 
 

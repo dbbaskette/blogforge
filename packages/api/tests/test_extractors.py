@@ -1,4 +1,5 @@
 """Reference extractors: URL via trafilatura, file (md/txt/pdf), pasted text."""
+
 from __future__ import annotations
 
 import io
@@ -16,6 +17,7 @@ from blogforge.references.extractors import (
 )
 
 # ---------- URL ----------
+
 
 def _fake_fetch_url(html: str):
     return mock.Mock(return_value=html)
@@ -56,9 +58,7 @@ async def test_extract_url_falls_back_to_url_when_title_unavailable() -> None:
 
 
 async def test_extract_url_fetch_failure_raises() -> None:
-    with mock.patch(
-        "blogforge.references.extractors.trafilatura.fetch_url", return_value=None
-    ):
+    with mock.patch("blogforge.references.extractors.trafilatura.fetch_url", return_value=None):
         with pytest.raises(ValueError):
             await extract_url("https://example.com/nope")
 
@@ -76,6 +76,7 @@ async def test_extract_url_truncates_at_cap() -> None:
 
 
 # ---------- file (.md / .txt) ----------
+
 
 def test_extract_file_md_identity() -> None:
     raw = b"# Heading\n\nSome **markdown** body."
@@ -104,6 +105,7 @@ def test_extract_file_truncates_at_cap() -> None:
 
 # ---------- file (.pdf) ----------
 
+
 def _tiny_pdf_bytes() -> bytes:
     """Synthesize a minimal one-page PDF carrying some text via pypdf."""
     from pypdf import PdfWriter
@@ -124,6 +126,7 @@ def test_extract_file_pdf_handles_blank_page() -> None:
 
 
 # ---------- pasted text ----------
+
 
 def test_extract_text_identity() -> None:
     result = extract_text("Field notes", "These are my notes.")

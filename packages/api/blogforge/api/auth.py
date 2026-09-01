@@ -1,4 +1,5 @@
 """Auth endpoints: /logout, /me, /sessions/revoke-all."""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Response, status
@@ -51,9 +52,7 @@ async def revoke_all_sessions(
 ) -> Response:
     """Bump session_version — every existing cookie (including this one)
     stops validating, forcing a fresh login everywhere."""
-    db_user = (
-        await session.execute(select(User).where(User.id == current.id))
-    ).scalar_one()
+    db_user = (await session.execute(select(User).where(User.id == current.id))).scalar_one()
     db_user.session_version += 1
     await session.commit()
     response.delete_cookie(COOKIE_NAME, path="/")

@@ -1,10 +1,12 @@
 """GitHub OAuth HTTP calls (token exchange + identity)."""
+
 from __future__ import annotations
 
 import httpx
 
 from blogforge.auth.github import GithubIdentity
 from blogforge.config import get_settings
+
 _GH = "https://github.com"
 _API = "https://api.github.com"
 
@@ -30,7 +32,7 @@ async def exchange_code(code: str, redirect_uri: str) -> str:
     token = resp.json().get("access_token")
     if not token:
         raise GithubAuthError("GitHub did not return an access token")
-    return token
+    return str(token)
 
 
 async def fetch_identity(token: str) -> GithubIdentity:

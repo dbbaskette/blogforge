@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
@@ -70,7 +72,9 @@ def _github_error(exc: PublishingError) -> HTTPException:
     return HTTPException(status_code=exc.status_code, detail={"error": error})
 
 
-async def _response_for(user_id, settings: PublishingSettings | None) -> PublishingSettingsResponse:
+async def _response_for(
+    user_id: UUID, settings: PublishingSettings | None
+) -> PublishingSettingsResponse:
     token_set = await PublishingTokenVault(user_id).is_set()
     validation = await PublishingSettingsStore().validation(user_id)
     if settings is None:

@@ -70,6 +70,7 @@ export function ModePicker({
         <button
           key={m.id}
           type="button"
+          // biome-ignore lint/a11y/useSemanticElements: these card buttons intentionally implement the WAI-ARIA radio pattern while preserving button activation behavior.
           role="radio"
           aria-checked={active === m.id}
           onClick={() => onPick(m.id)}
@@ -77,7 +78,7 @@ export function ModePicker({
             active === m.id ? "ring-2 ring-cobalt-400" : ""
           }`}
         >
-          <p className="font-semibold text-ink flex items-center gap-2">
+          <span className="font-semibold text-ink flex items-center gap-2">
             <span>
               <span aria-hidden="true">{m.icon}</span> {m.title}
             </span>
@@ -86,8 +87,8 @@ export function ModePicker({
                 {m.badge}
               </span>
             )}
-          </p>
-          <p className="text-sm text-muted mt-1 leading-snug">{m.blurb}</p>
+          </span>
+          <span className="block text-sm text-muted mt-1 leading-snug">{m.blurb}</span>
         </button>
       ))}
     </div>
