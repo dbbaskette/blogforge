@@ -25,6 +25,8 @@
   Because: Fabricated imperfections damage the meaning and credibility of the approved article.
 
 ## soul — De-robot / Soul
+- Rule: Please remove all mannered prose.
+  Because: Affected, ceremonious phrasing makes the prose feel performed instead of preserving the author's natural voice.
 - Rule: Rewrite sentences that sound manufactured, too precise, too constructed, or too eager to please as if telling a friend who already trusts you.
   Because: This retains the writer's intent while removing a templated, model-like surface.
 - Rule: Loosen a line that sounds optimized instead of over-polishing it.

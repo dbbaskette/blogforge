@@ -182,8 +182,10 @@ class _JsonLLM:
 
     def __init__(self, text: str) -> None:
         self._text = text
+        self.last_prompt = ""
 
-    async def complete(self, **_kw):
+    async def complete(self, **kwargs):
+        self.last_prompt = kwargs["prompt"]
         return LLMResponse(
             text=self._text, input_tokens=1, output_tokens=1, model="m", finish_reason="stop"
         )
@@ -212,3 +214,14 @@ async def test_analyze_humanize_light_only_runs_flow_and_soul(tmp_path):
     assert keys == ["flow", "soul"]
     assert report["intensity"] == "light"
     assert report["score"] == 100
+
+
+@pytest.mark.asyncio
+async def test_analyze_humanize_tells_model_to_remove_mannered_prose(tmp_path):
+    provider = _JsonLLM('{"lenses": {"flow": [], "soul": []}}')
+
+    await humanize.analyze_humanize(
+        _draft(), _fake_pack(tmp_path), provider, intensity="light", model="m"
+    )
+
+    assert "Rule: Please remove all mannered prose." in provider.last_prompt
